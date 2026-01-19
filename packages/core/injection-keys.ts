@@ -1,0 +1,4 @@
+export const DANIMAI_DB = "DANIMAI_DB";
+export const DANIMAI_LOGGER = "DANIMAI_LOGGER";
+export const DANIMAI_CONFIG = "DANIMAI_CONFIG";
+export const DANIMAI_CONTEXT = "DANIMAI_CONTEXT";
