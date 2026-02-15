@@ -18,6 +18,7 @@ export interface Database {
   product_variants: ProductVariantTable;
   variant_attribute_values: VariantAttributeValueTable;
   product_variant_option_relations: ProductVariantOptionRelationTable;
+  product_variant_image_relations: ProductVariantImageRelationTable;
 
   product_tags: ProductTagTable;
   product_tag_relations: ProductTagRelationTable;
@@ -25,7 +26,7 @@ export interface Database {
 
 // table products
 export interface ProductTable {
-  id: string;
+  id: Generated<string>;
   title: string;
   handle: string;
   subtitle: string | null;
@@ -47,7 +48,7 @@ export type ProductUpdate = Updateable<ProductTable>;
 
 // table product_attributes
 export interface ProductAttributeTable {
-  id: string;
+  id: Generated<string>;
   title: string;
   type: string;
   metadata: unknown | null;
@@ -61,7 +62,7 @@ export type ProductAttributeUpdate = Updateable<ProductAttributeTable>;
 
 // table product_attribute_values
 export interface ProductAttributeValueTable {
-  id: string;
+  id: Generated<string>;
   value: string;
   attribute_id: string | null;
   product_id: string | null;
@@ -77,7 +78,7 @@ export type ProductAttributeValueUpdate =
 
 // table variant_attribute_values
 export interface VariantAttributeValueTable {
-  id: string;
+  id: Generated<string>;
   value: string;
   attribute_id: string | null;
   variant_id: string | null;
@@ -93,7 +94,7 @@ export type VariantAttributeValueUpdate =
 
 // table product_variants
 export interface ProductVariantTable {
-  id: string;
+  id: Generated<string>;
   title: string;
   sku: string | null;
   barcode: string | null;
@@ -115,24 +116,25 @@ export type ProductVariantUpdate = Updateable<ProductVariantTable>;
 
 // table product_options
 export interface ProductOptionTable {
-  id: string;
+  id: Generated<string>;
   title: string;
   metadata: unknown | null;
-  product_id: string | null;
   created_at: Generated<string>;
   updated_at: Generated<string>;
   deleted_at: string | null;
 }
+
 export type ProductOption = Selectable<ProductOptionTable>;
 export type NewProductOption = Insertable<ProductOptionTable>;
 export type ProductOptionUpdate = Updateable<ProductOptionTable>;
 
 // table product_option_values
 export interface ProductOptionValueTable {
-  id: string;
+  id: Generated<string>;
   value: string;
   metadata: unknown | null;
   option_id: string | null;
+  product_id: string | null;
   created_at: Generated<string>;
   updated_at: Generated<string>;
   deleted_at: string | null;
@@ -143,7 +145,7 @@ export type ProductOptionValueUpdate = Updateable<ProductOptionValueTable>;
 
 // table product_collections
 export interface ProductCollectionTable {
-  id: string;
+  id: Generated<string>;
   title: string;
   handle: string;
   metadata: unknown | null;
@@ -156,11 +158,17 @@ export type NewProductCollection = Insertable<ProductCollectionTable>;
 export type ProductCollectionUpdate = Updateable<ProductCollectionTable>;
 
 // table product_categories
+export type ProductCategoryStatus = "active" | "inactive";
+export type ProductCategoryVisibility = "public" | "private";
+
 export interface ProductCategoryTable {
-  id: string;
+  id: Generated<string>;
   value: string;
+  handle: string;
   metadata: unknown | null;
   parent_id: string | null;
+  status: ProductCategoryStatus;
+  visibility: ProductCategoryVisibility;
   created_at: Generated<string>;
   updated_at: Generated<string>;
   deleted_at: string | null;
@@ -171,7 +179,7 @@ export type ProductCategoryUpdate = Updateable<ProductCategoryTable>;
 
 // table product_tags
 export interface ProductTagTable {
-  id: string;
+  id: Generated<string>;
   value: string;
   metadata: unknown | null;
   created_at: Generated<string>;
@@ -184,7 +192,7 @@ export type ProductTagUpdate = Updateable<ProductTagTable>;
 
 // table product_images
 export interface ProductImageTable {
-  id: string;
+  id: Generated<string>;
   url: string;
   metadata: unknown | null;
   rank: number;
@@ -220,6 +228,18 @@ export type NewProductVariantOptionRelation =
   Insertable<ProductVariantOptionRelationTable>;
 export type ProductVariantOptionRelationUpdate =
   Updateable<ProductVariantOptionRelationTable>;
+
+// table product_variant_image_relations
+export interface ProductVariantImageRelationTable {
+  variant_id: string;
+  image_id: string;
+}
+export type ProductVariantImageRelation =
+  Selectable<ProductVariantImageRelationTable>;
+export type NewProductVariantImageRelation =
+  Insertable<ProductVariantImageRelationTable>;
+export type ProductVariantImageRelationUpdate =
+  Updateable<ProductVariantImageRelationTable>;
 
 // table product_collection_relations
 export interface ProductCollectionRelationTable {

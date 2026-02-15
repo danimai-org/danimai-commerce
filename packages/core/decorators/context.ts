@@ -1,4 +1,4 @@
-import { Inject } from "typedi";
+import { inject } from "inversify";
 import { DANIMAI_CONTEXT } from "../injection-keys";
 
-export const InjectContext = () => Inject(DANIMAI_CONTEXT);
+export const InjectContext = () => inject(DANIMAI_CONTEXT);

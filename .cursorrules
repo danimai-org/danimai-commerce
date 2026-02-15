@@ -1,0 +1,13 @@
+Always complete the task correctly.
+
+Only modify files required for the task.
+Do not scan or analyze the full repository.
+
+If additional files are required to complete the task correctly,
+ASK for confirmation before reading them.
+
+Do not refactor or change code outside the task.
+Do not generate alternative solutions or retries.
+Do not provide explanations unless explicitly asked.
+
+Return final working code only.

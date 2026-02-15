@@ -1,4 +1,4 @@
-import { Inject } from "typedi";
+import { inject } from "inversify";
 import { DANIMAI_LOGGER } from "../injection-keys";
 
-export const InjectLogger = () => Inject(DANIMAI_LOGGER);
+export const InjectLogger = () => inject(DANIMAI_LOGGER);

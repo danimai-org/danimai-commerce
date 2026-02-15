@@ -1,0 +1,83 @@
+import {
+  InjectDB,
+  InjectLogger,
+  Process,
+  ProcessContext,
+  type ProcessContextType,
+  type ProcessContract,
+  type PaginationResponseType,
+  paginationResponse,
+  SortOrder,
+} from "@danimai/core";
+import { Kysely, sql } from "kysely";
+import type { Logger } from "@logtape/logtape";
+import {
+  type PaginatedCustomersProcessInput,
+  PaginatedCustomersSchema,
+} from "./paginated-customers.schema";
+import type { Database, Customer } from "../../db/type";
+
+export const PAGINATED_CUSTOMERS_PROCESS = Symbol("PaginatedCustomers");
+
+@Process(PAGINATED_CUSTOMERS_PROCESS)
+export class PaginatedCustomersProcess
+  implements ProcessContract<PaginationResponseType<Customer>> {
+  constructor(
+    @InjectDB()
+    private readonly db: Kysely<Database>,
+    @InjectLogger()
+    private readonly logger: Logger
+  ) {}
+
+  async runOperations(
+    @ProcessContext({
+      schema: PaginatedCustomersSchema,
+    })
+    context: ProcessContextType<typeof PaginatedCustomersSchema>
+  ) {
+    const { input } = context;
+    const {
+      page = 1,
+      limit = 10,
+      sorting_field = "created_at",
+      sorting_direction = SortOrder.DESC,
+    } = input;
+
+    let query = this.db
+      .selectFrom("customers")
+      .where("deleted_at", "is", null);
+
+    const countResult = await query
+      .select(({ fn }) => fn.count<number>("id").as("count"))
+      .executeTakeFirst();
+
+    const total = Number(countResult?.count ?? 0);
+
+    const sortOrder =
+      sorting_direction === SortOrder.ASC ? "asc" : "desc";
+    const allowedSortFields = [
+      "id",
+      "email",
+      "first_name",
+      "last_name",
+      "created_at",
+      "updated_at",
+    ];
+    const safeSortField = allowedSortFields.includes(sorting_field)
+      ? sorting_field
+      : "created_at";
+    query = query.orderBy(
+      sql.ref(`customers.${safeSortField}`),
+      sortOrder
+    );
+
+    const offset = (page - 1) * limit;
+    const data = await query
+      .selectAll()
+      .limit(limit)
+      .offset(offset)
+      .execute();
+
+    return paginationResponse<Customer>(data, total, input);
+  }
+}
