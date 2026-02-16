@@ -236,12 +236,15 @@
 	let addAttributeId = $state('');
 	let addAttributeValue = $state('');
 
-	function openEditSheet() {
-		if (!product) return;
+	async function openEditSheet() {
+		if (!product || !product.id) {
+			await loadProduct();
+			if (!product || !product.id) return;
+		}
 		editSheetOpen = true;
-		editTitle = product.title;
+		editTitle = product.title ?? '';
 		editSubtitle = product.subtitle ?? '';
-		editHandle = product.handle.startsWith('/') ? product.handle.slice(1) : product.handle;
+		editHandle = product.handle ? (product.handle.startsWith('/') ? product.handle.slice(1) : product.handle) : '';
 		editDescription = product.description ?? '';
 		editStatus = (product.status as 'draft' | 'proposed' | 'published' | 'rejected') || 'draft';
 		editDiscountable = product.discountable !== false;
@@ -337,8 +340,11 @@
 		}
 	}
 
-	function openEditAttributesSheet() {
-		if (!product) return;
+	async function openEditAttributesSheet() {
+		if (!product || !product.id) {
+			await loadProduct();
+			if (!product || !product.id) return;
+		}
 		editAttributesList = (product.attributes ?? []).map((a) => ({
 			attribute_id: a.id,
 			title: a.title,
@@ -444,8 +450,11 @@
 		}
 	}
 
-	function openOrgSheet() {
-		if (!product) return;
+	async function openOrgSheet() {
+		if (!product || !product.id) {
+			await loadProduct();
+			if (!product || !product.id) return;
+		}
 		orgSheetOpen = true;
 		orgCollectionIds = [...(product.collection_ids ?? product.collections?.map((c) => c.id) ?? [])];
 		orgCategoryId = product.category_id ?? '';
@@ -612,9 +621,13 @@
 		editSheetVariantRows = combinations.map((combo) => {
 			const key = combo.join('|');
 			const optionTitle = combo.join(' / ');
-			const existing = editSheetVariantRows.find((r) => r.key === key);
-			if (existing) return existing;
-			const variant = variants.find((v) => v.title === optionTitle);
+			// Try to find matching variant - check both exact match and normalized match
+			const variant = variants.find((v) => {
+				const normalizedVariantTitle = v.title.trim();
+				const normalizedOptionTitle = optionTitle.trim();
+				return normalizedVariantTitle === normalizedOptionTitle || 
+				       normalizedVariantTitle.toLowerCase() === normalizedOptionTitle.toLowerCase();
+			});
 			if (variant) {
 				return {
 					key,
@@ -637,13 +650,52 @@
 		});
 	}
 
-	function openVariantsEditSheet() {
+	async function openVariantsEditSheet() {
+		if (!product || !product.id) {
+			await loadProduct();
+			if (!product || !product.id) return;
+		}
+		await loadOptionsAndVariants();
+		
 		variantsEditSheetOpen = true;
 		variantsEditError = null;
+		
+		// Extract option values from existing variants
+		const optionValuesMap = new Map<string, Set<string>>();
+		options.forEach((opt) => {
+			optionValuesMap.set(opt.id, new Set<string>());
+		});
+		
+		// Extract values from variants
+		if (variants.length > 0) {
+			variants.forEach((variant) => {
+				if (options.length === 1) {
+					// Single option: variant title is the value
+					const optId = options[0].id;
+					const valueSet = optionValuesMap.get(optId);
+					if (valueSet && variant.title.trim()) {
+						valueSet.add(variant.title.trim());
+					}
+				} else if (options.length > 1) {
+					// Multiple options: variant title is "Value1 / Value2 / ..."
+					const parts = variant.title.split('/').map((p) => p.trim()).filter(Boolean);
+					if (parts.length === options.length) {
+						options.forEach((opt, index) => {
+							const valueSet = optionValuesMap.get(opt.id);
+							if (valueSet && parts[index]) {
+								valueSet.add(parts[index]);
+							}
+						});
+					}
+				}
+			});
+		}
+		
+		// Build editOptions with extracted values
 		editOptions = options.map((opt) => ({
 			id: opt.id,
 			title: opt.title,
-			values: options.length === 1 ? [...optionValues] : []
+			values: Array.from(optionValuesMap.get(opt.id) || [])
 		}));
 		variantsEditOptionValueInput = {};
 		editSheetVariantRows = [];

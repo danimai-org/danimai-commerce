@@ -106,6 +106,7 @@ const app = new Elysia()
           { name: "invites", description: "User invite endpoints" },
           { name: "customers", description: "Customer management endpoints" },
           { name: "inventory", description: "Inventory management endpoints" },
+          { name: "stock-locations", description: "Stock location management endpoints" },
         ],
       },
     })

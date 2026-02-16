@@ -54,6 +54,7 @@
 	let storeOpen = $state(false);
 	let promotionsOpen = $state(false);
 	let rolesPermissionsOpen = $state(false);
+	let inventoryOpen = $state(false);
 
 	$effect(() => {
 		if (path.startsWith('/products')) productsOpen = true;
@@ -71,6 +72,9 @@
 			path.startsWith('/settings/permissions') ||
 			path.startsWith('/settings/invites'))
 			rolesPermissionsOpen = true;
+	});
+	$effect(() => {
+		if (path.startsWith('/inventory')) inventoryOpen = true;
 	});
 </script>
 
@@ -244,14 +248,53 @@
 								</SidebarMenuButton>
 							</SidebarMenuItem>
 							<SidebarMenuItem>
-								<SidebarMenuButton
-									isActive={path.startsWith('/inventory')}
-									tooltipContent="Inventory"
-									onclick={() => goto('/inventory')}
-								>
-									<Layers />
-									<span>Inventory</span>
-								</SidebarMenuButton>
+								<Collapsible.Root bind:open={inventoryOpen} class="group/collapsible">
+									<Collapsible.Trigger>
+										{#snippet child({ props: triggerProps })}
+											<SidebarMenuButton
+												{...triggerProps}
+												isActive={path.startsWith('/inventory')}
+												tooltipContent="Manage Inventory"
+											>
+												<Layers />
+												<span>Manage Inventory</span>
+												<ChevronDown
+													class={cn(
+														'ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-180'
+													)}
+												/>
+											</SidebarMenuButton>
+										{/snippet}
+									</Collapsible.Trigger>
+									<Collapsible.Content>
+										<SidebarMenuSub>
+											<SidebarMenuSubItem>
+												<SidebarMenuSubButton
+													href="/inventory/items"
+													isActive={path.startsWith('/inventory/items')}
+												>
+													Inventory Item
+												</SidebarMenuSubButton>
+											</SidebarMenuSubItem>
+											<SidebarMenuSubItem>
+												<SidebarMenuSubButton
+													href="/inventory/stock-levels"
+													isActive={path.startsWith('/inventory/stock-levels')}
+												>
+													Stock levels
+												</SidebarMenuSubButton>
+											</SidebarMenuSubItem>
+											<SidebarMenuSubItem>
+												<SidebarMenuSubButton
+													href="/inventory/locations"
+													isActive={path.startsWith('/inventory/locations')}
+												>
+													Location
+												</SidebarMenuSubButton>
+											</SidebarMenuSubItem>
+										</SidebarMenuSub>
+									</Collapsible.Content>
+								</Collapsible.Root>
 							</SidebarMenuItem>
 							<SidebarMenuItem>
 								<SidebarMenuButton

@@ -23,6 +23,7 @@
     "@danimai/product": "../packages/product",
     "@danimai/region": "../packages/region",
     "@danimai/sales-channel": "../packages/sales-channel",
+    "@danimai/stock-location": "../packages/stock-location",
     "@danimai/store": "../packages/store",
     "@danimai/tax": "../packages/tax",
     "@danimai/user": "../packages/user",
