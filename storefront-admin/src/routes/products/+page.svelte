@@ -57,7 +57,7 @@
 		title: string;
 		options: Record<string, string>;
 		sku: string;
-		manage_inventory: boolean;
+		availableCount: string;
 		allow_backorder: boolean;
 		variant_rank: number;
 		priceAmount: string;
@@ -85,7 +85,7 @@
 				title: parts.join(' / '),
 				options: optionsRecord,
 				sku: '',
-				manage_inventory: false,
+				availableCount: '',
 				allow_backorder: false,
 				variant_rank: i,
 				priceAmount: ''
@@ -194,7 +194,7 @@
 	let createCollectionId = $state('');
 	let createCategoryId = $state('');
 	let createTagIds = $state<string[]>([]);
-	let createSalesChannels = $state<{ id: string }[]>([]);
+	let createSalesChannels = $state<{ id: string; name: string }[]>([]);
 	let createSalesChannelInput = $state('');
 
 	// Options & variants (when hasVariants)
@@ -210,7 +210,7 @@
 				? {
 						...v,
 						sku: ex.sku,
-						manage_inventory: ex.manage_inventory,
+						availableCount: ex.availableCount,
 						allow_backorder: ex.allow_backorder,
 						priceAmount: ex.priceAmount
 					}
@@ -223,6 +223,7 @@
 	let categoriesList = $state<{ id: string; value: string; handle: string }[]>([]);
 	let tagsList = $state<{ id: string; value: string }[]>([]);
 	let attributesList = $state<{ id: string; title: string; type: string }[]>([]);
+	let salesChannelsList = $state<{ id: string; name: string }[]>([]);
 
 	// Step 2: Attributes
 	type CreateAttributeEntry = { attributeId: string; attributeTitle: string; value: string };
@@ -299,6 +300,26 @@
 			})
 			.catch(() => {
 				attributesList = [];
+			});
+		// Fetch sales channels and set defaults
+		fetch(`${API_BASE}/sales-channels?limit=100`)
+			.then((r) => (r.ok ? r.json() : { data: [] }))
+			.then((j) => {
+				const salesChannels = j.data ?? [];
+				salesChannelsList = salesChannels.map((ch: { id: string; name: string }) => ({
+					id: ch.id,
+					name: ch.name
+				}));
+				const defaultChannels = salesChannels.filter((ch: { is_default: boolean }) => ch.is_default);
+				if (defaultChannels.length > 0) {
+					createSalesChannels = defaultChannels.map((ch: { id: string; name: string }) => ({
+						id: ch.id,
+						name: ch.name
+					}));
+				}
+			})
+			.catch(() => {
+				// Ignore error, leave createSalesChannels empty
 			});
 	}
 
@@ -406,8 +427,11 @@
 	function addSalesChannel() {
 		const id = createSalesChannelInput.trim();
 		if (id && !createSalesChannels.some((s) => s.id === id)) {
-			createSalesChannels = [...createSalesChannels, { id }];
-			createSalesChannelInput = '';
+			const channel = salesChannelsList.find((ch) => ch.id === id);
+			if (channel) {
+				createSalesChannels = [...createSalesChannels, { id: channel.id, name: channel.name }];
+				createSalesChannelInput = '';
+			}
 		}
 	}
 
@@ -435,14 +459,17 @@
 			const prices = v.priceAmount.trim()
 				? [{ amount: Math.round(parseFloat(v.priceAmount) * 100), currency_code: 'eur' }]
 				: [];
+			const availableCountStr = String(v.availableCount || '').trim();
+			const availableCountNum = availableCountStr ? parseInt(availableCountStr, 10) : null;
 			return {
 				title: v.title,
 				options: v.options,
 				sku: v.sku || undefined,
-				manage_inventory: v.manage_inventory,
+				manage_inventory: availableCountNum !== null && availableCountNum >= 0,
 				allow_backorder: v.allow_backorder,
 				variant_rank: i,
-				prices
+				prices,
+				available_count: availableCountNum !== null ? availableCountNum : undefined
 			};
 		});
 
@@ -463,7 +490,7 @@
 			tag_ids: createTagIds.length > 0 ? createTagIds : undefined,
 			options: createHasVariants ? optionsForApi : undefined,
 			variants: createHasVariants && variantsForApi.length > 0 ? variantsForApi : undefined,
-			sales_channels: createSalesChannels.length > 0 ? createSalesChannels : undefined,
+			sales_channels: createSalesChannels.length > 0 ? createSalesChannels.map((ch) => ({ id: ch.id })) : undefined,
 			attributes: attributesForApi.length > 0 ? attributesForApi : undefined
 		};
 	}
@@ -473,6 +500,34 @@
 		if (!createTitle.trim()) {
 			createError = 'Title is required';
 			return;
+		}
+		// Validate that SKU is provided if available count is set, and available count is non-negative
+		if (createHasVariants) {
+			for (const variant of createVariants) {
+				const availableCountStr = String(variant.availableCount || '').trim();
+				if (availableCountStr) {
+					if (!variant.sku.trim()) {
+						createError = 'SKU is required when available count is provided';
+						return;
+					}
+					const count = parseInt(availableCountStr, 10);
+					if (isNaN(count) || count < 0) {
+						createError = 'Available count must be a non-negative number';
+						return;
+					}
+				}
+			}
+			// Validate that at least one variant has a price > 0
+			const hasValidPrice = createVariants.some((variant) => {
+				const priceStr = variant.priceAmount.trim();
+				if (!priceStr) return false;
+				const price = parseFloat(priceStr);
+				return !isNaN(price) && price > 0;
+			});
+			if (!hasValidPrice) {
+				createError = 'At least one variant must have a price greater than 0';
+				return;
+			}
 		}
 		createSubmitting = true;
 		try {
@@ -1108,7 +1163,7 @@
 									<span
 										class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm"
 									>
-										{ch.id}
+										{ch.name}
 										<button
 											type="button"
 											class="rounded p-0.5 hover:bg-muted"
@@ -1120,22 +1175,22 @@
 									</span>
 								{/each}
 								<div class="flex gap-1">
-									<Input
+									<select
 										id="create-sales-channel-input"
-										placeholder="Sales channel ID"
-										class="h-8 w-40"
+										class="h-8 w-48 rounded-md border border-input bg-background px-3 py-1 text-sm"
 										bind:value={createSalesChannelInput}
-										onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), addSalesChannel())}
-									/>
-									<Button
-										type="button"
-										variant="outline"
-										size="sm"
-										class="h-8"
-										onclick={addSalesChannel}
+										onchange={() => {
+											if (createSalesChannelInput) {
+												addSalesChannel();
+												createSalesChannelInput = '';
+											}
+										}}
 									>
-										Add
-									</Button>
+										<option value="">Add sales channel</option>
+										{#each salesChannelsList.filter((ch) => !createSalesChannels.some((s) => s.id === ch.id)) as channel (channel.id)}
+											<option value={channel.id}>{channel.name}</option>
+										{/each}
+									</select>
 								</div>
 							</div>
 						</div>
@@ -1239,7 +1294,7 @@
 											<th class="px-3 py-2 text-left font-medium">Option</th>
 											<th class="px-3 py-2 text-left font-medium">Title</th>
 											<th class="px-3 py-2 text-left font-medium">SKU</th>
-											<th class="px-3 py-2 text-left font-medium">Managed inventory</th>
+											<th class="px-3 py-2 text-left font-medium">Available count</th>
 											<th class="px-3 py-2 text-left font-medium">Allow backorder</th>
 											<th class="px-3 py-2 text-left font-medium">Price EUR</th>
 										</tr>
@@ -1257,11 +1312,20 @@
 													<Input bind:value={v.sku} placeholder="SKU" class="h-8 w-24" />
 												</td>
 												<td class="px-3 py-2">
-													<input
-														type="checkbox"
-														bind:checked={v.manage_inventory}
-														class="rounded border-input"
+													<Input
+														type="number"
+														bind:value={v.availableCount}
+														placeholder="0"
+														min="0"
+														class={cn(
+															"h-8 w-20",
+															String(v.availableCount || '').trim() && !v.sku.trim() && "border-destructive"
+														)}
+														disabled={!v.sku.trim()}
 													/>
+													{#if String(v.availableCount || '').trim() && !v.sku.trim()}
+														<p class="text-xs text-destructive mt-0.5">SKU required</p>
+													{/if}
 												</td>
 												<td class="px-3 py-2">
 													<input

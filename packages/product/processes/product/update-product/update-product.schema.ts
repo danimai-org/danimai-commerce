@@ -17,7 +17,7 @@ export const UpdateProductSchema = Type.Object({
   thumbnail: Type.Optional(Type.String()),
   external_id: Type.Optional(Type.String()),
   category_id: Type.Optional(Type.String()),
-  metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
+  metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number(), Type.Array(Type.String()), Type.Array(Type.Number())]))),
   attributes: Type.Optional(Type.Array(UpdateProductAttributeEntrySchema)),
   tag_ids: Type.Optional(Type.Array(Type.String())),
   collection_ids: Type.Optional(Type.Array(Type.String())),

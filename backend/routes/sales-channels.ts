@@ -6,15 +6,23 @@ import {
   UPDATE_SALES_CHANNELS_PROCESS,
   DELETE_SALES_CHANNELS_PROCESS,
   PAGINATED_SALES_CHANNELS_PROCESS,
+  SYNC_PRODUCT_SALES_CHANNELS_PROCESS,
+  GET_PRODUCT_SALES_CHANNELS_PROCESS,
   CreateSalesChannelsProcess,
   UpdateSalesChannelsProcess,
   DeleteSalesChannelsProcess,
   PaginatedSalesChannelsProcess,
+  SyncProductSalesChannelsProcess,
+  GetProductSalesChannelsProcess,
   type CreateSalesChannelsProcessInput,
   type UpdateSalesChannelProcessInput,
   type DeleteSalesChannelsProcessInput,
   type PaginatedSalesChannelsProcessInput,
+  type SyncProductSalesChannelsProcessInput,
+  type GetProductSalesChannelsProcessInput,
   PaginatedSalesChannelsSchema,
+  SyncProductSalesChannelsSchema,
+  GetProductSalesChannelsSchema,
 } from "@danimai/sales-channel";
 import { handleProcessError } from "../utils/error-handler";
 import Value from "typebox/value";
@@ -139,6 +147,72 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
             },
           },
         },
+      },
+    }
+  )
+  .put(
+    "/products/:productId/sales-channels",
+    async ({ params, body, set }) => {
+      try {
+        const process = getService<SyncProductSalesChannelsProcess>(
+          SYNC_PRODUCT_SALES_CHANNELS_PROCESS
+        );
+        const logger = getService<Logger>(DANIMAI_LOGGER);
+        const input = Value.Convert(SyncProductSalesChannelsSchema, {
+          product_id: params.productId,
+          ...(body as Omit<SyncProductSalesChannelsProcessInput, "product_id">),
+        }) as SyncProductSalesChannelsProcessInput;
+        await process.runOperations({ input, logger });
+        return new Response(null, { status: 204 });
+      } catch (err) {
+        return handleProcessError(err, set);
+      }
+    },
+    {
+      detail: {
+        tags: ["sales-channels"],
+        summary: "Sync product sales channels",
+        description: "Updates the sales channels for a product",
+        parameters: [
+          { name: "productId", in: "path", required: true, schema: { type: "string" } },
+        ],
+        requestBody: {
+          content: {
+            "application/json": {
+              example: {
+                sales_channel_ids: ["550e8400-e29b-41d4-a716-446655440000"],
+              },
+            },
+          },
+        },
+      },
+    }
+  )
+  .get(
+    "/products/:productId/sales-channels",
+    async ({ params, set }) => {
+      try {
+        const process = getService<GetProductSalesChannelsProcess>(
+          GET_PRODUCT_SALES_CHANNELS_PROCESS
+        );
+        const logger = getService<Logger>(DANIMAI_LOGGER);
+        const input = Value.Convert(GetProductSalesChannelsSchema, {
+          product_id: params.productId,
+        }) as GetProductSalesChannelsProcessInput;
+        const result = await process.runOperations({ input, logger });
+        return result;
+      } catch (err) {
+        return handleProcessError(err, set);
+      }
+    },
+    {
+      detail: {
+        tags: ["sales-channels"],
+        summary: "Get product sales channels",
+        description: "Gets all sales channels for a product",
+        parameters: [
+          { name: "productId", in: "path", required: true, schema: { type: "string" } },
+        ],
       },
     }
   );

@@ -538,29 +538,26 @@ export class CreateProductProcess
 
   /**
    * Associate product with sales channels
-   * For now, stores in metadata. Can be extended with a relation table.
+   * Uses product_sales_channels junction table
    */
   async associateSalesChannels(
-    trx: Kysely<Database>,
+    trx: Kysely<any>,
     productId: string,
     salesChannels: Array<{ id: string }>
   ) {
-    const product = await trx
-      .selectFrom("products")
-      .where("id", "=", productId)
-      .selectAll()
-      .executeTakeFirst();
+    if (salesChannels.length === 0) return;
 
-    if (product) {
-      const metadata = (product.metadata as Record<string, unknown>) || {};
-      metadata.sales_channels = salesChannels.map((sc) => sc.id);
+    const relations = salesChannels.map((sc) => ({
+      id: randomUUID(),
+      product_id: productId,
+      sales_channel_id: sc.id,
+    }));
 
-      await trx
-        .updateTable("products")
-        .set({ metadata })
-        .where("id", "=", productId)
-        .execute();
-    }
+    await trx
+      .insertInto("product_sales_channels")
+      .values(relations)
+      .onConflict((oc) => oc.doNothing())
+      .execute();
   }
 
   /**

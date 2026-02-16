@@ -110,6 +110,12 @@ export class PaginatedProductsProcess
       ])
       .execute();
 
+    const salesChannelRelations = await (this.db as any)
+      .selectFrom("product_sales_channels")
+      .where("product_id", "in", productIds)
+      .select(["product_id", "sales_channel_id"])
+      .execute();
+
     const variantsByProduct = new Map<string, Array<{ id: string }>>();
     for (const v of variants) {
       if (!v.product_id) continue;
@@ -132,9 +138,14 @@ export class PaginatedProductsProcess
       } as ProductCollection);
     }
 
+    const salesChannelsByProduct = new Map<string, string[]>();
+    for (const r of salesChannelRelations) {
+      const list = salesChannelsByProduct.get(r.product_id) ?? [];
+      list.push(r.sales_channel_id);
+      salesChannelsByProduct.set(r.product_id, list);
+    }
+
     const products: PaginatedProductItem[] = rows.map((p) => {
-      const metadata = (p.metadata as Record<string, unknown> | null) ?? {};
-      const salesChannelIds = (metadata.sales_channels as string[] | undefined) ?? [];
       return {
         id: p.id,
         title: p.title,
@@ -143,7 +154,7 @@ export class PaginatedProductsProcess
         thumbnail: p.thumbnail,
         variants: variantsByProduct.get(p.id) ?? [],
         collection: collectionByProduct.get(p.id) ?? null,
-        sales_channel_ids: salesChannelIds,
+        sales_channel_ids: salesChannelsByProduct.get(p.id) ?? [],
       };
     });
 

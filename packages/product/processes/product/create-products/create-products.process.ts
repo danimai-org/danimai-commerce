@@ -83,12 +83,13 @@ export class CreateProductsProcess
         await this.createProductVariants(product.id, productInput.variants, optionMap);
       }
 
+      // Associate with sales channels
+      if (productInput.sales_channels && productInput.sales_channels.length > 0) {
+        await this.associateSalesChannels(product.id, productInput.sales_channels);
+      }
+
       // Collect metadata updates for bulk update
       const metadata: Record<string, unknown> = { ...((product.metadata as Record<string, unknown>) || {}) };
-
-      if (productInput.sales_channels && productInput.sales_channels.length > 0) {
-        metadata.sales_channels = productInput.sales_channels.map((sc) => sc.id);
-      }
 
       if (productInput.shipping_profile_id) {
         metadata.shipping_profile_id = productInput.shipping_profile_id;
@@ -730,28 +731,25 @@ export class CreateProductsProcess
 
   /**
    * Associate product with sales channels
-   * For now, stores in metadata. Can be extended with a relation table.
+   * Uses product_sales_channels junction table
    */
   async associateSalesChannels(
     productId: string,
     salesChannels: Array<{ id: string }>
   ) {
-    const product = await this.db
-      .selectFrom("products")
-      .where("id", "=", productId)
-      .selectAll()
-      .executeTakeFirst();
+    if (salesChannels.length === 0) return;
 
-    if (product) {
-      const metadata = (product.metadata as Record<string, unknown>) || {};
-      metadata.sales_channels = salesChannels.map((sc) => sc.id);
+    const relations = salesChannels.map((sc) => ({
+      id: randomUUID(),
+      product_id: productId,
+      sales_channel_id: sc.id,
+    }));
 
-      await this.db
-        .updateTable("products")
-        .set({ metadata })
-        .where("id", "=", productId)
-        .execute();
-    }
+    await this.db
+      .insertInto("product_sales_channels")
+      .values(relations)
+      .onConflict((oc) => oc.doNothing())
+      .execute();
   }
 
   /**

@@ -280,9 +280,9 @@
 						<tr>
 							<th class="px-4 py-3 text-left font-medium">Name</th>
 							<th class="px-4 py-3 text-left font-medium">Description</th>
-							<th class="px-4 py-3 text-left font-medium">Status</th>
-							<th class="px-4 py-3 text-left font-medium">Created</th>
-							<th class="px-4 py-3 text-left font-medium">Updated</th>
+							<th class="px-4 py-3 text-left font-medium">Default</th>
+							<th class="px-4 py-3 text-left font-medium">Created at</th>
+							<th class="px-4 py-3 text-left font-medium">Updated at</th>
 							<th class="w-10 px-4 py-3"></th>
 						</tr>
 					</thead>
@@ -301,13 +301,19 @@
 										{channel.description ?? '—'}
 									</td>
 									<td class="px-4 py-3">
-										<span class="inline-flex items-center gap-1.5">
+										{#if channel.is_default}
 											<span
-												class="size-2 rounded-full bg-green-500"
-												aria-hidden="true"
-											></span>
-											Enabled
-										</span>
+												class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-green-500/10 text-green-700 dark:text-green-400"
+											>
+												Yes
+											</span>
+										{:else}
+											<span
+												class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-red-500/10 text-red-700 dark:text-red-400"
+											>
+												No
+											</span>
+										{/if}
 									</td>
 									<td class="px-4 py-3 text-muted-foreground">
 										{formatDate(channel.created_at)}

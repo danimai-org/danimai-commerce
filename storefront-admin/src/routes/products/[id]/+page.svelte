@@ -19,6 +19,7 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import X from '@lucide/svelte/icons/x';
+	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import { DropdownMenu } from 'bits-ui';
 	import { cn } from '$lib/utils.js';
 
@@ -83,6 +84,14 @@
 	let category = $state<ProductCategory | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+
+	// Sales Channels
+	type SalesChannel = { id: string; name: string; is_default: boolean };
+	let salesChannelsSheetOpen = $state(false);
+	let allSalesChannels = $state<SalesChannel[]>([]);
+	let productSalesChannelIds = $state<Set<string>>(new Set());
+	let salesChannelsSearchQuery = $state('');
+	let salesChannelsSubmitting = $state(false);
 
 	// Option values: when single option, use variant titles as values
 	const optionValues = $derived.by(() => {
@@ -164,11 +173,73 @@
 	$effect(() => {
 		if (product?.id) {
 			loadOptionsAndVariants();
+			// Fetch product sales channels and all sales channels
+			fetchProductSalesChannels();
+			fetchSalesChannels();
 		} else {
 			options = [];
 			variants = [];
 		}
 	});
+
+	async function fetchSalesChannels() {
+		try {
+			const res = await fetch(`${API_BASE}/sales-channels?limit=100`, { cache: 'no-store' });
+			if (res.ok) {
+				const j = (await res.json()) as { data?: SalesChannel[] };
+				allSalesChannels = j.data ?? [];
+			} else {
+				allSalesChannels = [];
+			}
+		} catch {
+			allSalesChannels = [];
+		}
+	}
+
+	async function fetchProductSalesChannels() {
+		if (!productId) return;
+		try {
+			const res = await fetch(`${API_BASE}/sales-channels/products/${productId}/sales-channels`, { cache: 'no-store' });
+			if (res.ok) {
+				const channels = (await res.json()) as SalesChannel[];
+				productSalesChannelIds = new Set(channels.map((ch) => ch.id));
+			} else {
+				productSalesChannelIds = new Set();
+			}
+		} catch {
+			productSalesChannelIds = new Set();
+		}
+	}
+
+	async function updateProductSalesChannels() {
+		if (!productId) return;
+		salesChannelsSubmitting = true;
+		try {
+			const salesChannelIds = Array.from(productSalesChannelIds);
+			const res = await fetch(`${API_BASE}/sales-channels/products/${productId}/sales-channels`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ sales_channel_ids: salesChannelIds })
+			});
+			if (res.ok) {
+				await fetchProductSalesChannels();
+				salesChannelsSheetOpen = false;
+			} else {
+				const text = await res.text();
+				error = text || 'Failed to update sales channels';
+			}
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			salesChannelsSubmitting = false;
+		}
+	}
+
+	const filteredSalesChannels = $derived(
+		allSalesChannels.filter((ch) =>
+			ch.name.toLowerCase().includes(salesChannelsSearchQuery.toLowerCase())
+		)
+	);
 
 	$effect(() => {
 		if (product?.category_id) {
@@ -1386,16 +1457,40 @@
 					<div class="rounded-lg border bg-card p-6">
 						<div class="flex items-center justify-between">
 							<h2 class="font-semibold">Sales Channels</h2>
-							<Button variant="ghost" size="icon" class="size-8">
-								<MoreHorizontal class="size-4" />
-								<span class="sr-only">Actions</span>
+							<Button
+								variant="ghost"
+								size="icon"
+								class="size-8"
+								onclick={() => {
+									salesChannelsSheetOpen = true;
+									fetchSalesChannels();
+								}}
+							>
+								<SlidersHorizontal class="size-4" />
+								<span class="sr-only">Manage sales channels</span>
 							</Button>
 						</div>
-						<div class="mt-4 flex items-center gap-2 text-sm">
-							<Share2 class="size-4 text-muted-foreground" />
-							<span>Default Sales Channel</span>
+						<div class="mt-4 flex flex-col gap-2">
+							{#if productSalesChannelIds.size > 0}
+								{#each Array.from(productSalesChannelIds).map((id) => {
+									const channel = allSalesChannels.find((ch) => ch.id === id);
+									return channel;
+								}).filter(Boolean) as channel}
+									<div class="flex items-center gap-2 text-sm">
+										<Share2 class="size-4 text-muted-foreground" />
+										<span>{channel.name}</span>
+									</div>
+								{/each}
+							{:else}
+								<div class="flex items-center gap-2 text-sm">
+									<Share2 class="size-4 text-muted-foreground" />
+									<span>No sales channels selected</span>
+								</div>
+							{/if}
 						</div>
-						<p class="mt-1 text-xs text-muted-foreground">Available in 1 of 1 sales channels</p>
+						<p class="mt-1 text-xs text-muted-foreground">
+							Available in {productSalesChannelIds.size} of {allSalesChannels.length} sales channels
+						</p>
 					</div>
 
 					<!-- Shipping configuration -->
@@ -2436,4 +2531,87 @@
 			</Sheet.Content>
 		</Sheet.Root>
 	{/if}
+
+	<!-- Sales Channels Sheet -->
+	<Sheet.Root bind:open={salesChannelsSheetOpen}>
+		<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
+			<div class="flex h-full flex-col">
+				<div class="flex-1 overflow-auto p-6 pt-12">
+					<h2 class="text-lg font-semibold">Sales Channels</h2>
+					<p class="mt-1 text-sm text-muted-foreground">
+						Select which sales channels this product should be available in.
+					</p>
+					<div class="mt-6 flex flex-col gap-4">
+						<div class="relative">
+							<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+							<Input
+								type="search"
+								placeholder="Search sales channels"
+								bind:value={salesChannelsSearchQuery}
+								class="h-9 rounded-md pl-9"
+							/>
+						</div>
+						<div class="flex flex-col gap-2">
+							{#if filteredSalesChannels.length === 0}
+								<p class="py-8 text-center text-sm text-muted-foreground">
+									No sales channels found.
+								</p>
+							{:else}
+								{#each filteredSalesChannels as channel (channel.id)}
+									<div class="flex items-center justify-between rounded-md border p-3">
+										<div class="flex flex-col gap-1">
+											<span class="text-sm font-medium">{channel.name}</span>
+											{#if channel.is_default}
+												<span class="text-xs text-muted-foreground">Default</span>
+											{/if}
+										</div>
+										<button
+											type="button"
+											role="switch"
+											aria-checked={productSalesChannelIds.has(channel.id)}
+											aria-label={`Toggle ${channel.name}`}
+											class={cn(
+												'relative inline-flex h-6 min-h-6 w-11 min-w-11 flex-none shrink-0 cursor-pointer items-center self-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+												productSalesChannelIds.has(channel.id) ? 'bg-primary' : 'bg-input'
+											)}
+											onclick={() => {
+												const newSet = new Set(productSalesChannelIds);
+												if (newSet.has(channel.id)) {
+													newSet.delete(channel.id);
+												} else {
+													newSet.add(channel.id);
+												}
+												productSalesChannelIds = newSet;
+											}}
+										>
+											<span
+												class={cn(
+													'pointer-events-none block size-5 shrink-0 rounded-full border border-input bg-white shadow ring-0 transition-transform',
+													productSalesChannelIds.has(channel.id)
+														? 'translate-x-5'
+														: 'translate-x-[1px]'
+												)}
+											></span>
+										</button>
+									</div>
+								{/each}
+							{/if}
+						</div>
+					</div>
+				</div>
+				<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
+					<Button
+						variant="outline"
+						onclick={() => (salesChannelsSheetOpen = false)}
+						disabled={salesChannelsSubmitting}
+					>
+						Cancel
+					</Button>
+					<Button onclick={updateProductSalesChannels} disabled={salesChannelsSubmitting}>
+						{salesChannelsSubmitting ? 'Saving…' : 'Save'}
+					</Button>
+				</Sheet.Footer>
+			</div>
+		</Sheet.Content>
+	</Sheet.Root>
 </div>
