@@ -5,6 +5,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import Package from '@lucide/svelte/icons/package';
 	import Bell from '@lucide/svelte/icons/bell';
 	import Search from '@lucide/svelte/icons/search';
@@ -119,6 +120,35 @@
 		return titles;
 	});
 
+	// Options that are assigned to this product (have at least one value from variants), with their values
+	const optionsWithValues = $derived.by(() => {
+		if (variants.length === 0) return [] as { option: ProductOption; values: string[] }[];
+		// When no options from API but we have variants, show one inferred option (e.g. Size) with variant titles as values
+		if (options.length === 0) {
+			const values = [...new Set(variants.map((v) => v.title.trim()).filter(Boolean))];
+			if (values.length === 0) return [];
+			return [{ option: { id: '', title: 'Size', product_id: null }, values }];
+		}
+		if (options.length === 1) {
+			const values = [...new Set(variants.map((v) => v.title.trim()).filter(Boolean))];
+			if (values.length === 0) return [];
+			return [{ option: options[0], values }];
+		}
+		const result: { option: ProductOption; values: string[] }[] = [];
+		options.forEach((opt, index) => {
+			const valueSet = new Set<string>();
+			variants.forEach((v) => {
+				const parts = v.title.split('/').map((p) => p.trim()).filter(Boolean);
+				// Allow variant title with fewer parts than options (e.g. "S" when 2 options exist → assign to first option)
+				if (parts[index]) valueSet.add(parts[index]);
+			});
+			if (valueSet.size > 0) {
+				result.push({ option: opt, values: [...valueSet] });
+			}
+		});
+		return result;
+	});
+
 	async function loadProduct() {
 		if (!productId) return;
 		loading = true;
@@ -150,7 +180,10 @@
 			]);
 			if (optRes.ok) {
 				const j = (await optRes.json()) as { data?: ProductOption[] };
-				options = (j.data ?? []).filter((o) => o.product_id === productId);
+				// Include options for this product or options with no product_id (global options; API may not return product_id)
+				options = (j.data ?? []).filter(
+					(o) => o.product_id == null || o.product_id === productId
+				);
 			} else {
 				options = [];
 			}
@@ -768,10 +801,12 @@
 	function removeOrgTag(tagId: string) {
 		orgTagIds = orgTagIds.filter((id) => id !== tagId);
 	}
+	let orgTagsInputEl = $state<HTMLInputElement | null>(null);
 	function selectOrgTag(tagId: string) {
 		if (!orgTagIds.includes(tagId)) orgTagIds = [...orgTagIds, tagId];
 		orgTagInput = '';
 		orgTagDropdownOpen = false;
+		requestAnimationFrame(() => orgTagsInputEl?.focus());
 	}
 	async function createAndSelectOrgTag() {
 		const value = orgTagInput.trim();
@@ -867,17 +902,16 @@
 	}
 
 	function syncEditSheetVariantRows() {
-		const valueArrays = editOptions
-			.filter((o) => o.title.trim())
-			.map((o) => o.values.filter((v) => v.trim()));
-		const hasAllValues =
-			valueArrays.length === editOptions.length && valueArrays.every((a) => a.length > 0);
-		if (!hasAllValues || editOptions.length === 0) {
+		// Only use options that have at least one value (so we show existing variant data even when some options are unused)
+		const optionsWithValues = editOptions
+			.filter((o) => o.title.trim() && o.values.filter((v) => v.trim()).length > 0);
+		const valueArrays = optionsWithValues.map((o) => o.values.filter((v) => v.trim()));
+		if (valueArrays.length === 0 || valueArrays.some((a) => a.length === 0)) {
 			editSheetVariantRows = [];
 			return;
 		}
 		const combinations = cartesian(valueArrays);
-		const optionTitles = editOptions.filter((o) => o.title.trim()).map((o) => o.title);
+		const optionTitles = optionsWithValues.map((o) => o.title);
 		editSheetVariantRows = combinations.map((combo) => {
 			const key = combo.join('|');
 			const optionTitle = combo.join(' / ');
@@ -916,47 +950,60 @@
 			if (!product || !product.id) return;
 		}
 		await loadOptionsAndVariants();
-		
+
 		variantsEditSheetOpen = true;
 		variantsEditError = null;
-		
-		// Extract option values from existing variants
-		const optionValuesMap = new Map<string, Set<string>>();
-		options.forEach((opt) => {
-			optionValuesMap.set(opt.id, new Set<string>());
+
+		// Use existing options, or infer one option from variants when none exist
+		const optionsToUse =
+			options.length > 0
+				? options
+				: variants.length > 0
+					? [{ id: '', title: 'Size', product_id: productId as string | null }]
+					: [];
+
+		// Extract option values from existing variants (use arrays to preserve order)
+		const optionValuesMap = new Map<string, string[]>();
+		optionsToUse.forEach((opt) => {
+			optionValuesMap.set(opt.id, []);
 		});
-		
-		// Extract values from variants
+
+		function hasValueCaseInsensitive(arr: string[], value: string): boolean {
+			const lower = value.trim().toLowerCase();
+			return arr.some((x) => x.trim().toLowerCase() === lower);
+		}
 		if (variants.length > 0) {
 			variants.forEach((variant) => {
-				if (options.length === 1) {
-					// Single option: variant title is the value
-					const optId = options[0].id;
-					const valueSet = optionValuesMap.get(optId);
-					if (valueSet && variant.title.trim()) {
-						valueSet.add(variant.title.trim());
+				if (optionsToUse.length === 1) {
+					const optId = optionsToUse[0].id;
+					const arr = optionValuesMap.get(optId);
+					const val = variant.title.trim();
+					if (arr && val && !hasValueCaseInsensitive(arr, val)) {
+						arr.push(val);
 					}
-				} else if (options.length > 1) {
-					// Multiple options: variant title is "Value1 / Value2 / ..."
+				} else if (optionsToUse.length > 1) {
 					const parts = variant.title.split('/').map((p) => p.trim()).filter(Boolean);
-					if (parts.length === options.length) {
-						options.forEach((opt, index) => {
-							const valueSet = optionValuesMap.get(opt.id);
-							if (valueSet && parts[index]) {
-								valueSet.add(parts[index]);
-							}
-						});
-					}
+					// Allow fewer parts than options (e.g. "S" → assign to first option only)
+					optionsToUse.forEach((opt, index) => {
+						const part = parts[index];
+						if (!part) return;
+						const arr = optionValuesMap.get(opt.id);
+						if (arr && !hasValueCaseInsensitive(arr, part)) {
+							arr.push(part);
+						}
+					});
 				}
 			});
 		}
-		
-		// Build editOptions with extracted values
-		editOptions = options.map((opt) => ({
-			id: opt.id,
-			title: opt.title,
-			values: Array.from(optionValuesMap.get(opt.id) || [])
-		}));
+
+		// Build editOptions only for options that have at least one value (don't show unused options like Color with no values)
+		editOptions = optionsToUse
+			.filter((opt) => (optionValuesMap.get(opt.id) ?? []).length > 0)
+			.map((opt) => ({
+				id: opt.id || null,
+				title: opt.title,
+				values: optionValuesMap.get(opt.id) ?? []
+			}));
 		variantsEditOptionValueInput = {};
 		editSheetVariantRows = [];
 		syncEditSheetVariantRows();
@@ -979,6 +1026,12 @@
 	function addEditOptionValue(optionIndex: number, value: string) {
 		const v = value.trim();
 		if (!v) return;
+		const opt = editOptions[optionIndex];
+		if (!opt) return;
+		const existsCaseInsensitive = opt.values.some(
+			(existing) => existing.trim().toLowerCase() === v.toLowerCase()
+		);
+		if (existsCaseInsensitive) return;
 		editOptions = editOptions.map((o, i) =>
 			i === optionIndex ? { ...o, values: [...o.values, v] } : o
 		);
@@ -1217,6 +1270,13 @@
 		deleteVariantConfirmOpen = true;
 	}
 
+	function closeDeleteVariantConfirm() {
+		if (!deleteVariantSubmitting) {
+			deleteVariantConfirmOpen = false;
+			variantToDelete = null;
+		}
+	}
+
 	async function confirmDeleteVariant() {
 		const v = variantToDelete;
 		if (!v) return;
@@ -1336,32 +1396,14 @@
 		</div>
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
-			<div class="flex flex-col gap-8 p-6">
-				<div class="flex gap-6">
-					<div class="flex-1 rounded-lg border bg-card p-6 shadow-sm">
+			<div class="p-6">
+				<div class="grid gap-6" style="grid-template-columns: 1fr 13rem; grid-auto-rows: minmax(0, auto); align-items: start;">
+					<!-- Product card (row 1) -->
+					<div class="min-w-0 self-start rounded-lg border bg-card p-6 shadow-sm">
 						<!-- Product header -->
-						<section class="flex flex-col gap-6 pb-8">
+						<section class="flex flex-col gap-6 pb-4">
 							<div class="flex items-center justify-between gap-4">
-								<div class="flex flex-wrap items-center gap-2">
-									<h1 class="text-2xl font-semibold tracking-tight">{product.title}</h1>
-									<span
-										class={cn(
-											'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-											product.status === 'published' &&
-												'bg-green-500/10 text-green-700 dark:text-green-400',
-											product.status === 'draft' && 'bg-muted text-muted-foreground',
-											product.status === 'proposed' &&
-												'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-											product.status === 'rejected' && 'bg-destructive/10 text-destructive'
-										)}
-									>
-										<span
-											class="size-1.5 shrink-0 rounded-sm bg-current opacity-70"
-											aria-hidden="true"
-										></span>
-										{product.status}
-									</span>
-								</div>
+								<h1 class="text-2xl font-semibold tracking-tight">{product.title}</h1>
 								<Button
 									variant="ghost"
 									size="icon"
@@ -1373,9 +1415,9 @@
 								</Button>
 							</div>
 						</section>
-						<!-- Details -->
-						<div class="rounded-lg bg-card p-6">
-							<dl class="mt-4 grid gap-3 text-sm">
+						<!-- Details (pl-0 so content aligns with header above) -->
+						<div class="rounded-lg bg-card pt-6 pr-6 pb-6 pl-0">
+							<dl class="mt-0 grid gap-3 text-sm">
 							<div class="flex justify-between gap-4">
 								<dt class="shrink-0 font-medium text-muted-foreground">Description</dt>
 								<dd class="text-right">{product.description || '—'}</dd>
@@ -1402,34 +1444,182 @@
 					</div>
 				</div>
 
-					<!-- Right: Status card -->
-					<div class="rounded-lg border border-gray-300 bg-card p-6 self-start w-52 shadow-sm">
-						<h2 class="font-semibold mb-4">Status</h2>
-						<Select.Root
-							type="single"
-							value={product?.status ?? 'draft'}
-							onValueChange={(v) => {
-								if (v && (v === 'draft' || v === 'proposed' || v === 'published' || v === 'rejected')) {
-									updateStatus(v);
-								}
-							}}
-							disabled={statusUpdating || !product}
-						>
-							<Select.Trigger class="w-full">
-								{statusLabel(product?.status)}
-							</Select.Trigger>
-							<Select.Content>
-								<Select.Item value="published" label="Active">Active</Select.Item>
-								<Select.Item value="draft" label="Draft">Draft</Select.Item>
-								<Select.Item value="proposed" label="Unlisted">Unlisted</Select.Item>
-								<Select.Item value="rejected" label="Rejected">Rejected</Select.Item>
-							</Select.Content>
-						</Select.Root>
-					</div>
-				</div>
+					<!-- Right: Status, Visibility, and Organisation cards (span both rows) -->
+					<div class="row-span-2 flex w-52 flex-col gap-6 self-start">
+						<div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
+							<h2 class="font-semibold mb-4">Status</h2>
+							<Select.Root
+								type="single"
+								value={product?.status ?? 'draft'}
+								onValueChange={(v) => {
+									if (v && (v === 'draft' || v === 'proposed' || v === 'published' || v === 'rejected')) {
+										updateStatus(v);
+									}
+								}}
+								disabled={statusUpdating || !product}
+							>
+								<Select.Trigger class="w-full">
+									{statusLabel(product?.status)}
+								</Select.Trigger>
+								<Select.Content>
+									<Select.Item value="published" label="Active">Active</Select.Item>
+									<Select.Item value="draft" label="Draft">Draft</Select.Item>
+									<Select.Item value="proposed" label="Unlisted">Unlisted</Select.Item>
+									<Select.Item value="rejected" label="Rejected">Rejected</Select.Item>
+								</Select.Content>
+							</Select.Root>
+							<h2 class="font-semibold mt-6 mb-4">Visibility</h2>
+							<Select.Root
+								type="single"
+								value={product?.status === 'published' ? 'public' : 'private'}
+								onValueChange={(v) => {
+									if (v === 'public') updateStatus('published');
+									if (v === 'private') updateStatus('draft');
+								}}
+								disabled={statusUpdating || !product}
+							>
+								<Select.Trigger class="w-full">
+									{product?.status === 'published' ? 'Public' : 'Private'}
+								</Select.Trigger>
+								<Select.Content>
+									<Select.Item value="public" label="Public">Public</Select.Item>
+									<Select.Item value="private" label="Private">Private</Select.Item>
+								</Select.Content>
+							</Select.Root>
+						</div>
+						<div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
+							<div class="flex items-center justify-between gap-2">
+								<h2 class="font-semibold">Organisation</h2>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-8 shrink-0"
+									onclick={openOrgSheet}
+									aria-label="Edit organisation"
+								>
+									<Pencil class="size-4" />
+								</Button>
+							</div>
+							<dl class="mt-4 grid gap-3 text-sm">
+								<div>
+									<dt class="font-medium text-muted-foreground">Category</dt>
+									<dd class="mt-0.5">{category?.value ?? '—'}</dd>
+								</div>
+								<div>
+									<dt class="font-medium text-muted-foreground">Collections</dt>
+									<dd class="mt-0.5">
+										{#if product?.collections?.length}
+											{product.collections.map((c) => c.title).join(', ')}
+										{:else if product?.collection_ids?.length}
+											{product.collection_ids.length} collection(s)
+										{:else}
+											—
+										{/if}
+									</dd>
+								</div>
+								<div>
+									<dt class="font-medium text-muted-foreground">Tags</dt>
+									<dd class="mt-0.5">
+										{#if product?.tags?.length}
+											{product.tags.map((t) => t.value).join(', ')}
+										{:else if product?.tag_ids?.length}
+											{product.tag_ids.length} tag(s)
+										{:else}
+											—
+										{/if}
+									</dd>
+								</div>
+							</dl>
+						</div>
 
-				<div class="flex gap-6">
-					<div class="flex-1 flex flex-col gap-6">
+						<!-- Sales Channels -->
+						<div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
+							<div class="flex items-center justify-between">
+								<h2 class="font-semibold">Sales Channels</h2>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-8 shrink-0"
+									onclick={() => {
+										salesChannelsSheetOpen = true;
+										fetchSalesChannels();
+									}}
+									aria-label="Edit sales channels"
+								>
+									<Pencil class="size-4" />
+								</Button>
+							</div>
+							<div class="mt-4 flex flex-col gap-2">
+								{#if productSalesChannelIds.size > 0}
+									{#each Array.from(productSalesChannelIds).map((id) => allSalesChannels.find((ch) => ch.id === id)).filter((ch): ch is NonNullable<typeof ch> => ch != null) as channel}
+										<div class="flex items-center gap-2 text-sm">
+											<Share2 class="size-4 text-muted-foreground" />
+											<span>{channel.name}</span>
+										</div>
+									{/each}
+								{:else}
+									<div class="flex items-center gap-2 text-sm">
+										<Share2 class="size-4 text-muted-foreground" />
+										<span>No sales channels selected</span>
+									</div>
+								{/if}
+							</div>
+							<p class="mt-1 text-xs text-muted-foreground">
+								Available in {productSalesChannelIds.size} of {allSalesChannels.length} sales channels
+							</p>
+						</div>
+
+						<!-- Attributes -->
+						<div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
+							<div class="flex items-center justify-between">
+								<h2 class="font-semibold">Attributes</h2>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-8 shrink-0"
+									onclick={openEditAttributesSheet}
+									aria-label="Edit attributes"
+								>
+									<Pencil class="size-4" />
+								</Button>
+							</div>
+							<dl class="mt-4 space-y-3 text-sm">
+								{#if product?.attributes && product.attributes.length > 0}
+									{#each product.attributes as attr (attr.id)}
+										<div>
+											<dt class="font-medium text-muted-foreground">{attr.title}</dt>
+											<dd class="break-words text-foreground">{attr.value}</dd>
+										</div>
+									{/each}
+								{:else}
+									<div>
+										<dt class="font-medium text-muted-foreground">No attributes</dt>
+										<dd>—</dd>
+									</div>
+								{/if}
+							</dl>
+						</div>
+
+						<!-- Shipping configuration -->
+						<div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
+							<div class="flex items-center justify-between">
+								<h2 class="font-semibold">Shipping configuration</h2>
+								<Button variant="outline" size="sm" disabled>
+									Edit
+								</Button>
+							</div>
+							<div class="mt-4 flex w-full items-center gap-3 rounded-md border p-3 text-left text-sm">
+								<Lock class="size-4 text-muted-foreground" />
+								<div>
+									<p class="font-medium">Default Shipping Profile</p>
+									<p class="text-xs text-muted-foreground">default</p>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Media + Options (row 2, column 1) -->
+					<div class="min-w-0 flex flex-col gap-6">
 						<!-- Media card -->
 						<div class="rounded-lg border bg-card p-6 shadow-sm">
 							<div class="flex items-center justify-between">
@@ -1478,26 +1668,22 @@
 							</Button>
 						</div>
 
-						<!-- Options section -->
-						{#if options.length === 0}
+						<!-- Options section: only options assigned to this product, with their values -->
+						{#if optionsWithValues.length === 0}
 							<p class="mt-4 text-sm text-muted-foreground">No options defined.</p>
 						{:else}
 							<div class="mt-4 flex flex-col gap-4">
-								{#each options as opt (opt.id)}
+								{#each optionsWithValues as { option: opt, values: vals } (opt.id)}
 									<div>
 										<p class="text-sm font-medium text-muted-foreground">{opt.title}</p>
 										<div class="mt-1.5 flex flex-wrap gap-1.5">
-											{#if optionValues.length > 0 && options.length === 1}
-												{#each optionValues as val (val)}
-													<span
-														class="inline-flex items-center rounded-md border bg-muted/50 px-2.5 py-1 text-sm"
-													>
-														{val}
-													</span>
-												{/each}
-											{:else}
-												<span class="text-sm text-muted-foreground">—</span>
-											{/if}
+											{#each vals as val (val)}
+												<span
+													class="inline-flex items-center rounded-md border bg-muted/50 px-2.5 py-1 text-sm"
+												>
+													{val}
+												</span>
+											{/each}
 										</div>
 									</div>
 								{/each}
@@ -1512,9 +1698,9 @@
 										<th class="w-14 px-4 py-3 text-left font-medium">Image</th>
 										<th class="px-4 py-3 text-left font-medium">Title</th>
 										<th class="px-4 py-3 text-left font-medium">SKU</th>
-										{#if options.length === 1}
+										{#if optionsWithValues.length === 1}
 											<th class="px-4 py-3 text-left font-medium"
-												>{options[0]?.title ?? 'Option'}</th
+												>{optionsWithValues[0]?.option?.title ?? 'Option'}</th
 											>
 										{/if}
 										<th class="px-4 py-3 text-left font-medium">Inventory</th>
@@ -1527,7 +1713,7 @@
 									{#if paginatedVariants.length === 0}
 										<tr>
 											<td
-												colspan={options.length === 1 ? 8 : 7}
+												colspan={optionsWithValues.length === 1 ? 8 : 7}
 												class="px-4 py-8 text-center text-muted-foreground"
 											>
 												No variants.
@@ -1553,7 +1739,7 @@
 												</td>
 												<td class="px-4 py-3 font-medium">{v.title}</td>
 												<td class="px-4 py-3 text-muted-foreground">{v.sku || '—'}</td>
-												{#if options.length === 1}
+												{#if optionsWithValues.length === 1}
 													<td class="px-4 py-3">{v.title}</td>
 												{/if}
 												<td class="px-4 py-3 text-muted-foreground">
@@ -1562,15 +1748,26 @@
 												<td class="px-4 py-3 text-muted-foreground">{formatDate(v.created_at)}</td>
 												<td class="px-4 py-3 text-muted-foreground">{formatDate(v.updated_at)}</td>
 												<td class="px-4 py-3">
-													<Button
-														variant="ghost"
-														size="icon"
-														class="size-8 shrink-0"
-														onclick={() => openEditVariantSheet(v)}
-														aria-label="Edit variant"
-													>
-														<Pencil class="size-4" />
-													</Button>
+													<div class="flex items-center gap-2">
+														<Button
+															variant="ghost"
+															size="icon"
+															class="size-8 shrink-0"
+															onclick={() => openEditVariantSheet(v)}
+															aria-label="Edit variant"
+														>
+															<Pencil class="size-4" />
+														</Button>
+														<Button
+															variant="ghost"
+															size="icon"
+															class="size-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+															onclick={() => openDeleteVariantConfirm(v)}
+															aria-label="Delete variant"
+														>
+															<Trash2 class="size-4" />
+														</Button>
+													</div>
 												</td>
 											</tr>
 										{/each}
@@ -1636,94 +1833,6 @@
 							</div>
 						</div>
 					</div>
-
-					<!-- Right column -->
-					<div class="flex flex-col gap-6 w-52 self-start">
-						<!-- Sales Channels -->
-						<div class="rounded-lg border bg-card p-6 shadow-sm">
-							<div class="flex items-center justify-between">
-							<h2 class="font-semibold">Sales Channels</h2>
-							<Button
-								variant="ghost"
-								size="icon"
-								class="size-8 shrink-0"
-								onclick={() => {
-									salesChannelsSheetOpen = true;
-									fetchSalesChannels();
-								}}
-								aria-label="Edit sales channels"
-							>
-								<Pencil class="size-4" />
-							</Button>
-						</div>
-						<div class="mt-4 flex flex-col gap-2">
-							{#if productSalesChannelIds.size > 0}
-								{#each Array.from(productSalesChannelIds).map((id) => allSalesChannels.find((ch) => ch.id === id)).filter((ch): ch is NonNullable<typeof ch> => ch != null) as channel}
-									<div class="flex items-center gap-2 text-sm">
-										<Share2 class="size-4 text-muted-foreground" />
-										<span>{channel.name}</span>
-									</div>
-								{/each}
-							{:else}
-								<div class="flex items-center gap-2 text-sm">
-									<Share2 class="size-4 text-muted-foreground" />
-									<span>No sales channels selected</span>
-								</div>
-							{/if}
-						</div>
-							<p class="mt-1 text-xs text-muted-foreground">
-								Available in {productSalesChannelIds.size} of {allSalesChannels.length} sales channels
-							</p>
-						</div>
-
-						<!-- Attributes -->
-						<div class="rounded-lg border bg-card p-6 shadow-sm">
-							<div class="flex items-center justify-between">
-								<h2 class="font-semibold">Attributes</h2>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									onclick={openEditAttributesSheet}
-									aria-label="Edit attributes"
-								>
-									<Pencil class="size-4" />
-								</Button>
-							</div>
-							<dl class="mt-4 space-y-3 text-sm">
-								{#if product?.attributes && product.attributes.length > 0}
-									{#each product.attributes as attr (attr.id)}
-										<div>
-											<dt class="font-medium text-muted-foreground">{attr.title}</dt>
-											<dd class="break-words text-foreground">{attr.value}</dd>
-										</div>
-									{/each}
-								{:else}
-									<div>
-										<dt class="font-medium text-muted-foreground">No attributes</dt>
-										<dd>—</dd>
-									</div>
-								{/if}
-							</dl>
-						</div>
-
-						<!-- Shipping configuration -->
-						<div class="rounded-lg border bg-card p-6 shadow-sm">
-							<div class="flex items-center justify-between">
-								<h2 class="font-semibold">Shipping configuration</h2>
-								<Button variant="outline" size="sm" disabled>
-									Edit
-								</Button>
-							</div>
-							<div class="mt-4 flex w-full items-center gap-3 rounded-md border p-3 text-left text-sm">
-								<Lock class="size-4 text-muted-foreground" />
-								<div>
-									<p class="font-medium">Default Shipping Profile</p>
-									<p class="text-xs text-muted-foreground">default</p>
-								</div>
-							</div>
-						</div>
-					</div>
 				</div>
 			</div>
 		</div>
@@ -1778,39 +1887,18 @@
 		</Sheet.Root>
 
 		<!-- Delete variant confirmation -->
-		<Dialog.Root bind:open={deleteVariantConfirmOpen}>
-			<Dialog.Content class="items-center justify-center">
-				<div class="w-full max-w-md rounded-lg border bg-card shadow-lg">
-					<Dialog.Header class="p-6 pb-0">
-						<Dialog.Title>Delete variant</Dialog.Title>
-					</Dialog.Header>
-					<div class="px-6 py-4">
-						<p class="text-sm text-muted-foreground">
-							{#if variantToDelete}
-								Delete <strong class="text-foreground">"{variantToDelete.title}"</strong
-								>{#if variantToDelete.sku} (SKU: {variantToDelete.sku}){/if}? This cannot be undone.
-							{/if}
-						</p>
-					</div>
-					<Dialog.Footer class="flex justify-end gap-2 border-t p-4">
-						<Button
-							variant="outline"
-							onclick={() => (deleteVariantConfirmOpen = false)}
-							disabled={deleteVariantSubmitting}
-						>
-							Cancel
-						</Button>
-						<Button
-							variant="destructive"
-							onclick={confirmDeleteVariant}
-							disabled={deleteVariantSubmitting}
-						>
-							{deleteVariantSubmitting ? 'Deleting…' : 'Delete'}
-						</Button>
-					</Dialog.Footer>
-				</div>
-			</Dialog.Content>
-		</Dialog.Root>
+		<DeleteConfirmationModal
+			bind:open={deleteVariantConfirmOpen}
+			entityName="variant"
+			entityTitle={
+				variantToDelete
+					? `"${variantToDelete.title}"${variantToDelete.sku ? ` (SKU: ${variantToDelete.sku})` : ''}`
+					: ''
+			}
+			onConfirm={confirmDeleteVariant}
+			onCancel={closeDeleteVariantConfirm}
+			submitting={deleteVariantSubmitting}
+		/>
 
 		<!-- Variant image sheet -->
 		<Sheet.Root bind:open={variantImageSheetOpen}>
@@ -2071,7 +2159,11 @@
 
 		<!-- Edit Organization sheet (Product organization / category selection) -->
 		<Sheet.Root bind:open={orgSheetOpen}>
-			<Sheet.Content class="flex w-full flex-col sm:max-w-lg" side="right">
+			<Sheet.Content
+				class="flex w-full flex-col sm:max-w-lg"
+				side="right"
+				onOpenAutoFocus={(e) => e.preventDefault()}
+			>
 				<Sheet.Header class="flex flex-col gap-1.5 px-4 pt-4 text-left">
 					<div class="flex items-center gap-2">
 						<Sheet.Title>Product organization</Sheet.Title>
@@ -2095,6 +2187,7 @@
 							aria-haspopup="listbox"
 							aria-controls="org-categories-listbox"
 							id="org-categories"
+							onclick={() => (orgCategoryDropdownOpen = true)}
 							onfocusout={(e) => {
 								if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
 									orgCategoryDropdownOpen = false;
@@ -2104,10 +2197,12 @@
 						>
 							<input
 								type="text"
-								class="h-full min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm outline-none placeholder:text-muted-foreground"
-								placeholder={orgCategoryDropdownOpen ? 'Type to search…' : (orgCategoryId ? orgCategoryLabel : 'Select category…')}
-								bind:value={orgCategoryInput}
-								onfocus={() => (orgCategoryDropdownOpen = true)}
+								class="h-full min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+								placeholder={orgCategoryDropdownOpen ? 'Type to search…' : (orgCategoryId ? '' : 'Select category…')}
+								value={orgCategoryDropdownOpen ? orgCategoryInput : (orgCategoryId ? orgCategoryLabel : orgCategoryInput)}
+								oninput={(e) => {
+									if (orgCategoryDropdownOpen) orgCategoryInput = (e.currentTarget as HTMLInputElement).value;
+								}}
 								onkeydown={(e) => {
 									if (e.key === 'Escape') {
 										orgCategoryDropdownOpen = false;
@@ -2119,28 +2214,34 @@
 									}
 								}}
 							/>
+							{#if orgCategoryId}
+								<button
+									type="button"
+									class="flex shrink-0 items-center justify-center rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+									aria-label="Clear category"
+									onclick={(e) => {
+										e.stopPropagation();
+										selectOrgCategory('');
+									}}
+								>
+									<X class="size-4" />
+								</button>
+							{/if}
 							{#if orgCategoryDropdownOpen}
 								<ul
 									id="org-categories-listbox"
 									class="absolute top-full left-0 z-50 mt-1 max-h-48 w-full min-w-0 overflow-auto rounded-md border border-input bg-popover py-1 text-popover-foreground shadow-md"
 									role="listbox"
 								>
-									<li role="option" aria-selected={!orgCategoryId}>
-										<button
-											type="button"
-											class="w-full cursor-pointer px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-											onclick={() => selectOrgCategory('')}
-											onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), selectOrgCategory(''))}
-										>
-											None
-										</button>
-									</li>
 									{#each orgCategoryFilteredOptions as cat (cat.id)}
 										<li role="option" aria-selected={orgCategoryId === cat.id}>
 											<button
 												type="button"
 												class="w-full cursor-pointer px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-												onclick={() => selectOrgCategory(cat.id)}
+												onclick={(e) => {
+													e.stopPropagation();
+													selectOrgCategory(cat.id);
+												}}
 												onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), selectOrgCategory(cat.id))}
 											>
 												{cat.value}
@@ -2154,58 +2255,106 @@
 							{/if}
 						</div>
 					</div>
-					<!-- Collections edit UI: search + add new + checkbox list -->
+					<!-- Collections edit UI: search input with dropdown list -->
 					<div class="flex flex-col gap-3">
 						<h3 class="text-sm font-medium">Collections</h3>
-						<div class="relative">
+						<div
+							class="relative flex h-9 w-full rounded-md border border-input bg-background text-sm shadow-xs focus-within:ring-2 focus-within:ring-ring"
+							role="combobox"
+							tabindex="0"
+							aria-expanded={orgCollectionDropdownOpen}
+							aria-haspopup="listbox"
+							aria-controls="org-collections-listbox"
+							onclick={() => (orgCollectionDropdownOpen = true)}
+							onkeydown={(e) => {
+								if (e.key === 'Escape') orgCollectionDropdownOpen = false;
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault();
+									orgCollectionDropdownOpen = true;
+								}
+							}}
+							onfocusout={(e) => {
+								if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+									orgCollectionDropdownOpen = false;
+								}
+							}}
+						>
 							<Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 							<input
 								type="text"
 								id="org-collections-search"
-								class="h-9 w-full rounded-md border border-input bg-background py-1 pl-9 pr-3 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+								class="h-full min-w-0 flex-1 border-0 bg-transparent py-1 pl-9 pr-3 outline-none placeholder:text-muted-foreground"
 								placeholder="Search collections…"
 								bind:value={orgCollectionInput}
+								onkeydown={(e) => {
+									if (e.key === 'Escape') orgCollectionDropdownOpen = false;
+								}}
 							/>
-						</div>
-						<a
-							href="/products/collections"
-							class="flex items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-						>
-							<span class="flex size-5 shrink-0 items-center justify-center rounded-full border border-current">
-								<Plus class="size-3" />
-							</span>
-							Add new collection
-						</a>
-						<ul class="max-h-48 space-y-0 overflow-auto rounded-md border border-input py-1" role="listbox">
-							{#if orgCollectionsFilteredForList.length === 0}
-								<li class="px-3 py-2 text-sm text-muted-foreground">
-									{orgCollectionInput.trim() ? 'No collections found.' : 'No collections yet.'}
-								</li>
-							{:else}
-								{#each orgCollectionsFilteredForList as col (col.id)}
-									<li class="flex items-center gap-3 px-3 py-2 text-sm">
-										<input
-											type="checkbox"
-											id="org-col-{col.id}"
-											class="size-4 rounded border-input"
-											checked={orgCollectionIds.includes(col.id)}
-											onchange={() => toggleOrgCollection(col.id)}
-										/>
-										<label for="org-col-{col.id}" class="min-w-0 flex-1 cursor-pointer truncate">
-											{col.title}
-										</label>
-									</li>
-								{/each}
+							{#if orgCollectionDropdownOpen}
+								<ul
+									id="org-collections-listbox"
+									class="absolute top-full left-0 z-50 mt-1 max-h-48 w-full min-w-0 overflow-auto rounded-md border border-input bg-popover py-1 text-popover-foreground shadow-md"
+									role="listbox"
+								>
+									{#if orgCollectionsFilteredForList.length === 0}
+										<li class="px-3 py-1.5 text-sm text-muted-foreground">
+											{orgCollectionInput.trim() ? 'No collections found.' : 'No collections yet.'}
+										</li>
+									{:else}
+										{#each orgCollectionsFilteredForList as col (col.id)}
+											<li role="option" aria-selected={orgCollectionIds.includes(col.id)}>
+												<button
+													type="button"
+													class="flex w-full cursor-pointer items-center gap-3 px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+													onclick={(e) => {
+														e.preventDefault();
+														toggleOrgCollection(col.id);
+													}}
+												>
+													<input
+														type="checkbox"
+														class="size-4 rounded border-input"
+														checked={orgCollectionIds.includes(col.id)}
+														tabindex="-1"
+														readonly
+													/>
+													<span class="min-w-0 flex-1 truncate">{col.title}</span>
+												</button>
+											</li>
+										{/each}
+									{/if}
+								</ul>
 							{/if}
-						</ul>
-						<p class="text-xs text-muted-foreground">{orgCollectionLabel}</p>
+						</div>
+						{#if orgCollectionIds.length > 0}
+							<div class="flex flex-wrap gap-1.5">
+								{#each orgCollectionIds as colId (colId)}
+									{@const col = collectionsList.find((c) => c.id === colId)}
+									{#if col}
+										<span
+											class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm"
+										>
+											{col.title}
+											<button
+												type="button"
+												class="rounded p-0.5 hover:bg-muted-foreground/20"
+												aria-label="Remove collection"
+												onclick={() => removeOrgCollection(colId)}
+											>
+												<X class="size-3" />
+											</button>
+										</span>
+									{/if}
+								{/each}
+							</div>
+						{/if}
 					</div>
 					<div class="flex flex-col gap-2">
 						<label for="org-tags-input" class="text-sm font-medium">
 							Tags <span class="font-normal text-muted-foreground">(Optional)</span>
 						</label>
 						<div
-							class="flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-2 py-1.5 text-sm shadow-xs outline-none focus-within:ring-2 focus-within:ring-ring"
+							class="relative flex min-h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-xs outline-none focus-within:ring-2 focus-within:ring-ring"
 							role="combobox"
 							aria-expanded={orgTagDropdownOpen}
 							aria-haspopup="listbox"
@@ -2215,83 +2364,85 @@
 								if (!e.currentTarget.contains(e.relatedTarget as Node | null)) orgTagDropdownOpen = false;
 							}}
 						>
-							{#each orgTagIds as tagId (tagId)}
-								{@const tag = tagsList.find((t) => t.id === tagId)}
-								{#if tag}
-									<span
-										class="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium"
-									>
-										{tag.value}
-										<button
-											type="button"
-											class="rounded p-0.5 hover:bg-muted-foreground/20"
-											aria-label="Remove tag"
-											onclick={() => removeOrgTag(tagId)}
-										>
-											<X class="size-3" />
-										</button>
-									</span>
-								{/if}
-							{/each}
-							<div class="relative flex-1 min-w-24">
-								<input
-									id="org-tags-input"
-									type="text"
-									class="flex h-7 min-w-0 flex-1 border-0 bg-transparent px-1 py-0.5 text-sm outline-none placeholder:text-muted-foreground"
-									placeholder="Type to search or create…"
-									bind:value={orgTagInput}
-									onfocus={() => (orgTagDropdownOpen = true)}
-									onkeydown={(e) => {
-										if (e.key === 'Escape') {
-											orgTagDropdownOpen = false;
-											orgTagInput = '';
-										}
-										if (e.key === 'Enter' && orgTagDropdownOpen) {
-											e.preventDefault();
-											if (orgTagShowCreate) createAndSelectOrgTag();
-											else if (orgTagFilteredOptions.length > 0) selectOrgTag(orgTagFilteredOptions[0].id);
-										}
-									}}
-								/>
-								{#if orgTagDropdownOpen}
-									<ul
-										id="org-tags-listbox"
-										class="absolute top-full left-0 z-50 mt-1 max-h-48 w-full min-w-[12rem] overflow-auto rounded-md border border-input bg-popover py-1 text-popover-foreground shadow-md"
-										role="listbox"
-									>
-										{#each orgTagFilteredOptions as tag (tag.id)}
-											<li role="option" aria-selected="false">
-												<button
-													type="button"
-													class="w-full cursor-pointer px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-													onclick={() => selectOrgTag(tag.id)}
-													onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), selectOrgTag(tag.id))}
-												>
-													{tag.value}
-												</button>
-											</li>
-										{/each}
-										{#if orgTagShowCreate}
-											<li role="option" aria-selected="false">
-												<button
-													type="button"
-													class="w-full cursor-pointer px-3 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-													disabled={orgTagCreating}
-													onclick={() => createAndSelectOrgTag()}
-													onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), createAndSelectOrgTag())}
-												>
-													{orgTagCreating ? 'Creating…' : `Create "${orgTagInput.trim()}"`}
-												</button>
-											</li>
-										{/if}
-										{#if !orgTagFilteredOptions.length && !orgTagShowCreate && orgTagInput.trim()}
-											<li class="px-3 py-1.5 text-sm text-muted-foreground">No tags found</li>
-										{/if}
-									</ul>
-								{/if}
-							</div>
+							<input
+								bind:this={orgTagsInputEl}
+								id="org-tags-input"
+								type="text"
+								class="h-7 min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm outline-none placeholder:text-muted-foreground"
+								placeholder="Type to search or create…"
+								bind:value={orgTagInput}
+								onfocus={() => (orgTagDropdownOpen = true)}
+								onkeydown={(e) => {
+									if (e.key === 'Escape') {
+										orgTagDropdownOpen = false;
+										orgTagInput = '';
+									}
+									if (e.key === 'Enter' && orgTagDropdownOpen) {
+										e.preventDefault();
+										if (orgTagShowCreate) createAndSelectOrgTag();
+										else if (orgTagFilteredOptions.length > 0) selectOrgTag(orgTagFilteredOptions[0].id);
+									}
+								}}
+							/>
+							{#if orgTagDropdownOpen}
+								<ul
+									id="org-tags-listbox"
+									class="absolute top-full left-0 z-50 mt-1 max-h-48 w-full min-w-[12rem] overflow-auto rounded-md border border-input bg-popover py-1 text-popover-foreground shadow-md"
+									role="listbox"
+								>
+									{#each orgTagFilteredOptions as tag (tag.id)}
+										<li role="option" aria-selected="false">
+											<button
+												type="button"
+												class="w-full cursor-pointer px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+												onclick={() => selectOrgTag(tag.id)}
+												onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), selectOrgTag(tag.id))}
+											>
+												{tag.value}
+											</button>
+										</li>
+									{/each}
+									{#if orgTagShowCreate}
+										<li role="option" aria-selected="false">
+											<button
+												type="button"
+												class="w-full cursor-pointer px-3 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+												disabled={orgTagCreating}
+												onclick={() => createAndSelectOrgTag()}
+												onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), createAndSelectOrgTag())}
+											>
+												{orgTagCreating ? 'Creating…' : `Create "${orgTagInput.trim()}"`}
+											</button>
+										</li>
+									{/if}
+									{#if !orgTagFilteredOptions.length && !orgTagShowCreate && orgTagInput.trim()}
+										<li class="px-3 py-1.5 text-sm text-muted-foreground">No tags found</li>
+									{/if}
+								</ul>
+							{/if}
 						</div>
-						<p class="text-xs text-muted-foreground">{orgTagLabel}</p>
+						{#if orgTagIds.length > 0}
+							<div class="flex flex-wrap gap-1.5">
+								{#each orgTagIds as tagId (tagId)}
+									{@const tag = tagsList.find((t) => t.id === tagId)}
+									{#if tag}
+										<span
+											class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-0.5 text-xs font-medium"
+										>
+											{tag.value}
+											<button
+												type="button"
+												class="rounded p-0.5 hover:bg-muted-foreground/20"
+												aria-label="Remove tag"
+												onclick={() => removeOrgTag(tagId)}
+											>
+												<X class="size-3" />
+											</button>
+										</span>
+									{/if}
+								{/each}
+							</div>
+						{/if}
 					</div>
 					{#if orgError}
 						<p class="text-sm text-destructive">{orgError}</p>
@@ -2776,22 +2927,7 @@
 							</div>
 						{/if}
 					</div>
-					<Sheet.Footer class="flex flex-wrap items-center justify-between gap-2 border-t p-4">
-						<div>
-							{#if editingVariant}
-								<Button
-									variant="destructive"
-									class="mr-auto"
-									disabled={editVariantSubmitting}
-									onclick={() => {
-										if (editingVariant) openDeleteVariantConfirm(editingVariant);
-										closeEditVariantSheet();
-									}}
-								>
-									Delete variant
-								</Button>
-							{/if}
-						</div>
+					<Sheet.Footer class="flex flex-wrap items-center justify-end gap-2 border-t p-4">
 						<div class="flex gap-2">
 							<Button
 								variant="outline"
