@@ -11,11 +11,15 @@
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import FolderTree from '@lucide/svelte/icons/folder-tree';
+	import Share2 from '@lucide/svelte/icons/share-2';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import * as Select from '$lib/components/ui/select/index.js';
+	import { SidebarTrigger } from '$lib/components/ui/sidebar/index.js';
 	import { DropdownMenu } from 'bits-ui';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import X from '@lucide/svelte/icons/x';
 	import Info from '@lucide/svelte/icons/info';
 	import { cn } from '$lib/utils.js';
 
@@ -71,6 +75,113 @@
 	let error = $state<string | null>(null);
 	let productPage = $state(1);
 	let productLimit = $state(20);
+
+	// Add products sheet
+	let addProductsSheetOpen = $state(false);
+	let addProductsData = $state<ProductsResponse | null>(null);
+	let addProductsPage = $state(1);
+	let addProductsLimit = $state(20);
+	let addProductsSearch = $state('');
+	let addProductsSelectedIds = $state<Set<string>>(new Set());
+	let addProductsSubmitting = $state(false);
+	let addProductsError = $state<string | null>(null);
+	const addProductsList = $derived(addProductsData?.products ?? []);
+	const addProductsCount = $derived(addProductsData?.count ?? 0);
+	const addProductsOffset = $derived(addProductsData?.offset ?? 0);
+	const addProductsTotalPages = $derived(
+		addProductsLimit > 0 ? Math.ceil(addProductsCount / addProductsLimit) : 1
+	);
+	const addProductsStart = $derived(addProductsOffset + 1);
+	const addProductsEnd = $derived(
+		Math.min(addProductsOffset + addProductsList.length, addProductsCount)
+	);
+	const addProductsFiltered = $derived(
+		addProductsSearch.trim()
+			? addProductsList.filter((p) =>
+					p.title.toLowerCase().includes(addProductsSearch.trim().toLowerCase())
+				)
+			: addProductsList
+	);
+
+	async function loadAddProductsList() {
+		try {
+			const params = new URLSearchParams({
+				page: String(addProductsPage),
+				limit: String(addProductsLimit),
+				sorting_field: 'created_at',
+				sorting_direction: 'desc'
+			});
+			const res = await fetch(`${API_BASE}/products?${params}`, { cache: 'no-store' });
+			if (!res.ok) throw new Error(await res.text());
+			addProductsData = (await res.json()) as ProductsResponse;
+		} catch (e) {
+			addProductsData = null;
+		}
+	}
+
+	$effect(() => {
+		if (addProductsSheetOpen) {
+			addProductsPage;
+			addProductsLimit;
+			loadAddProductsList();
+		}
+	});
+
+	function openAddProductsSheet() {
+		addProductsSheetOpen = true;
+		addProductsSelectedIds = new Set();
+		addProductsPage = 1;
+		addProductsSearch = '';
+		addProductsError = null;
+	}
+
+	function closeAddProductsSheet() {
+		addProductsSheetOpen = false;
+		addProductsError = null;
+	}
+
+	function toggleAddProductSelection(id: string) {
+		addProductsSelectedIds = new Set(addProductsSelectedIds);
+		if (addProductsSelectedIds.has(id)) addProductsSelectedIds.delete(id);
+		else addProductsSelectedIds.add(id);
+		addProductsSelectedIds = new Set(addProductsSelectedIds);
+	}
+
+	function toggleAddProductsSelectAll() {
+		if (addProductsSelectedIds.size === addProductsFiltered.length) {
+			addProductsSelectedIds = new Set();
+		} else {
+			addProductsSelectedIds = new Set(addProductsFiltered.map((p) => p.id));
+		}
+	}
+
+	async function submitAddProducts() {
+		if (!categoryId || !category) return;
+		const ids = Array.from(addProductsSelectedIds);
+		if (ids.length === 0) {
+			addProductsError = 'Select at least one product';
+			return;
+		}
+		addProductsError = null;
+		addProductsSubmitting = true;
+		try {
+			// Update each product to add it to this category
+			for (const productId of ids) {
+				const res = await fetch(`${API_BASE}/products/${productId}`, {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ category_id: categoryId })
+				});
+				if (!res.ok) throw new Error(await res.text());
+			}
+			closeAddProductsSheet();
+			loadProducts();
+		} catch (e) {
+			addProductsError = e instanceof Error ? e.message : String(e);
+		} finally {
+			addProductsSubmitting = false;
+		}
+	}
 
 	async function loadCategory() {
 		if (!categoryId) return;
@@ -146,6 +257,35 @@
 		if (!c?.metadata || typeof c.metadata !== 'object') return '—';
 		const desc = (c.metadata as { description?: string }).description;
 		return desc != null && desc !== '' ? String(desc) : '—';
+	}
+
+	function statusLabel(s: string | undefined): string {
+		if (!s) return 'Inactive';
+		if (s === 'active') return 'Active';
+		return 'Inactive';
+	}
+
+	let statusUpdating = $state(false);
+
+	async function updateStatus(newStatus: 'active' | 'inactive') {
+		if (!category) return;
+		statusUpdating = true;
+		try {
+			const res = await fetch(`${API_BASE}/product-categories/${category.id}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ status: newStatus })
+			});
+			if (!res.ok) {
+				const text = await res.text();
+				throw new Error(text || `HTTP ${res.status}`);
+			}
+			loadCategory();
+		} catch (e) {
+			console.error('Failed to update status:', e);
+		} finally {
+			statusUpdating = false;
+		}
 	}
 
 	let editSheetOpen = $state(false);
@@ -305,6 +445,24 @@
 	function goToProductEdit(productId: string) {
 		goto(`/products/${productId}`);
 	}
+
+	async function removeProductDirectly(product: Product) {
+		if (!categoryId || !category) return;
+		try {
+			const res = await fetch(`${API_BASE}/products/${product.id}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ category_id: null })
+			});
+			if (!res.ok) {
+				const text = await res.text();
+				throw new Error(text);
+			}
+			loadProducts();
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		}
+	}
 </script>
 
 <svelte:head>
@@ -312,8 +470,8 @@
 </svelte:head>
 
 <div class="flex h-full flex-col">
-	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-4">
-		<nav class="flex items-center gap-2 text-sm">
+	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
+		<nav class="flex items-center gap-[5px] text-sm pl-[10px]">
 			<button
 				type="button"
 				class="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
@@ -325,10 +483,6 @@
 			<ChevronRight class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
 			<span class="font-medium text-foreground">{category?.value ?? categoryId ?? '…'}</span>
 		</nav>
-		<Button variant="ghost" size="icon" class="size-9">
-			<Bell class="size-4" />
-			<span class="sr-only">Notifications</span>
-		</Button>
 	</div>
 
 	{#if loading}
@@ -345,141 +499,106 @@
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="flex flex-col gap-8 p-6">
-				<!-- Header: title + status pills + dropdown -->
-				<section class="flex flex-col gap-6 border-b pb-8">
-					<div class="flex flex-wrap items-center gap-2">
-						<h1 class="text-2xl font-semibold tracking-tight">{category.value}</h1>
-						<span
-							class={cn(
-								'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-								category.status === 'active' &&
-									'bg-green-500/10 text-green-700 dark:text-green-400',
-								category.status === 'inactive' && 'bg-muted text-muted-foreground'
-							)}
-						>
-							<span
-								class={cn(
-									'size-1.5 shrink-0 rounded-sm bg-current opacity-70',
-									category.status === 'active' && 'bg-green-600',
-									category.status === 'inactive' && 'bg-muted-foreground'
-								)}
-							></span>
-							{category.status === 'active' ? 'Active' : 'Inactive'}
-						</span>
-						<span
-							class={cn(
-								'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-								category.visibility === 'public' &&
-									'bg-green-500/10 text-green-700 dark:text-green-400',
-								category.visibility === 'private' && 'bg-muted text-muted-foreground'
-							)}
-						>
-							<span
-								class={cn(
-									'size-1.5 shrink-0 rounded-sm bg-current opacity-70',
-									category.visibility === 'public' && 'bg-green-600',
-									category.visibility === 'private' && 'bg-muted-foreground'
-								)}
-							></span>
-							{category.visibility === 'public' ? 'Public' : 'Private'}
-						</span>
-						<DropdownMenu.Root>
-							<DropdownMenu.Trigger
-								class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
-							>
-								<MoreHorizontal class="size-4" />
-								<span class="sr-only">Actions</span>
-							</DropdownMenu.Trigger>
-							<DropdownMenu.Portal>
-								<DropdownMenu.Content
-									class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-									sideOffset={4}
+				<div class="flex gap-6">
+					<div class="flex-1 rounded-lg border bg-card p-6 shadow-sm">
+						<!-- Header: title + status pills + dropdown -->
+						<section class="flex flex-col gap-6 pb-8">
+							<div class="flex items-center justify-between gap-4">
+								<div class="flex flex-wrap items-center gap-2">
+									<h1 class="text-2xl font-semibold tracking-tight">{category.value}</h1>
+									<span
+										class={cn(
+											'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
+											category.visibility === 'public' &&
+												'bg-green-500/10 text-green-700 dark:text-green-400',
+											category.visibility === 'private' && 'bg-muted text-muted-foreground'
+										)}
+									>
+										<span
+											class={cn(
+												'size-1.5 shrink-0 rounded-sm bg-current opacity-70',
+												category.visibility === 'public' && 'bg-green-600',
+												category.visibility === 'private' && 'bg-muted-foreground'
+											)}
+										></span>
+										{category.visibility === 'public' ? 'Public' : 'Private'}
+									</span>
+								</div>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-8 shrink-0"
+									onclick={openEditSheet}
+									aria-label="Edit category"
 								>
-									<DropdownMenu.Item
-										textValue="Edit"
-										class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-										onSelect={openEditSheet}
-									>
-										<Pencil class="size-4" />
-										Edit
-									</DropdownMenu.Item>
-									<DropdownMenu.Item
-										textValue="Delete"
-										class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-										onSelect={() => {}}
-									>
-										<Trash2 class="size-4" />
-										Delete
-									</DropdownMenu.Item>
-								</DropdownMenu.Content>
-							</DropdownMenu.Portal>
-						</DropdownMenu.Root>
-					</div>
-				</section>
-
-				<div class="grid gap-6 lg:grid-cols-3">
-					<!-- Left: Details card -->
-					<div class="rounded-lg border bg-card p-6 lg:col-span-2">
-						<h2 class="font-semibold">{category.value}</h2>
-						<dl class="mt-4 grid gap-3 text-sm">
-							<div class="flex justify-between gap-4">
-								<dt class="shrink-0 font-medium text-muted-foreground">Description</dt>
-								<dd class="text-right">{getDescription(category)}</dd>
+									<Pencil class="size-4" />
+								</Button>
 							</div>
-							<div class="flex justify-between gap-4">
-								<dt class="shrink-0 font-medium text-muted-foreground">Handle</dt>
-								<dd class="text-right">{getHandle(category)}</dd>
-							</div>
-						</dl>
-					</div>
-
-					<!-- Right: Organize card -->
-					<div class="rounded-lg border bg-card p-6">
-						<div class="flex items-center justify-between">
-							<h2 class="font-semibold">Organize</h2>
-							<DropdownMenu.Root>
-								<DropdownMenu.Trigger
-									class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
-								>
-									<MoreHorizontal class="size-4" />
-									<span class="sr-only">Actions</span>
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Portal>
-									<DropdownMenu.Content
-										class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-										sideOffset={4}
-									>
-										<DropdownMenu.Item
-											textValue="Edit"
-											class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-											onSelect={openEditSheet}
-										>
-											<Pencil class="size-4" />
-											Edit
-										</DropdownMenu.Item>
-									</DropdownMenu.Content>
-								</DropdownMenu.Portal>
-							</DropdownMenu.Root>
+						</section>
+						<!-- Details card -->
+						<div class="rounded-lg bg-card p-6">
+							<dl class="mt-4 grid gap-3 text-sm">
+								<div class="flex justify-between gap-4">
+									<dt class="shrink-0 font-medium text-muted-foreground">Description</dt>
+									<dd class="text-right">{getDescription(category)}</dd>
+								</div>
+								<div class="flex justify-between gap-4">
+									<dt class="shrink-0 font-medium text-muted-foreground">Handle</dt>
+									<dd class="text-right">{getHandle(category)}</dd>
+								</div>
+							</dl>
 						</div>
-						<dl class="mt-4 space-y-3 text-sm">
-							<div>
-								<dt class="font-medium text-muted-foreground">Path</dt>
-								<dd>{category.value}</dd>
-							</div>
-							<div>
-								<dt class="font-medium text-muted-foreground">Children</dt>
-								<dd>—</dd>
-							</div>
-						</dl>
+					</div>
+
+					<!-- Right: Status card -->
+					<div class="rounded-lg border bg-card p-6 self-start w-52 shadow-sm">
+						<h2 class="font-semibold mb-4">Status</h2>
+						<Select.Root
+							type="single"
+							value={category?.status ?? 'inactive'}
+							onValueChange={(v) => {
+								if (v && (v === 'active' || v === 'inactive')) {
+									updateStatus(v);
+								}
+							}}
+							disabled={statusUpdating || !category}
+						>
+							<Select.Trigger class="w-full">
+								<span
+									class={cn(
+										'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
+										category?.status === 'active' &&
+											'bg-green-500/10 text-green-700 dark:text-green-400',
+										category?.status === 'inactive' && 'bg-red-500/10 text-red-700 dark:text-red-400'
+									)}
+								>
+									<span
+										class={cn(
+											'size-1.5 shrink-0 rounded-sm bg-current opacity-70',
+											category?.status === 'active' && 'bg-green-600',
+											category?.status === 'inactive' && 'bg-red-600'
+										)}
+									></span>
+									{statusLabel(category?.status)}
+								</span>
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="active" label="Active">Active</Select.Item>
+								<Select.Item value="inactive" label="Inactive">Inactive</Select.Item>
+							</Select.Content>
+						</Select.Root>
 					</div>
 				</div>
 
 				<!-- Products section -->
-				<section class="rounded-lg border bg-card">
-					<div class="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4">
+				<section class="rounded-lg border bg-card shadow-sm overflow-hidden">
+					<div class="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4 rounded-t-lg">
 						<h2 class="text-base font-semibold">Products</h2>
 						<div class="flex items-center gap-2">
-							<Button variant="outline" size="sm" class="rounded-md" type="button">
+							<Button type="button" size="sm" class="rounded-md" onclick={openAddProductsSheet}>
+								Add
+							</Button>
+							<Button variant="outline" size="sm" class="rounded-md">
 								<SlidersHorizontal class="mr-1.5 size-4" />
 								Sort
 							</Button>
@@ -514,7 +633,7 @@
 									<th class="px-4 py-3 text-left font-medium">Sales Channels</th>
 									<th class="px-4 py-3 text-left font-medium">Variants</th>
 									<th class="px-4 py-3 text-left font-medium">Status</th>
-									<th class="w-10 px-4 py-3"></th>
+									<th class="px-4 py-3 text-left font-medium">Actions</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -594,29 +713,14 @@
 												</span>
 											</td>
 											<td class="px-4 py-3">
-												<DropdownMenu.Root>
-													<DropdownMenu.Trigger
-														class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
-													>
-														<MoreHorizontal class="size-4" />
-														<span class="sr-only">Actions</span>
-													</DropdownMenu.Trigger>
-													<DropdownMenu.Portal>
-														<DropdownMenu.Content
-															class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-															sideOffset={4}
-														>
-															<DropdownMenu.Item
-																textValue="Edit"
-																class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-																onSelect={() => goToProductEdit(product.id)}
-															>
-																<Pencil class="size-4" />
-																Edit
-															</DropdownMenu.Item>
-														</DropdownMenu.Content>
-													</DropdownMenu.Portal>
-												</DropdownMenu.Root>
+												<button
+													type="button"
+													class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
+													onclick={() => removeProductDirectly(product)}
+													aria-label="Remove product"
+												>
+													<X class="size-4" />
+												</button>
 											</td>
 										</tr>
 									{/each}
@@ -656,7 +760,7 @@
 
 				<!-- Metadata & JSON -->
 				<div class="grid gap-4 sm:grid-cols-2">
-					<div class="rounded-lg border bg-card p-4">
+					<div class="rounded-lg border bg-card p-4 shadow-sm">
 						<div class="flex items-center justify-between gap-2">
 							<h3 class="font-medium">Metadata</h3>
 							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
@@ -673,7 +777,7 @@
 							</Button>
 						</div>
 					</div>
-					<div class="rounded-lg border bg-card p-4">
+					<div class="rounded-lg border bg-card p-4 shadow-sm">
 						<div class="flex items-center justify-between gap-2">
 							<h3 class="font-medium">JSON</h3>
 							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
@@ -761,17 +865,6 @@
 								rows="4"
 								class="flex w-full min-w-0 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 							></textarea>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="edit-cat-status" class="text-sm font-medium">Status</label>
-							<select
-								id="edit-cat-status"
-								bind:value={editStatus}
-								class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<option value="active">Active</option>
-								<option value="inactive">Inactive</option>
-							</select>
 						</div>
 						<div class="flex flex-col gap-2">
 							<label for="edit-cat-visibility" class="text-sm font-medium">Visibility</label>
@@ -876,6 +969,172 @@
 				{:else}
 					<p class="text-sm text-muted-foreground">No data</p>
 				{/if}
+			</div>
+		</div>
+	</Sheet.Content>
+</Sheet.Root>
+
+<!-- Add products sheet -->
+<Sheet.Root bind:open={addProductsSheetOpen}>
+	<Sheet.Content side="right" class="w-full max-w-4xl sm:max-w-4xl">
+		<div class="flex h-full flex-col">
+			<div class="shrink-0 border-b px-6 py-4">
+				<h2 class="text-lg font-semibold">Add products</h2>
+				<p class="mt-1 text-sm text-muted-foreground">Select products to add to this category.</p>
+			</div>
+			<div class="flex min-h-0 flex-1 flex-col">
+				<div class="flex flex-wrap items-center justify-between gap-4 border-b px-6 py-4">
+					<Button variant="outline" size="sm" class="rounded-md" type="button">
+						<SlidersHorizontal class="mr-1.5 size-4" />
+						Sort
+					</Button>
+					<div class="relative w-48">
+						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							type="search"
+							placeholder="Search"
+							bind:value={addProductsSearch}
+							class="h-9 rounded-md pl-9"
+						/>
+					</div>
+				</div>
+				<div class="min-h-0 flex-1 overflow-auto px-6">
+					<table class="w-full text-sm">
+						<thead class="sticky top-0 z-10 border-b bg-muted/50">
+							<tr>
+								<th class="w-10 px-4 py-3 text-left font-medium">
+									<input
+										type="checkbox"
+										class="rounded border-muted-foreground/50"
+										aria-label="Select all"
+										checked={addProductsFiltered.length > 0 &&
+											addProductsSelectedIds.size === addProductsFiltered.length}
+										onchange={toggleAddProductsSelectAll}
+									/>
+								</th>
+								<th class="px-4 py-3 text-left font-medium">Product</th>
+								<th class="px-4 py-3 text-left font-medium">Collection</th>
+								<th class="px-4 py-3 text-left font-medium">Sales Channels</th>
+								<th class="px-4 py-3 text-left font-medium">Variants</th>
+								<th class="px-4 py-3 text-left font-medium">Status</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#if addProductsFiltered.length === 0}
+								<tr>
+									<td colspan="6" class="px-4 py-8 text-center text-muted-foreground">
+										No products to show.
+									</td>
+								</tr>
+							{:else}
+								{#each addProductsFiltered as p (p.id)}
+									<tr class="border-b last:border-0">
+										<td class="px-4 py-3">
+											<input
+												type="checkbox"
+												class="rounded border-muted-foreground/50"
+												aria-label="Select row"
+												checked={addProductsSelectedIds.has(p.id)}
+												onchange={() => toggleAddProductSelection(p.id)}
+											/>
+										</td>
+										<td class="px-4 py-3">
+											<div class="flex items-center gap-3">
+												{#if p.thumbnail}
+													<img
+														src={p.thumbnail}
+														alt=""
+														class="size-10 shrink-0 rounded-md object-cover"
+													/>
+												{:else}
+													<div
+														class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
+													>
+														<ImageIcon class="size-5" />
+													</div>
+												{/if}
+												<span class="font-medium">{p.title}</span>
+											</div>
+										</td>
+										<td class="px-4 py-3 text-muted-foreground">
+											{p.collection?.title ?? '—'}
+										</td>
+										<td class="px-4 py-3 text-muted-foreground">
+											{p.sales_channels?.length
+												? p.sales_channels.map((sc) => sc.name).join(', ')
+												: '—'}
+										</td>
+										<td class="px-4 py-3 text-muted-foreground">
+											{p.variants?.length ?? 0} variant{(p.variants?.length ?? 0) === 1 ? '' : 's'}
+										</td>
+										<td class="px-4 py-3">
+											<span
+												class={cn(
+													'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
+													p.status === 'published' &&
+														'bg-green-500/10 text-green-700 dark:text-green-400',
+													p.status === 'draft' && 'bg-muted text-muted-foreground',
+													p.status === 'proposed' &&
+														'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+													p.status === 'rejected' && 'bg-destructive/10 text-destructive'
+												)}
+											>
+												<span
+													class={cn(
+														'size-1.5 rounded-full',
+														p.status === 'published' && 'bg-green-600',
+														p.status === 'draft' && 'bg-muted-foreground/60',
+														p.status === 'proposed' && 'bg-amber-600',
+														p.status === 'rejected' && 'bg-destructive'
+													)}
+												></span>
+												{p.status}
+											</span>
+										</td>
+									</tr>
+								{/each}
+							{/if}
+						</tbody>
+					</table>
+				</div>
+				{#if addProductsCount > 0}
+					<div class="flex items-center justify-between gap-4 border-t px-6 py-4">
+						<p class="text-sm text-muted-foreground">
+							{addProductsStart} – {addProductsEnd} of {addProductsCount} results
+						</p>
+						<div class="flex items-center gap-2">
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={addProductsPage <= 1}
+								onclick={() => (addProductsPage = Math.max(1, addProductsPage - 1))}
+							>
+								Prev
+							</Button>
+							<span class="text-sm text-muted-foreground">
+								{addProductsPage} of {addProductsTotalPages} pages
+							</span>
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={addProductsPage >= addProductsTotalPages}
+								onclick={() =>
+									(addProductsPage = Math.min(addProductsTotalPages, addProductsPage + 1))}
+							>
+								Next
+							</Button>
+						</div>
+					</div>
+				{/if}
+			</div>
+			{#if addProductsError}
+				<p class="px-6 pb-2 text-sm text-destructive">{addProductsError}</p>
+			{/if}
+			<div class="flex justify-end gap-2 border-t p-4">
+				<Button variant="outline" onclick={closeAddProductsSheet}>Cancel</Button>
+				<Button onclick={submitAddProducts} disabled={addProductsSubmitting}>
+					{addProductsSubmitting ? 'Saving…' : 'Save'}
+				</Button>
 			</div>
 		</div>
 	</Sheet.Content>

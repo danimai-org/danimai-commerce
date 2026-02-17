@@ -3,6 +3,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import { DropdownMenu } from 'bits-ui';
 	import Search from '@lucide/svelte/icons/search';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
@@ -10,7 +11,6 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import FileText from '@lucide/svelte/icons/file-text';
-	import Bell from '@lucide/svelte/icons/bell';
 	import Info from '@lucide/svelte/icons/info';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { cn } from '$lib/utils.js';
@@ -95,17 +95,39 @@
 		return collection.handle.startsWith('/') ? collection.handle : `/${collection.handle}`;
 	}
 
-	async function deleteCollection(collection: ProductCollection) {
+	let deleteConfirmOpen = $state(false);
+	let collectionToDelete = $state<ProductCollection | null>(null);
+	let deleteSubmitting = $state(false);
+
+	function openDeleteConfirm(collection: ProductCollection) {
+		collectionToDelete = collection;
+		deleteConfirmOpen = true;
+	}
+
+	function closeDeleteConfirm() {
+		if (!deleteSubmitting) {
+			deleteConfirmOpen = false;
+			collectionToDelete = null;
+		}
+	}
+
+	async function confirmDeleteCollection() {
+		if (!collectionToDelete) return;
+		deleteSubmitting = true;
 		try {
 			const res = await fetch(`${API_BASE}/collections`, {
 				method: 'DELETE',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ collection_ids: [collection.id] })
+				body: JSON.stringify({ collection_ids: [collectionToDelete.id] })
 			});
 			if (!res.ok) throw new Error(await res.text());
+			deleteConfirmOpen = false;
+			collectionToDelete = null;
 			fetchCollections();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			deleteSubmitting = false;
 		}
 	}
 
@@ -221,13 +243,6 @@
 				<FileText class="size-4" />
 				<span>Collections</span>
 			</div>
-			<button
-				type="button"
-				class="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-			>
-				<Bell class="size-4" />
-				<span class="sr-only">Notifications</span>
-			</button>
 		</div>
 		<div class="mb-6 flex flex-col gap-4">
 			<div class="flex items-start justify-between gap-4">
@@ -330,7 +345,7 @@
 													<DropdownMenu.Item
 														textValue="Delete"
 														class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => deleteCollection(collection)}
+														onSelect={() => openDeleteConfirm(collection)}
 													>
 														<Trash2 class="size-4" />
 														Delete
@@ -519,3 +534,13 @@
 		</div>
 	</Sheet.Content>
 </Sheet.Root>
+
+<!-- Delete collection confirmation -->
+<DeleteConfirmationModal
+	bind:open={deleteConfirmOpen}
+	entityName="collection"
+	entityTitle={collectionToDelete?.title || collectionToDelete?.handle || collectionToDelete?.id || ''}
+	onConfirm={confirmDeleteCollection}
+	onCancel={closeDeleteConfirm}
+	submitting={deleteSubmitting}
+/>

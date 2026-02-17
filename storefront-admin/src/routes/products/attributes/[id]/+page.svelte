@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+	import Pencil from '@lucide/svelte/icons/pencil';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -133,6 +133,45 @@
 	let metadataRows = $state<Array<{ key: string; value: string }>>([{ key: '', value: '' }]);
 	let metadataError = $state<string | null>(null);
 	let metadataSubmitting = $state(false);
+	let editAttributeSheetOpen = $state(false);
+	let editAttributeTitle = $state('');
+	let editAttributeType = $state('');
+	let editAttributeError = $state<string | null>(null);
+	let editAttributeSaving = $state(false);
+
+	function openEditAttributeSheet() {
+		if (!attribute) return;
+		editAttributeSheetOpen = true;
+		editAttributeTitle = attribute.title;
+		editAttributeType = attribute.type;
+		editAttributeError = null;
+	}
+
+	async function saveAttributeEdit() {
+		if (!attributeId || !attribute) return;
+		editAttributeError = null;
+		editAttributeSaving = true;
+		try {
+			const res = await fetch(`${API_BASE}/product-attributes/${attributeId}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ 
+					title: editAttributeTitle.trim(),
+					type: editAttributeType
+				})
+			});
+			if (!res.ok) {
+				const text = await res.text();
+				throw new Error(text || `HTTP ${res.status}`);
+			}
+			editAttributeSheetOpen = false;
+			await loadAttribute();
+		} catch (e) {
+			editAttributeError = e instanceof Error ? e.message : String(e);
+		} finally {
+			editAttributeSaving = false;
+		}
+	}
 
 	function openMetadataSheet() {
 		if (!attribute) return;
@@ -195,8 +234,8 @@
 </svelte:head>
 
 <div class="flex h-full flex-col">
-	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-4">
-		<nav class="flex items-center gap-2 text-sm">
+	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
+		<nav class="flex items-center gap-[5px] text-sm pl-[10px]">
 			<button
 				type="button"
 				class="flex items-center gap-1 text-muted-foreground hover:text-foreground"
@@ -230,53 +269,43 @@
 			>
 		</div>
 	{:else}
-		<div class="flex-1 overflow-auto p-6">
-			<div class="mx-auto max-w-4xl space-y-6">
-				<div class="flex items-start justify-between gap-4">
-					<div class="flex items-center gap-2">
-						<ListFilter class="size-5 text-muted-foreground" />
-						<h1 class="text-xl font-semibold">{attribute.title}</h1>
+		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
+			<div class="flex flex-col gap-8 p-6">
+				<div class="flex gap-6">
+					<div class="flex-1 rounded-lg border bg-card p-6 shadow-sm">
+						<!-- Attribute header -->
+						<section class="flex flex-col gap-6 pb-8">
+							<div class="flex items-center justify-between gap-4">
+								<div class="flex items-center gap-2">
+									<ListFilter class="size-5 text-muted-foreground" />
+									<h1 class="text-2xl font-semibold tracking-tight">{attribute.title}</h1>
+								</div>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-8 shrink-0"
+									onclick={openEditAttributeSheet}
+									aria-label="Edit attribute"
+								>
+									<Pencil class="size-4" />
+								</Button>
+							</div>
+						</section>
+						<!-- Details -->
+						<div class="rounded-lg bg-card">
+							<dl class="grid gap-3 text-sm sm:grid-cols-2">
+								<div>
+									<dt class="font-medium text-muted-foreground">Type</dt>
+									<dd class="mt-1 font-medium">{attribute.type}</dd>
+								</div>
+							</dl>
+						</div>
 					</div>
-					<Button variant="ghost" size="icon" class="size-8 shrink-0">
-						<MoreHorizontal class="size-4" />
-						<span class="sr-only">Actions</span>
-					</Button>
 				</div>
 
-				<dl class="grid gap-4 rounded-lg border bg-card p-6 sm:grid-cols-2">
-					<div>
-						<dt class="font-medium text-muted-foreground">Type</dt>
-						<dd class="mt-1 font-medium">{attribute.type}</dd>
-					</div>
-					<div>
-						<dt class="font-medium text-muted-foreground">Created</dt>
-						<dd class="mt-1 text-sm">
-							{new Date(attribute.created_at).toLocaleDateString('en-US', {
-								month: 'short',
-								day: 'numeric',
-								year: 'numeric',
-								hour: '2-digit',
-								minute: '2-digit'
-							})}
-						</dd>
-					</div>
-					<div>
-						<dt class="font-medium text-muted-foreground">Updated</dt>
-						<dd class="mt-1 text-sm">
-							{new Date(attribute.updated_at).toLocaleDateString('en-US', {
-								month: 'short',
-								day: 'numeric',
-								year: 'numeric',
-								hour: '2-digit',
-								minute: '2-digit'
-							})}
-						</dd>
-					</div>
-				</dl>
-
-				<div class="rounded-lg border bg-card p-6">
-					<div class="flex flex-wrap items-center justify-between gap-2">
-						<h2 class="font-semibold">Products</h2>
+				<section class="rounded-lg border bg-card shadow-sm overflow-hidden">
+					<div class="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4 rounded-t-lg">
+						<h2 class="text-base font-semibold">Products</h2>
 						<div class="flex items-center gap-2">
 							<Button variant="outline" size="sm" class="rounded-md">
 								<SlidersHorizontal class="mr-1.5 size-4" />
@@ -295,7 +324,7 @@
 							</div>
 						</div>
 					</div>
-					<div class="mt-4 overflow-hidden rounded-md border">
+					<div class="overflow-x-auto">
 						<table class="w-full text-sm">
 							<thead class="border-b bg-muted/50">
 								<tr>
@@ -386,7 +415,7 @@
 						</table>
 					</div>
 					{#if pagination && pagination.total > 0}
-						<div class="mt-4 flex items-center justify-between border-t pt-4">
+						<div class="mt-4 flex items-center justify-between border-t pt-[5px] px-[5px] pb-[5px]">
 							<p class="text-sm text-muted-foreground">
 								{start} – {end} of {pagination.total} results
 							</p>
@@ -413,24 +442,24 @@
 							</div>
 						</div>
 					{/if}
-				</div>
+				</section>
 
 				<div class="grid gap-4 sm:grid-cols-2">
-					<div class="rounded-lg border bg-card p-4">
-						<div class="flex items-center justify-between">
+					<div class="rounded-lg border bg-card p-4 shadow-sm">
+						<div class="flex items-center justify-between gap-2">
 							<h3 class="font-medium">Metadata</h3>
-							<span class="text-xs text-muted-foreground">{metadataKeys} keys</span>
-							<Button variant="ghost" size="icon" class="size-8" onclick={openMetadataSheet}>
+							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{metadataKeys} keys</span>
+							<Button variant="ghost" size="icon" class="size-8 shrink-0" onclick={openMetadataSheet}>
 								<ExternalLink class="size-4" />
 								<span class="sr-only">Open</span>
 							</Button>
 						</div>
 					</div>
-					<div class="rounded-lg border bg-card p-4">
-						<div class="flex items-center justify-between">
+					<div class="rounded-lg border bg-card p-4 shadow-sm">
+						<div class="flex items-center justify-between gap-2">
 							<h3 class="font-medium">JSON</h3>
-							<span class="text-xs text-muted-foreground">{jsonKeys} keys</span>
-							<Button variant="ghost" size="icon" class="size-8" onclick={() => (jsonOpen = true)}>
+							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{jsonKeys} keys</span>
+							<Button variant="ghost" size="icon" class="size-8 shrink-0" onclick={() => (jsonOpen = true)}>
 								<ExternalLink class="size-4" />
 								<span class="sr-only">Open</span>
 							</Button>
@@ -499,6 +528,60 @@
 				<Button variant="outline" onclick={closeMetadataSheet}>Cancel</Button>
 				<Button onclick={submitAttributeMetadata} disabled={metadataSubmitting}>
 					{metadataSubmitting ? 'Saving…' : 'Save'}
+				</Button>
+			</div>
+		</div>
+	</Sheet.Content>
+</Sheet.Root>
+
+<!-- Edit attribute sheet -->
+<Sheet.Root bind:open={editAttributeSheetOpen}>
+	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
+		<div class="flex h-full flex-col">
+			<Sheet.Header class="flex flex-col gap-1.5 border-b px-6 py-4">
+				<Sheet.Title>Edit attribute</Sheet.Title>
+				<Sheet.Description class="text-sm text-muted-foreground">
+					Update the attribute title and type.
+				</Sheet.Description>
+			</Sheet.Header>
+			<div class="min-h-0 flex-1 overflow-auto p-6">
+				{#if editAttributeError}
+					<div class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+						{editAttributeError}
+					</div>
+				{/if}
+				<div class="flex flex-col gap-6">
+					<div class="flex flex-col gap-4">
+						<div class="flex flex-col gap-2">
+							<label for="edit-attribute-title" class="text-sm font-medium">Title</label>
+							<Input
+								id="edit-attribute-title"
+								bind:value={editAttributeTitle}
+								placeholder="e.g. Color"
+								class="h-9"
+							/>
+						</div>
+						<div class="flex flex-col gap-2">
+							<label for="edit-attribute-type" class="text-sm font-medium">Type</label>
+							<select
+								id="edit-attribute-type"
+								bind:value={editAttributeType}
+								class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							>
+								<option value="string">String</option>
+								<option value="number">Number</option>
+								<option value="boolean">Boolean</option>
+							</select>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="flex justify-end gap-2 border-t p-4">
+				<Button variant="outline" onclick={() => (editAttributeSheetOpen = false)} disabled={editAttributeSaving}>
+					Cancel
+				</Button>
+				<Button onclick={saveAttributeEdit} disabled={editAttributeSaving || !editAttributeTitle.trim()}>
+					{editAttributeSaving ? 'Saving…' : 'Save'}
 				</Button>
 			</div>
 		</div>

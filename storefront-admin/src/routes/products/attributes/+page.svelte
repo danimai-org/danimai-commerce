@@ -3,6 +3,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import { DropdownMenu } from 'bits-ui';
 	import Search from '@lucide/svelte/icons/search';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
@@ -95,17 +96,39 @@
 		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
 	);
 
-	async function deleteAttribute(attr: ProductAttribute) {
+	let deleteConfirmOpen = $state(false);
+	let attributeToDelete = $state<ProductAttribute | null>(null);
+	let deleteSubmitting = $state(false);
+
+	function openDeleteConfirm(attr: ProductAttribute) {
+		attributeToDelete = attr;
+		deleteConfirmOpen = true;
+	}
+
+	function closeDeleteConfirm() {
+		if (!deleteSubmitting) {
+			deleteConfirmOpen = false;
+			attributeToDelete = null;
+		}
+	}
+
+	async function confirmDeleteAttribute() {
+		if (!attributeToDelete) return;
+		deleteSubmitting = true;
 		try {
 			const res = await fetch(`${API_BASE}/product-attributes`, {
 				method: 'DELETE',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ attribute_ids: [attr.id] })
+				body: JSON.stringify({ attribute_ids: [attributeToDelete.id] })
 			});
 			if (!res.ok) throw new Error(await res.text());
+			deleteConfirmOpen = false;
+			attributeToDelete = null;
 			fetchAttributes();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			deleteSubmitting = false;
 		}
 	}
 
@@ -304,14 +327,6 @@
 													sideOffset={4}
 												>
 													<DropdownMenu.Item
-														textValue="View"
-														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => goto(`/products/attributes/${attr.id}`)}
-													>
-														<Eye class="size-4" />
-														View
-													</DropdownMenu.Item>
-													<DropdownMenu.Item
 														textValue="Edit"
 														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
 														onSelect={() => openEdit(attr)}
@@ -322,7 +337,7 @@
 													<DropdownMenu.Item
 														textValue="Delete"
 														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => deleteAttribute(attr)}
+														onSelect={() => openDeleteConfirm(attr)}
 													>
 														<Trash2 class="size-4" />
 														Delete
@@ -472,3 +487,13 @@
 		</div>
 	</Sheet.Content>
 </Sheet.Root>
+
+<!-- Delete attribute confirmation -->
+<DeleteConfirmationModal
+	bind:open={deleteConfirmOpen}
+	entityName="attribute"
+	entityTitle={attributeToDelete?.title || attributeToDelete?.id || ''}
+	onConfirm={confirmDeleteAttribute}
+	onCancel={closeDeleteConfirm}
+	submitting={deleteSubmitting}
+/>

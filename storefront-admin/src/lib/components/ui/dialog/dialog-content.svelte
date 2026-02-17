@@ -11,16 +11,18 @@
 		ref = $bindable(null),
 		class: className,
 		portalProps,
+		overlayClass,
 		children,
 		...restProps
 	}: WithoutChildrenOrChild<DialogPrimitive.ContentProps> & {
 		portalProps?: WithoutChildrenOrChild<ComponentProps<typeof DialogPortal>>;
+		overlayClass?: string;
 		children: Snippet;
 	} = $props();
 </script>
 
 <DialogPortal {...portalProps}>
-	<DialogOverlay />
+	<DialogOverlay class={overlayClass} />
 	<DialogPrimitive.Content
 		bind:ref
 		data-slot="dialog-content"
@@ -28,6 +30,7 @@
 			'fixed inset-0 z-50 flex h-dvh w-full flex-col overflow-hidden bg-background shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:duration-300 data-[state=open]:duration-500',
 			className
 		)}
+		style="background-color: var(--background, oklch(1 0 0));"
 		{...restProps}
 	>
 		{@render children?.()}

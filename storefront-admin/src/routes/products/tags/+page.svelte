@@ -3,6 +3,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import { DropdownMenu } from 'bits-ui';
 	import Search from '@lucide/svelte/icons/search';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
@@ -11,7 +12,6 @@
 	import Eye from '@lucide/svelte/icons/eye';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import Tag from '@lucide/svelte/icons/tag';
-	import Bell from '@lucide/svelte/icons/bell';
 	import { cn } from '$lib/utils.js';
 
 	const API_BASE = 'http://localhost:8000';
@@ -88,17 +88,39 @@
 		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
 	);
 
-	async function deleteTag(tag: ProductTag) {
+	let deleteConfirmOpen = $state(false);
+	let tagToDelete = $state<ProductTag | null>(null);
+	let deleteSubmitting = $state(false);
+
+	function openDeleteConfirm(tag: ProductTag) {
+		tagToDelete = tag;
+		deleteConfirmOpen = true;
+	}
+
+	function closeDeleteConfirm() {
+		if (!deleteSubmitting) {
+			deleteConfirmOpen = false;
+			tagToDelete = null;
+		}
+	}
+
+	async function confirmDeleteTag() {
+		if (!tagToDelete) return;
+		deleteSubmitting = true;
 		try {
 			const res = await fetch(`${API_BASE}/product-tags`, {
 				method: 'DELETE',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ tag_ids: [tag.id] })
+				body: JSON.stringify({ tag_ids: [tagToDelete.id] })
 			});
 			if (!res.ok) throw new Error(await res.text());
+			deleteConfirmOpen = false;
+			tagToDelete = null;
 			fetchTags();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			deleteSubmitting = false;
 		}
 	}
 
@@ -198,13 +220,6 @@
 				<Tag class="size-4" />
 				<span>Tags</span>
 			</div>
-			<button
-				type="button"
-				class="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-			>
-				<Bell class="size-4" />
-				<span class="sr-only">Notifications</span>
-			</button>
 		</div>
 		<div class="mb-6 flex flex-col gap-4">
 			<div class="flex items-start justify-between gap-4">
@@ -301,14 +316,6 @@
 													sideOffset={4}
 												>
 													<DropdownMenu.Item
-														textValue="View"
-														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => goto(`/products/tags/${tag.id}`)}
-													>
-														<Eye class="size-4" />
-														View
-													</DropdownMenu.Item>
-													<DropdownMenu.Item
 														textValue="Edit"
 														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
 														onSelect={() => openEdit(tag)}
@@ -319,7 +326,7 @@
 													<DropdownMenu.Item
 														textValue="Delete"
 														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => deleteTag(tag)}
+														onSelect={() => openDeleteConfirm(tag)}
 													>
 														<Trash2 class="size-4" />
 														Delete
@@ -444,3 +451,13 @@
 		</div>
 	</Sheet.Content>
 </Sheet.Root>
+
+<!-- Delete tag confirmation -->
+<DeleteConfirmationModal
+	bind:open={deleteConfirmOpen}
+	entityName="tag"
+	entityTitle={tagToDelete?.value || tagToDelete?.id || ''}
+	onConfirm={confirmDeleteTag}
+	onCancel={closeDeleteConfirm}
+	submitting={deleteSubmitting}
+/>

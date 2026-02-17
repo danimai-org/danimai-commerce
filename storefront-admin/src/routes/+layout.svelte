@@ -278,14 +278,6 @@
 											</SidebarMenuSubItem>
 											<SidebarMenuSubItem>
 												<SidebarMenuSubButton
-													href="/inventory/stock-levels"
-													isActive={path.startsWith('/inventory/stock-levels')}
-												>
-													Stock levels
-												</SidebarMenuSubButton>
-											</SidebarMenuSubItem>
-											<SidebarMenuSubItem>
-												<SidebarMenuSubButton
 													href="/inventory/locations"
 													isActive={path.startsWith('/inventory/locations')}
 												>

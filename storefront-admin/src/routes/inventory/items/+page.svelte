@@ -1,8 +1,12 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import Search from '@lucide/svelte/icons/search';
-	import Plus from '@lucide/svelte/icons/plus';
+	import Pencil from '@lucide/svelte/icons/pencil';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
 
 	const API_BASE = 'http://localhost:8000';
 
@@ -88,6 +92,152 @@
 		page = 1;
 		fetchItems();
 	}
+
+	// Create inventory item sheet
+	let createSheetOpen = $state(false);
+	let createSku = $state('');
+	let createRequiresShipping = $state(true);
+	let createError = $state<string | null>(null);
+	let createSubmitting = $state(false);
+
+	function openCreateSheet() {
+		createSheetOpen = true;
+		createSku = '';
+		createRequiresShipping = true;
+		createError = null;
+	}
+
+	function closeCreateSheet() {
+		createSheetOpen = false;
+	}
+
+	async function submitCreate() {
+		createError = null;
+		createSubmitting = true;
+		try {
+			const res = await fetch(`${API_BASE}/inventory/items`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					inventory_items: [
+						{
+							sku: createSku.trim() || null,
+							requires_shipping: createRequiresShipping
+						}
+					]
+				})
+			});
+			if (!res.ok) {
+				const text = await res.text();
+				throw new Error(text || `HTTP ${res.status}`);
+			}
+			closeCreateSheet();
+			fetchItems();
+		} catch (e) {
+			createError = e instanceof Error ? e.message : String(e);
+		} finally {
+			createSubmitting = false;
+		}
+	}
+
+	// Edit inventory item sheet
+	let editSheetOpen = $state(false);
+	let editItemId = $state<string | null>(null);
+	let editSku = $state('');
+	let editRequiresShipping = $state(true);
+	let editError = $state<string | null>(null);
+	let editSubmitting = $state(false);
+
+	function openEditSheet(item: InventoryItem) {
+		editItemId = item.id;
+		editSku = item.sku ?? '';
+		editRequiresShipping = item.requires_shipping;
+		editError = null;
+		editSheetOpen = true;
+	}
+
+	function closeEditSheet() {
+		editSheetOpen = false;
+		editItemId = null;
+	}
+
+	async function submitEdit() {
+		if (!editItemId) return;
+		editError = null;
+		editSubmitting = true;
+		try {
+			const res = await fetch(`${API_BASE}/inventory/items/${editItemId}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					sku: editSku.trim() || null,
+					requires_shipping: editRequiresShipping
+				})
+			});
+			if (!res.ok) {
+				const text = await res.text();
+				throw new Error(text || `HTTP ${res.status}`);
+			}
+			closeEditSheet();
+			fetchItems();
+		} catch (e) {
+			editError = e instanceof Error ? e.message : String(e);
+		} finally {
+			editSubmitting = false;
+		}
+	}
+
+	// Delete inventory item
+	let deleteModalOpen = $state(false);
+	let deleteItemId = $state<string | null>(null);
+	let deleteItemTitle = $state('');
+	let deleteError = $state<string | null>(null);
+	let deleteSubmitting = $state(false);
+
+	function openDeleteModal(item: InventoryItem) {
+		deleteItemId = item.id;
+		deleteItemTitle = item.sku ?? item.id.slice(0, 8);
+		deleteError = null;
+		deleteModalOpen = true;
+	}
+
+	function closeDeleteModal() {
+		if (!deleteSubmitting) {
+			deleteModalOpen = false;
+			deleteItemId = null;
+			deleteError = null;
+		}
+	}
+
+	async function confirmDelete() {
+		if (!deleteItemId) return;
+		deleteSubmitting = true;
+		deleteError = null;
+		try {
+			const res = await fetch(`${API_BASE}/inventory/items/${deleteItemId}`, {
+				method: 'DELETE'
+			});
+			if (!res.ok) {
+				const text = await res.text();
+				let message = text;
+				try {
+					const json = JSON.parse(text) as { message?: string };
+					if (json.message) message = json.message;
+				} catch {
+					// use text as-is
+				}
+				deleteError = message;
+				return;
+			}
+			deleteModalOpen = false;
+			deleteItemId = null;
+			fetchItems();
+		} catch (e) {
+			deleteError = e instanceof Error ? e.message : String(e);
+		} finally {
+			deleteSubmitting = false;
+		}
+	}
 </script>
 
 <div class="flex h-full flex-col">
@@ -107,8 +257,7 @@
 						Manage and track your inventory items.
 					</p>
 				</div>
-				<Button>
-					<Plus class="mr-2 size-4" />
+				<Button onclick={openCreateSheet}>
 					Add Item
 				</Button>
 			</div>
@@ -160,12 +309,30 @@
 						{:else}
 							{#each items as item (item.id)}
 								<tr class="border-b transition-colors hover:bg-muted/30">
-									<td class="px-4 py-3 font-medium">{item.sku ?? '–'}</td>
-									<td class="px-4 py-3 text-muted-foreground">
+									<td
+										class="px-4 py-3 font-medium cursor-pointer"
+										onclick={() => goto(`/inventory/items/${item.id}`)}
+									>
+										{item.sku ?? '–'}
+									</td>
+									<td
+										class="px-4 py-3 text-muted-foreground cursor-pointer"
+										onclick={() => goto(`/inventory/items/${item.id}`)}
+									>
 										{item.requires_shipping ? 'Yes' : 'No'}
 									</td>
-									<td class="px-4 py-3 text-muted-foreground">{formatDate(item.created_at)}</td>
-									<td class="px-4 py-3 text-muted-foreground">{formatDate(item.updated_at)}</td>
+									<td
+										class="px-4 py-3 text-muted-foreground cursor-pointer"
+										onclick={() => goto(`/inventory/items/${item.id}`)}
+									>
+										{formatDate(item.created_at)}
+									</td>
+									<td
+										class="px-4 py-3 text-muted-foreground cursor-pointer"
+										onclick={() => goto(`/inventory/items/${item.id}`)}
+									>
+										{formatDate(item.updated_at)}
+									</td>
 								</tr>
 							{/each}
 						{/if}
@@ -205,3 +372,114 @@
 		{/if}
 	</div>
 </div>
+
+<!-- Create Inventory Item Sheet -->
+<Sheet.Root bind:open={createSheetOpen}>
+	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
+		<div class="flex h-full flex-col">
+			<div class="flex-1 overflow-auto p-6 pt-12">
+				<h2 class="text-lg font-semibold">Create Inventory Item</h2>
+				<p class="mt-1 text-sm text-muted-foreground">
+					Add a new inventory item to track stock.
+				</p>
+				{#if createError && !createSubmitting}
+					<div
+						class="mt-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+					>
+						{createError}
+					</div>
+				{/if}
+				<div class="mt-6 flex flex-col gap-4">
+					<div class="flex flex-col gap-2">
+						<label for="create-sku" class="text-sm font-medium">SKU</label>
+						<Input
+							id="create-sku"
+							bind:value={createSku}
+							placeholder="e.g. SKU-001"
+							class="h-9"
+						/>
+						<p class="text-xs text-muted-foreground">Optional. Leave blank for non-shippable items.</p>
+					</div>
+					<div class="flex items-center gap-2">
+						<input
+							type="checkbox"
+							id="create-requires-shipping"
+							bind:checked={createRequiresShipping}
+							class="h-4 w-4 rounded border-input"
+						/>
+						<label for="create-requires-shipping" class="text-sm font-medium">Requires shipping</label>
+					</div>
+				</div>
+			</div>
+			<div class="flex justify-end gap-2 border-t p-4">
+				<Button variant="outline" onclick={closeCreateSheet} disabled={createSubmitting}>
+					Cancel
+				</Button>
+				<Button onclick={submitCreate} disabled={createSubmitting}>
+					{createSubmitting ? 'Creating…' : 'Create'}
+				</Button>
+			</div>
+		</div>
+	</Sheet.Content>
+</Sheet.Root>
+
+<!-- Edit Inventory Item Sheet -->
+<Sheet.Root bind:open={editSheetOpen}>
+	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
+		<div class="flex h-full flex-col">
+			<div class="flex-1 overflow-auto p-6 pt-12">
+				<h2 class="text-lg font-semibold">Edit Inventory Item</h2>
+				<p class="mt-1 text-sm text-muted-foreground">
+					Update inventory item details.
+				</p>
+				{#if editError && !editSubmitting}
+					<div
+						class="mt-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+					>
+						{editError}
+					</div>
+				{/if}
+				<div class="mt-6 flex flex-col gap-4">
+					<div class="flex flex-col gap-2">
+						<label for="edit-sku" class="text-sm font-medium">SKU</label>
+						<Input
+							id="edit-sku"
+							bind:value={editSku}
+							placeholder="e.g. SKU-001"
+							class="h-9"
+						/>
+						<p class="text-xs text-muted-foreground">Optional. Leave blank for non-shippable items.</p>
+					</div>
+					<div class="flex items-center gap-2">
+						<input
+							type="checkbox"
+							id="edit-requires-shipping"
+							bind:checked={editRequiresShipping}
+							class="h-4 w-4 rounded border-input"
+						/>
+						<label for="edit-requires-shipping" class="text-sm font-medium">Requires shipping</label>
+					</div>
+				</div>
+			</div>
+			<div class="flex justify-end gap-2 border-t p-4">
+				<Button variant="outline" onclick={closeEditSheet} disabled={editSubmitting}>
+					Cancel
+				</Button>
+				<Button onclick={submitEdit} disabled={editSubmitting}>
+					{editSubmitting ? 'Saving…' : 'Save'}
+				</Button>
+			</div>
+		</div>
+	</Sheet.Content>
+</Sheet.Root>
+
+<!-- Delete Confirmation Modal -->
+<DeleteConfirmationModal
+	bind:open={deleteModalOpen}
+	entityName="inventory item"
+	entityTitle={deleteItemTitle}
+	onConfirm={confirmDelete}
+	onCancel={closeDeleteModal}
+	submitting={deleteSubmitting}
+	error={deleteError}
+/>

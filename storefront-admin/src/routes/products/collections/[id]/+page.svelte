@@ -13,9 +13,11 @@
 	import FileText from '@lucide/svelte/icons/file-text';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import { DropdownMenu } from 'bits-ui';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import X from '@lucide/svelte/icons/x';
 	import Info from '@lucide/svelte/icons/info';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { cn } from '$lib/utils.js';
@@ -371,18 +373,72 @@
 		goto(`/products/${productId}`);
 	}
 
-	async function removeProductFromCollection(productId: string) {
+	let removeProductModalOpen = $state(false);
+	let productToRemove = $state<Product | null>(null);
+	let removeProductSubmitting = $state(false);
+	let removeProductError = $state<string | null>(null);
+
+	function openRemoveProductConfirm(product: Product) {
+		productToRemove = product;
+		removeProductError = null;
+		removeProductModalOpen = true;
+	}
+
+	function closeRemoveProductConfirm() {
+		if (!removeProductSubmitting) {
+			removeProductModalOpen = false;
+			productToRemove = null;
+			removeProductError = null;
+		}
+	}
+
+	async function confirmRemoveProduct() {
+		if (!collectionId || !collection || !productToRemove) return;
+		removeProductSubmitting = true;
+		removeProductError = null;
+		try {
+			const res = await fetch(`${API_BASE}/collections/${collectionId}/products`, {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ product_ids: [productToRemove.id] })
+			});
+			if (!res.ok) {
+				const text = await res.text();
+				let message = text;
+				try {
+					const json = JSON.parse(text) as { message?: string };
+					if (json.message) message = json.message;
+				} catch {
+					// use text as-is
+				}
+				removeProductError = message;
+				return;
+			}
+			removeProductModalOpen = false;
+			productToRemove = null;
+			loadProducts();
+		} catch (e) {
+			removeProductError = e instanceof Error ? e.message : String(e);
+		} finally {
+			removeProductSubmitting = false;
+		}
+	}
+
+	async function removeProductDirectly(product: Product) {
 		if (!collectionId || !collection) return;
 		try {
 			const res = await fetch(`${API_BASE}/collections/${collectionId}/products`, {
 				method: 'DELETE',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ product_ids: [productId] })
+				body: JSON.stringify({ product_ids: [product.id] })
 			});
-			if (!res.ok) throw new Error(await res.text());
+			if (!res.ok) {
+				const text = await res.text();
+				throw new Error(text);
+			}
 			loadProducts();
-		} catch {
-			// could set error state
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
 		}
 	}
 </script>
@@ -393,8 +449,8 @@
 
 <div class="flex h-full flex-col">
 	<!-- Breadcrumb + actions -->
-	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-4">
-		<nav class="flex items-center gap-2 text-sm">
+	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
+		<nav class="flex items-center gap-[5px] text-sm pl-[10px]">
 			<button
 				type="button"
 				class="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
@@ -406,12 +462,6 @@
 			<ChevronRight class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
 			<span class="font-medium text-foreground">{collection?.title ?? collectionId ?? '…'}</span>
 		</nav>
-		<div class="flex items-center gap-1">
-			<Button variant="ghost" size="icon" class="size-9">
-				<Bell class="size-4" />
-				<span class="sr-only">Notifications</span>
-			</Button>
-		</div>
 	</div>
 
 	{#if loading}
@@ -428,115 +478,96 @@
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="flex flex-col gap-8 p-6">
-				<!-- Collection details section: title bar (title left, actions right) + Handle below -->
-				<section class="flex flex-col gap-6 border-b pb-8">
-					<div class="flex items-center justify-between gap-4">
-						<h1 class="text-2xl font-semibold tracking-tight">{collection.title}</h1>
-						<DropdownMenu.Root>
-							<DropdownMenu.Trigger
-								class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
-							>
-								<MoreHorizontal class="size-4" />
-								<span class="sr-only">Actions</span>
-							</DropdownMenu.Trigger>
-							<DropdownMenu.Portal>
-								<DropdownMenu.Content
-									class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-									sideOffset={4}
+				<div class="flex gap-6">
+					<div class="flex-1 rounded-lg border bg-card p-6 shadow-sm">
+						<!-- Collection header -->
+						<section class="flex flex-col gap-6 pb-8">
+							<div class="flex items-center justify-between gap-4">
+								<h1 class="text-2xl font-semibold tracking-tight">{collection.title}</h1>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-8 shrink-0"
+									onclick={openEdit}
+									aria-label="Edit collection"
 								>
-									<DropdownMenu.Item
-										textValue="Edit"
-										class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-										onSelect={openEdit}
-									>
-										<Pencil class="size-4" />
-										Edit
-									</DropdownMenu.Item>
-									<DropdownMenu.Item
-										textValue="Delete"
-										class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-										onSelect={() => {}}
-									>
-										<Trash2 class="size-4" />
-										Delete
-									</DropdownMenu.Item>
-								</DropdownMenu.Content>
-							</DropdownMenu.Portal>
-						</DropdownMenu.Root>
-					</div>
-					<div class="flex items-center gap-3">
-						<label
-							for="collection-handle"
-							class="shrink-0 text-sm font-medium text-muted-foreground">Handle</label
-						>
-						<Input
-							id="collection-handle"
-							type="text"
-							value={getHandle(collection)}
-							readonly
-							class="h-9 max-w-xs rounded-md border border-input bg-background px-3 font-mono text-sm"
-						/>
-					</div>
-				</section>
-
-				<!-- Products section -->
-				<section class="rounded-lg border bg-card">
-					<div class="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4">
-						<div class="flex items-center gap-2">
-							<h2 class="text-base font-semibold">Products</h2>
-							<DropdownMenu.Root>
-								<DropdownMenu.Trigger
-									class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
+									<Pencil class="size-4" />
+								</Button>
+							</div>
+							<div class="flex items-center gap-3">
+								<label
+									for="collection-handle"
+									class="shrink-0 text-sm font-medium text-muted-foreground">Handle</label
 								>
-									<MoreHorizontal class="size-4" />
-									<span class="sr-only">Products actions</span>
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Portal>
-									<DropdownMenu.Content
-										class="z-50 min-w-40 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-										sideOffset={4}
-									>
-										<DropdownMenu.Item
-											textValue="Add products"
-											class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-											onSelect={openAddProductsSheet}
-										>
-											Add products
-										</DropdownMenu.Item>
-									</DropdownMenu.Content>
-								</DropdownMenu.Portal>
-							</DropdownMenu.Root>
-						</div>
-						<div class="flex items-center gap-2">
-							<Button type="button" size="sm" class="rounded-md" onclick={openAddProductsSheet}>
-								<Plus class="mr-1.5 size-4" />
-								Add
-							</Button>
-							<Button variant="outline" size="sm" class="rounded-md">
-								<SlidersHorizontal class="mr-1.5 size-4" />
-								Sort
-							</Button>
-							<div class="relative w-48">
-								<Search
-									class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-								/>
 								<Input
-									type="search"
-									placeholder="Search"
-									bind:value={productSearch}
-									class="h-9 rounded-md pl-9"
+									id="collection-handle"
+									type="text"
+									value={getHandle(collection)}
+									readonly
+									class="h-9 max-w-xs rounded-md border border-input bg-background px-3 font-mono text-sm"
 								/>
 							</div>
-							<button
-								type="button"
-								class="flex size-9 shrink-0 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-							>
-								<SlidersHorizontal class="size-4" />
-								<span class="sr-only">Sort</span>
-							</button>
-						</div>
+						</section>
 					</div>
-					<div class="overflow-x-auto">
+				</div>
+
+				<!-- Products section -->
+				<section class="rounded-lg border bg-card shadow-sm overflow-hidden">
+						<div class="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4 rounded-t-lg">
+							<div class="flex items-center gap-2">
+								<h2 class="text-base font-semibold">Products</h2>
+								<DropdownMenu.Root>
+									<DropdownMenu.Trigger
+										class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
+									>
+										<MoreHorizontal class="size-4" />
+										<span class="sr-only">Products actions</span>
+									</DropdownMenu.Trigger>
+									<DropdownMenu.Portal>
+										<DropdownMenu.Content
+											class="z-50 min-w-40 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+											sideOffset={4}
+										>
+											<DropdownMenu.Item
+												textValue="Add products"
+												class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+												onSelect={openAddProductsSheet}
+											>
+												Add products
+											</DropdownMenu.Item>
+										</DropdownMenu.Content>
+									</DropdownMenu.Portal>
+								</DropdownMenu.Root>
+							</div>
+							<div class="flex items-center gap-2">
+								<Button type="button" size="sm" class="rounded-md" onclick={openAddProductsSheet}>
+									Add
+								</Button>
+								<Button variant="outline" size="sm" class="rounded-md">
+									<SlidersHorizontal class="mr-1.5 size-4" />
+									Sort
+								</Button>
+								<div class="relative w-48">
+									<Search
+										class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+									/>
+									<Input
+										type="search"
+										placeholder="Search"
+										bind:value={productSearch}
+										class="h-9 rounded-md pl-9"
+									/>
+								</div>
+								<button
+									type="button"
+									class="flex size-9 shrink-0 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+								>
+									<SlidersHorizontal class="size-4" />
+									<span class="sr-only">Sort</span>
+								</button>
+							</div>
+						</div>
+						<div class="overflow-x-auto">
 						<table class="w-full text-sm">
 							<thead class="sticky top-0 z-10 border-b bg-muted/50">
 								<tr>
@@ -552,7 +583,7 @@
 									<th class="px-4 py-3 text-left font-medium">Sales Channels</th>
 									<th class="px-4 py-3 text-left font-medium">Variants</th>
 									<th class="px-4 py-3 text-left font-medium">Status</th>
-									<th class="w-10 px-4 py-3"></th>
+									<th class="px-4 py-3 text-left font-medium">Actions</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -631,45 +662,22 @@
 												</span>
 											</td>
 											<td class="px-4 py-3">
-												<DropdownMenu.Root>
-													<DropdownMenu.Trigger
-														class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
-													>
-														<MoreHorizontal class="size-4" />
-														<span class="sr-only">Actions</span>
-													</DropdownMenu.Trigger>
-													<DropdownMenu.Portal>
-														<DropdownMenu.Content
-															class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-															sideOffset={4}
-														>
-															<DropdownMenu.Item
-																textValue="Edit"
-																class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-																onSelect={() => goToProductEdit(product.id)}
-															>
-																<Pencil class="size-4" />
-																Edit
-															</DropdownMenu.Item>
-															<DropdownMenu.Item
-																textValue="Remove"
-																class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-																onSelect={() => removeProductFromCollection(product.id)}
-															>
-																<Trash2 class="size-4" />
-																Remove
-															</DropdownMenu.Item>
-														</DropdownMenu.Content>
-													</DropdownMenu.Portal>
-												</DropdownMenu.Root>
+												<button
+													type="button"
+													class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
+													onclick={() => removeProductDirectly(product)}
+													aria-label="Remove product"
+												>
+													<X class="size-4" />
+												</button>
 											</td>
 										</tr>
 									{/each}
 								{/if}
 							</tbody>
 						</table>
-					</div>
-					{#if count > 0}
+						</div>
+						{#if count > 0}
 						<div class="flex items-center justify-between gap-4 border-t px-6 py-4">
 							<p class="text-sm text-muted-foreground">
 								{start} – {end} of {count} results
@@ -696,12 +704,12 @@
 								</Button>
 							</div>
 						</div>
-					{/if}
-				</section>
+						{/if}
+					</section>
 
 				<!-- Metadata & JSON -->
 				<div class="grid gap-4 sm:grid-cols-2">
-					<div class="rounded-lg border bg-card p-4">
+					<div class="rounded-lg border bg-card p-4 shadow-sm">
 						<div class="flex items-center justify-between gap-2">
 							<h3 class="font-medium">Metadata</h3>
 							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
@@ -718,7 +726,7 @@
 							</Button>
 						</div>
 					</div>
-					<div class="rounded-lg border bg-card p-4">
+					<div class="rounded-lg border bg-card p-4 shadow-sm">
 						<div class="flex items-center justify-between gap-2">
 							<h3 class="font-medium">JSON</h3>
 							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
@@ -1055,3 +1063,15 @@
 		</div>
 	</Sheet.Content>
 </Sheet.Root>
+
+<!-- Remove product from collection confirmation -->
+<DeleteConfirmationModal
+	bind:open={removeProductModalOpen}
+	entityName="product"
+	entityTitle={productToRemove?.title ?? productToRemove?.id ?? ''}
+	customMessage="Remove this product from the collection? The product will remain but will no longer be associated with this collection."
+	onConfirm={confirmRemoveProduct}
+	onCancel={closeRemoveProductConfirm}
+	submitting={removeProductSubmitting}
+	error={removeProductError}
+/>

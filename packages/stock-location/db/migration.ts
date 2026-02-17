@@ -9,16 +9,16 @@ export async function up(db: Kysely<unknown>) {
   await db.schema
     .createTable("stock_locations")
     .addColumn("id", "uuid", (col) =>
-      col.primaryKey().defaultTo(sql`gen_random_uuid()`)
+      col.primaryKey().defaultTo(sql`gen_random_uuid()`),
     )
     .addColumn("name", "text")
     .addColumn("address_id", "uuid")
     .addColumn("metadata", "jsonb")
     .addColumn("created_at", "timestamptz", (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`now()`),
     )
     .addColumn("updated_at", "timestamptz", (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`now()`),
     )
     .addColumn("deleted_at", "timestamptz")
     .execute();
@@ -27,10 +27,10 @@ export async function up(db: Kysely<unknown>) {
   await db.schema
     .createTable("stock_location_addresses")
     .addColumn("id", "uuid", (col) =>
-      col.primaryKey().defaultTo(sql`gen_random_uuid()`)
+      col.primaryKey().defaultTo(sql`gen_random_uuid()`),
     )
     .addColumn("stock_location_id", "uuid", (col) =>
-      col.references("stock_locations.id").onDelete("cascade")
+      col.references("stock_locations.id").onDelete("cascade"),
     )
     .addColumn("address_1", "text")
     .addColumn("address_2", "text")
@@ -42,16 +42,16 @@ export async function up(db: Kysely<unknown>) {
     .addColumn("phone", "text")
     .addColumn("metadata", "jsonb")
     .addColumn("created_at", "timestamptz", (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`now()`),
     )
     .addColumn("updated_at", "timestamptz", (col) =>
-      col.notNull().defaultTo(sql`now()`)
+      col.notNull().defaultTo(sql`now()`),
     )
     .addColumn("deleted_at", "timestamptz")
     .execute();
 }
 
 export async function down(db: Kysely<unknown>) {
-  await db.schema.dropTable("stock_locations").execute();
+  await db.schema.dropTable("stock_locations").cascade().execute();
   await db.schema.dropTable("stock_location_addresses").execute();
 }

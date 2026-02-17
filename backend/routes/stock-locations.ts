@@ -21,6 +21,10 @@ import {
   UpdateStockLocationSchema,
   DeleteStockLocationsSchema,
 } from "@danimai/stock-location";
+import {
+  CHECK_LOCATIONS_IN_USE_PROCESS,
+  CheckLocationsInUseProcess,
+} from "@danimai/inventory";
 import { handleProcessError } from "../utils/error-handler";
 import Value from "typebox/value";
 
@@ -153,9 +157,14 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
     "/",
     async ({ body, set }) => {
       try {
-        const process = getService<DeleteStockLocationsProcess>(DELETE_STOCK_LOCATIONS_PROCESS);
         const logger = getService<Logger>(DANIMAI_LOGGER);
         const input = body as unknown as DeleteStockLocationsProcessInput;
+        const checkProcess = getService<CheckLocationsInUseProcess>(CHECK_LOCATIONS_IN_USE_PROCESS);
+        await checkProcess.runOperations({
+          input: { location_ids: input.stock_location_ids },
+          logger,
+        });
+        const process = getService<DeleteStockLocationsProcess>(DELETE_STOCK_LOCATIONS_PROCESS);
         await process.runOperations({ input, logger });
         return new Response(null, { status: 204 });
       } catch (err) {

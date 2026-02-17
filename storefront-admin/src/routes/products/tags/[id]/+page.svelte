@@ -11,6 +11,7 @@
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import Pencil from '@lucide/svelte/icons/pencil';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { cn } from '$lib/utils.js';
 
@@ -132,6 +133,40 @@
 	let metadataRows = $state<Array<{ key: string; value: string }>>([{ key: '', value: '' }]);
 	let metadataError = $state<string | null>(null);
 	let metadataSubmitting = $state(false);
+	let editTagSheetOpen = $state(false);
+	let editTagValue = $state('');
+	let editTagError = $state<string | null>(null);
+	let editTagSaving = $state(false);
+
+	function openEditTagSheet() {
+		if (!tag) return;
+		editTagSheetOpen = true;
+		editTagValue = tag.value;
+		editTagError = null;
+	}
+
+	async function saveTagEdit() {
+		if (!tagId || !tag) return;
+		editTagError = null;
+		editTagSaving = true;
+		try {
+			const res = await fetch(`${API_BASE}/product-tags/${tagId}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ value: editTagValue.trim() })
+			});
+			if (!res.ok) {
+				const text = await res.text();
+				throw new Error(text || `HTTP ${res.status}`);
+			}
+			editTagSheetOpen = false;
+			await loadTag();
+		} catch (e) {
+			editTagError = e instanceof Error ? e.message : String(e);
+		} finally {
+			editTagSaving = false;
+		}
+	}
 
 	function openMetadataSheet() {
 		if (!tag) return;
@@ -195,8 +230,8 @@
 
 <div class="flex h-full flex-col">
 	<!-- Breadcrumb + actions -->
-	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-4">
-		<nav class="flex items-center gap-2 text-sm">
+	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
+		<nav class="flex items-center gap-[5px] text-sm pl-[10px]">
 			<button
 				type="button"
 				class="flex items-center gap-1 text-muted-foreground hover:text-foreground"
@@ -216,10 +251,6 @@
 			<span class="text-muted-foreground">/</span>
 			<span class="font-medium">{tag?.value ?? tagId ?? '…'}</span>
 		</nav>
-		<Button variant="ghost" size="icon" class="size-9">
-			<Bell class="size-4" />
-			<span class="sr-only">Notifications</span>
-		</Button>
 	</div>
 
 	{#if loading}
@@ -232,21 +263,32 @@
 			<Button variant="outline" onclick={() => goto('/products/tags')}>Back to Tags</Button>
 		</div>
 	{:else}
-		<div class="flex-1 overflow-auto p-6">
-			<div class="mx-auto max-w-4xl space-y-6">
-				<!-- Tag header -->
-				<div class="flex items-start justify-between gap-4">
-					<h1 class="text-xl font-semibold"># {tag.value}</h1>
-					<Button variant="ghost" size="icon" class="size-8 shrink-0">
-						<MoreHorizontal class="size-4" />
-						<span class="sr-only">Actions</span>
-					</Button>
+		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
+			<div class="flex flex-col gap-8 p-6">
+				<div class="flex gap-6">
+					<div class="flex-1 rounded-lg border bg-card p-6 shadow-sm">
+						<!-- Tag header -->
+						<section class="flex flex-col gap-6 pb-8">
+							<div class="flex items-center justify-between gap-4">
+								<h1 class="text-2xl font-semibold tracking-tight"># {tag.value}</h1>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-8 shrink-0"
+									onclick={openEditTagSheet}
+									aria-label="Edit tag"
+								>
+									<Pencil class="size-4" />
+								</Button>
+							</div>
+						</section>
+					</div>
 				</div>
 
 				<!-- Products section -->
-				<div class="rounded-lg border bg-card p-6">
-					<div class="flex flex-wrap items-center justify-between gap-2">
-						<h2 class="font-semibold">Products</h2>
+				<section class="rounded-lg border bg-card shadow-sm overflow-hidden">
+					<div class="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4 rounded-t-lg">
+						<h2 class="text-base font-semibold">Products</h2>
 						<div class="flex items-center gap-2">
 							<Button variant="outline" size="sm" class="rounded-md">
 								<SlidersHorizontal class="mr-1.5 size-4" />
@@ -265,7 +307,7 @@
 							</div>
 						</div>
 					</div>
-					<div class="mt-4 overflow-hidden rounded-md border">
+					<div class="overflow-x-auto">
 						<table class="w-full text-sm">
 							<thead class="border-b bg-muted/50">
 								<tr>
@@ -356,7 +398,7 @@
 						</table>
 					</div>
 					{#if pagination && pagination.total > 0}
-						<div class="mt-4 flex items-center justify-between border-t pt-4">
+						<div class="mt-4 flex items-center justify-between border-t p-[5px]">
 							<p class="text-sm text-muted-foreground">
 								{start} – {end} of {pagination.total} results
 							</p>
@@ -383,25 +425,25 @@
 							</div>
 						</div>
 					{/if}
-				</div>
+				</section>
 
 				<!-- Metadata & JSON -->
 				<div class="grid gap-4 sm:grid-cols-2">
-					<div class="rounded-lg border bg-card p-4">
-						<div class="flex items-center justify-between">
+					<div class="rounded-lg border bg-card p-4 shadow-sm">
+						<div class="flex items-center justify-between gap-2">
 							<h3 class="font-medium">Metadata</h3>
-							<span class="text-xs text-muted-foreground">{metadataKeys} keys</span>
-							<Button variant="ghost" size="icon" class="size-8" onclick={openMetadataSheet}>
+							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{metadataKeys} keys</span>
+							<Button variant="ghost" size="icon" class="size-8 shrink-0" onclick={openMetadataSheet}>
 								<ExternalLink class="size-4" />
 								<span class="sr-only">Open</span>
 							</Button>
 						</div>
 					</div>
-					<div class="rounded-lg border bg-card p-4">
-						<div class="flex items-center justify-between">
+					<div class="rounded-lg border bg-card p-4 shadow-sm">
+						<div class="flex items-center justify-between gap-2">
 							<h3 class="font-medium">JSON</h3>
-							<span class="text-xs text-muted-foreground">{jsonKeys} keys</span>
-							<Button variant="ghost" size="icon" class="size-8" onclick={() => (jsonOpen = true)}>
+							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{jsonKeys} keys</span>
+							<Button variant="ghost" size="icon" class="size-8 shrink-0" onclick={() => (jsonOpen = true)}>
 								<ExternalLink class="size-4" />
 								<span class="sr-only">Open</span>
 							</Button>
@@ -470,6 +512,46 @@
 				<Button variant="outline" onclick={closeMetadataSheet}>Cancel</Button>
 				<Button onclick={submitTagMetadata} disabled={metadataSubmitting}>
 					{metadataSubmitting ? 'Saving…' : 'Save'}
+				</Button>
+			</div>
+		</div>
+	</Sheet.Content>
+</Sheet.Root>
+
+<!-- Edit tag sheet -->
+<Sheet.Root bind:open={editTagSheetOpen}>
+	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
+		<div class="flex h-full flex-col">
+			<Sheet.Header class="flex flex-col gap-1.5 border-b px-6 py-4">
+				<Sheet.Title>Edit tag</Sheet.Title>
+				<Sheet.Description class="text-sm text-muted-foreground">
+					Update the tag value.
+				</Sheet.Description>
+			</Sheet.Header>
+			<div class="min-h-0 flex-1 overflow-auto p-6">
+				{#if editTagError}
+					<div class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+						{editTagError}
+					</div>
+				{/if}
+				<div class="flex flex-col gap-6">
+					<div class="flex flex-col gap-2">
+						<label for="edit-tag-value" class="text-sm font-medium">Tag value</label>
+						<Input
+							id="edit-tag-value"
+							bind:value={editTagValue}
+							placeholder="e.g. sale"
+							class="h-9"
+						/>
+					</div>
+				</div>
+			</div>
+			<div class="flex justify-end gap-2 border-t p-4">
+				<Button variant="outline" onclick={() => (editTagSheetOpen = false)} disabled={editTagSaving}>
+					Cancel
+				</Button>
+				<Button onclick={saveTagEdit} disabled={editTagSaving || !editTagValue.trim()}>
+					{editTagSaving ? 'Saving…' : 'Save'}
 				</Button>
 			</div>
 		</div>

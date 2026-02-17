@@ -4,6 +4,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import Package from '@lucide/svelte/icons/package';
 	import Bell from '@lucide/svelte/icons/bell';
 	import Search from '@lucide/svelte/icons/search';
@@ -14,9 +15,11 @@
 	import Check from '@lucide/svelte/icons/check';
 	import Upload from '@lucide/svelte/icons/upload-cloud';
 	import GripVertical from '@lucide/svelte/icons/grip-vertical';
+	import XCircle from '@lucide/svelte/icons/x-circle';
 	import X from '@lucide/svelte/icons/x';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import Plus from '@lucide/svelte/icons/plus';
 	import { DropdownMenu } from 'bits-ui';
 	import { cn } from '$lib/utils.js';
 
@@ -31,9 +34,9 @@
 		status: string;
 		thumbnail: string | null;
 		category_id?: string | null;
+		category?: { id: string; value: string; handle: string } | null;
 		created_at?: string;
 		updated_at?: string;
-		collection?: { id: string; title: string; handle: string } | null;
 		sales_channels?: Array<{ id: string; name: string }>;
 		variants?: Array<{ id: string }>;
 	};
@@ -107,6 +110,8 @@
 	let productToDelete = $state<Product | null>(null);
 	let deleteSubmitting = $state(false);
 
+	let selectedProducts = $state<Set<string>>(new Set());
+
 	async function fetchProducts() {
 		loading = true;
 		error = null;
@@ -118,6 +123,9 @@
 				sorting_field: sortingField,
 				sorting_direction: sortingDirection
 			});
+			if (searchQuery.trim()) {
+				params.append('search', searchQuery.trim());
+			}
 			const res = await fetch(`${API_BASE}/products?${params}`, { cache: 'no-store' });
 			if (!res.ok) {
 				const text = await res.text();
@@ -153,11 +161,20 @@
 		}
 	}
 
+	let previousSearchQuery = $state('');
+	$effect(() => {
+		if (searchQuery !== previousSearchQuery) {
+			previousSearchQuery = searchQuery;
+			page = 1;
+		}
+	});
+
 	$effect(() => {
 		page;
 		limit;
 		sortingField;
 		sortingDirection;
+		searchQuery;
 		fetchProducts();
 	});
 
@@ -349,6 +366,13 @@
 			error = 'Failed to delete product';
 		} finally {
 			deleteSubmitting = false;
+		}
+	}
+
+	function handleDeleteCancel() {
+		if (!deleteSubmitting) {
+			deleteConfirmOpen = false;
+			productToDelete = null;
 		}
 	}
 
@@ -585,10 +609,50 @@
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex flex-col gap-4">
 			<div class="flex flex-wrap items-center gap-2">
-				<Button variant="outline" size="sm" class="rounded-md">
-					<SlidersHorizontal class="mr-1.5 size-4" />
-					Sort
-				</Button>
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger
+						class="inline-flex items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+					>
+						<SlidersHorizontal class="size-4" />
+						Sort
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Portal>
+						<DropdownMenu.Content
+							class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+							sideOffset={4}
+						>
+							<DropdownMenu.Item
+								textValue="Add"
+								class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+								onSelect={openCreate}
+							>
+								<Plus class="size-4" />
+								Add
+							</DropdownMenu.Item>
+							<DropdownMenu.Separator class="my-1 h-px bg-muted" />
+							<DropdownMenu.Item
+								textValue="Sort by Created Date"
+								class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+								onSelect={() => {
+									sortingField = 'created_at';
+									sortingDirection = sortingDirection === 'asc' ? 'desc' : 'asc';
+								}}
+							>
+								Sort by Created Date
+							</DropdownMenu.Item>
+							<DropdownMenu.Item
+								textValue="Sort by Title"
+								class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+								onSelect={() => {
+									sortingField = 'title';
+									sortingDirection = sortingDirection === 'asc' ? 'desc' : 'asc';
+								}}
+							>
+								Sort by Title
+							</DropdownMenu.Item>
+						</DropdownMenu.Content>
+					</DropdownMenu.Portal>
+				</DropdownMenu.Root>
 				<div class="relative max-w-md min-w-[200px] flex-1">
 					<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 					<Input
@@ -624,24 +688,44 @@
 				<table class="w-full text-sm">
 					<thead class="sticky top-0 border-b bg-muted/50">
 						<tr>
+							<th class="w-10 px-4 py-3"></th>
 							<th class="px-4 py-3 text-left font-medium">Product</th>
-							<th class="px-4 py-3 text-left font-medium">Collection</th>
+							<th class="px-4 py-3 text-left font-medium">Category</th>
+							<th class="px-4 py-3 text-left font-medium">Inventory</th>
 							<th class="px-4 py-3 text-left font-medium">Sales Channels</th>
 							<th class="px-4 py-3 text-left font-medium">Variants</th>
 							<th class="px-4 py-3 text-left font-medium">Status</th>
-							<th class="w-10 px-4 py-3"></th>
+							<th class="px-4 py-3 text-left font-medium">Actions</th>
 						</tr>
 					</thead>
 					<tbody>
 						{#if products.length === 0}
 							<tr>
-								<td colspan="6" class="px-4 py-8 text-center text-muted-foreground">
+								<td colspan="8" class="px-4 py-8 text-center text-muted-foreground">
 									No products found.
 								</td>
 							</tr>
 						{:else}
 							{#each products as product (product.id)}
+								{@const isSelected = selectedProducts.has(product.id)}
 								<tr class="border-b transition-colors hover:bg-muted/30">
+									<td class="px-4 py-3">
+										<input
+											type="checkbox"
+											checked={isSelected}
+											onchange={(e) => {
+												const checked = (e.currentTarget as HTMLInputElement).checked;
+												if (checked) {
+													selectedProducts = new Set([...selectedProducts, product.id]);
+												} else {
+													const newSet = new Set(selectedProducts);
+													newSet.delete(product.id);
+													selectedProducts = newSet;
+												}
+											}}
+											class="size-4 rounded border-input"
+										/>
+									</td>
 									<td class="px-4 py-3">
 										<a
 											href="/products/{product.id}"
@@ -666,7 +750,15 @@
 										</a>
 									</td>
 									<td class="px-4 py-3 text-muted-foreground">
-										{product.collection?.title ?? '—'}
+										{product.category?.value ?? '—'}
+									</td>
+									<td class="px-4 py-3 text-muted-foreground">
+										<a
+											href="/products/{product.id}"
+											class="text-primary hover:underline"
+										>
+											View
+										</a>
 									</td>
 									<td class="px-4 py-3 text-muted-foreground">
 										{product.sales_channels?.length
@@ -701,40 +793,21 @@
 										</span>
 									</td>
 									<td class="px-4 py-3">
-										<DropdownMenu.Root>
-											<DropdownMenu.Trigger
+										{#if isSelected}
+											<button
+												type="button"
+												onclick={() => {
+													const newSet = new Set(selectedProducts);
+													newSet.delete(product.id);
+													selectedProducts = newSet;
+												}}
 												class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground"
+												aria-label="Deselect"
 											>
-												<MoreHorizontal class="size-4" />
-												<span class="sr-only">Actions</span>
-											</DropdownMenu.Trigger>
-											<DropdownMenu.Portal>
-												<DropdownMenu.Content
-													class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-													sideOffset={4}
-												>
-													<DropdownMenu.Item
-														textValue="Edit"
-														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => goto(`/products/${product.id}`)}
-													>
-														<Pencil class="size-4" />
-														Edit
-													</DropdownMenu.Item>
-													<DropdownMenu.Item
-														textValue="Delete"
-														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => {
-															productToDelete = product;
-															deleteConfirmOpen = true;
-														}}
-													>
-														<Trash2 class="size-4" />
-														Delete
-													</DropdownMenu.Item>
-												</DropdownMenu.Content>
-											</DropdownMenu.Portal>
-										</DropdownMenu.Root>
+												<XCircle class="size-4" />
+												<span class="sr-only">Cancel selection</span>
+											</button>
+										{/if}
 									</td>
 								</tr>
 							{/each}
@@ -1392,37 +1465,11 @@
 </Dialog.Root>
 
 <!-- Delete product confirmation -->
-<Dialog.Root
-	open={deleteConfirmOpen}
-	onOpenChange={(o) => {
-		deleteConfirmOpen = o;
-		if (!o) productToDelete = null;
-	}}
->
-	<Dialog.Content class="max-w-md gap-0 p-0">
-		<Dialog.Header class="p-6 pb-0">
-			<Dialog.Title>Delete product</Dialog.Title>
-		</Dialog.Header>
-		<div class="px-6 py-4">
-			<p class="text-sm text-muted-foreground">
-				Are you sure you want to delete
-				{#if productToDelete}
-					<strong class="text-foreground">{productToDelete.title || productToDelete.handle || productToDelete.id}</strong>?
-				{/if}
-				This action cannot be undone.
-			</p>
-		</div>
-		<Dialog.Footer class="flex justify-end gap-2 border-t p-4">
-			<Button variant="outline" disabled={deleteSubmitting} onclick={closeDeleteConfirm}>
-				Cancel
-			</Button>
-			<Button
-				variant="destructive"
-				disabled={deleteSubmitting}
-				onclick={confirmDeleteProduct}
-			>
-				{deleteSubmitting ? 'Deleting…' : 'Delete'}
-			</Button>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+<DeleteConfirmationModal
+	bind:open={deleteConfirmOpen}
+	entityName="product"
+	entityTitle={productToDelete?.title || productToDelete?.handle || productToDelete?.id || ''}
+	onConfirm={confirmDeleteProduct}
+	onCancel={handleDeleteCancel}
+	submitting={deleteSubmitting}
+/>

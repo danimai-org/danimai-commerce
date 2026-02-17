@@ -19,8 +19,10 @@ import { inviteRoutes } from "./invites";
 import { customerRoutes } from "./customers";
 import { inventoryRoutes } from "./inventory";
 import { stockLocationRoutes } from "./stock-locations";
+import { uploadRoutes } from "./upload";
 
 export const routes = new Elysia()
+  .use(uploadRoutes)
   .use(productRoutes)
   .use(collectionRoutes)
   .use(productCategoryRoutes)

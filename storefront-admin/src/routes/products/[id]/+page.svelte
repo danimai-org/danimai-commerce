@@ -4,6 +4,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import Package from '@lucide/svelte/icons/package';
 	import Bell from '@lucide/svelte/icons/bell';
 	import Search from '@lucide/svelte/icons/search';
@@ -20,7 +21,10 @@
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import X from '@lucide/svelte/icons/x';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+	import Info from '@lucide/svelte/icons/info';
+	import Plus from '@lucide/svelte/icons/plus';
 	import { DropdownMenu } from 'bits-ui';
+	import * as Select from '$lib/components/ui/select/index.js';
 	import { cn } from '$lib/utils.js';
 
 	const API_BASE = 'http://localhost:8000';
@@ -64,6 +68,7 @@
 		title: string;
 		sku: string | null;
 		product_id: string | null;
+		thumbnail: string | null;
 		manage_inventory: boolean;
 		allow_backorder?: boolean;
 		barcode?: string | null;
@@ -92,6 +97,20 @@
 	let productSalesChannelIds = $state<Set<string>>(new Set());
 	let salesChannelsSearchQuery = $state('');
 	let salesChannelsSubmitting = $state(false);
+
+	// Media (product image)
+	let addMediaSheetOpen = $state(false);
+	let productImageUrl = $state('');
+	let productImageFilePreview = $state<string | null>(null);
+	let addMediaSubmitting = $state(false);
+	let addMediaError = $state<string | null>(null);
+	let productImageFile = $state<File | null>(null);
+
+	// Variant image picker
+	let variantImageSheetOpen = $state(false);
+	let variantImageVariant = $state<ProductVariant | null>(null);
+	let variantImageUrl = $state('');
+	let variantImageSubmitting = $state(false);
 
 	// Option values: when single option, use variant titles as values
 	const optionValues = $derived.by(() => {
@@ -235,6 +254,112 @@
 		}
 	}
 
+	function openAddMediaSheet() {
+		productImageUrl =
+			product?.thumbnail && isPersistentImageUrl(product.thumbnail) ? product.thumbnail : '';
+		productImageFilePreview = null;
+		productImageFile = null;
+		addMediaError = null;
+		addMediaSheetOpen = true;
+	}
+
+	function onAddMediaFileSelect(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (file && file.type.startsWith('image/')) {
+			if (productImageFilePreview) URL.revokeObjectURL(productImageFilePreview);
+			productImageFile = file;
+			productImageFilePreview = URL.createObjectURL(file);
+			productImageUrl = productImageFilePreview;
+		}
+		input.value = '';
+	}
+
+	function isPersistentImageUrl(url: string | null | undefined): boolean {
+		if (!url) return false;
+		return url.startsWith('http://') || url.startsWith('https://');
+	}
+
+	async function saveProductImage() {
+		if (!productId) return;
+		if (!productImageFile && productImageUrl?.startsWith('blob:')) {
+			return;
+		}
+		addMediaSubmitting = true;
+		addMediaError = null;
+		try {
+			let thumbnail: string | null = productImageUrl?.trim() || null;
+			if (productImageFile) {
+				const formData = new FormData();
+				formData.append('file', productImageFile);
+				const uploadRes = await fetch(`${API_BASE}/upload`, {
+					method: 'POST',
+					body: formData
+				});
+				if (!uploadRes.ok) {
+					const data = (await uploadRes.json()) as { error?: string };
+					addMediaError = data.error || uploadRes.statusText;
+					return;
+				}
+				const data = (await uploadRes.json()) as { url: string };
+				thumbnail = data.url;
+			} else if (thumbnail?.startsWith('blob:')) {
+				return;
+			}
+			const res = await fetch(`${API_BASE}/products/${productId}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ thumbnail })
+			});
+			if (res.ok) {
+				product = (await res.json()) as Product;
+				if (productImageFilePreview) {
+					URL.revokeObjectURL(productImageFilePreview);
+					productImageFilePreview = null;
+				}
+				productImageFile = null;
+				addMediaSheetOpen = false;
+			} else {
+				addMediaError = await res.text();
+			}
+		} catch (e) {
+			addMediaError = e instanceof Error ? e.message : String(e);
+		} finally {
+			addMediaSubmitting = false;
+		}
+	}
+
+	function openVariantImageSheet(v: ProductVariant) {
+		variantImageVariant = v;
+		variantImageUrl = v.thumbnail ?? '';
+		variantImageSheetOpen = true;
+	}
+
+	async function saveVariantImage() {
+		const v = variantImageVariant;
+		if (!v?.id) return;
+		variantImageSubmitting = true;
+		try {
+			const res = await fetch(`${API_BASE}/product-variants/${v.id}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ thumbnail: variantImageUrl || null })
+			});
+			if (res.ok) {
+				variants = variants.map((x) =>
+					x.id === v.id ? { ...x, thumbnail: variantImageUrl || null } : x
+				);
+				variantImageSheetOpen = false;
+			} else {
+				error = await res.text();
+			}
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			variantImageSubmitting = false;
+		}
+	}
+
 	const filteredSalesChannels = $derived(
 		allSalesChannels.filter((ch) =>
 			ch.name.toLowerCase().includes(salesChannelsSearchQuery.toLowerCase())
@@ -353,6 +478,37 @@
 	function closeEditSheet() {
 		editSheetOpen = false;
 		editError = null;
+	}
+
+	function statusLabel(s: string | undefined): string {
+		if (!s) return 'Draft';
+		if (s === 'published') return 'Active';
+		if (s === 'draft') return 'Draft';
+		if (s === 'proposed') return 'Unlisted';
+		return s;
+	}
+
+	let statusUpdating = $state(false);
+
+	async function updateStatus(newStatus: 'draft' | 'proposed' | 'published' | 'rejected') {
+		if (!product) return;
+		statusUpdating = true;
+		try {
+			const res = await fetch(`${API_BASE}/products/${product.id}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ status: newStatus })
+			});
+			if (!res.ok) {
+				const text = await res.text();
+				throw new Error(text || `HTTP ${res.status}`);
+			}
+			loadProduct();
+		} catch (e) {
+			console.error('Failed to update status:', e);
+		} finally {
+			statusUpdating = false;
+		}
 	}
 
 	async function submitEditProduct() {
@@ -582,6 +738,18 @@
 			? (categoriesList.find((c) => c.id === orgCategoryId)?.value ?? '1 selected')
 			: 'None'
 	);
+	let orgCategoryInput = $state('');
+	let orgCategoryDropdownOpen = $state(false);
+	const orgCategoryFilteredOptions = $derived(
+		categoriesList.filter((c) =>
+			!orgCategoryInput.trim() || c.value.toLowerCase().includes(orgCategoryInput.trim().toLowerCase())
+		)
+	);
+	function selectOrgCategory(catId: string) {
+		orgCategoryId = catId;
+		orgCategoryInput = '';
+		orgCategoryDropdownOpen = false;
+	}
 	const orgTagLabel = $derived(orgTagIds.length === 0 ? 'None' : `${orgTagIds.length} selected`);
 	let orgTagInput = $state('');
 	let orgTagDropdownOpen = $state(false);
@@ -630,8 +798,12 @@
 			? 'None'
 			: `${orgCollectionIds.length} selected`
 	);
+	let orgCollectionInput = $state('');
+	let orgCollectionDropdownOpen = $state(false);
 	function addOrgCollection(collectionId: string) {
 		if (!orgCollectionIds.includes(collectionId)) orgCollectionIds = [...orgCollectionIds, collectionId];
+		orgCollectionInput = '';
+		orgCollectionDropdownOpen = false;
 	}
 	function removeOrgCollection(collectionId: string) {
 		orgCollectionIds = orgCollectionIds.filter((id) => id !== collectionId);
@@ -639,6 +811,23 @@
 	const orgCollectionsAvailableToAdd = $derived(
 		collectionsList.filter((c) => !orgCollectionIds.includes(c.id))
 	);
+	const orgCollectionsFilteredToAdd = $derived(
+		orgCollectionsAvailableToAdd.filter((c) =>
+			!orgCollectionInput.trim() || c.title.toLowerCase().includes(orgCollectionInput.trim().toLowerCase())
+		)
+	);
+	const orgCollectionsFilteredForList = $derived(
+		collectionsList.filter((c) =>
+			!orgCollectionInput.trim() || c.title.toLowerCase().includes(orgCollectionInput.trim().toLowerCase())
+		)
+	);
+	function toggleOrgCollection(collectionId: string) {
+		if (orgCollectionIds.includes(collectionId)) {
+			orgCollectionIds = orgCollectionIds.filter((id) => id !== collectionId);
+		} else {
+			orgCollectionIds = [...orgCollectionIds, collectionId];
+		}
+	}
 
 	let metadataSheetOpen = $state(false);
 	let metadataRows = $state<Array<{ key: string; value: string }>>([]);
@@ -1019,7 +1208,19 @@
 		}
 	}
 
-	async function deleteVariant(v: ProductVariant) {
+	let variantToDelete = $state<ProductVariant | null>(null);
+	let deleteVariantConfirmOpen = $state(false);
+	let deleteVariantSubmitting = $state(false);
+
+	function openDeleteVariantConfirm(v: ProductVariant) {
+		variantToDelete = v;
+		deleteVariantConfirmOpen = true;
+	}
+
+	async function confirmDeleteVariant() {
+		const v = variantToDelete;
+		if (!v) return;
+		deleteVariantSubmitting = true;
 		try {
 			const res = await fetch(`${API_BASE}/product-variants`, {
 				method: 'DELETE',
@@ -1027,9 +1228,13 @@
 				body: JSON.stringify({ variant_ids: [v.id] })
 			});
 			if (!res.ok) throw new Error(await res.text());
+			deleteVariantConfirmOpen = false;
+			variantToDelete = null;
 			loadOptionsAndVariants();
 		} catch {
 			// ignore for now
+		} finally {
+			deleteVariantSubmitting = false;
 		}
 	}
 
@@ -1106,8 +1311,8 @@
 
 <div class="flex h-full flex-col">
 	<!-- Breadcrumb + actions -->
-	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-4">
-		<nav class="flex items-center gap-2 text-sm">
+	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
+		<nav class="flex items-center gap-[5px] text-sm pl-[10px]">
 			<button
 				type="button"
 				class="text-muted-foreground hover:text-foreground"
@@ -1118,10 +1323,6 @@
 			<span class="text-muted-foreground">/</span>
 			<span class="font-medium">{product?.title ?? productId ?? '…'}</span>
 		</nav>
-		<Button variant="ghost" size="icon" class="size-9">
-			<Bell class="size-4" />
-			<span class="sr-only">Notifications</span>
-		</Button>
 	</div>
 
 	{#if loading}
@@ -1134,16 +1335,15 @@
 			<Button variant="outline" onclick={() => goto('/products')}>Back to products</Button>
 		</div>
 	{:else}
-		<div class="flex-1 overflow-auto p-6">
-			<div class="mx-auto grid max-w-6xl gap-6 lg:grid-cols-3">
-				<!-- Left / center column -->
-				<div class="flex flex-col gap-6 lg:col-span-2">
-					<!-- General card -->
-					<div class="rounded-lg border bg-card p-6">
-						<div class="flex items-start justify-between gap-4">
-							<div class="min-w-0 flex-1">
+		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
+			<div class="flex flex-col gap-8 p-6">
+				<div class="flex gap-6">
+					<div class="flex-1 rounded-lg border bg-card p-6 shadow-sm">
+						<!-- Product header -->
+						<section class="flex flex-col gap-6 pb-8">
+							<div class="flex items-center justify-between gap-4">
 								<div class="flex flex-wrap items-center gap-2">
-									<h1 class="truncate text-xl font-semibold">{product.title}</h1>
+									<h1 class="text-2xl font-semibold tracking-tight">{product.title}</h1>
 									<span
 										class={cn(
 											'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
@@ -1162,40 +1362,20 @@
 										{product.status}
 									</span>
 								</div>
-							</div>
-							<DropdownMenu.Root>
-								<DropdownMenu.Trigger
-									class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-8 shrink-0"
+									onclick={openEditSheet}
+									aria-label="Edit product"
 								>
-									<MoreHorizontal class="size-4" />
-									<span class="sr-only">Actions</span>
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Portal>
-									<DropdownMenu.Content
-										class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-										sideOffset={4}
-									>
-										<DropdownMenu.Item
-											textValue="Edit"
-											class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-											onSelect={openEditSheet}
-										>
-											<Pencil class="size-4" />
-											Edit
-										</DropdownMenu.Item>
-										<DropdownMenu.Item
-											textValue="Delete"
-											class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-											onSelect={() => {}}
-										>
-											<Trash2 class="size-4" />
-											Delete
-										</DropdownMenu.Item>
-									</DropdownMenu.Content>
-								</DropdownMenu.Portal>
-							</DropdownMenu.Root>
-						</div>
-						<dl class="mt-4 grid gap-3 text-sm">
+									<Pencil class="size-4" />
+								</Button>
+							</div>
+						</section>
+						<!-- Details -->
+						<div class="rounded-lg bg-card p-6">
+							<dl class="mt-4 grid gap-3 text-sm">
 							<div class="flex justify-between gap-4">
 								<dt class="shrink-0 font-medium text-muted-foreground">Description</dt>
 								<dd class="text-right">{product.description || '—'}</dd>
@@ -1220,60 +1400,82 @@
 							</div>
 						</dl>
 					</div>
+				</div>
 
-					<!-- Media card -->
-					<div class="rounded-lg border bg-card p-6">
-						<div class="flex items-center justify-between">
-							<h2 class="font-semibold">Media</h2>
-							<Button variant="ghost" size="icon" class="size-8">
-								<MoreHorizontal class="size-4" />
-								<span class="sr-only">Actions</span>
-							</Button>
-						</div>
-						<div
-							class="mt-4 flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-muted-foreground/25 bg-muted/30 py-8 text-center text-sm text-muted-foreground"
+					<!-- Right: Status card -->
+					<div class="rounded-lg border border-gray-300 bg-card p-6 self-start w-52 shadow-sm">
+						<h2 class="font-semibold mb-4">Status</h2>
+						<Select.Root
+							type="single"
+							value={product?.status ?? 'draft'}
+							onValueChange={(v) => {
+								if (v && (v === 'draft' || v === 'proposed' || v === 'published' || v === 'rejected')) {
+									updateStatus(v);
+								}
+							}}
+							disabled={statusUpdating || !product}
 						>
-							<Upload class="size-8" />
-							<p>No media yet</p>
-							<p class="text-xs">Add media to the product to showcase it in your storefront.</p>
-							<Button variant="outline" size="sm" class="mt-2">Add media</Button>
-						</div>
+							<Select.Trigger class="w-full">
+								{statusLabel(product?.status)}
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="published" label="Active">Active</Select.Item>
+								<Select.Item value="draft" label="Draft">Draft</Select.Item>
+								<Select.Item value="proposed" label="Unlisted">Unlisted</Select.Item>
+								<Select.Item value="rejected" label="Rejected">Rejected</Select.Item>
+							</Select.Content>
+						</Select.Root>
 					</div>
+				</div>
 
-					<!-- Options & Variants card (merged) -->
-					<div class="rounded-lg border bg-card p-6">
-						<div class="flex flex-wrap items-center justify-between gap-2">
-							<h2 class="font-semibold">Options & Variants</h2>
-							<div class="flex items-center gap-2">
-								<Button variant="outline" size="icon" class="size-8">
-									<Search class="size-4" />
-									<span class="sr-only">Sort</span>
+				<div class="flex gap-6">
+					<div class="flex-1 flex flex-col gap-6">
+						<!-- Media card -->
+						<div class="rounded-lg border bg-card p-6 shadow-sm">
+							<div class="flex items-center justify-between">
+								<h2 class="font-semibold">Media</h2>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-8 shrink-0"
+									onclick={openAddMediaSheet}
+									aria-label="Edit media"
+								>
+									<Pencil class="size-4" />
 								</Button>
-								<Input placeholder="Search" class="h-8 w-32" />
-								<DropdownMenu.Root>
-									<DropdownMenu.Trigger
-										class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
-									>
-										<MoreHorizontal class="size-4" />
-										<span class="sr-only">Actions</span>
-									</DropdownMenu.Trigger>
-									<DropdownMenu.Portal>
-										<DropdownMenu.Content
-											class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-											sideOffset={4}
-										>
-											<DropdownMenu.Item
-												textValue="Edit"
-												class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-												onSelect={openVariantsEditSheet}
-											>
-												<Pencil class="size-4" />
-												Edit
-											</DropdownMenu.Item>
-										</DropdownMenu.Content>
-									</DropdownMenu.Portal>
-								</DropdownMenu.Root>
 							</div>
+							{#if product?.thumbnail && isPersistentImageUrl(product.thumbnail)}
+								<div class="mt-4">
+									<img
+										src={product.thumbnail}
+										alt="Product"
+										class="size-24 rounded-md border object-cover"
+									/>
+								</div>
+							{:else}
+								<div
+									class="mt-4 flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-muted-foreground/25 bg-muted/30 py-8 text-center text-sm text-muted-foreground"
+								>
+									<Upload class="size-8" />
+									<p>No media yet</p>
+									<p class="text-xs">Add media to the product to showcase it in your storefront.</p>
+								</div>
+							{/if}
+						</div>
+
+						<!-- Options & Variants card (merged) -->
+						<div class="rounded-lg border bg-card p-6 shadow-sm">
+						<div class="flex items-center justify-between">
+							<h2 class="font-semibold">Options & Variants</h2>
+							<Button
+								variant="ghost"
+								size="icon"
+								class="size-8 shrink-0"
+								onclick={openVariantsEditSheet}
+								aria-label="Edit options and variants"
+							>
+								<Pencil class="size-4" />
+							</Button>
 						</div>
 
 						<!-- Options section -->
@@ -1303,10 +1505,11 @@
 						{/if}
 
 						<!-- Variants section -->
-						<div class="mt-4 overflow-hidden rounded-md border">
+						<div class="mt-4 overflow-x-auto rounded-md border">
 							<table class="w-full text-sm">
 								<thead class="border-b bg-muted/50">
 									<tr>
+										<th class="w-14 px-4 py-3 text-left font-medium">Image</th>
 										<th class="px-4 py-3 text-left font-medium">Title</th>
 										<th class="px-4 py-3 text-left font-medium">SKU</th>
 										{#if options.length === 1}
@@ -1324,7 +1527,7 @@
 									{#if paginatedVariants.length === 0}
 										<tr>
 											<td
-												colspan={options.length === 1 ? 7 : 6}
+												colspan={options.length === 1 ? 8 : 7}
 												class="px-4 py-8 text-center text-muted-foreground"
 											>
 												No variants.
@@ -1333,6 +1536,21 @@
 									{:else}
 										{#each paginatedVariants as v (v.id)}
 											<tr class="border-b last:border-0">
+												<td class="px-4 py-3">
+													<div
+														class="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground"
+													>
+														{#if v.thumbnail}
+															<img
+																src={v.thumbnail}
+																alt=""
+																class="size-10 rounded-md object-cover"
+															/>
+														{:else}
+															<ImageIcon class="size-5" />
+														{/if}
+													</div>
+												</td>
 												<td class="px-4 py-3 font-medium">{v.title}</td>
 												<td class="px-4 py-3 text-muted-foreground">{v.sku || '—'}</td>
 												{#if options.length === 1}
@@ -1344,37 +1562,15 @@
 												<td class="px-4 py-3 text-muted-foreground">{formatDate(v.created_at)}</td>
 												<td class="px-4 py-3 text-muted-foreground">{formatDate(v.updated_at)}</td>
 												<td class="px-4 py-3">
-													<DropdownMenu.Root>
-														<DropdownMenu.Trigger
-															class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
-														>
-															<MoreHorizontal class="size-4" />
-															<span class="sr-only">Actions</span>
-														</DropdownMenu.Trigger>
-														<DropdownMenu.Portal>
-															<DropdownMenu.Content
-																class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-																sideOffset={4}
-															>
-																<DropdownMenu.Item
-																	textValue="Edit"
-																	class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-																	onSelect={() => openEditVariantSheet(v)}
-																>
-																	<Pencil class="size-4" />
-																	Edit
-																</DropdownMenu.Item>
-																<DropdownMenu.Item
-																	textValue="Delete"
-																	class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-																	onSelect={() => deleteVariant(v)}
-																>
-																	<Trash2 class="size-4" />
-																	Delete
-																</DropdownMenu.Item>
-															</DropdownMenu.Content>
-														</DropdownMenu.Portal>
-													</DropdownMenu.Root>
+													<Button
+														variant="ghost"
+														size="icon"
+														class="size-8 shrink-0"
+														onclick={() => openEditVariantSheet(v)}
+														aria-label="Edit variant"
+													>
+														<Pencil class="size-4" />
+													</Button>
 												</td>
 											</tr>
 										{/each}
@@ -1412,70 +1608,57 @@
 						{/if}
 					</div>
 
-					<!-- Metadata / JSON placeholders -->
-					<div class="flex gap-4">
-						<div class="flex-1 rounded-lg border bg-card p-4">
-							<div class="flex items-center justify-between gap-2">
-								<h3 class="font-medium">Metadata</h3>
-								<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-									{metadataKeysCount} keys
-								</span>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									onclick={openMetadataSheet}
-								>
-									<ExternalLink class="size-4" />
-									<span class="sr-only">Edit metadata</span>
-								</Button>
+						<!-- Metadata / JSON placeholders -->
+						<div class="grid gap-4 sm:grid-cols-2">
+							<div class="rounded-lg border bg-card p-4 shadow-sm">
+								<div class="flex items-center justify-between gap-2">
+									<h3 class="font-medium">Metadata</h3>
+									<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+										{metadataKeysCount} keys
+									</span>
+									<Button variant="ghost" size="icon" class="size-8 shrink-0" onclick={openMetadataSheet}>
+										<ExternalLink class="size-4" />
+										<span class="sr-only">Open</span>
+									</Button>
+								</div>
 							</div>
-						</div>
-						<div class="flex-1 rounded-lg border bg-card p-4">
-							<div class="flex items-center justify-between gap-2">
-								<h3 class="font-medium">JSON</h3>
-								<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-									{jsonKeysCount} keys
-								</span>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									onclick={() => (jsonSheetOpen = true)}
-								>
-									<ExternalLink class="size-4" />
-									<span class="sr-only">View JSON</span>
-								</Button>
+							<div class="rounded-lg border bg-card p-4 shadow-sm">
+								<div class="flex items-center justify-between gap-2">
+									<h3 class="font-medium">JSON</h3>
+									<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+										{jsonKeysCount} keys
+									</span>
+									<Button variant="ghost" size="icon" class="size-8 shrink-0" onclick={() => (jsonSheetOpen = true)}>
+										<ExternalLink class="size-4" />
+										<span class="sr-only">Open</span>
+									</Button>
+								</div>
 							</div>
 						</div>
 					</div>
-				</div>
 
-				<!-- Right column -->
-				<div class="flex flex-col gap-6">
-					<!-- Sales Channels -->
-					<div class="rounded-lg border bg-card p-6">
-						<div class="flex items-center justify-between">
+					<!-- Right column -->
+					<div class="flex flex-col gap-6 w-52 self-start">
+						<!-- Sales Channels -->
+						<div class="rounded-lg border bg-card p-6 shadow-sm">
+							<div class="flex items-center justify-between">
 							<h2 class="font-semibold">Sales Channels</h2>
 							<Button
 								variant="ghost"
 								size="icon"
-								class="size-8"
+								class="size-8 shrink-0"
 								onclick={() => {
 									salesChannelsSheetOpen = true;
 									fetchSalesChannels();
 								}}
+								aria-label="Edit sales channels"
 							>
-								<SlidersHorizontal class="size-4" />
-								<span class="sr-only">Manage sales channels</span>
+								<Pencil class="size-4" />
 							</Button>
 						</div>
 						<div class="mt-4 flex flex-col gap-2">
 							{#if productSalesChannelIds.size > 0}
-								{#each Array.from(productSalesChannelIds).map((id) => {
-									const channel = allSalesChannels.find((ch) => ch.id === id);
-									return channel;
-								}).filter(Boolean) as channel}
+								{#each Array.from(productSalesChannelIds).map((id) => allSalesChannels.find((ch) => ch.id === id)).filter((ch): ch is NonNullable<typeof ch> => ch != null) as channel}
 									<div class="flex items-center gap-2 text-sm">
 										<Share2 class="size-4 text-muted-foreground" />
 										<span>{channel.name}</span>
@@ -1488,175 +1671,188 @@
 								</div>
 							{/if}
 						</div>
-						<p class="mt-1 text-xs text-muted-foreground">
-							Available in {productSalesChannelIds.size} of {allSalesChannels.length} sales channels
-						</p>
-					</div>
-
-					<!-- Shipping configuration -->
-					<div class="rounded-lg border bg-card p-6">
-						<div class="flex items-center justify-between">
-							<h2 class="font-semibold">Shipping configuration</h2>
-							<Button variant="ghost" size="icon" class="size-8">
-								<MoreHorizontal class="size-4" />
-								<span class="sr-only">Actions</span>
-							</Button>
+							<p class="mt-1 text-xs text-muted-foreground">
+								Available in {productSalesChannelIds.size} of {allSalesChannels.length} sales channels
+							</p>
 						</div>
-						<button
-							type="button"
-							class="mt-4 flex w-full items-center gap-3 rounded-md border p-3 text-left text-sm hover:bg-muted/50"
-						>
-							<Lock class="size-4 text-muted-foreground" />
-							<div>
-								<p class="font-medium">Default Shipping Profile</p>
-								<p class="text-xs text-muted-foreground">default</p>
-							</div>
-							<span class="ml-auto text-muted-foreground">→</span>
-						</button>
-					</div>
 
-					<!-- Organize -->
-					<div class="rounded-lg border bg-card p-6">
-						<div class="flex items-center justify-between">
-							<h2 class="font-semibold">Organize</h2>
-							<DropdownMenu.Root>
-								<DropdownMenu.Trigger
-									class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
+						<!-- Attributes -->
+						<div class="rounded-lg border bg-card p-6 shadow-sm">
+							<div class="flex items-center justify-between">
+								<h2 class="font-semibold">Attributes</h2>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-8 shrink-0"
+									onclick={openEditAttributesSheet}
+									aria-label="Edit attributes"
 								>
-									<MoreHorizontal class="size-4" />
-									<span class="sr-only">Actions</span>
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Portal>
-									<DropdownMenu.Content
-										class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-										sideOffset={4}
-									>
-										<DropdownMenu.Item
-											textValue="Edit"
-											class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-											onSelect={openOrgSheet}
-										>
-											<Pencil class="size-4" />
-											Edit
-										</DropdownMenu.Item>
-									</DropdownMenu.Content>
-								</DropdownMenu.Portal>
-							</DropdownMenu.Root>
-						</div>
-						<dl class="mt-4 space-y-3 text-sm">
-							<div>
-								<dt class="font-medium text-muted-foreground">Collections</dt>
-								<dd>
-									{#if product.collections && product.collections.length > 0}
-										<span class="inline-flex flex-wrap gap-1">
-											{#each product.collections as col (col.id)}
-												<span
-													class="inline-flex items-center rounded-md border bg-muted/50 px-2 py-0.5 text-xs"
-												>
-													{col.title}
-												</span>
-											{/each}
-										</span>
-									{:else}
-										—
-									{/if}
-								</dd>
+									<Pencil class="size-4" />
+								</Button>
 							</div>
-							<div>
-								<dt class="font-medium text-muted-foreground">Categories</dt>
-								<dd>
-									{#if category}
-										<span
-											class="inline-flex items-center rounded-md border bg-muted/50 px-2 py-0.5 text-xs"
-										>
-											{category.value}
-										</span>
-									{:else}
-										—
-									{/if}
-								</dd>
-							</div>
-							<div>
-								<dt class="font-medium text-muted-foreground">Tags</dt>
-								<dd>
-									{#if product.tags && product.tags.length > 0}
-										<span class="inline-flex flex-wrap gap-1">
-											{#each product.tags as tag (tag.id)}
-												<span
-													class="inline-flex items-center rounded-md border bg-muted/50 px-2 py-0.5 text-xs"
-												>
-													{tag.value}
-												</span>
-											{/each}
-										</span>
-									{:else if product.tag_ids && product.tag_ids.length > 0 && tagsList.length > 0}
-										<span class="inline-flex flex-wrap gap-1">
-											{#each product.tag_ids as tagId (tagId)}
-												{@const tag = tagsList.find((t) => t.id === tagId)}
-												{#if tag}
-													<span
-														class="inline-flex items-center rounded-md border bg-muted/50 px-2 py-0.5 text-xs"
-													>
-														{tag.value}
-													</span>
-												{/if}
-											{/each}
-										</span>
-									{:else}
-										—
-									{/if}
-								</dd>
-							</div>
-						</dl>
-					</div>
-
-					<!-- Attributes -->
-					<div class="rounded-lg border bg-card p-6">
-						<div class="flex items-center justify-between">
-							<h2 class="font-semibold">Attributes</h2>
-							<DropdownMenu.Root>
-								<DropdownMenu.Trigger
-									class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
-								>
-									<MoreHorizontal class="size-4" />
-									<span class="sr-only">Actions</span>
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Portal>
-									<DropdownMenu.Content
-										class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-										sideOffset={4}
-									>
-										<DropdownMenu.Item
-											textValue="Edit"
-											class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-											onSelect={openEditAttributesSheet}
-										>
-											<Pencil class="size-4" />
-											Edit
-										</DropdownMenu.Item>
-									</DropdownMenu.Content>
-								</DropdownMenu.Portal>
-							</DropdownMenu.Root>
-						</div>
-						<dl class="mt-4 space-y-3 text-sm">
-							{#if product?.attributes && product.attributes.length > 0}
-								{#each product.attributes as attr (attr.id)}
+							<dl class="mt-4 space-y-3 text-sm">
+								{#if product?.attributes && product.attributes.length > 0}
+									{#each product.attributes as attr (attr.id)}
+										<div>
+											<dt class="font-medium text-muted-foreground">{attr.title}</dt>
+											<dd class="break-words text-foreground">{attr.value}</dd>
+										</div>
+									{/each}
+								{:else}
 									<div>
-										<dt class="font-medium text-muted-foreground">{attr.title}</dt>
-										<dd class="break-words text-foreground">{attr.value}</dd>
+										<dt class="font-medium text-muted-foreground">No attributes</dt>
+										<dd>—</dd>
 									</div>
-								{/each}
-							{:else}
+								{/if}
+							</dl>
+						</div>
+
+						<!-- Shipping configuration -->
+						<div class="rounded-lg border bg-card p-6 shadow-sm">
+							<div class="flex items-center justify-between">
+								<h2 class="font-semibold">Shipping configuration</h2>
+								<Button variant="outline" size="sm" disabled>
+									Edit
+								</Button>
+							</div>
+							<div class="mt-4 flex w-full items-center gap-3 rounded-md border p-3 text-left text-sm">
+								<Lock class="size-4 text-muted-foreground" />
 								<div>
-									<dt class="font-medium text-muted-foreground">No attributes</dt>
-									<dd>—</dd>
+									<p class="font-medium">Default Shipping Profile</p>
+									<p class="text-xs text-muted-foreground">default</p>
 								</div>
-							{/if}
-						</dl>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
 		</div>
+
+		<!-- Add / change product image sheet -->
+		<Sheet.Root bind:open={addMediaSheetOpen}>
+			<Sheet.Content side="right" class="w-full max-w-md">
+				<Sheet.Header class="border-b px-6 py-4">
+					<Sheet.Title>Add image</Sheet.Title>
+				</Sheet.Header>
+				<div class="flex flex-col gap-4 p-6">
+					{#if addMediaError}
+						<p class="text-sm text-destructive">{addMediaError}</p>
+					{/if}
+					<div class="flex flex-col gap-2">
+						<label for="product-image-url" class="text-sm font-medium">Image URL</label>
+						<Input
+							id="product-image-url"
+							type="url"
+							placeholder="https://..."
+							bind:value={productImageUrl}
+							class="w-full"
+						/>
+					</div>
+					<div class="flex flex-col gap-2">
+						<span class="text-sm font-medium">Or choose file</span>
+						<input
+							type="file"
+							accept="image/*"
+							class="text-sm file:mr-2 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-primary-foreground"
+							onchange={onAddMediaFileSelect}
+						/>
+					</div>
+					{#if productImageUrl}
+						<div class="flex justify-center rounded-md border bg-muted/30 p-4">
+							<img
+								src={productImageUrl}
+								alt="Preview"
+								class="max-h-40 rounded object-contain"
+								onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
+							/>
+						</div>
+					{/if}
+				</div>
+				<div class="flex justify-end gap-2 border-t p-4">
+					<Button variant="outline" onclick={() => { addMediaSheetOpen = false; addMediaError = null; }}>Cancel</Button>
+					<Button onclick={saveProductImage} disabled={addMediaSubmitting}>
+						{addMediaSubmitting ? 'Saving…' : 'Save'}
+					</Button>
+				</div>
+			</Sheet.Content>
+		</Sheet.Root>
+
+		<!-- Delete variant confirmation -->
+		<Dialog.Root bind:open={deleteVariantConfirmOpen}>
+			<Dialog.Content class="items-center justify-center">
+				<div class="w-full max-w-md rounded-lg border bg-card shadow-lg">
+					<Dialog.Header class="p-6 pb-0">
+						<Dialog.Title>Delete variant</Dialog.Title>
+					</Dialog.Header>
+					<div class="px-6 py-4">
+						<p class="text-sm text-muted-foreground">
+							{#if variantToDelete}
+								Delete <strong class="text-foreground">"{variantToDelete.title}"</strong
+								>{#if variantToDelete.sku} (SKU: {variantToDelete.sku}){/if}? This cannot be undone.
+							{/if}
+						</p>
+					</div>
+					<Dialog.Footer class="flex justify-end gap-2 border-t p-4">
+						<Button
+							variant="outline"
+							onclick={() => (deleteVariantConfirmOpen = false)}
+							disabled={deleteVariantSubmitting}
+						>
+							Cancel
+						</Button>
+						<Button
+							variant="destructive"
+							onclick={confirmDeleteVariant}
+							disabled={deleteVariantSubmitting}
+						>
+							{deleteVariantSubmitting ? 'Deleting…' : 'Delete'}
+						</Button>
+					</Dialog.Footer>
+				</div>
+			</Dialog.Content>
+		</Dialog.Root>
+
+		<!-- Variant image sheet -->
+		<Sheet.Root bind:open={variantImageSheetOpen}>
+			<Sheet.Content side="right" class="w-full max-w-md">
+				<Sheet.Header class="border-b px-6 py-4">
+					<Sheet.Title>Select image</Sheet.Title>
+					{#if variantImageVariant}
+						<Sheet.Description class="text-sm text-muted-foreground">
+							{variantImageVariant.title}
+						</Sheet.Description>
+					{/if}
+				</Sheet.Header>
+				<div class="flex flex-col gap-4 p-6">
+					<div class="flex flex-col gap-2">
+						<label for="variant-image-url" class="text-sm font-medium">Image URL</label>
+						<Input
+							id="variant-image-url"
+							type="url"
+							placeholder="https://..."
+							bind:value={variantImageUrl}
+							class="w-full"
+						/>
+					</div>
+					{#if variantImageUrl}
+						<div class="flex justify-center rounded-md border bg-muted/30 p-4">
+							<img
+								src={variantImageUrl}
+								alt="Preview"
+								class="max-h-40 rounded object-contain"
+								onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
+							/>
+						</div>
+					{/if}
+				</div>
+				<div class="flex justify-end gap-2 border-t p-4">
+					<Button variant="outline" onclick={() => (variantImageSheetOpen = false)}>Cancel</Button>
+					<Button onclick={saveVariantImage} disabled={variantImageSubmitting}>
+						{variantImageSubmitting ? 'Saving…' : 'Save'}
+					</Button>
+				</div>
+			</Sheet.Content>
+		</Sheet.Root>
 
 		<!-- Edit Product sheet -->
 		<Sheet.Root bind:open={editSheetOpen}>
@@ -1873,71 +2069,136 @@
 			</Sheet.Content>
 		</Sheet.Root>
 
-		<!-- Edit Organization sheet -->
+		<!-- Edit Organization sheet (Product organization / category selection) -->
 		<Sheet.Root bind:open={orgSheetOpen}>
 			<Sheet.Content class="flex w-full flex-col sm:max-w-lg" side="right">
-				<Sheet.Header class="flex flex-col items-center gap-1.5 text-center sm:text-center">
-					<Sheet.Title>Edit Organization</Sheet.Title>
+				<Sheet.Header class="flex flex-col gap-1.5 px-4 pt-4 text-left">
+					<div class="flex items-center gap-2">
+						<Sheet.Title>Product organization</Sheet.Title>
+						<span
+							class="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+							title="Assign a category (type), collections, and tags to organize this product."
+							aria-label="Info"
+						>
+							<Info class="size-3" />
+						</span>
+					</div>
 				</Sheet.Header>
 				<div class="flex flex-1 flex-col gap-4 overflow-auto px-4 pb-4">
+					<!-- Type (Category selection) -->
 					<div class="flex flex-col gap-2">
-						<label for="org-collections" class="text-sm font-medium">
-							Collections <span class="font-normal text-muted-foreground">(Optional)</span>
-						</label>
-						<div class="flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-2 py-1.5">
-							{#each orgCollectionIds as colId (colId)}
-								{@const col = collectionsList.find((c) => c.id === colId)}
-								{#if col}
-									<span
-										class="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium"
-									>
-										{col.title}
+						<label for="org-categories" class="text-sm font-medium">Type</label>
+						<div
+							class="relative flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-within:ring-2 focus-within:ring-ring"
+							role="combobox"
+							aria-expanded={orgCategoryDropdownOpen}
+							aria-haspopup="listbox"
+							aria-controls="org-categories-listbox"
+							id="org-categories"
+							onfocusout={(e) => {
+								if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+									orgCategoryDropdownOpen = false;
+									orgCategoryInput = '';
+								}
+							}}
+						>
+							<input
+								type="text"
+								class="h-full min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm outline-none placeholder:text-muted-foreground"
+								placeholder={orgCategoryDropdownOpen ? 'Type to search…' : (orgCategoryId ? orgCategoryLabel : 'Select category…')}
+								bind:value={orgCategoryInput}
+								onfocus={() => (orgCategoryDropdownOpen = true)}
+								onkeydown={(e) => {
+									if (e.key === 'Escape') {
+										orgCategoryDropdownOpen = false;
+										orgCategoryInput = '';
+									}
+									if (e.key === 'Enter' && orgCategoryDropdownOpen) {
+										e.preventDefault();
+										if (orgCategoryFilteredOptions.length > 0) selectOrgCategory(orgCategoryFilteredOptions[0].id);
+									}
+								}}
+							/>
+							{#if orgCategoryDropdownOpen}
+								<ul
+									id="org-categories-listbox"
+									class="absolute top-full left-0 z-50 mt-1 max-h-48 w-full min-w-0 overflow-auto rounded-md border border-input bg-popover py-1 text-popover-foreground shadow-md"
+									role="listbox"
+								>
+									<li role="option" aria-selected={!orgCategoryId}>
 										<button
 											type="button"
-											class="rounded p-0.5 hover:bg-muted-foreground/20"
-											aria-label="Remove collection"
-											onclick={() => removeOrgCollection(colId)}
+											class="w-full cursor-pointer px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+											onclick={() => selectOrgCategory('')}
+											onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), selectOrgCategory(''))}
 										>
-											<X class="size-3" />
+											None
 										</button>
-									</span>
-								{/if}
-							{/each}
-							{#if orgCollectionsAvailableToAdd.length > 0}
-								<select
-									id="org-collections"
-									class="h-7 min-w-24 flex-1 rounded border-0 bg-transparent px-1 text-sm outline-none"
-									onchange={(e) => {
-										const id = e.currentTarget.value;
-										if (id) {
-											addOrgCollection(id);
-											e.currentTarget.value = '';
-										}
-									}}
-								>
-									<option value="">Add collection…</option>
-									{#each orgCollectionsAvailableToAdd as col (col.id)}
-										<option value={col.id}>{col.title}</option>
+									</li>
+									{#each orgCategoryFilteredOptions as cat (cat.id)}
+										<li role="option" aria-selected={orgCategoryId === cat.id}>
+											<button
+												type="button"
+												class="w-full cursor-pointer px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+												onclick={() => selectOrgCategory(cat.id)}
+												onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), selectOrgCategory(cat.id))}
+											>
+												{cat.value}
+											</button>
+										</li>
 									{/each}
-								</select>
+									{#if !orgCategoryFilteredOptions.length && orgCategoryInput.trim()}
+										<li class="px-3 py-1.5 text-sm text-muted-foreground">No categories found</li>
+									{/if}
+								</ul>
 							{/if}
 						</div>
-						<p class="text-xs text-muted-foreground">{orgCollectionLabel}</p>
 					</div>
-					<div class="flex flex-col gap-2">
-						<label for="org-categories" class="text-sm font-medium">
-							Categories <span class="font-normal text-muted-foreground">(Optional)</span>
-						</label>
-						<select
-							id="org-categories"
-							bind:value={orgCategoryId}
-							class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					<!-- Collections edit UI: search + add new + checkbox list -->
+					<div class="flex flex-col gap-3">
+						<h3 class="text-sm font-medium">Collections</h3>
+						<div class="relative">
+							<Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+							<input
+								type="text"
+								id="org-collections-search"
+								class="h-9 w-full rounded-md border border-input bg-background py-1 pl-9 pr-3 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+								placeholder="Search collections…"
+								bind:value={orgCollectionInput}
+							/>
+						</div>
+						<a
+							href="/products/collections"
+							class="flex items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 						>
-							<option value="">None</option>
-							{#each categoriesList as cat (cat.id)}
-								<option value={cat.id}>{cat.value}</option>
-							{/each}
-						</select>
+							<span class="flex size-5 shrink-0 items-center justify-center rounded-full border border-current">
+								<Plus class="size-3" />
+							</span>
+							Add new collection
+						</a>
+						<ul class="max-h-48 space-y-0 overflow-auto rounded-md border border-input py-1" role="listbox">
+							{#if orgCollectionsFilteredForList.length === 0}
+								<li class="px-3 py-2 text-sm text-muted-foreground">
+									{orgCollectionInput.trim() ? 'No collections found.' : 'No collections yet.'}
+								</li>
+							{:else}
+								{#each orgCollectionsFilteredForList as col (col.id)}
+									<li class="flex items-center gap-3 px-3 py-2 text-sm">
+										<input
+											type="checkbox"
+											id="org-col-{col.id}"
+											class="size-4 rounded border-input"
+											checked={orgCollectionIds.includes(col.id)}
+											onchange={() => toggleOrgCollection(col.id)}
+										/>
+										<label for="org-col-{col.id}" class="min-w-0 flex-1 cursor-pointer truncate">
+											{col.title}
+										</label>
+									</li>
+								{/each}
+							{/if}
+						</ul>
+						<p class="text-xs text-muted-foreground">{orgCollectionLabel}</p>
 					</div>
 					<div class="flex flex-col gap-2">
 						<label for="org-tags-input" class="text-sm font-medium">
@@ -2338,7 +2599,7 @@
 					<Sheet.Header class="flex flex-col gap-1.5 border-b px-6 py-4">
 						<Sheet.Title>Edit Variant</Sheet.Title>
 					</Sheet.Header>
-					<div class="flex-1 overflow-auto p-6">
+					<div class="min-h-0 flex-1 overflow-auto p-6">
 						{#if editingVariant}
 							<div class="flex flex-col gap-4">
 								<div class="flex flex-col gap-2">
@@ -2515,17 +2776,34 @@
 							</div>
 						{/if}
 					</div>
-					<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-						<Button
-							variant="outline"
-							onclick={closeEditVariantSheet}
-							disabled={editVariantSubmitting}
-						>
-							Cancel
-						</Button>
-						<Button onclick={submitEditVariant} disabled={editVariantSubmitting}>
-							{editVariantSubmitting ? 'Saving…' : 'Save'}
-						</Button>
+					<Sheet.Footer class="flex flex-wrap items-center justify-between gap-2 border-t p-4">
+						<div>
+							{#if editingVariant}
+								<Button
+									variant="destructive"
+									class="mr-auto"
+									disabled={editVariantSubmitting}
+									onclick={() => {
+										if (editingVariant) openDeleteVariantConfirm(editingVariant);
+										closeEditVariantSheet();
+									}}
+								>
+									Delete variant
+								</Button>
+							{/if}
+						</div>
+						<div class="flex gap-2">
+							<Button
+								variant="outline"
+								onclick={closeEditVariantSheet}
+								disabled={editVariantSubmitting}
+							>
+								Cancel
+							</Button>
+							<Button onclick={submitEditVariant} disabled={editVariantSubmitting}>
+								{editVariantSubmitting ? 'Saving…' : 'Save'}
+							</Button>
+						</div>
 					</Sheet.Footer>
 				</div>
 			</Sheet.Content>
