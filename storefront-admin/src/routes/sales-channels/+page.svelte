@@ -2,12 +2,15 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import { DropdownMenu } from 'bits-ui';
 	import Search from '@lucide/svelte/icons/search';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+	import ListFilter from '@lucide/svelte/icons/list-filter';
+	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import { cn } from '$lib/utils.js';
 
 	const API_BASE = 'http://localhost:8000';
@@ -97,17 +100,39 @@
 			: channels
 	);
 
-	async function deleteChannel(channel: SalesChannel) {
+	let deleteConfirmOpen = $state(false);
+	let channelToDelete = $state<SalesChannel | null>(null);
+	let deleteSubmitting = $state(false);
+
+	function openDeleteConfirm(ch: SalesChannel) {
+		channelToDelete = ch;
+		deleteConfirmOpen = true;
+	}
+
+	function closeDeleteConfirm() {
+		if (!deleteSubmitting) {
+			deleteConfirmOpen = false;
+			channelToDelete = null;
+		}
+	}
+
+	async function confirmDeleteChannel() {
+		if (!channelToDelete) return;
+		deleteSubmitting = true;
 		try {
 			const res = await fetch(`${API_BASE}/sales-channels`, {
 				method: 'DELETE',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ sales_channel_ids: [channel.id] })
+				body: JSON.stringify({ sales_channel_ids: [channelToDelete.id] })
 			});
 			if (!res.ok) throw new Error(await res.text());
+			deleteConfirmOpen = false;
+			channelToDelete = null;
 			fetchChannels();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			deleteSubmitting = false;
 		}
 	}
 
@@ -230,20 +255,14 @@
 
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div class="mb-4 flex items-center justify-between border-b pb-4">
-			<div class="flex items-center gap-2 text-sm text-muted-foreground">
-				<span class="text-foreground">Sales Channels</span>
+		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
+			<div class="flex items-center gap-2">
+				<ListFilter class="size-4" />
+				<span class="font-semibold">Sales Channels</span>
 			</div>
+			<Button size="sm" onclick={openCreate}>Create</Button>
 		</div>
 		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex items-start justify-between gap-4">
-				<div>
-					<p class="text-sm text-muted-foreground">
-						Manage the online and offline channels you sell products on.
-					</p>
-				</div>
-				<Button size="sm" onclick={openCreate}>Create</Button>
-			</div>
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<Button variant="outline" size="sm" class="rounded-md">
 					<SlidersHorizontal class="mr-1.5 size-4" />
@@ -259,6 +278,13 @@
 							class="h-9 rounded-md pl-9"
 						/>
 					</div>
+					<button
+						type="button"
+						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+					>
+						<ArrowUpDown class="size-4" />
+						<span class="sr-only">Sort</span>
+					</button>
 				</div>
 			</div>
 		</div>
@@ -281,8 +307,8 @@
 							<th class="px-4 py-3 text-left font-medium">Name</th>
 							<th class="px-4 py-3 text-left font-medium">Description</th>
 							<th class="px-4 py-3 text-left font-medium">Default</th>
-							<th class="px-4 py-3 text-left font-medium">Created at</th>
-							<th class="px-4 py-3 text-left font-medium">Updated at</th>
+							<th class="px-4 py-3 text-left font-medium">Created</th>
+							<th class="px-4 py-3 text-left font-medium">Updated</th>
 							<th class="w-10 px-4 py-3"></th>
 						</tr>
 					</thead>
@@ -323,36 +349,36 @@
 									</td>
 									<td class="px-4 py-3">
 										<DropdownMenu.Root>
-											<DropdownMenu.Trigger
-												class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
-											>
-												<MoreHorizontal class="size-4" />
-												<span class="sr-only">Actions</span>
-											</DropdownMenu.Trigger>
-											<DropdownMenu.Portal>
-												<DropdownMenu.Content
-													class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-													sideOffset={4}
+												<DropdownMenu.Trigger
+													class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
 												>
-													<DropdownMenu.Item
-														textValue="Edit"
-														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => openEdit(channel)}
+													<MoreHorizontal class="size-4" />
+													<span class="sr-only">Actions</span>
+												</DropdownMenu.Trigger>
+												<DropdownMenu.Portal>
+													<DropdownMenu.Content
+														class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+														sideOffset={4}
 													>
-														<Pencil class="size-4" />
-														Edit
-													</DropdownMenu.Item>
-													<DropdownMenu.Item
-														textValue="Delete"
-														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => deleteChannel(channel)}
-													>
-														<Trash2 class="size-4" />
-														Delete
-													</DropdownMenu.Item>
-												</DropdownMenu.Content>
-											</DropdownMenu.Portal>
-										</DropdownMenu.Root>
+														<DropdownMenu.Item
+															textValue="Edit"
+															class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+															onSelect={() => openEdit(channel)}
+														>
+															<Pencil class="size-4" />
+															Edit
+														</DropdownMenu.Item>
+														<DropdownMenu.Item
+															textValue="Delete"
+															class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
+															onSelect={() => openDeleteConfirm(channel)}
+														>
+															<Trash2 class="size-4" />
+															Delete
+														</DropdownMenu.Item>
+													</DropdownMenu.Content>
+												</DropdownMenu.Portal>
+											</DropdownMenu.Root>
 									</td>
 								</tr>
 							{/each}
@@ -506,3 +532,13 @@
 		</div>
 	</Sheet.Content>
 </Sheet.Root>
+
+<!-- Delete sales channel confirmation -->
+<DeleteConfirmationModal
+	bind:open={deleteConfirmOpen}
+	entityName="sales channel"
+	entityTitle={channelToDelete?.name ?? channelToDelete?.id ?? ''}
+	onConfirm={confirmDeleteChannel}
+	onCancel={closeDeleteConfirm}
+	submitting={deleteSubmitting}
+/>

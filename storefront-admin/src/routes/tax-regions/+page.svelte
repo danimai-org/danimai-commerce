@@ -2,12 +2,15 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import { DropdownMenu } from 'bits-ui';
 	import Search from '@lucide/svelte/icons/search';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+	import ListFilter from '@lucide/svelte/icons/list-filter';
+	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import Info from '@lucide/svelte/icons/info';
 	import { cn } from '$lib/utils.js';
 
@@ -114,17 +117,39 @@
 			: taxRegions
 	);
 
-	async function deleteTaxRegion(region: TaxRegion) {
+	let deleteConfirmOpen = $state(false);
+	let regionToDelete = $state<TaxRegion | null>(null);
+	let deleteSubmitting = $state(false);
+
+	function openDeleteConfirm(region: TaxRegion) {
+		regionToDelete = region;
+		deleteConfirmOpen = true;
+	}
+
+	function closeDeleteConfirm() {
+		if (!deleteSubmitting) {
+			deleteConfirmOpen = false;
+			regionToDelete = null;
+		}
+	}
+
+	async function confirmDeleteTaxRegion() {
+		if (!regionToDelete) return;
+		deleteSubmitting = true;
 		try {
 			const res = await fetch(`${API_BASE}/tax-regions`, {
 				method: 'DELETE',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ tax_region_ids: [region.id] })
+				body: JSON.stringify({ tax_region_ids: [regionToDelete.id] })
 			});
 			if (!res.ok) throw new Error(await res.text());
+			deleteConfirmOpen = false;
+			regionToDelete = null;
 			fetchTaxRegions();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			deleteSubmitting = false;
 		}
 	}
 
@@ -247,20 +272,14 @@
 
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div class="mb-4 flex items-center justify-between border-b pb-4">
-			<div class="flex items-center gap-2 text-sm text-muted-foreground">
-				<span class="text-foreground">Tax Regions</span>
+		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
+			<div class="flex items-center gap-2">
+				<ListFilter class="size-4" />
+				<span class="font-semibold">Tax Regions</span>
 			</div>
+			<Button size="sm" onclick={openCreate}>Create</Button>
 		</div>
 		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex items-start justify-between gap-4">
-				<div>
-					<p class="text-sm text-muted-foreground">
-						Manage what you charge your customers when they shop from different countries and regions.
-					</p>
-				</div>
-				<Button size="sm" onclick={openCreate}>Create</Button>
-			</div>
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<Button variant="outline" size="sm" class="rounded-md">
 					<SlidersHorizontal class="mr-1.5 size-4" />
@@ -276,6 +295,13 @@
 							class="h-9 rounded-md pl-9"
 						/>
 					</div>
+					<button
+						type="button"
+						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+					>
+						<ArrowUpDown class="size-4" />
+						<span class="sr-only">Sort</span>
+					</button>
 				</div>
 			</div>
 		</div>
@@ -324,36 +350,36 @@
 									</td>
 									<td class="px-4 py-3">
 										<DropdownMenu.Root>
-											<DropdownMenu.Trigger
-												class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
-											>
-												<MoreHorizontal class="size-4" />
-												<span class="sr-only">Actions</span>
-											</DropdownMenu.Trigger>
-											<DropdownMenu.Portal>
-												<DropdownMenu.Content
-													class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-													sideOffset={4}
+												<DropdownMenu.Trigger
+													class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
 												>
-													<DropdownMenu.Item
-														textValue="Edit"
-														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => openEdit(region)}
+													<MoreHorizontal class="size-4" />
+													<span class="sr-only">Actions</span>
+												</DropdownMenu.Trigger>
+												<DropdownMenu.Portal>
+													<DropdownMenu.Content
+														class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+														sideOffset={4}
 													>
-														<Pencil class="size-4" />
-														Edit
-													</DropdownMenu.Item>
-													<DropdownMenu.Item
-														textValue="Delete"
-														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => deleteTaxRegion(region)}
-													>
-														<Trash2 class="size-4" />
-														Delete
-													</DropdownMenu.Item>
-												</DropdownMenu.Content>
-											</DropdownMenu.Portal>
-										</DropdownMenu.Root>
+														<DropdownMenu.Item
+															textValue="Edit"
+															class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+															onSelect={() => openEdit(region)}
+														>
+															<Pencil class="size-4" />
+															Edit
+														</DropdownMenu.Item>
+														<DropdownMenu.Item
+															textValue="Delete"
+															class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
+															onSelect={() => openDeleteConfirm(region)}
+														>
+															<Trash2 class="size-4" />
+															Delete
+														</DropdownMenu.Item>
+													</DropdownMenu.Content>
+												</DropdownMenu.Portal>
+											</DropdownMenu.Root>
 									</td>
 								</tr>
 							{/each}
@@ -547,3 +573,13 @@
 		</div>
 	</Sheet.Content>
 </Sheet.Root>
+
+<!-- Delete tax region confirmation -->
+<DeleteConfirmationModal
+	bind:open={deleteConfirmOpen}
+	entityName="tax region"
+	entityTitle={regionToDelete?.name ?? regionToDelete?.id ?? ''}
+	onConfirm={confirmDeleteTaxRegion}
+	onCancel={closeDeleteConfirm}
+	submitting={deleteSubmitting}
+/>

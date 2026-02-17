@@ -315,17 +315,7 @@
 										})}
 									</td>
 									<td class="px-4 py-3">
-										<div class="flex items-center gap-2">
-											<Button
-												variant="ghost"
-												size="sm"
-												class="size-8 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-												onclick={() => openDeleteConfirm(attr)}
-											>
-												<Trash2 class="size-4" />
-												<span class="sr-only">Delete</span>
-											</Button>
-											<DropdownMenu.Root>
+										<DropdownMenu.Root>
 												<DropdownMenu.Trigger
 													class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
 												>
@@ -356,7 +346,6 @@
 													</DropdownMenu.Content>
 												</DropdownMenu.Portal>
 											</DropdownMenu.Root>
-										</div>
 									</td>
 								</tr>
 							{/each}
