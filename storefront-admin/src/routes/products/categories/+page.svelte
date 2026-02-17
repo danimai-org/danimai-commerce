@@ -3,6 +3,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import { DropdownMenu } from 'bits-ui';
 	import Search from '@lucide/svelte/icons/search';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
@@ -11,6 +12,8 @@
 	import Info from '@lucide/svelte/icons/info';
 	import GripVertical from '@lucide/svelte/icons/grip-vertical';
 	import FolderTree from '@lucide/svelte/icons/folder-tree';
+	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import { cn } from '$lib/utils.js';
 
 	const API_BASE = 'http://localhost:8000';
@@ -331,17 +334,34 @@
 		return `/${category.value.toLowerCase().replace(/\s+/g, '-')}`;
 	}
 
-	async function deleteCategory(category: ProductCategory) {
+	// Delete confirmation
+	let categoryToDelete = $state<ProductCategory | null>(null);
+	let deleteConfirmOpen = $state(false);
+
+	function openDeleteConfirm(category: ProductCategory) {
+		categoryToDelete = category;
+		deleteConfirmOpen = true;
+	}
+
+	function closeDeleteConfirm() {
+		deleteConfirmOpen = false;
+		categoryToDelete = null;
+	}
+
+	async function confirmDeleteCategory() {
+		if (!categoryToDelete) return;
 		try {
 			const res = await fetch(`${API_BASE}/product-categories`, {
 				method: 'DELETE',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ category_ids: [category.id] })
+				body: JSON.stringify({ category_ids: [categoryToDelete.id] })
 			});
 			if (!res.ok) throw new Error(await res.text());
 			fetchCategories();
+			closeDeleteConfirm();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
+			closeDeleteConfirm();
 		}
 	}
 </script>
@@ -349,29 +369,43 @@
 <div class="flex h-full flex-col">
 	<!-- Content -->
 	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex items-start justify-between gap-4">
-				<div>
-					<p class="text-sm text-muted-foreground">
-						Organize products into categories, and manage those categories' ranking and hierarchy.
-					</p>
-				</div>
-				<div class="flex items-center gap-2">
-					<Button variant="outline" size="sm" onclick={openRanking}>
-						<GripVertical class="mr-1.5 size-4" />
-						Edit ranking
-					</Button>
-					<Button size="sm" onclick={openCreate}>Create</Button>
-				</div>
+		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
+			<div class="flex items-center gap-2">
+				<FolderTree class="size-4" />
+				<span class="font-semibold">Categories</span>
 			</div>
-			<div class="relative max-w-sm">
-				<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-				<Input
-					type="search"
-					placeholder="Search"
-					bind:value={searchQuery}
-					class="h-9 rounded-md pl-9"
-				/>
+			<div class="flex items-center gap-2">
+				<Button variant="outline" size="sm" onclick={openRanking}>
+					<GripVertical class="mr-1.5 size-4" />
+					Edit ranking
+				</Button>
+				<Button size="sm" onclick={openCreate}>Create</Button>
+			</div>
+		</div>
+		<div class="mb-6 flex flex-col gap-4">
+			<div class="flex flex-wrap items-center justify-between gap-2">
+				<Button variant="outline" size="sm" class="rounded-md">
+					<SlidersHorizontal class="mr-1.5 size-4" />
+					Add filter
+				</Button>
+				<div class="flex items-center gap-2">
+					<div class="relative w-64">
+						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							type="search"
+							placeholder="Search"
+							bind:value={searchQuery}
+							class="h-9 rounded-md pl-9"
+						/>
+					</div>
+					<button
+						type="button"
+						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+					>
+						<ArrowUpDown class="size-4" />
+						<span class="sr-only">Sort</span>
+					</button>
+				</div>
 			</div>
 		</div>
 
@@ -395,12 +429,13 @@
 							<th class="px-4 py-3 text-left font-medium">Handle</th>
 							<th class="px-4 py-3 text-left font-medium">Status</th>
 							<th class="px-4 py-3 text-left font-medium">Visibility</th>
+							<th class="px-4 py-3 text-left font-medium">Actions</th>
 						</tr>
 					</thead>
 					<tbody>
 						{#if categories.length === 0}
 							<tr>
-								<td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
+								<td colspan="5" class="px-4 py-8 text-center text-muted-foreground">
 									No categories found.
 								</td>
 							</tr>
@@ -451,6 +486,39 @@
 											></span>
 											{category.visibility ?? 'Public'}
 										</span>
+									</td>
+									<td class="px-4 py-3" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+										<DropdownMenu.Root>
+											<DropdownMenu.Trigger
+												class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
+											>
+												<MoreHorizontal class="size-4" />
+												<span class="sr-only">Actions</span>
+											</DropdownMenu.Trigger>
+											<DropdownMenu.Portal>
+												<DropdownMenu.Content
+													class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+													sideOffset={4}
+												>
+													<DropdownMenu.Item
+														textValue="Edit"
+														class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+														onSelect={() => openEdit(category)}
+													>
+														<Pencil class="size-4" />
+														Edit
+													</DropdownMenu.Item>
+													<DropdownMenu.Item
+														textValue="Delete"
+														class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
+														onSelect={() => openDeleteConfirm(category)}
+													>
+														<Trash2 class="size-4" />
+														Delete
+													</DropdownMenu.Item>
+												</DropdownMenu.Content>
+											</DropdownMenu.Portal>
+										</DropdownMenu.Root>
 									</td>
 								</tr>
 							{/each}
@@ -779,3 +847,13 @@
 		</div>
 	</Sheet.Content>
 </Sheet.Root>
+
+<!-- Delete Confirmation Modal -->
+<DeleteConfirmationModal
+	bind:open={deleteConfirmOpen}
+	entityName="category"
+	entityTitle={categoryToDelete?.value ?? categoryToDelete?.id ?? ''}
+	customMessage="Delete this category? This action cannot be undone."
+	onConfirm={confirmDeleteCategory}
+	onCancel={closeDeleteConfirm}
+/>

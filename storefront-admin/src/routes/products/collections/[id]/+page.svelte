@@ -8,6 +8,7 @@
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import Bell from '@lucide/svelte/icons/bell';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import FileText from '@lucide/svelte/icons/file-text';
@@ -516,37 +517,8 @@
 						<div class="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4 rounded-t-lg">
 							<div class="flex items-center gap-2">
 								<h2 class="text-base font-semibold">Products</h2>
-								<DropdownMenu.Root>
-									<DropdownMenu.Trigger
-										class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
-									>
-										<MoreHorizontal class="size-4" />
-										<span class="sr-only">Products actions</span>
-									</DropdownMenu.Trigger>
-									<DropdownMenu.Portal>
-										<DropdownMenu.Content
-											class="z-50 min-w-40 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-											sideOffset={4}
-										>
-											<DropdownMenu.Item
-												textValue="Add products"
-												class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-												onSelect={openAddProductsSheet}
-											>
-												Add products
-											</DropdownMenu.Item>
-										</DropdownMenu.Content>
-									</DropdownMenu.Portal>
-								</DropdownMenu.Root>
 							</div>
 							<div class="flex items-center gap-2">
-								<Button type="button" size="sm" class="rounded-md" onclick={openAddProductsSheet}>
-									Add
-								</Button>
-								<Button variant="outline" size="sm" class="rounded-md">
-									<SlidersHorizontal class="mr-1.5 size-4" />
-									Sort
-								</Button>
 								<div class="relative w-48">
 									<Search
 										class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
@@ -560,11 +532,14 @@
 								</div>
 								<button
 									type="button"
-									class="flex size-9 shrink-0 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+									class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 								>
-									<SlidersHorizontal class="size-4" />
+									<ArrowUpDown class="size-4" />
 									<span class="sr-only">Sort</span>
 								</button>
+								<Button type="button" size="sm" class="rounded-md" onclick={openAddProductsSheet}>
+									Add product
+								</Button>
 							</div>
 						</div>
 						<div class="overflow-x-auto">
@@ -908,18 +883,23 @@
 			</div>
 			<div class="flex min-h-0 flex-1 flex-col">
 				<div class="flex flex-wrap items-center justify-between gap-4 border-b px-6 py-4">
-					<Button variant="outline" size="sm" class="rounded-md" type="button">
-						<SlidersHorizontal class="mr-1.5 size-4" />
-						Sort
-					</Button>
-					<div class="relative w-48">
-						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							type="search"
-							placeholder="Search"
-							bind:value={addProductsSearch}
-							class="h-9 rounded-md pl-9"
-						/>
+					<div class="flex items-center gap-2">
+						<div class="relative w-48">
+							<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+							<Input
+								type="search"
+								placeholder="Search"
+								bind:value={addProductsSearch}
+								class="h-9 rounded-md pl-9"
+							/>
+						</div>
+						<button
+							type="button"
+							class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+						>
+							<ArrowUpDown class="size-4" />
+							<span class="sr-only">Sort</span>
+						</button>
 					</div>
 				</div>
 				<div class="min-h-0 flex-1 overflow-auto px-6">

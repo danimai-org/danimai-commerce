@@ -9,6 +9,7 @@
 	import Bell from '@lucide/svelte/icons/bell';
 	import Search from '@lucide/svelte/icons/search';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Info from '@lucide/svelte/icons/info';
@@ -109,6 +110,11 @@
 	let deleteConfirmOpen = $state(false);
 	let productToDelete = $state<Product | null>(null);
 	let deleteSubmitting = $state(false);
+
+	function openDeleteConfirm(product: Product) {
+		productToDelete = product;
+		deleteConfirmOpen = true;
+	}
 
 	let selectedProducts = $state<Set<string>>(new Set());
 
@@ -608,64 +614,26 @@
 	<!-- Content -->
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex flex-col gap-4">
-			<div class="flex flex-wrap items-center gap-2">
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger
-						class="inline-flex items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-					>
-						<SlidersHorizontal class="size-4" />
-						Sort
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Portal>
-						<DropdownMenu.Content
-							class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-							sideOffset={4}
-						>
-							<DropdownMenu.Item
-								textValue="Add"
-								class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-								onSelect={openCreate}
-							>
-								<Plus class="size-4" />
-								Add
-							</DropdownMenu.Item>
-							<DropdownMenu.Separator class="my-1 h-px bg-muted" />
-							<DropdownMenu.Item
-								textValue="Sort by Created Date"
-								class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-								onSelect={() => {
-									sortingField = 'created_at';
-									sortingDirection = sortingDirection === 'asc' ? 'desc' : 'asc';
-								}}
-							>
-								Sort by Created Date
-							</DropdownMenu.Item>
-							<DropdownMenu.Item
-								textValue="Sort by Title"
-								class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-								onSelect={() => {
-									sortingField = 'title';
-									sortingDirection = sortingDirection === 'asc' ? 'desc' : 'asc';
-								}}
-							>
-								Sort by Title
-							</DropdownMenu.Item>
-						</DropdownMenu.Content>
-					</DropdownMenu.Portal>
-				</DropdownMenu.Root>
-				<div class="relative max-w-md min-w-[200px] flex-1">
-					<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-					<Input
-						type="search"
-						placeholder="Search products..."
-						bind:value={searchQuery}
-						class="h-9 rounded-md pr-9 pl-9"
-					/>
+			<div class="flex flex-wrap items-center justify-between gap-2">
+				<Button variant="outline" size="sm" class="rounded-md">
+					<SlidersHorizontal class="mr-1.5 size-4" />
+					Add filter
+				</Button>
+				<div class="flex items-center gap-2">
+					<div class="relative max-w-md min-w-[200px] flex-1">
+						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							type="search"
+							placeholder="Search products..."
+							bind:value={searchQuery}
+							class="h-9 rounded-md pl-9"
+						/>
+					</div>
 					<button
 						type="button"
-						class="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 					>
-						<SlidersHorizontal class="size-4" />
+						<ArrowUpDown class="size-4" />
 						<span class="sr-only">Sort</span>
 					</button>
 				</div>
@@ -792,22 +760,38 @@
 											{product.status}
 										</span>
 									</td>
-									<td class="px-4 py-3">
-										{#if isSelected}
-											<button
-												type="button"
-												onclick={() => {
-													const newSet = new Set(selectedProducts);
-													newSet.delete(product.id);
-													selectedProducts = newSet;
-												}}
-												class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground"
-												aria-label="Deselect"
+									<td class="px-4 py-3" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+										<DropdownMenu.Root>
+											<DropdownMenu.Trigger
+												class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
 											>
-												<XCircle class="size-4" />
-												<span class="sr-only">Cancel selection</span>
-											</button>
-										{/if}
+												<MoreHorizontal class="size-4" />
+												<span class="sr-only">Actions</span>
+											</DropdownMenu.Trigger>
+											<DropdownMenu.Portal>
+												<DropdownMenu.Content
+													class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+													sideOffset={4}
+												>
+													<DropdownMenu.Item
+														textValue="Edit"
+														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+														onSelect={() => goto(`/products/${product.id}`)}
+													>
+														<Pencil class="size-4" />
+														Edit
+													</DropdownMenu.Item>
+													<DropdownMenu.Item
+														textValue="Delete"
+														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
+														onSelect={() => openDeleteConfirm(product)}
+													>
+														<Trash2 class="size-4" />
+														Delete
+													</DropdownMenu.Item>
+												</DropdownMenu.Content>
+											</DropdownMenu.Portal>
+										</DropdownMenu.Root>
 									</td>
 								</tr>
 							{/each}

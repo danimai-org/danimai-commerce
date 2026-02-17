@@ -7,6 +7,9 @@
 	import Search from '@lucide/svelte/icons/search';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import Package from '@lucide/svelte/icons/package';
+	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 
 	const API_BASE = 'http://localhost:8000';
 
@@ -242,39 +245,40 @@
 
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div class="mb-4 flex items-center justify-between border-b pb-4">
-			<div class="flex items-center gap-2 text-sm text-muted-foreground">
-				<span class="text-foreground">Inventory</span>
-				<span>/</span>
-				<span>Inventory Item</span>
+		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
+			<div class="flex items-center gap-2">
+				<Package class="size-4" />
+				<span class="font-semibold">Inventory Item</span>
 			</div>
+			<Button size="sm" onclick={openCreateSheet}>Create</Button>
 		</div>
 		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex items-center justify-between">
-				<div>
-					<h1 class="text-lg font-semibold leading-none">Inventory Item</h1>
-					<p class="mt-1 text-sm text-muted-foreground">
-						Manage and track your inventory items.
-					</p>
-				</div>
-				<Button onclick={openCreateSheet}>
-					Add Item
+			<div class="flex flex-wrap items-center justify-between gap-2">
+				<Button variant="outline" size="sm" class="rounded-md">
+					<SlidersHorizontal class="mr-1.5 size-4" />
+					Add filter
 				</Button>
-			</div>
-			<div class="flex items-center gap-2">
-				<div class="relative flex-1 max-w-sm">
-					<Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-					<Input
-						type="text"
-						placeholder="Search by SKU..."
-						bind:value={searchQuery}
-						class="pl-9"
-						onkeydown={(e) => {
-							if (e.key === 'Enter') handleSearch();
-						}}
-					/>
+				<div class="flex items-center gap-2">
+					<div class="relative w-64">
+						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							type="search"
+							placeholder="Search"
+							bind:value={searchQuery}
+							class="h-9 rounded-md pl-9"
+							onkeydown={(e) => {
+								if (e.key === 'Enter') handleSearch();
+							}}
+						/>
+					</div>
+					<button
+						type="button"
+						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+					>
+						<ArrowUpDown class="size-4" />
+						<span class="sr-only">Sort</span>
+					</button>
 				</div>
-				<Button variant="outline" onclick={handleSearch}>Search</Button>
 			</div>
 		</div>
 

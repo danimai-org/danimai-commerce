@@ -8,6 +8,9 @@
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import MapPin from '@lucide/svelte/icons/map-pin';
+	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 
 	const API_BASE = 'http://localhost:8000';
 
@@ -322,37 +325,40 @@
 
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div class="mb-4 flex items-center justify-between border-b pb-4">
-			<div class="flex items-center gap-2 text-sm text-muted-foreground">
-				<span class="text-foreground">Inventory</span>
-				<span>/</span>
-				<span>Location</span>
+		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
+			<div class="flex items-center gap-2">
+				<MapPin class="size-4" />
+				<span class="font-semibold">Location</span>
 			</div>
+			<Button size="sm" onclick={openCreateSheet}>Create</Button>
 		</div>
 		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex items-center justify-between">
-				<div>
-					<h1 class="text-lg font-semibold leading-none">Location</h1>
-					<p class="mt-1 text-sm text-muted-foreground">
-						Manage stock locations and warehouses.
-					</p>
+			<div class="flex flex-wrap items-center justify-between gap-2">
+				<Button variant="outline" size="sm" class="rounded-md">
+					<SlidersHorizontal class="mr-1.5 size-4" />
+					Add filter
+				</Button>
+				<div class="flex items-center gap-2">
+					<div class="relative w-64">
+						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							type="search"
+							placeholder="Search"
+							bind:value={searchQuery}
+							class="h-9 rounded-md pl-9"
+							onkeydown={(e) => {
+								if (e.key === 'Enter') handleSearch();
+							}}
+						/>
+					</div>
+					<button
+						type="button"
+						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+					>
+						<ArrowUpDown class="size-4" />
+						<span class="sr-only">Sort</span>
+					</button>
 				</div>
-				<Button onclick={openCreateSheet}>Add Location</Button>
-			</div>
-			<div class="flex items-center gap-2">
-				<div class="relative flex-1 max-w-sm">
-					<Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-					<Input
-						type="text"
-						placeholder="Search by name..."
-						bind:value={searchQuery}
-						class="pl-9"
-						onkeydown={(e) => {
-							if (e.key === 'Enter') handleSearch();
-						}}
-					/>
-				</div>
-				<Button variant="outline" onclick={handleSearch}>Search</Button>
 			</div>
 		</div>
 

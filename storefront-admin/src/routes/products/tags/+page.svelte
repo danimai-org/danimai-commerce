@@ -12,6 +12,7 @@
 	import Eye from '@lucide/svelte/icons/eye';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import Tag from '@lucide/svelte/icons/tag';
+	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import { cn } from '$lib/utils.js';
 
 	const API_BASE = 'http://localhost:8000';
@@ -215,21 +216,14 @@
 
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div class="mb-4 flex items-center justify-between border-b pb-4">
-			<div class="flex items-center gap-2 text-sm text-muted-foreground">
+		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
+			<div class="flex items-center gap-2">
 				<Tag class="size-4" />
-				<span>Tags</span>
+				<span class="font-semibold">Tags</span>
 			</div>
+			<Button size="sm" onclick={openCreate}>Create</Button>
 		</div>
 		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex items-start justify-between gap-4">
-				<div>
-					<p class="text-sm text-muted-foreground">
-						Organize products with tags.
-					</p>
-				</div>
-				<Button size="sm" onclick={openCreate}>Create</Button>
-			</div>
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<Button variant="outline" size="sm" class="rounded-md">
 					<SlidersHorizontal class="mr-1.5 size-4" />
@@ -245,6 +239,13 @@
 							class="h-9 rounded-md pl-9"
 						/>
 					</div>
+					<button
+						type="button"
+						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+					>
+						<ArrowUpDown class="size-4" />
+						<span class="sr-only">Sort</span>
+					</button>
 				</div>
 			</div>
 		</div>

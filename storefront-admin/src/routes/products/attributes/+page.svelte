@@ -12,6 +12,7 @@
 	import Eye from '@lucide/svelte/icons/eye';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import ListFilter from '@lucide/svelte/icons/list-filter';
+	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import { cn } from '$lib/utils.js';
 
 	const API_BASE = 'http://localhost:8000';
@@ -20,7 +21,7 @@
 		{ value: 'string', label: 'String' },
 		{ value: 'number', label: 'Number' },
 		{ value: 'boolean', label: 'Boolean' },
-		{ value: 'date', label: 'Date' },
+		{ value: 'date', label: 'Date' }
 	] as const;
 
 	type ProductAttribute = {
@@ -227,21 +228,14 @@
 
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div class="mb-4 flex items-center justify-between border-b pb-4">
-			<div class="flex items-center gap-2 text-sm text-muted-foreground">
+		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
+			<div class="flex items-center gap-2">
 				<ListFilter class="size-4" />
-				<span>Attributes</span>
+				<span class="font-semibold">Attributes</span>
 			</div>
+			<Button size="sm" onclick={openCreate}>Create</Button>
 		</div>
 		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex items-start justify-between gap-4">
-				<div>
-					<p class="text-sm text-muted-foreground">
-						Define product attributes (e.g. Color, Size) used for variants and filtering.
-					</p>
-				</div>
-				<Button size="sm" onclick={openCreate}>Create</Button>
-			</div>
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<Button variant="outline" size="sm" class="rounded-md">
 					<SlidersHorizontal class="mr-1.5 size-4" />
@@ -257,6 +251,13 @@
 							class="h-9 rounded-md pl-9"
 						/>
 					</div>
+					<button
+						type="button"
+						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+					>
+						<ArrowUpDown class="size-4" />
+						<span class="sr-only">Sort</span>
+					</button>
 				</div>
 			</div>
 		</div>
@@ -418,7 +419,7 @@
 						<select
 							id="create-type"
 							bind:value={createType}
-							class="border-input bg-background ring-offset-background flex h-9 w-full min-w-0 rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+							class="flex h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs ring-offset-background outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{#each ATTRIBUTE_TYPES as opt}
 								<option value={opt.value}>{opt.label}</option>
@@ -466,7 +467,7 @@
 						<select
 							id="edit-type"
 							bind:value={editType}
-							class="border-input bg-background ring-offset-background flex h-9 w-full min-w-0 rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+							class="flex h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs ring-offset-background outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{#if editType && !ATTRIBUTE_TYPES.some((t) => t.value === editType)}
 								<option value={editType}>{editType}</option>

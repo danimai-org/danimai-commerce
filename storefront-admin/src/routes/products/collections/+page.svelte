@@ -12,6 +12,7 @@
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Info from '@lucide/svelte/icons/info';
+	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { cn } from '$lib/utils.js';
 
@@ -238,21 +239,14 @@
 
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div class="mb-4 flex items-center justify-between border-b pb-4">
-			<div class="flex items-center gap-2 text-sm text-muted-foreground">
+		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
+			<div class="flex items-center gap-2">
 				<FileText class="size-4" />
-				<span>Collections</span>
+				<span class="font-semibold">Collections</span>
 			</div>
+			<Button size="sm" onclick={openCreate}>Create</Button>
 		</div>
 		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex items-start justify-between gap-4">
-				<div>
-					<p class="text-sm text-muted-foreground">
-						Organize products into collections.
-					</p>
-				</div>
-				<Button size="sm" onclick={openCreate}>Create</Button>
-			</div>
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<Button variant="outline" size="sm" class="rounded-md">
 					<SlidersHorizontal class="mr-1.5 size-4" />
@@ -272,8 +266,8 @@
 						type="button"
 						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 					>
-						<SlidersHorizontal class="size-4" />
-						<span class="sr-only">Filter</span>
+						<ArrowUpDown class="size-4" />
+						<span class="sr-only">Sort</span>
 					</button>
 				</div>
 			</div>
