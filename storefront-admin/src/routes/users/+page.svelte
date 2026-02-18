@@ -8,6 +8,8 @@
 	import Search from '@lucide/svelte/icons/search';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import Pencil from '@lucide/svelte/icons/pencil';
+	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+	import { DropdownMenu } from 'bits-ui';
 
 	const API_BASE = 'http://localhost:8000';
 
@@ -73,6 +75,21 @@
 		fetchUsers();
 	});
 
+	// Load roles once for Role column and Edit sheet
+	$effect(() => {
+		if (roles.length > 0) return;
+		fetch(`${API_BASE}/roles?limit=100`, { cache: 'no-store' })
+			.then((r) => r.json())
+			.then((j: { data: Role[] }) => {
+				if (j.data?.length) roles = j.data;
+			});
+	});
+
+	const rolesById = $derived.by(() => {
+		const m = new Map<string, string>();
+		for (const r of roles) m.set(r.id, r.name);
+		return m;
+	});
 	const users = $derived(data?.data ?? []);
 	const pagination = $derived(data?.pagination ?? null);
 	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
@@ -149,6 +166,69 @@
 			inviteError = e instanceof Error ? e.message : String(e);
 		} finally {
 			inviteSubmitting = false;
+		}
+	}
+
+	// Edit user sheet
+	let editOpen = $state(false);
+	let editUser = $state<User | null>(null);
+	let editFirstName = $state('');
+	let editLastName = $state('');
+	let editRoleId = $state<string | null>(null);
+	let editError = $state<string | null>(null);
+	let editSubmitting = $state(false);
+
+	function openEdit(user: User) {
+		editUser = user;
+		editOpen = true;
+		editFirstName = user.first_name ?? '';
+		editLastName = user.last_name ?? '';
+		editRoleId = user.role_id ?? null;
+		editError = null;
+	}
+
+	function closeEdit() {
+		editOpen = false;
+		editUser = null;
+	}
+
+	async function submitEdit() {
+		if (!editUser) return;
+		editError = null;
+		editSubmitting = true;
+		try {
+			const body: { first_name?: string | null; last_name?: string | null; role_id?: string | null } = {};
+			if (editFirstName.trim() !== (editUser.first_name ?? '')) body.first_name = editFirstName.trim() || null;
+			if (editLastName.trim() !== (editUser.last_name ?? '')) body.last_name = editLastName.trim() || null;
+			if (editRoleId !== (editUser.role_id ?? null)) body.role_id = editRoleId;
+			if (Object.keys(body).length === 0) {
+				closeEdit();
+				return;
+			}
+			const res = await fetch(`${API_BASE}/users/${editUser.id}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					first_name: editFirstName.trim() || null,
+					last_name: editLastName.trim() || null,
+					role_id: editRoleId
+				})
+			});
+			const text = await res.text();
+			if (!res.ok) {
+				let msg = text;
+				try {
+					const j = JSON.parse(text);
+					msg = j.message ?? text;
+				} catch {}
+				throw new Error(msg);
+			}
+			closeEdit();
+			fetchUsers();
+		} catch (e) {
+			editError = e instanceof Error ? e.message : String(e);
+		} finally {
+			editSubmitting = false;
 		}
 	}
 </script>
@@ -262,6 +342,86 @@
 			</Sheet.Content>
 		</Sheet.Root>
 
+		<!-- Edit user sheet -->
+		<Sheet.Root bind:open={editOpen}>
+			<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
+				<div class="flex h-full flex-col">
+<div class="border-b px-6 py-4">
+					<h2 class="text-lg font-semibold">Edit user</h2>
+					<p class="mt-1 text-sm text-muted-foreground">
+						Update first name, last name, and role.
+					</p>
+				</div>
+					<form
+						onsubmit={(e) => {
+							e.preventDefault();
+							submitEdit();
+						}}
+						class="flex flex-1 flex-col overflow-auto"
+					>
+						<div class="space-y-4 px-6 py-6">
+							<div class="space-y-2">
+								<label for="edit-first-name" class="block text-sm font-medium">First Name</label>
+								<Input
+									id="edit-first-name"
+									type="text"
+									placeholder="First name"
+									class="w-full"
+									bind:value={editFirstName}
+									disabled={editSubmitting}
+								/>
+							</div>
+							<div class="space-y-2">
+								<label for="edit-last-name" class="block text-sm font-medium">Last Name</label>
+								<Input
+									id="edit-last-name"
+									type="text"
+									placeholder="Last name"
+									class="w-full"
+									bind:value={editLastName}
+									disabled={editSubmitting}
+								/>
+							</div>
+							<div class="space-y-2">
+								<label for="edit-role" class="block text-sm font-medium">Role</label>
+								<Select.Root
+									type="single"
+									value={editRoleId ?? undefined}
+									onValueChange={(v) => (editRoleId = v ?? null)}
+									allowDeselect
+									disabled={editSubmitting}
+								>
+									<Select.Trigger id="edit-role" class="w-full">
+										{#if editRoleId && roles.find((r) => r.id === editRoleId)}
+											{roles.find((r) => r.id === editRoleId)?.name}
+										{:else}
+											Select role
+										{/if}
+									</Select.Trigger>
+									<Select.Content>
+										{#each roles as role (role.id)}
+											<Select.Item value={role.id} label={role.name}>{role.name}</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+							</div>
+							{#if editError}
+								<p class="text-sm text-destructive">{editError}</p>
+							{/if}
+						</div>
+						<div class="flex justify-end gap-2 border-t p-4">
+							<Button type="button" variant="outline" onclick={closeEdit} disabled={editSubmitting}>
+								Cancel
+							</Button>
+							<Button type="submit" disabled={editSubmitting}>
+								{editSubmitting ? 'Saving…' : 'Save'}
+							</Button>
+						</div>
+					</form>
+				</div>
+			</Sheet.Content>
+		</Sheet.Root>
+
 		{#if error}
 			<div
 				class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
@@ -280,6 +440,7 @@
 							<th class="px-4 py-3 text-left font-medium">Email</th>
 							<th class="px-4 py-3 text-left font-medium">First Name</th>
 							<th class="px-4 py-3 text-left font-medium">Last Name</th>
+							<th class="px-4 py-3 text-left font-medium">Role</th>
 							<th class="px-4 py-3 text-left font-medium">Created</th>
 							<th class="px-4 py-3 text-left font-medium">Updated</th>
 							<th class="w-10 px-4 py-3"></th>
@@ -288,7 +449,7 @@
 					<tbody>
 						{#if users.length === 0}
 							<tr>
-								<td colspan="6" class="px-4 py-8 text-center text-muted-foreground">
+								<td colspan="7" class="px-4 py-8 text-center text-muted-foreground">
 									No users found.
 								</td>
 							</tr>
@@ -298,17 +459,33 @@
 									<td class="px-4 py-3 font-medium">{user.email}</td>
 									<td class="px-4 py-3 text-muted-foreground">{user.first_name ?? '–'}</td>
 									<td class="px-4 py-3 text-muted-foreground">{user.last_name ?? '–'}</td>
+									<td class="px-4 py-3 text-muted-foreground">{user.role_id ? (rolesById.get(user.role_id) ?? '–') : '–'}</td>
 									<td class="px-4 py-3 text-muted-foreground">{formatDate(user.created_at)}</td>
 									<td class="px-4 py-3 text-muted-foreground">{formatDate(user.updated_at)}</td>
 									<td class="px-4 py-3">
-										<button
-											type="button"
-											class="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-											title="Edit user"
-										>
-											<Pencil class="size-4" />
-											<span class="sr-only">Edit</span>
-										</button>
+										<DropdownMenu.Root>
+											<DropdownMenu.Trigger
+												class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
+											>
+												<MoreHorizontal class="size-4" />
+												<span class="sr-only">Actions</span>
+											</DropdownMenu.Trigger>
+											<DropdownMenu.Portal>
+												<DropdownMenu.Content
+													class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+													sideOffset={4}
+												>
+													<DropdownMenu.Item
+														textValue="Edit"
+														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+														onSelect={() => openEdit(user)}
+													>
+														<Pencil class="size-4" />
+														Edit
+													</DropdownMenu.Item>
+												</DropdownMenu.Content>
+											</DropdownMenu.Portal>
+										</DropdownMenu.Root>
 									</td>
 								</tr>
 							{/each}

@@ -3,8 +3,10 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { Collapsible, DropdownMenu } from 'bits-ui';
+	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import Pencil from '@lucide/svelte/icons/pencil';
+import Trash2 from '@lucide/svelte/icons/trash-2';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import ShieldCheck from '@lucide/svelte/icons/shield-check';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
@@ -46,6 +48,10 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let selectedIds = $state<Set<string>>(new Set());
+	let deleteModalOpen = $state(false);
+	let roleToDelete = $state<Role | null>(null);
+	let deleteSubmitting = $state(false);
+	let deleteError = $state<string | null>(null);
 
 	async function fetchRoles() {
 		loading = true;
@@ -104,19 +110,36 @@
 		else selectedIds = new Set(roles.map((r) => r.id));
 	}
 
-	async function deleteRole(role: Role) {
+	async function deleteRole(role: Role): Promise<void> {
+		const res = await fetch(`${API_BASE}/roles`, {
+			method: 'DELETE',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ role_ids: [role.id] })
+		});
+		if (!res.ok) throw new Error(await res.text());
+		selectedIds = new Set(selectedIds);
+		selectedIds.delete(role.id);
+		fetchRoles();
+	}
+
+	function openDeleteModal(role: Role) {
+		roleToDelete = role;
+		deleteError = null;
+		deleteModalOpen = true;
+	}
+
+	async function confirmDelete() {
+		if (!roleToDelete) return;
+		deleteSubmitting = true;
+		deleteError = null;
 		try {
-			const res = await fetch(`${API_BASE}/roles`, {
-				method: 'DELETE',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ role_ids: [role.id] })
-			});
-			if (!res.ok) throw new Error(await res.text());
-			selectedIds = new Set(selectedIds);
-			selectedIds.delete(role.id);
-			fetchRoles();
+			await deleteRole(roleToDelete);
+			deleteModalOpen = false;
+			roleToDelete = null;
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			deleteError = e instanceof Error ? e.message : String(e);
+		} finally {
+			deleteSubmitting = false;
 		}
 	}
 
@@ -264,6 +287,19 @@
 		sheetOpen = true;
 	}
 
+	function parseRoleError(body: string): string {
+		try {
+			const json = JSON.parse(body) as { message?: string };
+			const msg = json?.message ?? body;
+			if (msg.includes('roles_name_key') || msg.toLowerCase().includes('duplicate key')) {
+				return 'A role with this name already exists.';
+			}
+			return msg;
+		} catch {
+			return body;
+		}
+	}
+
 	async function submitForm() {
 		formError = null;
 		if (!formName.trim()) {
@@ -278,14 +314,14 @@
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ name: formName.trim(), description: formDescription.trim() })
 				});
-				if (!res.ok) throw new Error(await res.text());
+				if (!res.ok) throw new Error(parseRoleError(await res.text()));
 			} else if (editRole) {
 				const res = await fetch(`${API_BASE}/roles/${editRole.id}`, {
 					method: 'PUT',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ name: formName.trim(), description: formDescription.trim() })
 				});
-				if (!res.ok) throw new Error(await res.text());
+				if (!res.ok) throw new Error(parseRoleError(await res.text()));
 			}
 			sheetOpen = false;
 			fetchRoles();
@@ -415,12 +451,13 @@
 														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
 														onSelect={() => openEdit(role)}
 													>
+														<Pencil class="size-4" />
 														Edit
 													</DropdownMenu.Item>
 													<DropdownMenu.Item
 														textValue="Delete"
 														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => deleteRole(role)}
+														onSelect={() => openDeleteModal(role)}
 													>
 														<Trash2 class="size-4" />
 														Delete
@@ -469,6 +506,16 @@
 		{/if}
 	</div>
 </div>
+
+<DeleteConfirmationModal
+	bind:open={deleteModalOpen}
+	entityName="role"
+	entityTitle={roleToDelete?.name ?? ''}
+	onConfirm={confirmDelete}
+	onCancel={() => { deleteError = null; roleToDelete = null; }}
+	submitting={deleteSubmitting}
+	error={deleteError}
+/>
 
 <Sheet.Root bind:open={sheetOpen}>
 	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
