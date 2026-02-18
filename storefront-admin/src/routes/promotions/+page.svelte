@@ -9,6 +9,7 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+	import Folder from '@lucide/svelte/icons/folder';
 	import Info from '@lucide/svelte/icons/info';
 	import Clock from '@lucide/svelte/icons/clock';
 	import { cn } from '$lib/utils.js';
@@ -345,14 +346,12 @@
 
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div class="mb-4 flex items-center justify-between border-b pb-4">
-			<div class="flex items-center gap-2 text-sm text-muted-foreground">
-				<span class="text-foreground">Promotions</span>
-			</div>
-		</div>
 		<div class="mb-4 flex flex-col gap-4">
-			<div class="flex items-center justify-between gap-4">
-				<h1 class="text-xl font-semibold">Promotions</h1>
+			<div class="flex items-center justify-between gap-4 border-b pb-4">
+				<h1 class="relative flex items-center gap-2 text-xl font-semibold">
+					<Folder class="relative size-5 shrink-0" />
+					Promotions
+				</h1>
 				<Button size="sm" onclick={openCreate}>Create</Button>
 			</div>
 			<div class="flex flex-wrap items-center justify-between gap-2">
@@ -514,8 +513,8 @@
 	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
 		<div class="flex h-full flex-col">
 			<!-- Header: close + step indicator -->
-			<Sheet.Header class="flex flex-col gap-4 border-b px-6 py-4">
-				<div class="flex items-center gap-2">
+			<Sheet.Header class="flex flex-col gap-4 border-b px-8 py-4">
+				<div class="flex items-center gap-2 pt-[10px]">
 					<div class="flex items-center gap-1.5">
 						<span
 							class={cn(

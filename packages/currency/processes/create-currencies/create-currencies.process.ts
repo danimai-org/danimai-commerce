@@ -49,23 +49,52 @@ export class CreateCurrenciesProcess
       const existing = await this.db
         .selectFrom("currencies")
         .where("code", "=", item.code)
-        .where("deleted_at", "is", null)
         .selectAll()
         .executeTakeFirst();
-      if (existing) continue;
+      
+      if (existing) {
+        // If currency exists and is not deleted, skip it
+        if (existing.deleted_at === null) {
+          continue;
+        }
+        // If currency exists but is soft-deleted, restore it
+        const restored = await this.db
+          .updateTable("currencies")
+          .set({
+            deleted_at: null,
+            tax_inclusive_pricing: item.tax_inclusive_pricing ?? false,
+            updated_at: new Date(),
+          })
+          .where("code", "=", item.code)
+          .returningAll()
+          .executeTakeFirst();
+        if (restored) created.push(restored);
+        continue;
+      }
 
-      const row = await this.db
-        .insertInto("currencies")
-        .values({
-          code: def.code,
-          name: def.name,
-          symbol: def.symbol,
-          symbol_native: def.symbol_native,
-          tax_inclusive_pricing: item.tax_inclusive_pricing ?? false,
-        })
-        .returningAll()
-        .executeTakeFirst();
-      if (row) created.push(row);
+      // Currency doesn't exist, insert it
+      try {
+        const row = await this.db
+          .insertInto("currencies")
+          .values({
+            code: def.code,
+            name: def.name,
+            symbol: def.symbol,
+            symbol_native: def.symbol_native,
+            tax_inclusive_pricing: item.tax_inclusive_pricing ?? false,
+          })
+          .returningAll()
+          .executeTakeFirst();
+        if (row) created.push(row);
+      } catch (error: any) {
+        // Handle race condition: if another request inserted the same currency
+        // between our check and insert, catch the duplicate key error
+        if (error?.code === "23505" || error?.message?.includes("duplicate key")) {
+          // Currency was inserted by another request, skip it
+          continue;
+        }
+        throw error;
+      }
     }
     return created;
   }

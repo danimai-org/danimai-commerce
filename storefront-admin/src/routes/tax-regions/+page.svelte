@@ -177,10 +177,20 @@
 		createOpen = false;
 	}
 
+	function isValidUUID(str: string): boolean {
+		const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+		return uuidRegex.test(str);
+	}
+
 	async function submitCreate() {
 		createError = null;
 		if (!createCountry.trim()) {
 			createError = 'Country is required';
+			return;
+		}
+		const trimmedTaxProviderId = createTaxProviderId.trim();
+		if (trimmedTaxProviderId && !isValidUUID(trimmedTaxProviderId)) {
+			createError = 'Tax provider ID must be a valid UUID';
 			return;
 		}
 		createSubmitting = true;
@@ -192,7 +202,7 @@
 					tax_regions: [
 						{
 							name: createCountry.trim(),
-							tax_provider_id: createTaxProviderId.trim() || null
+							tax_provider_id: trimmedTaxProviderId || null
 						}
 					]
 				})
@@ -238,6 +248,11 @@
 			editError = 'Name is required';
 			return;
 		}
+		const trimmedTaxProviderId = editTaxProviderId.trim();
+		if (trimmedTaxProviderId && !isValidUUID(trimmedTaxProviderId)) {
+			editError = 'Tax provider ID must be a valid UUID';
+			return;
+		}
 		editSubmitting = true;
 		try {
 			const res = await fetch(`${API_BASE}/tax-regions/${editRegion.id}`, {
@@ -245,7 +260,7 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					name: editName.trim(),
-					tax_provider_id: editTaxProviderId.trim() || null
+					tax_provider_id: trimmedTaxProviderId || null
 				})
 			});
 			if (!res.ok) {
@@ -460,8 +475,16 @@
 							<Input
 								id="create-tax-provider"
 								bind:value={createTaxProviderId}
-								placeholder="Tax provider ID (optional)"
-								class="h-9"
+								placeholder="Tax provider ID (optional, UUID format)"
+								oninput={() => {
+									if (createError === 'Tax provider ID must be a valid UUID') {
+										createError = null;
+									}
+								}}
+								class={cn(
+									'h-9',
+									createError === 'Tax provider ID must be a valid UUID' && 'border-destructive'
+								)}
 							/>
 						</div>
 					</div>
@@ -558,8 +581,16 @@
 						<Input
 							id="edit-tax-provider"
 							bind:value={editTaxProviderId}
-							placeholder="Tax provider ID (optional)"
-							class="h-9"
+							placeholder="Tax provider ID (optional, UUID format)"
+							oninput={() => {
+								if (editError === 'Tax provider ID must be a valid UUID') {
+									editError = null;
+								}
+							}}
+							class={cn(
+								'h-9',
+								editError === 'Tax provider ID must be a valid UUID' && 'border-destructive'
+							)}
 						/>
 					</div>
 				</div>

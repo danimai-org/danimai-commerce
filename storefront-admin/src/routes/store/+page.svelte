@@ -8,7 +8,11 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+	import Store from '@lucide/svelte/icons/store';
+	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import { cn } from '$lib/utils.js';
+	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
+	import Combobox from '$lib/components/organs/combobox/combobox.svelte';
 
 	const API_BASE = 'http://localhost:8000';
 
@@ -57,6 +61,23 @@
 		deleted_at: string | null;
 	};
 
+	type Region = {
+		id: string;
+		name: string;
+		currency_code: string;
+	};
+
+	type SalesChannel = {
+		id: string;
+		name: string;
+		description: string | null;
+	};
+
+	type StockLocation = {
+		id: string;
+		name: string | null;
+	};
+
 	// Store details from API (first store)
 	let storeData = $state<Store | null>(null);
 	let storeLoading = $state(true);
@@ -76,6 +97,123 @@
 	$effect(() => {
 		fetchStore();
 	});
+
+	// Edit store sheet
+	let editStoreOpen = $state(false);
+	let editStoreName = $state('');
+	let editStoreDefaultCurrency = $state('');
+	let editStoreDefaultRegion = $state('');
+	let editStoreDefaultSalesChannel = $state('');
+	let editStoreDefaultLocation = $state('');
+	let editStoreSubmitting = $state(false);
+	let editStoreError = $state<string | null>(null);
+
+	// Options for dropdowns
+	let storeRegions = $state<Region[]>([]);
+	let storeSalesChannels = $state<SalesChannel[]>([]);
+	let storeStockLocations = $state<StockLocation[]>([]);
+	let storeCurrencies = $state<Currency[]>([]);
+	let storeOptionsLoading = $state(false);
+
+	async function fetchStoreOptions() {
+		storeOptionsLoading = true;
+		try {
+			const [regionsRes, channelsRes, locationsRes, currenciesRes] = await Promise.all([
+				fetch(`${API_BASE}/regions?limit=100`, { cache: 'no-store' }),
+				fetch(`${API_BASE}/sales-channels?limit=100`, { cache: 'no-store' }),
+				fetch(`${API_BASE}/stock-locations?limit=100`, { cache: 'no-store' }),
+				fetch(`${API_BASE}/currencies?limit=100`, { cache: 'no-store' })
+			]);
+
+			if (regionsRes.ok) {
+				const json = (await regionsRes.json()) as { data: Region[] };
+				storeRegions = json.data;
+			}
+			if (channelsRes.ok) {
+				const json = (await channelsRes.json()) as { data: SalesChannel[] };
+				storeSalesChannels = json.data;
+			}
+			if (locationsRes.ok) {
+				const json = (await locationsRes.json()) as { data: StockLocation[] };
+				storeStockLocations = json.data;
+			}
+			if (currenciesRes.ok) {
+				const json = (await currenciesRes.json()) as { data: Currency[] };
+				storeCurrencies = json.data;
+			}
+		} catch (e) {
+			console.error('Failed to fetch options:', e);
+		} finally {
+			storeOptionsLoading = false;
+		}
+	}
+
+	function openEditStore() {
+		if (!storeData) return;
+		editStoreName = storeData.name;
+		editStoreDefaultCurrency = storeData.default_currency_code?.toLowerCase() ?? '';
+		editStoreDefaultRegion = storeData.default_region_id ?? '';
+		editStoreDefaultSalesChannel = storeData.default_sales_channel_id ?? '';
+		editStoreDefaultLocation = storeData.default_location_id ?? '';
+		editStoreError = null;
+		editStoreOpen = true;
+		fetchStoreOptions();
+	}
+
+	function closeEditStore() {
+		if (!editStoreSubmitting) {
+			editStoreOpen = false;
+			editStoreError = null;
+		}
+	}
+
+	async function submitEditStore() {
+		if (!storeData) return;
+		editStoreError = null;
+		editStoreSubmitting = true;
+		try {
+			const body: {
+				name?: string;
+				default_currency_code?: string | null;
+				default_region_id?: string | null;
+				default_sales_channel_id?: string | null;
+				default_location_id?: string | null;
+			} = {};
+			if (editStoreName.trim() !== storeData.name) body.name = editStoreName.trim();
+			if (editStoreDefaultCurrency !== (storeData.default_currency_code?.toLowerCase() ?? ''))
+				body.default_currency_code = editStoreDefaultCurrency || null;
+			if (editStoreDefaultRegion !== (storeData.default_region_id ?? ''))
+				body.default_region_id = editStoreDefaultRegion || null;
+			if (editStoreDefaultSalesChannel !== (storeData.default_sales_channel_id ?? ''))
+				body.default_sales_channel_id = editStoreDefaultSalesChannel || null;
+			if (editStoreDefaultLocation !== (storeData.default_location_id ?? ''))
+				body.default_location_id = editStoreDefaultLocation || null;
+
+			const res = await fetch(`${API_BASE}/stores/${storeData.id}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body)
+			});
+			if (!res.ok) throw new Error(await res.text());
+			closeEditStore();
+			fetchStore();
+		} catch (e) {
+			editStoreError = e instanceof Error ? e.message : String(e);
+		} finally {
+			editStoreSubmitting = false;
+		}
+	}
+
+	const storeCurrencyOptions = $derived(
+		storeCurrencies.map((c) => ({ id: c.code.toLowerCase(), value: `${c.code.toUpperCase()} - ${c.name}` }))
+	);
+	const storeRegionOptions = $derived(storeRegions.map((r) => ({ id: r.id, value: r.name })));
+	const storeSalesChannelOptions = $derived(
+		storeSalesChannels.map((sc) => ({ id: sc.id, value: sc.name }))
+	);
+	const storeLocationOptions = $derived(
+		storeStockLocations.map((l) => ({ id: l.id, value: l.name || 'Unnamed location' }))
+	);
 
 	const storeDetails = $derived({
 		name: storeData?.name ?? '—',
@@ -151,19 +289,46 @@
 		else selectedIds = new Set(filteredCurrencies.map((c) => c.id));
 	}
 
-	async function removeCurrency(currency: Currency) {
+	// Delete currency modal
+	let deleteModalOpen = $state(false);
+	let currencyToDelete = $state<Currency | null>(null);
+	let deleteSubmitting = $state(false);
+	let deleteError = $state<string | null>(null);
+
+	function openDeleteModal(currency: Currency) {
+		currencyToDelete = currency;
+		deleteModalOpen = true;
+		deleteError = null;
+	}
+
+	function closeDeleteModal() {
+		if (!deleteSubmitting) {
+			deleteModalOpen = false;
+			currencyToDelete = null;
+			deleteError = null;
+		}
+	}
+
+	async function removeCurrency() {
+		if (!currencyToDelete) return;
+		deleteSubmitting = true;
+		deleteError = null;
 		try {
 			const res = await fetch(`${API_BASE}/currencies`, {
 				method: 'DELETE',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ currency_ids: [currency.id] })
+				body: JSON.stringify({ currency_ids: [currencyToDelete.id] })
 			});
 			if (!res.ok) throw new Error(await res.text());
 			selectedIds = new Set(selectedIds);
-			selectedIds.delete(currency.id);
+			selectedIds.delete(currencyToDelete.id);
 			fetchCurrencies();
+			deleteModalOpen = false;
+			currencyToDelete = null;
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			deleteError = e instanceof Error ? e.message : String(e);
+		} finally {
+			deleteSubmitting = false;
 		}
 	}
 
@@ -344,8 +509,9 @@
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex items-center justify-between border-b pb-4">
-			<div class="flex items-center gap-2 text-sm text-muted-foreground">
-				<span class="text-foreground">Store</span>
+			<div class="flex items-center gap-2">
+				<Store class="size-5 text-foreground" />
+				<span class="text-lg font-semibold text-foreground">Store</span>
 			</div>
 		</div>
 
@@ -355,13 +521,29 @@
 				<div>
 					<p class="text-sm text-muted-foreground">Manage your store's details.</p>
 				</div>
-				<button
-					type="button"
-					class="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
-					aria-label="Store menu"
-				>
-					<MoreHorizontal class="size-4" />
-				</button>
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger
+						class="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+					>
+						<MoreHorizontal class="size-4" />
+						<span class="sr-only">Store menu</span>
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Portal>
+						<DropdownMenu.Content
+							class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+							sideOffset={4}
+						>
+							<DropdownMenu.Item
+								textValue="Edit"
+								class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+								onSelect={openEditStore}
+							>
+								<Pencil class="size-4" />
+								Edit
+							</DropdownMenu.Item>
+						</DropdownMenu.Content>
+					</DropdownMenu.Portal>
+				</DropdownMenu.Root>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
 				{#if storeLoading}
@@ -407,13 +589,6 @@
 					<p class="mt-1 text-sm text-muted-foreground">Manage active currencies for your store.</p>
 				</div>
 				<div class="flex items-center gap-2">
-					<button
-						type="button"
-						class="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
-						aria-label="Currencies menu"
-					>
-						<MoreHorizontal class="size-4" />
-					</button>
 					<Button size="sm" onclick={openAdd}>Add currencies</Button>
 				</div>
 			</div>
@@ -446,6 +621,13 @@
 							class="h-9 rounded-md pl-9"
 						/>
 					</div>
+					<button
+						type="button"
+						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+					>
+						<ArrowUpDown class="size-4" />
+						<span class="sr-only">Sort</span>
+					</button>
 				</div>
 			</div>
 		</div>
@@ -529,7 +711,7 @@
 													<DropdownMenu.Item
 														textValue="Remove"
 														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => removeCurrency(currency)}
+														onSelect={() => openDeleteModal(currency)}
 													>
 														<Trash2 class="size-4" />
 														Remove
@@ -743,6 +925,97 @@
 				<Button variant="outline" onclick={closeAdd}>Cancel</Button>
 				<Button onclick={submitAdd} disabled={addSubmitting || toAdd.length === 0}>
 					{addSubmitting ? 'Saving…' : 'Save'}
+				</Button>
+			</div>
+		</div>
+	</Sheet.Content>
+</Sheet.Root>
+
+<!-- Delete currency confirmation modal -->
+<DeleteConfirmationModal
+	bind:open={deleteModalOpen}
+	entityName="currency"
+	entityTitle={currencyToDelete ? `${currencyToDelete.code} (${currencyToDelete.name})` : ''}
+	onConfirm={removeCurrency}
+	onCancel={closeDeleteModal}
+	submitting={deleteSubmitting}
+	error={deleteError}
+	customMessage={currencyToDelete ? `Are you sure you want to remove ${currencyToDelete.code} (${currencyToDelete.name})? This action cannot be undone.` : undefined}
+/>
+
+<!-- Edit store sheet -->
+<Sheet.Root bind:open={editStoreOpen}>
+	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
+		<div class="flex h-full flex-col">
+			<div class="flex-1 overflow-auto p-6 pt-12">
+				<h2 class="text-lg font-semibold">Edit store</h2>
+				<p class="mt-1 text-sm text-muted-foreground">Update your store's details.</p>
+				{#if editStoreError && !editStoreSubmitting}
+					<div
+						class="mt-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+					>
+						{editStoreError}
+					</div>
+				{/if}
+				<div class="mt-6 flex flex-col gap-4">
+					<div class="flex flex-col gap-2">
+						<label for="edit-store-name" class="text-sm font-medium">Name</label>
+						<Input
+							id="edit-store-name"
+							type="text"
+							bind:value={editStoreName}
+							placeholder="Store name"
+							class="h-9"
+						/>
+					</div>
+					<div class="flex flex-col gap-2">
+						<label for="edit-store-currency" class="text-sm font-medium">Default currency</label>
+						<Combobox
+							id="edit-store-currency"
+							options={storeCurrencyOptions}
+							bind:value={editStoreDefaultCurrency}
+							placeholder="Select currency"
+							disabled={storeOptionsLoading}
+						/>
+					</div>
+					<div class="flex flex-col gap-2">
+						<label for="edit-store-region" class="text-sm font-medium">Default region</label>
+						<Combobox
+							id="edit-store-region"
+							options={storeRegionOptions}
+							bind:value={editStoreDefaultRegion}
+							placeholder="Select region"
+							disabled={storeOptionsLoading}
+						/>
+					</div>
+					<div class="flex flex-col gap-2">
+						<label for="edit-store-sales-channel" class="text-sm font-medium"
+							>Default sales channel</label
+						>
+						<Combobox
+							id="edit-store-sales-channel"
+							options={storeSalesChannelOptions}
+							bind:value={editStoreDefaultSalesChannel}
+							placeholder="Select sales channel"
+							disabled={storeOptionsLoading}
+						/>
+					</div>
+					<div class="flex flex-col gap-2">
+						<label for="edit-store-location" class="text-sm font-medium">Default location</label>
+						<Combobox
+							id="edit-store-location"
+							options={storeLocationOptions}
+							bind:value={editStoreDefaultLocation}
+							placeholder="Select location"
+							disabled={storeOptionsLoading}
+						/>
+					</div>
+				</div>
+			</div>
+			<div class="flex justify-end gap-2 border-t p-4">
+				<Button variant="outline" onclick={closeEditStore} disabled={editStoreSubmitting}>Cancel</Button>
+				<Button onclick={submitEditStore} disabled={editStoreSubmitting || storeOptionsLoading}>
+					{editStoreSubmitting ? 'Saving…' : 'Save'}
 				</Button>
 			</div>
 		</div>

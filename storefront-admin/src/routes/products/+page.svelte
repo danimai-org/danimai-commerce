@@ -547,16 +547,18 @@
 					}
 				}
 			}
-			// Validate that at least one variant has a price > 0
-			const hasValidPrice = createVariants.some((variant) => {
-				const priceStr = variant.priceAmount.trim();
-				if (!priceStr) return false;
-				const price = parseFloat(priceStr);
-				return !isNaN(price) && price > 0;
-			});
-			if (!hasValidPrice) {
-				createError = 'At least one variant must have a price greater than 0';
-				return;
+			// Validate that at least one variant has a price > 0 (only for published products)
+			if (status === 'published') {
+				const hasValidPrice = createVariants.some((variant) => {
+					const priceStr = variant.priceAmount.trim();
+					if (!priceStr) return false;
+					const price = parseFloat(priceStr);
+					return !isNaN(price) && price > 0;
+				});
+				if (!hasValidPrice) {
+					createError = 'At least one variant must have a price greater than 0';
+					return;
+				}
 			}
 		}
 		createSubmitting = true;

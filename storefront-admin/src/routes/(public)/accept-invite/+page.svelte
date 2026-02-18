@@ -3,15 +3,18 @@
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import Eye from '@lucide/svelte/icons/eye';
+	import EyeOff from '@lucide/svelte/icons/eye-off';
 
 	const API_BASE = 'http://localhost:8000';
 
 	const tokenFromUrl = $derived($page.url.searchParams.get('token') ?? '');
-	const hasTokenInUrl = $derived($page.url.searchParams.has('token'));
 
 	let token = $state('');
 	let password = $state('');
 	let confirmPassword = $state('');
+	let showPassword = $state(false);
+	let showConfirmPassword = $state(false);
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
 	let success = $state(false);
@@ -24,7 +27,7 @@
 		error = null;
 		const t = token.trim();
 		if (!t) {
-			error = 'Invite token is required. Use the link from your invite email.';
+			error = 'Invite token is required. Please use the link from your invite email.';
 			return;
 		}
 		if (password.length < 8) {
@@ -80,45 +83,60 @@
 			class="mt-6 space-y-4"
 		>
 			<div class="space-y-2">
-				<label for="token" class="block text-sm font-medium">Invite token</label>
-				<Input
-					id="token"
-					type="text"
-					placeholder="Paste token from invite link or email"
-					class="w-full font-mono text-sm"
-					bind:value={token}
-					disabled={hasTokenInUrl}
-					autocomplete="off"
-				/>
-				{#if hasTokenInUrl}
-					<p class="text-xs text-muted-foreground">Token was taken from the link.</p>
-				{/if}
-			</div>
-			<div class="space-y-2">
 				<label for="password" class="block text-sm font-medium">Password</label>
-				<Input
-					id="password"
-					type="password"
-					placeholder="At least 8 characters"
-					class="w-full"
-					bind:value={password}
-					disabled={submitting}
-					minlength={8}
-					required
-				/>
+				<div class="relative">
+					<Input
+						id="password"
+						type={showPassword ? 'text' : 'password'}
+						placeholder="At least 8 characters"
+						class="w-full pr-10"
+						bind:value={password}
+						disabled={submitting}
+						minlength={8}
+						required
+					/>
+					<button
+						type="button"
+						class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+						onclick={() => (showPassword = !showPassword)}
+						aria-label={showPassword ? 'Hide password' : 'Show password'}
+						tabindex="-1"
+					>
+						{#if showPassword}
+							<EyeOff class="size-4" />
+						{:else}
+							<Eye class="size-4" />
+						{/if}
+					</button>
+				</div>
 			</div>
 			<div class="space-y-2">
 				<label for="confirmPassword" class="block text-sm font-medium">Confirm password</label>
-				<Input
-					id="confirmPassword"
-					type="password"
-					placeholder="Repeat password"
-					class="w-full"
-					bind:value={confirmPassword}
-					disabled={submitting}
-					minlength={8}
-					required
-				/>
+				<div class="relative">
+					<Input
+						id="confirmPassword"
+						type={showConfirmPassword ? 'text' : 'password'}
+						placeholder="Repeat password"
+						class="w-full pr-10"
+						bind:value={confirmPassword}
+						disabled={submitting}
+						minlength={8}
+						required
+					/>
+					<button
+						type="button"
+						class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+						onclick={() => (showConfirmPassword = !showConfirmPassword)}
+						aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+						tabindex="-1"
+					>
+						{#if showConfirmPassword}
+							<EyeOff class="size-4" />
+						{:else}
+							<Eye class="size-4" />
+						{/if}
+					</button>
+				</div>
 			</div>
 			{#if error}
 				<p class="text-sm text-destructive">{error}</p>
