@@ -316,36 +316,36 @@
 									</td>
 									<td class="px-4 py-3">
 										<DropdownMenu.Root>
-												<DropdownMenu.Trigger
-													class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
+											<DropdownMenu.Trigger
+												class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
+											>
+												<MoreHorizontal class="size-4" />
+												<span class="sr-only">Actions</span>
+											</DropdownMenu.Trigger>
+											<DropdownMenu.Portal>
+												<DropdownMenu.Content
+													class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+													sideOffset={4}
 												>
-													<MoreHorizontal class="size-4" />
-													<span class="sr-only">Actions</span>
-												</DropdownMenu.Trigger>
-												<DropdownMenu.Portal>
-													<DropdownMenu.Content
-														class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-														sideOffset={4}
+													<DropdownMenu.Item
+														textValue="Edit"
+														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+														onSelect={() => openEdit(attr)}
 													>
-														<DropdownMenu.Item
-															textValue="Edit"
-															class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-															onSelect={() => openEdit(attr)}
-														>
-															<Pencil class="size-4" />
-															Edit
-														</DropdownMenu.Item>
-														<DropdownMenu.Item
-															textValue="Delete"
-															class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-															onSelect={() => openDeleteConfirm(attr)}
-														>
-															<Trash2 class="size-4" />
-															Delete
-														</DropdownMenu.Item>
-													</DropdownMenu.Content>
-												</DropdownMenu.Portal>
-											</DropdownMenu.Root>
+														<Pencil class="size-4" />
+														Edit
+													</DropdownMenu.Item>
+													<DropdownMenu.Item
+														textValue="Delete"
+														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
+														onSelect={() => openDeleteConfirm(attr)}
+													>
+														<Trash2 class="size-4" />
+														Delete
+													</DropdownMenu.Item>
+												</DropdownMenu.Content>
+											</DropdownMenu.Portal>
+										</DropdownMenu.Root>
 									</td>
 								</tr>
 							{/each}

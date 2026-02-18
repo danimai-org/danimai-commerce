@@ -9,7 +9,7 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
-	import ListFilter from '@lucide/svelte/icons/list-filter';
+	import Share2 from '@lucide/svelte/icons/share-2';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import { cn } from '$lib/utils.js';
 
@@ -257,7 +257,7 @@
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
 			<div class="flex items-center gap-2">
-				<ListFilter class="size-4" />
+				<Share2 class="size-4" />
 				<span class="font-semibold">Sales Channels</span>
 			</div>
 			<Button size="sm" onclick={openCreate}>Create</Button>

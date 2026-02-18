@@ -3,6 +3,10 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import Users from '@lucide/svelte/icons/users';
+	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+	import Search from '@lucide/svelte/icons/search';
+	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 
 	const API_BASE = 'http://localhost:8000';
 
@@ -34,6 +38,7 @@
 		has_previous_page: boolean;
 	};
 
+	let searchQuery = $state('');
 	let page = $state(1);
 	let limit = $state(10);
 	let data = $state<{ data: User[]; pagination: Pagination } | null>(null);
@@ -149,22 +154,37 @@
 
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div class="mb-4 flex items-center justify-between border-b pb-4">
-			<div class="flex items-center gap-2 text-sm text-muted-foreground">
-				<a href="/users" class="flex items-center gap-1 hover:text-foreground">Manage Users</a>
-				<span>/</span>
-				<span class="text-foreground">Users</span>
+		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
+			<div class="flex items-center gap-2">
+				<Users class="size-4" />
+				<span class="font-semibold">Users</span>
 			</div>
+			<Button size="sm" onclick={openInviteDialog}>Invite user</Button>
 		</div>
 		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex items-start justify-between gap-4">
-				<div>
-					<h1 class="text-lg font-semibold leading-none">Users</h1>
-					<p class="mt-1 text-sm text-muted-foreground">
-						Manage admin users.
-					</p>
+			<div class="flex flex-wrap items-center justify-between gap-2">
+				<Button variant="outline" size="sm" class="rounded-md">
+					<SlidersHorizontal class="mr-1.5 size-4" />
+					Add filter
+				</Button>
+				<div class="flex items-center gap-2">
+					<div class="relative w-64">
+						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							type="search"
+							placeholder="Search"
+							bind:value={searchQuery}
+							class="h-9 rounded-md pl-9"
+						/>
+					</div>
+					<button
+						type="button"
+						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+					>
+						<ArrowUpDown class="size-4" />
+						<span class="sr-only">Sort</span>
+					</button>
 				</div>
-				<Button size="sm" onclick={openInviteDialog}>Invite user</Button>
 			</div>
 		</div>
 
