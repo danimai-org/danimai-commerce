@@ -5,7 +5,11 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
+	import {
+		DeleteConfirmationModal,
+		Combobox,
+		MultiSelectCombobox
+	} from '$lib/components/organs/index.js';
 	import Package from '@lucide/svelte/icons/package';
 	import Bell from '@lucide/svelte/icons/bell';
 	import Search from '@lucide/svelte/icons/search';
@@ -138,7 +142,10 @@
 		options.forEach((opt, index) => {
 			const valueSet = new Set<string>();
 			variants.forEach((v) => {
-				const parts = v.title.split('/').map((p) => p.trim()).filter(Boolean);
+				const parts = v.title
+					.split('/')
+					.map((p) => p.trim())
+					.filter(Boolean);
 				// Allow variant title with fewer parts than options (e.g. "S" when 2 options exist → assign to first option)
 				if (parts[index]) valueSet.add(parts[index]);
 			});
@@ -181,9 +188,7 @@
 			if (optRes.ok) {
 				const j = (await optRes.json()) as { data?: ProductOption[] };
 				// Include options for this product or options with no product_id (global options; API may not return product_id)
-				options = (j.data ?? []).filter(
-					(o) => o.product_id == null || o.product_id === productId
-				);
+				options = (j.data ?? []).filter((o) => o.product_id == null || o.product_id === productId);
 			} else {
 				options = [];
 			}
@@ -251,7 +256,9 @@
 	async function fetchProductSalesChannels() {
 		if (!productId) return;
 		try {
-			const res = await fetch(`${API_BASE}/sales-channels/products/${productId}/sales-channels`, { cache: 'no-store' });
+			const res = await fetch(`${API_BASE}/sales-channels/products/${productId}/sales-channels`, {
+				cache: 'no-store'
+			});
 			if (res.ok) {
 				const channels = (await res.json()) as SalesChannel[];
 				productSalesChannelIds = new Set(channels.map((ch) => ch.id));
@@ -473,7 +480,11 @@
 		editSheetOpen = true;
 		editTitle = product.title ?? '';
 		editSubtitle = product.subtitle ?? '';
-		editHandle = product.handle ? (product.handle.startsWith('/') ? product.handle.slice(1) : product.handle) : '';
+		editHandle = product.handle
+			? product.handle.startsWith('/')
+				? product.handle.slice(1)
+				: product.handle
+			: '';
 		editDescription = product.description ?? '';
 		editStatus = (product.status as 'draft' | 'proposed' | 'published' | 'rejected') || 'draft';
 		editDiscountable = product.discountable !== false;
@@ -489,7 +500,9 @@
 	}
 
 	const editProductAttributesAvailableToAdd = $derived(
-		availableAttributesList.filter((a) => !editProductAttributesList.some((e) => e.attribute_id === a.id))
+		availableAttributesList.filter(
+			(a) => !editProductAttributesList.some((e) => e.attribute_id === a.id)
+		)
 	);
 
 	function removeEditProductAttribute(index: number) {
@@ -566,7 +579,10 @@
 				handle,
 				status: editStatus,
 				discountable: editDiscountable,
-				attributes: editProductAttributesList.map((a) => ({ attribute_id: a.attribute_id, value: a.value }))
+				attributes: editProductAttributesList.map((a) => ({
+					attribute_id: a.attribute_id,
+					value: a.value
+				}))
 			};
 			const res = await fetch(`${API_BASE}/products/${product.id}`, {
 				method: 'PUT',
@@ -590,7 +606,9 @@
 		try {
 			const res = await fetch(`${API_BASE}/product-attributes?limit=100`, { cache: 'no-store' });
 			if (res.ok) {
-				const j = (await res.json()) as { data?: Array<{ id: string; title: string; type: string }> };
+				const j = (await res.json()) as {
+					data?: Array<{ id: string; title: string; type: string }>;
+				};
 				availableAttributesList = j.data ?? [];
 			} else {
 				availableAttributesList = [];
@@ -630,7 +648,10 @@
 		if (!addAttributeId) return;
 		const att = availableAttributesList.find((a) => a.id === addAttributeId);
 		if (!att) return;
-		editAttributesList = [...editAttributesList, { attribute_id: att.id, title: att.title, value: addAttributeValue.trim() }];
+		editAttributesList = [
+			...editAttributesList,
+			{ attribute_id: att.id, title: att.title, value: addAttributeValue.trim() }
+		];
 		addAttributeId = '';
 		addAttributeValue = '';
 	}
@@ -645,7 +666,10 @@
 		editAttributesSubmitting = true;
 		try {
 			const body = {
-				attributes: editAttributesList.map((a) => ({ attribute_id: a.attribute_id, value: a.value }))
+				attributes: editAttributesList.map((a) => ({
+					attribute_id: a.attribute_id,
+					value: a.value
+				}))
 			};
 			const res = await fetch(`${API_BASE}/products/${product.id}`, {
 				method: 'PUT',
@@ -766,50 +790,9 @@
 		}
 	}
 
-	const orgCategoryLabel = $derived(
-		orgCategoryId
-			? (categoriesList.find((c) => c.id === orgCategoryId)?.value ?? '1 selected')
-			: 'None'
-	);
-	let orgCategoryInput = $state('');
-	let orgCategoryDropdownOpen = $state(false);
-	const orgCategoryFilteredOptions = $derived(
-		categoriesList.filter((c) =>
-			!orgCategoryInput.trim() || c.value.toLowerCase().includes(orgCategoryInput.trim().toLowerCase())
-		)
-	);
-	function selectOrgCategory(catId: string) {
-		orgCategoryId = catId;
-		orgCategoryInput = '';
-		orgCategoryDropdownOpen = false;
-	}
-	const orgTagLabel = $derived(orgTagIds.length === 0 ? 'None' : `${orgTagIds.length} selected`);
-	let orgTagInput = $state('');
-	let orgTagDropdownOpen = $state(false);
 	let orgTagCreating = $state(false);
-	const orgTagFilteredOptions = $derived(
-		tagsList.filter(
-			(tag) =>
-				!orgTagIds.includes(tag.id) &&
-				(!orgTagInput.trim() || tag.value.toLowerCase().includes(orgTagInput.trim().toLowerCase()))
-		)
-	);
-	const orgTagShowCreate = $derived(
-		orgTagInput.trim().length > 0 &&
-		!tagsList.some((t) => t.value.toLowerCase() === orgTagInput.trim().toLowerCase())
-	);
-	function removeOrgTag(tagId: string) {
-		orgTagIds = orgTagIds.filter((id) => id !== tagId);
-	}
-	let orgTagsInputEl = $state<HTMLInputElement | null>(null);
-	function selectOrgTag(tagId: string) {
-		if (!orgTagIds.includes(tagId)) orgTagIds = [...orgTagIds, tagId];
-		orgTagInput = '';
-		orgTagDropdownOpen = false;
-		requestAnimationFrame(() => orgTagsInputEl?.focus());
-	}
-	async function createAndSelectOrgTag() {
-		const value = orgTagInput.trim();
+	async function createAndSelectOrgTag(tagValue: string) {
+		const value = tagValue.trim();
 		if (!value || orgTagCreating) return;
 		orgTagCreating = true;
 		try {
@@ -821,48 +804,15 @@
 			if (!res.ok) throw new Error(await res.text());
 			const tag = (await res.json()) as { id: string; value: string };
 			tagsList = [...tagsList, { id: tag.id, value: tag.value }];
-			selectOrgTag(tag.id);
+			orgTagIds = [...orgTagIds, tag.id];
 		} catch {
-			// leave input so user can retry
+			// leave so user can retry
 		} finally {
 			orgTagCreating = false;
 		}
 	}
-	const orgCollectionLabel = $derived(
-		orgCollectionIds.length === 0
-			? 'None'
-			: `${orgCollectionIds.length} selected`
-	);
-	let orgCollectionInput = $state('');
-	let orgCollectionDropdownOpen = $state(false);
-	function addOrgCollection(collectionId: string) {
-		if (!orgCollectionIds.includes(collectionId)) orgCollectionIds = [...orgCollectionIds, collectionId];
-		orgCollectionInput = '';
-		orgCollectionDropdownOpen = false;
-	}
-	function removeOrgCollection(collectionId: string) {
-		orgCollectionIds = orgCollectionIds.filter((id) => id !== collectionId);
-	}
-	const orgCollectionsAvailableToAdd = $derived(
-		collectionsList.filter((c) => !orgCollectionIds.includes(c.id))
-	);
-	const orgCollectionsFilteredToAdd = $derived(
-		orgCollectionsAvailableToAdd.filter((c) =>
-			!orgCollectionInput.trim() || c.title.toLowerCase().includes(orgCollectionInput.trim().toLowerCase())
-		)
-	);
-	const orgCollectionsFilteredForList = $derived(
-		collectionsList.filter((c) =>
-			!orgCollectionInput.trim() || c.title.toLowerCase().includes(orgCollectionInput.trim().toLowerCase())
-		)
-	);
-	function toggleOrgCollection(collectionId: string) {
-		if (orgCollectionIds.includes(collectionId)) {
-			orgCollectionIds = orgCollectionIds.filter((id) => id !== collectionId);
-		} else {
-			orgCollectionIds = [...orgCollectionIds, collectionId];
-		}
-	}
+	const tagsOptions = $derived(tagsList.map((t) => ({ id: t.id, value: t.value })));
+	const collectionsOptions = $derived(collectionsList.map((c) => ({ id: c.id, value: c.title })));
 
 	let metadataSheetOpen = $state(false);
 	let metadataRows = $state<Array<{ key: string; value: string }>>([]);
@@ -903,8 +853,9 @@
 
 	function syncEditSheetVariantRows() {
 		// Only use options that have at least one value (so we show existing variant data even when some options are unused)
-		const optionsWithValues = editOptions
-			.filter((o) => o.title.trim() && o.values.filter((v) => v.trim()).length > 0);
+		const optionsWithValues = editOptions.filter(
+			(o) => o.title.trim() && o.values.filter((v) => v.trim()).length > 0
+		);
 		const valueArrays = optionsWithValues.map((o) => o.values.filter((v) => v.trim()));
 		if (valueArrays.length === 0 || valueArrays.some((a) => a.length === 0)) {
 			editSheetVariantRows = [];
@@ -919,8 +870,10 @@
 			const variant = variants.find((v) => {
 				const normalizedVariantTitle = v.title.trim();
 				const normalizedOptionTitle = optionTitle.trim();
-				return normalizedVariantTitle === normalizedOptionTitle || 
-				       normalizedVariantTitle.toLowerCase() === normalizedOptionTitle.toLowerCase();
+				return (
+					normalizedVariantTitle === normalizedOptionTitle ||
+					normalizedVariantTitle.toLowerCase() === normalizedOptionTitle.toLowerCase()
+				);
 			});
 			if (variant) {
 				return {
@@ -982,7 +935,10 @@
 						arr.push(val);
 					}
 				} else if (optionsToUse.length > 1) {
-					const parts = variant.title.split('/').map((p) => p.trim()).filter(Boolean);
+					const parts = variant.title
+						.split('/')
+						.map((p) => p.trim())
+						.filter(Boolean);
 					// Allow fewer parts than options (e.g. "S" → assign to first option only)
 					optionsToUse.forEach((opt, index) => {
 						const part = parts[index];
@@ -1161,7 +1117,9 @@
 	// Edit single variant sheet
 	let editVariantSheetOpen = $state(false);
 	let editingVariant = $state<ProductVariant | null>(null);
-	let editVariantAttributes = $state<Array<{ id: string; title: string; type: string; value: string }>>([]);
+	let editVariantAttributes = $state<
+		Array<{ id: string; title: string; type: string; value: string }>
+	>([]);
 	let editVariantTitle = $state('');
 	let editVariantMaterial = $state('');
 	let editVariantSku = $state('');
@@ -1195,10 +1153,16 @@
 				const data = await res.json();
 				editVariantAttributes = data.attributes ?? [];
 			} else {
-				editVariantAttributes = (product?.attributes ?? []).map((a) => ({ ...a, value: a.value ?? '' }));
+				editVariantAttributes = (product?.attributes ?? []).map((a) => ({
+					...a,
+					value: a.value ?? ''
+				}));
 			}
 		} catch {
-			editVariantAttributes = (product?.attributes ?? []).map((a) => ({ ...a, value: a.value ?? '' }));
+			editVariantAttributes = (product?.attributes ?? []).map((a) => ({
+				...a,
+				value: a.value ?? ''
+			}));
 		}
 	}
 
@@ -1206,7 +1170,10 @@
 		if (!editVariantAddAttributeId) return;
 		const att = availableAttributesList.find((a) => a.id === editVariantAddAttributeId);
 		if (!att || editVariantAttributes.some((a) => a.id === att.id)) return;
-		editVariantAttributes = [...editVariantAttributes, { id: att.id, title: att.title, type: att.type, value: '' }];
+		editVariantAttributes = [
+			...editVariantAttributes,
+			{ id: att.id, title: att.title, type: att.type, value: '' }
+		];
 		editVariantAddAttributeId = '';
 	}
 
@@ -1372,7 +1339,7 @@
 <div class="flex h-full flex-col">
 	<!-- Breadcrumb + actions -->
 	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
-		<nav class="flex items-center gap-[5px] text-sm pl-[10px]">
+		<nav class="flex items-center gap-[5px] pl-[10px] text-sm">
 			<button
 				type="button"
 				class="text-muted-foreground hover:text-foreground"
@@ -1397,7 +1364,10 @@
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="p-6">
-				<div class="grid gap-6" style="grid-template-columns: 1fr 13rem; grid-auto-rows: minmax(0, auto); align-items: start;">
+				<div
+					class="grid gap-6"
+					style="grid-template-columns: 1fr 13rem; grid-auto-rows: minmax(0, auto); align-items: start;"
+				>
 					<!-- Product card (row 1) -->
 					<div class="min-w-0 self-start rounded-lg border bg-card p-6 shadow-sm">
 						<!-- Product header -->
@@ -1418,41 +1388,44 @@
 						<!-- Details (pl-0 so content aligns with header above) -->
 						<div class="rounded-lg bg-card pt-6 pr-6 pb-6 pl-0">
 							<dl class="mt-0 grid gap-3 text-sm">
-							<div class="flex justify-between gap-4">
-								<dt class="shrink-0 font-medium text-muted-foreground">Description</dt>
-								<dd class="text-right">{product.description || '—'}</dd>
-							</div>
-							<div class="flex justify-between gap-4">
-								<dt class="shrink-0 font-medium text-muted-foreground">Subtitle</dt>
-								<dd class="text-right">{product.subtitle || '—'}</dd>
-							</div>
-							<div class="flex justify-between gap-4">
-								<dt class="shrink-0 font-medium text-muted-foreground">Handle</dt>
-								<dd class="text-right">{handleDisplay}</dd>
-							</div>
-							<div class="flex justify-between gap-4">
-								<dt class="shrink-0 font-medium text-muted-foreground">Discountable</dt>
-								<dd class="text-right">
-									{product.discountable === true
-										? 'True'
-										: product.discountable === false
-											? 'False'
-											: '—'}
-								</dd>
-							</div>
-						</dl>
+								<div class="flex justify-between gap-4">
+									<dt class="shrink-0 font-medium text-muted-foreground">Description</dt>
+									<dd class="text-right">{product.description || '—'}</dd>
+								</div>
+								<div class="flex justify-between gap-4">
+									<dt class="shrink-0 font-medium text-muted-foreground">Subtitle</dt>
+									<dd class="text-right">{product.subtitle || '—'}</dd>
+								</div>
+								<div class="flex justify-between gap-4">
+									<dt class="shrink-0 font-medium text-muted-foreground">Handle</dt>
+									<dd class="text-right">{handleDisplay}</dd>
+								</div>
+								<div class="flex justify-between gap-4">
+									<dt class="shrink-0 font-medium text-muted-foreground">Discountable</dt>
+									<dd class="text-right">
+										{product.discountable === true
+											? 'True'
+											: product.discountable === false
+												? 'False'
+												: '—'}
+									</dd>
+								</div>
+							</dl>
+						</div>
 					</div>
-				</div>
 
 					<!-- Right: Status, Visibility, and Organisation cards (span both rows) -->
 					<div class="row-span-2 flex w-52 flex-col gap-6 self-start">
 						<div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
-							<h2 class="font-semibold mb-4">Status</h2>
+							<h2 class="mb-4 font-semibold">Status</h2>
 							<Select.Root
 								type="single"
 								value={product?.status ?? 'draft'}
 								onValueChange={(v) => {
-									if (v && (v === 'draft' || v === 'proposed' || v === 'published' || v === 'rejected')) {
+									if (
+										v &&
+										(v === 'draft' || v === 'proposed' || v === 'published' || v === 'rejected')
+									) {
 										updateStatus(v);
 									}
 								}}
@@ -1468,7 +1441,7 @@
 									<Select.Item value="rejected" label="Rejected">Rejected</Select.Item>
 								</Select.Content>
 							</Select.Root>
-							<h2 class="font-semibold mt-6 mb-4">Visibility</h2>
+							<h2 class="mt-6 mb-4 font-semibold">Visibility</h2>
 							<Select.Root
 								type="single"
 								value={product?.status === 'published' ? 'public' : 'private'}
@@ -1551,7 +1524,9 @@
 							</div>
 							<div class="mt-4 flex flex-col gap-2">
 								{#if productSalesChannelIds.size > 0}
-									{#each Array.from(productSalesChannelIds).map((id) => allSalesChannels.find((ch) => ch.id === id)).filter((ch): ch is NonNullable<typeof ch> => ch != null) as channel}
+									{#each Array.from(productSalesChannelIds)
+										.map((id) => allSalesChannels.find((ch) => ch.id === id))
+										.filter((ch): ch is NonNullable<typeof ch> => ch != null) as channel}
 										<div class="flex items-center gap-2 text-sm">
 											<Share2 class="size-4 text-muted-foreground" />
 											<span>{channel.name}</span>
@@ -1604,11 +1579,11 @@
 						<div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
 							<div class="flex items-center justify-between">
 								<h2 class="font-semibold">Shipping configuration</h2>
-								<Button variant="outline" size="sm" disabled>
-									Edit
-								</Button>
+								<Button variant="outline" size="sm" disabled>Edit</Button>
 							</div>
-							<div class="mt-4 flex w-full items-center gap-3 rounded-md border p-3 text-left text-sm">
+							<div
+								class="mt-4 flex w-full items-center gap-3 rounded-md border p-3 text-left text-sm"
+							>
 								<Lock class="size-4 text-muted-foreground" />
 								<div>
 									<p class="font-medium">Default Shipping Profile</p>
@@ -1619,7 +1594,7 @@
 					</div>
 
 					<!-- Media + Options (row 2, column 1) -->
-					<div class="min-w-0 flex flex-col gap-6">
+					<div class="flex min-w-0 flex-col gap-6">
 						<!-- Media card -->
 						<div class="rounded-lg border bg-card p-6 shadow-sm">
 							<div class="flex items-center justify-between">
@@ -1655,155 +1630,157 @@
 
 						<!-- Options & Variants card (merged) -->
 						<div class="rounded-lg border bg-card p-6 shadow-sm">
-						<div class="flex items-center justify-between">
-							<h2 class="font-semibold">Options & Variants</h2>
-							<Button
-								variant="ghost"
-								size="icon"
-								class="size-8 shrink-0"
-								onclick={openVariantsEditSheet}
-								aria-label="Edit options and variants"
-							>
-								<Pencil class="size-4" />
-							</Button>
-						</div>
-
-						<!-- Options section: only options assigned to this product, with their values -->
-						{#if optionsWithValues.length === 0}
-							<p class="mt-4 text-sm text-muted-foreground">No options defined.</p>
-						{:else}
-							<div class="mt-4 flex flex-col gap-4">
-								{#each optionsWithValues as { option: opt, values: vals } (opt.id)}
-									<div>
-										<p class="text-sm font-medium text-muted-foreground">{opt.title}</p>
-										<div class="mt-1.5 flex flex-wrap gap-1.5">
-											{#each vals as val (val)}
-												<span
-													class="inline-flex items-center rounded-md border bg-muted/50 px-2.5 py-1 text-sm"
-												>
-													{val}
-												</span>
-											{/each}
-										</div>
-									</div>
-								{/each}
+							<div class="flex items-center justify-between">
+								<h2 class="font-semibold">Options & Variants</h2>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-8 shrink-0"
+									onclick={openVariantsEditSheet}
+									aria-label="Edit options and variants"
+								>
+									<Pencil class="size-4" />
+								</Button>
 							</div>
-						{/if}
 
-						<!-- Variants section -->
-						<div class="mt-4 overflow-x-auto rounded-md border">
-							<table class="w-full text-sm">
-								<thead class="border-b bg-muted/50">
-									<tr>
-										<th class="w-14 px-4 py-3 text-left font-medium">Image</th>
-										<th class="px-4 py-3 text-left font-medium">Title</th>
-										<th class="px-4 py-3 text-left font-medium">SKU</th>
-										{#if optionsWithValues.length === 1}
-											<th class="px-4 py-3 text-left font-medium"
-												>{optionsWithValues[0]?.option?.title ?? 'Option'}</th
-											>
-										{/if}
-										<th class="px-4 py-3 text-left font-medium">Inventory</th>
-										<th class="px-4 py-3 text-left font-medium">Created</th>
-										<th class="px-4 py-3 text-left font-medium">Updated</th>
-										<th class="w-10 px-4 py-3"></th>
-									</tr>
-								</thead>
-								<tbody>
-									{#if paginatedVariants.length === 0}
-										<tr>
-											<td
-												colspan={optionsWithValues.length === 1 ? 8 : 7}
-												class="px-4 py-8 text-center text-muted-foreground"
-											>
-												No variants.
-											</td>
-										</tr>
-									{:else}
-										{#each paginatedVariants as v (v.id)}
-											<tr class="border-b last:border-0">
-												<td class="px-4 py-3">
-													<div
-														class="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground"
+							<!-- Options section: only options assigned to this product, with their values -->
+							{#if optionsWithValues.length === 0}
+								<p class="mt-4 text-sm text-muted-foreground">No options defined.</p>
+							{:else}
+								<div class="mt-4 flex flex-col gap-4">
+									{#each optionsWithValues as { option: opt, values: vals } (opt.id)}
+										<div>
+											<p class="text-sm font-medium text-muted-foreground">{opt.title}</p>
+											<div class="mt-1.5 flex flex-wrap gap-1.5">
+												{#each vals as val (val)}
+													<span
+														class="inline-flex items-center rounded-md border bg-muted/50 px-2.5 py-1 text-sm"
 													>
-														{#if v.thumbnail}
-															<img
-																src={v.thumbnail}
-																alt=""
-																class="size-10 rounded-md object-cover"
-															/>
-														{:else}
-															<ImageIcon class="size-5" />
-														{/if}
-													</div>
-												</td>
-												<td class="px-4 py-3 font-medium">{v.title}</td>
-												<td class="px-4 py-3 text-muted-foreground">{v.sku || '—'}</td>
-												{#if optionsWithValues.length === 1}
-													<td class="px-4 py-3">{v.title}</td>
-												{/if}
-												<td class="px-4 py-3 text-muted-foreground">
-													{v.manage_inventory ? 'Managed' : 'Not managed'}
-												</td>
-												<td class="px-4 py-3 text-muted-foreground">{formatDate(v.created_at)}</td>
-												<td class="px-4 py-3 text-muted-foreground">{formatDate(v.updated_at)}</td>
-												<td class="px-4 py-3">
-													<div class="flex items-center gap-2">
-														<Button
-															variant="ghost"
-															size="icon"
-															class="size-8 shrink-0"
-															onclick={() => openEditVariantSheet(v)}
-															aria-label="Edit variant"
-														>
-															<Pencil class="size-4" />
-														</Button>
-														<Button
-															variant="ghost"
-															size="icon"
-															class="size-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-															onclick={() => openDeleteVariantConfirm(v)}
-															aria-label="Delete variant"
-														>
-															<Trash2 class="size-4" />
-														</Button>
-													</div>
+														{val}
+													</span>
+												{/each}
+											</div>
+										</div>
+									{/each}
+								</div>
+							{/if}
+
+							<!-- Variants section -->
+							<div class="mt-4 overflow-x-auto rounded-md border">
+								<table class="w-full text-sm">
+									<thead class="border-b bg-muted/50">
+										<tr>
+											<th class="w-14 px-4 py-3 text-left font-medium">Image</th>
+											<th class="px-4 py-3 text-left font-medium">Title</th>
+											<th class="px-4 py-3 text-left font-medium">SKU</th>
+											{#if optionsWithValues.length === 1}
+												<th class="px-4 py-3 text-left font-medium"
+													>{optionsWithValues[0]?.option?.title ?? 'Option'}</th
+												>
+											{/if}
+											<th class="px-4 py-3 text-left font-medium">Inventory</th>
+											<th class="px-4 py-3 text-left font-medium">Created</th>
+											<th class="px-4 py-3 text-left font-medium">Updated</th>
+											<th class="w-10 px-4 py-3"></th>
+										</tr>
+									</thead>
+									<tbody>
+										{#if paginatedVariants.length === 0}
+											<tr>
+												<td
+													colspan={optionsWithValues.length === 1 ? 8 : 7}
+													class="px-4 py-8 text-center text-muted-foreground"
+												>
+													No variants.
 												</td>
 											</tr>
-										{/each}
-									{/if}
-								</tbody>
-							</table>
-						</div>
-						{#if variantTotal > 0}
-							<div class="mt-4 flex items-center justify-between border-t pt-4">
-								<p class="text-sm text-muted-foreground">
-									{variantStart} – {variantEnd} of {variantTotal} results
-								</p>
-								<div class="flex items-center gap-2">
-									<Button
-										variant="outline"
-										size="sm"
-										disabled={variantPage <= 1}
-										onclick={() => (variantPage = Math.max(1, variantPage - 1))}
-									>
-										Prev
-									</Button>
-									<span class="text-sm text-muted-foreground">
-										{variantPage} of {variantTotalPages} pages
-									</span>
-									<Button
-										variant="outline"
-										size="sm"
-										disabled={variantPage >= variantTotalPages}
-										onclick={() => (variantPage = Math.min(variantTotalPages, variantPage + 1))}
-									>
-										Next
-									</Button>
-								</div>
+										{:else}
+											{#each paginatedVariants as v (v.id)}
+												<tr class="border-b last:border-0">
+													<td class="px-4 py-3">
+														<div
+															class="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground"
+														>
+															{#if v.thumbnail}
+																<img
+																	src={v.thumbnail}
+																	alt=""
+																	class="size-10 rounded-md object-cover"
+																/>
+															{:else}
+																<ImageIcon class="size-5" />
+															{/if}
+														</div>
+													</td>
+													<td class="px-4 py-3 font-medium">{v.title}</td>
+													<td class="px-4 py-3 text-muted-foreground">{v.sku || '—'}</td>
+													{#if optionsWithValues.length === 1}
+														<td class="px-4 py-3">{v.title}</td>
+													{/if}
+													<td class="px-4 py-3 text-muted-foreground">
+														{v.manage_inventory ? 'Managed' : 'Not managed'}
+													</td>
+													<td class="px-4 py-3 text-muted-foreground">{formatDate(v.created_at)}</td
+													>
+													<td class="px-4 py-3 text-muted-foreground">{formatDate(v.updated_at)}</td
+													>
+													<td class="px-4 py-3">
+														<div class="flex items-center gap-2">
+															<Button
+																variant="ghost"
+																size="icon"
+																class="size-8 shrink-0"
+																onclick={() => openEditVariantSheet(v)}
+																aria-label="Edit variant"
+															>
+																<Pencil class="size-4" />
+															</Button>
+															<Button
+																variant="ghost"
+																size="icon"
+																class="size-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+																onclick={() => openDeleteVariantConfirm(v)}
+																aria-label="Delete variant"
+															>
+																<Trash2 class="size-4" />
+															</Button>
+														</div>
+													</td>
+												</tr>
+											{/each}
+										{/if}
+									</tbody>
+								</table>
 							</div>
-						{/if}
-					</div>
+							{#if variantTotal > 0}
+								<div class="mt-4 flex items-center justify-between border-t pt-4">
+									<p class="text-sm text-muted-foreground">
+										{variantStart} – {variantEnd} of {variantTotal} results
+									</p>
+									<div class="flex items-center gap-2">
+										<Button
+											variant="outline"
+											size="sm"
+											disabled={variantPage <= 1}
+											onclick={() => (variantPage = Math.max(1, variantPage - 1))}
+										>
+											Prev
+										</Button>
+										<span class="text-sm text-muted-foreground">
+											{variantPage} of {variantTotalPages} pages
+										</span>
+										<Button
+											variant="outline"
+											size="sm"
+											disabled={variantPage >= variantTotalPages}
+											onclick={() => (variantPage = Math.min(variantTotalPages, variantPage + 1))}
+										>
+											Next
+										</Button>
+									</div>
+								</div>
+							{/if}
+						</div>
 
 						<!-- Metadata / JSON placeholders -->
 						<div class="grid gap-4 sm:grid-cols-2">
@@ -1813,7 +1790,12 @@
 									<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
 										{metadataKeysCount} keys
 									</span>
-									<Button variant="ghost" size="icon" class="size-8 shrink-0" onclick={openMetadataSheet}>
+									<Button
+										variant="ghost"
+										size="icon"
+										class="size-8 shrink-0"
+										onclick={openMetadataSheet}
+									>
 										<ExternalLink class="size-4" />
 										<span class="sr-only">Open</span>
 									</Button>
@@ -1825,7 +1807,12 @@
 									<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
 										{jsonKeysCount} keys
 									</span>
-									<Button variant="ghost" size="icon" class="size-8 shrink-0" onclick={() => (jsonSheetOpen = true)}>
+									<Button
+										variant="ghost"
+										size="icon"
+										class="size-8 shrink-0"
+										onclick={() => (jsonSheetOpen = true)}
+									>
 										<ExternalLink class="size-4" />
 										<span class="sr-only">Open</span>
 									</Button>
@@ -1878,7 +1865,13 @@
 					{/if}
 				</div>
 				<div class="flex justify-end gap-2 border-t p-4">
-					<Button variant="outline" onclick={() => { addMediaSheetOpen = false; addMediaError = null; }}>Cancel</Button>
+					<Button
+						variant="outline"
+						onclick={() => {
+							addMediaSheetOpen = false;
+							addMediaError = null;
+						}}>Cancel</Button
+					>
 					<Button onclick={saveProductImage} disabled={addMediaSubmitting}>
 						{addMediaSubmitting ? 'Saving…' : 'Save'}
 					</Button>
@@ -1890,11 +1883,9 @@
 		<DeleteConfirmationModal
 			bind:open={deleteVariantConfirmOpen}
 			entityName="variant"
-			entityTitle={
-				variantToDelete
-					? `"${variantToDelete.title}"${variantToDelete.sku ? ` (SKU: ${variantToDelete.sku})` : ''}`
-					: ''
-			}
+			entityTitle={variantToDelete
+				? `"${variantToDelete.title}"${variantToDelete.sku ? ` (SKU: ${variantToDelete.sku})` : ''}`
+				: ''}
 			onConfirm={confirmDeleteVariant}
 			onCancel={closeDeleteVariantConfirm}
 			submitting={deleteVariantSubmitting}
@@ -2099,11 +2090,7 @@
 							<div class="flex items-center gap-2 rounded-md border p-2">
 								<div class="min-w-0 flex-1">
 									<span class="text-sm font-medium text-muted-foreground">{row.title}</span>
-									<Input
-										bind:value={row.value}
-										class="mt-1 h-9"
-										placeholder="Value"
-									/>
+									<Input bind:value={row.value} class="mt-1 h-9" placeholder="Value" />
 								</div>
 								<Button
 									type="button"
@@ -2133,10 +2120,16 @@
 								</select>
 								<Input
 									bind:value={addAttributeValue}
-									class="h-9 flex-1 min-w-24"
+									class="h-9 min-w-24 flex-1"
 									placeholder="Value"
 								/>
-								<Button type="button" variant="secondary" size="sm" onclick={addAttributeToEdit} disabled={!addAttributeId}>
+								<Button
+									type="button"
+									variant="secondary"
+									size="sm"
+									onclick={addAttributeToEdit}
+									disabled={!addAttributeId}
+								>
 									Add
 								</Button>
 							</div>
@@ -2147,7 +2140,11 @@
 					{/if}
 				</div>
 				<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-					<Button variant="outline" onclick={closeEditAttributesSheet} disabled={editAttributesSubmitting}>
+					<Button
+						variant="outline"
+						onclick={closeEditAttributesSheet}
+						disabled={editAttributesSubmitting}
+					>
 						Cancel
 					</Button>
 					<Button onclick={submitEditAttributes} disabled={editAttributesSubmitting}>
@@ -2180,269 +2177,50 @@
 					<!-- Type (Category selection) -->
 					<div class="flex flex-col gap-2">
 						<label for="org-categories" class="text-sm font-medium">Type</label>
-						<div
-							class="relative flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-within:ring-2 focus-within:ring-ring"
-							role="combobox"
-							aria-expanded={orgCategoryDropdownOpen}
-							aria-haspopup="listbox"
-							aria-controls="org-categories-listbox"
+						<Combobox
 							id="org-categories"
-							onclick={() => (orgCategoryDropdownOpen = true)}
-							onfocusout={(e) => {
-								if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-									orgCategoryDropdownOpen = false;
-									orgCategoryInput = '';
-								}
-							}}
-						>
-							<input
-								type="text"
-								class="h-full min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm text-foreground outline-none placeholder:text-muted-foreground"
-								placeholder={orgCategoryDropdownOpen ? 'Type to search…' : (orgCategoryId ? '' : 'Select category…')}
-								value={orgCategoryDropdownOpen ? orgCategoryInput : (orgCategoryId ? orgCategoryLabel : orgCategoryInput)}
-								oninput={(e) => {
-									if (orgCategoryDropdownOpen) orgCategoryInput = (e.currentTarget as HTMLInputElement).value;
-								}}
-								onkeydown={(e) => {
-									if (e.key === 'Escape') {
-										orgCategoryDropdownOpen = false;
-										orgCategoryInput = '';
-									}
-									if (e.key === 'Enter' && orgCategoryDropdownOpen) {
-										e.preventDefault();
-										if (orgCategoryFilteredOptions.length > 0) selectOrgCategory(orgCategoryFilteredOptions[0].id);
-									}
-								}}
-							/>
-							{#if orgCategoryId}
-								<button
-									type="button"
-									class="flex shrink-0 items-center justify-center rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-									aria-label="Clear category"
-									onclick={(e) => {
-										e.stopPropagation();
-										selectOrgCategory('');
-									}}
-								>
-									<X class="size-4" />
-								</button>
-							{/if}
-							{#if orgCategoryDropdownOpen}
-								<ul
-									id="org-categories-listbox"
-									class="absolute top-full left-0 z-50 mt-1 max-h-48 w-full min-w-0 overflow-auto rounded-md border border-input bg-popover py-1 text-popover-foreground shadow-md"
-									role="listbox"
-								>
-									{#each orgCategoryFilteredOptions as cat (cat.id)}
-										<li role="option" aria-selected={orgCategoryId === cat.id}>
-											<button
-												type="button"
-												class="w-full cursor-pointer px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-												onclick={(e) => {
-													e.stopPropagation();
-													selectOrgCategory(cat.id);
-												}}
-												onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), selectOrgCategory(cat.id))}
-											>
-												{cat.value}
-											</button>
-										</li>
-									{/each}
-									{#if !orgCategoryFilteredOptions.length && orgCategoryInput.trim()}
-										<li class="px-3 py-1.5 text-sm text-muted-foreground">No categories found</li>
-									{/if}
-								</ul>
-							{/if}
-						</div>
+							bind:value={orgCategoryId}
+							options={categoriesList}
+							placeholder="Select category…"
+							emptyMessage="No categories found"
+						/>
 					</div>
-					<!-- Collections edit UI: search input with dropdown list -->
+					<!-- Collections -->
 					<div class="flex flex-col gap-3">
 						<h3 class="text-sm font-medium">Collections</h3>
-						<div
-							class="relative flex h-9 w-full rounded-md border border-input bg-background text-sm shadow-xs focus-within:ring-2 focus-within:ring-ring"
-							role="combobox"
-							tabindex="0"
-							aria-expanded={orgCollectionDropdownOpen}
-							aria-haspopup="listbox"
-							aria-controls="org-collections-listbox"
-							onclick={() => (orgCollectionDropdownOpen = true)}
-							onkeydown={(e) => {
-								if (e.key === 'Escape') orgCollectionDropdownOpen = false;
-								if (e.key === 'Enter' || e.key === ' ') {
-									e.preventDefault();
-									orgCollectionDropdownOpen = true;
-								}
-							}}
-							onfocusout={(e) => {
-								if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-									orgCollectionDropdownOpen = false;
-								}
-							}}
-						>
-							<Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-							<input
-								type="text"
-								id="org-collections-search"
-								class="h-full min-w-0 flex-1 border-0 bg-transparent py-1 pl-9 pr-3 outline-none placeholder:text-muted-foreground"
-								placeholder="Search collections…"
-								bind:value={orgCollectionInput}
-								onkeydown={(e) => {
-									if (e.key === 'Escape') orgCollectionDropdownOpen = false;
-								}}
-							/>
-							{#if orgCollectionDropdownOpen}
-								<ul
-									id="org-collections-listbox"
-									class="absolute top-full left-0 z-50 mt-1 max-h-48 w-full min-w-0 overflow-auto rounded-md border border-input bg-popover py-1 text-popover-foreground shadow-md"
-									role="listbox"
-								>
-									{#if orgCollectionsFilteredForList.length === 0}
-										<li class="px-3 py-1.5 text-sm text-muted-foreground">
-											{orgCollectionInput.trim() ? 'No collections found.' : 'No collections yet.'}
-										</li>
-									{:else}
-										{#each orgCollectionsFilteredForList as col (col.id)}
-											<li role="option" aria-selected={orgCollectionIds.includes(col.id)}>
-												<button
-													type="button"
-													class="flex w-full cursor-pointer items-center gap-3 px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-													onclick={(e) => {
-														e.preventDefault();
-														toggleOrgCollection(col.id);
-													}}
-												>
-													<input
-														type="checkbox"
-														class="size-4 rounded border-input"
-														checked={orgCollectionIds.includes(col.id)}
-														tabindex="-1"
-														readonly
-													/>
-													<span class="min-w-0 flex-1 truncate">{col.title}</span>
-												</button>
-											</li>
-										{/each}
-									{/if}
-								</ul>
-							{/if}
-						</div>
-						{#if orgCollectionIds.length > 0}
-							<div class="flex flex-wrap gap-1.5">
-								{#each orgCollectionIds as colId (colId)}
-									{@const col = collectionsList.find((c) => c.id === colId)}
-									{#if col}
-										<span
-											class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm"
-										>
-											{col.title}
-											<button
-												type="button"
-												class="rounded p-0.5 hover:bg-muted-foreground/20"
-												aria-label="Remove collection"
-												onclick={() => removeOrgCollection(colId)}
-											>
-												<X class="size-3" />
-											</button>
-										</span>
-									{/if}
-								{/each}
-							</div>
-						{/if}
+						<MultiSelectCombobox
+							id="org-collections"
+							bind:value={orgCollectionIds}
+							options={collectionsOptions}
+							placeholder="Search collections…"
+							emptyMessage="No collections yet."
+						/>
 					</div>
 					<div class="flex flex-col gap-2">
-						<label for="org-tags-input" class="text-sm font-medium">
-							Tags <span class="font-normal text-muted-foreground">(Optional)</span>
-						</label>
-						<div
-							class="relative flex min-h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-xs outline-none focus-within:ring-2 focus-within:ring-ring"
-							role="combobox"
-							aria-expanded={orgTagDropdownOpen}
-							aria-haspopup="listbox"
-							aria-controls="org-tags-listbox"
-							id="org-tags"
-							onfocusout={(e) => {
-								if (!e.currentTarget.contains(e.relatedTarget as Node | null)) orgTagDropdownOpen = false;
-							}}
-						>
-							<input
-								bind:this={orgTagsInputEl}
-								id="org-tags-input"
-								type="text"
-								class="h-7 min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm outline-none placeholder:text-muted-foreground"
-								placeholder="Type to search or create…"
-								bind:value={orgTagInput}
-								onfocus={() => (orgTagDropdownOpen = true)}
-								onkeydown={(e) => {
-									if (e.key === 'Escape') {
-										orgTagDropdownOpen = false;
-										orgTagInput = '';
-									}
-									if (e.key === 'Enter' && orgTagDropdownOpen) {
-										e.preventDefault();
-										if (orgTagShowCreate) createAndSelectOrgTag();
-										else if (orgTagFilteredOptions.length > 0) selectOrgTag(orgTagFilteredOptions[0].id);
-									}
+						<div class="flex items-center justify-between gap-2">
+							<label for="org-tags-search" class="text-sm font-medium">
+								Tags <span class="font-normal text-muted-foreground">(Optional)</span>
+							</label>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={orgTagCreating}
+								onclick={async () => {
+									const name = window.prompt('New tag name');
+									if (name) await createAndSelectOrgTag(name);
 								}}
-							/>
-							{#if orgTagDropdownOpen}
-								<ul
-									id="org-tags-listbox"
-									class="absolute top-full left-0 z-50 mt-1 max-h-48 w-full min-w-[12rem] overflow-auto rounded-md border border-input bg-popover py-1 text-popover-foreground shadow-md"
-									role="listbox"
-								>
-									{#each orgTagFilteredOptions as tag (tag.id)}
-										<li role="option" aria-selected="false">
-											<button
-												type="button"
-												class="w-full cursor-pointer px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-												onclick={() => selectOrgTag(tag.id)}
-												onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), selectOrgTag(tag.id))}
-											>
-												{tag.value}
-											</button>
-										</li>
-									{/each}
-									{#if orgTagShowCreate}
-										<li role="option" aria-selected="false">
-											<button
-												type="button"
-												class="w-full cursor-pointer px-3 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-												disabled={orgTagCreating}
-												onclick={() => createAndSelectOrgTag()}
-												onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), createAndSelectOrgTag())}
-											>
-												{orgTagCreating ? 'Creating…' : `Create "${orgTagInput.trim()}"`}
-											</button>
-										</li>
-									{/if}
-									{#if !orgTagFilteredOptions.length && !orgTagShowCreate && orgTagInput.trim()}
-										<li class="px-3 py-1.5 text-sm text-muted-foreground">No tags found</li>
-									{/if}
-								</ul>
-							{/if}
+							>
+								{orgTagCreating ? 'Creating…' : 'Create tag'}
+							</Button>
 						</div>
-						{#if orgTagIds.length > 0}
-							<div class="flex flex-wrap gap-1.5">
-								{#each orgTagIds as tagId (tagId)}
-									{@const tag = tagsList.find((t) => t.id === tagId)}
-									{#if tag}
-										<span
-											class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-0.5 text-xs font-medium"
-										>
-											{tag.value}
-											<button
-												type="button"
-												class="rounded p-0.5 hover:bg-muted-foreground/20"
-												aria-label="Remove tag"
-												onclick={() => removeOrgTag(tagId)}
-											>
-												<X class="size-3" />
-											</button>
-										</span>
-									{/if}
-								{/each}
-							</div>
-						{/if}
+						<MultiSelectCombobox
+							id="org-tags"
+							bind:value={orgTagIds}
+							options={tagsOptions}
+							placeholder="Type to search…"
+							emptyMessage="No tags found"
+						/>
 					</div>
 					{#if orgError}
 						<p class="text-sm text-destructive">{orgError}</p>
@@ -2812,13 +2590,17 @@
 								<div class="flex flex-col gap-2">
 									<p class="text-sm font-medium">Attributes</p>
 									<p class="text-xs text-muted-foreground">
-										Values default from product attributes; variant overrides when set. Changes are saved as variant attribute values.
+										Values default from product attributes; variant overrides when set. Changes are
+										saved as variant attribute values.
 									</p>
 									<div class="space-y-3 text-sm">
 										{#each editVariantAttributes as attr (attr.id)}
 											<div class="flex items-end gap-2">
 												<div class="min-w-0 flex-1">
-													<label for="edit-variant-attr-{attr.id}" class="font-medium text-muted-foreground">{attr.title}</label>
+													<label
+														for="edit-variant-attr-{attr.id}"
+														class="font-medium text-muted-foreground">{attr.title}</label
+													>
 													<Input
 														id="edit-variant-attr-{attr.id}"
 														class="mt-1 h-9"
@@ -2957,7 +2739,9 @@
 					</p>
 					<div class="mt-6 flex flex-col gap-4">
 						<div class="relative">
-							<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+							<Search
+								class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+							/>
 							<Input
 								type="search"
 								placeholder="Search sales channels"

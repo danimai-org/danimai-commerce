@@ -148,7 +148,10 @@
 					{ cache: 'no-store' }
 				);
 				if (!res.ok) throw new Error(await res.text());
-				const json = (await res.json()) as { data: Permission[]; pagination: { has_next_page: boolean } };
+				const json = (await res.json()) as {
+					data: Permission[];
+					pagination: { has_next_page: boolean };
+				};
 				const data = json.data ?? [];
 				all = all.concat(data);
 				hasMore = (json.pagination?.has_next_page ?? false) && data.length === 100;
@@ -293,9 +296,7 @@
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex items-center justify-between border-b pb-4">
 			<div class="flex items-center gap-2 text-sm text-muted-foreground">
-				<a href="/settings" class="flex items-center gap-1 hover:text-foreground">Settings</a>
-				<span>/</span>
-				<a href="/settings/roles" class="flex items-center gap-1 hover:text-foreground">Manage Users</a>
+				<a href="/users" class="flex items-center gap-1 hover:text-foreground">Manage Users</a>
 				<span>/</span>
 				<span class="text-foreground">Roles</span>
 			</div>
@@ -303,10 +304,8 @@
 		<div class="mb-6 flex flex-col gap-4">
 			<div class="flex items-start justify-between gap-4">
 				<div>
-					<h1 class="text-lg font-semibold leading-none">Roles</h1>
-					<p class="mt-1 text-sm text-muted-foreground">
-						Manage user roles and their permissions.
-					</p>
+					<h1 class="text-lg leading-none font-semibold">Roles</h1>
+					<p class="mt-1 text-sm text-muted-foreground">Manage user roles and their permissions.</p>
 				</div>
 				<Button size="sm" onclick={openCreate}>Add role</Button>
 			</div>
@@ -549,9 +548,7 @@
 				</div>
 			</div>
 			<div class="flex justify-end gap-2 border-t p-4">
-				<Button type="button" variant="outline" onclick={() => (sheetOpen = false)}>
-					Cancel
-				</Button>
+				<Button type="button" variant="outline" onclick={() => (sheetOpen = false)}>Cancel</Button>
 				<Button type="button" disabled={formSubmitting} onclick={submitForm}>
 					{formSubmitting ? 'Saving…' : sheetMode === 'create' ? 'Create' : 'Save'}
 				</Button>

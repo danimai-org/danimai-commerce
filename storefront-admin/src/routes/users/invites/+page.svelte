@@ -174,9 +174,7 @@
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex items-center justify-between border-b pb-4">
 			<div class="flex items-center gap-2 text-sm text-muted-foreground">
-				<a href="/settings" class="flex items-center gap-1 hover:text-foreground">Settings</a>
-				<span>/</span>
-				<a href="/settings/users" class="flex items-center gap-1 hover:text-foreground">Manage Users</a>
+				<a href="/users" class="flex items-center gap-1 hover:text-foreground">Manage Users</a>
 				<span>/</span>
 				<span class="text-foreground">Invites</span>
 			</div>
@@ -184,9 +182,10 @@
 		<div class="mb-6 flex flex-col gap-4">
 			<div class="flex items-start justify-between gap-4">
 				<div>
-					<h1 class="text-lg font-semibold leading-none">Invites</h1>
+					<h1 class="text-lg leading-none font-semibold">Invites</h1>
 					<p class="mt-1 text-sm text-muted-foreground">
-						Invite new users to the store by email. They will receive an invite link to create their account.
+						Invite new users to the store by email. They will receive an invite link to create their
+						account.
 					</p>
 				</div>
 				<Button size="sm" onclick={openInviteSheet}>Invite user</Button>
@@ -222,11 +221,20 @@
 									<td class="px-4 py-3">{invite.role ?? '—'}</td>
 									<td class="px-4 py-3">
 										{#if invite.accepted}
-											<span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium text-white bg-green-600 dark:bg-green-500">Accepted</span>
+											<span
+												class="inline-flex rounded-full bg-green-600 px-2.5 py-0.5 text-xs font-medium text-white dark:bg-green-500"
+												>Accepted</span
+											>
 										{:else if isExpired(invite.expires_at)}
-											<span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium text-white bg-gray-500 dark:bg-gray-400">Expired</span>
+											<span
+												class="inline-flex rounded-full bg-gray-500 px-2.5 py-0.5 text-xs font-medium text-white dark:bg-gray-400"
+												>Expired</span
+											>
 										{:else}
-											<span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium text-white bg-amber-500 dark:bg-amber-500">Pending</span>
+											<span
+												class="inline-flex rounded-full bg-amber-500 px-2.5 py-0.5 text-xs font-medium text-white dark:bg-amber-500"
+												>Pending</span
+											>
 										{/if}
 									</td>
 									<td class="px-4 py-3">{formatDate(invite.expires_at)}</td>
@@ -253,7 +261,10 @@
 				{#if pagination && pagination.total_pages > 1}
 					<div class="flex items-center justify-between border-t px-4 py-3">
 						<p class="text-sm text-muted-foreground">
-							Showing {(pagination.page - 1) * pagination.limit + 1}–{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+							Showing {(pagination.page - 1) * pagination.limit + 1}–{Math.min(
+								pagination.page * pagination.limit,
+								pagination.total
+							)} of {pagination.total}
 						</p>
 						<div class="flex gap-2">
 							<Button
@@ -281,7 +292,7 @@
 </div>
 
 <Sheet.Root bind:open={inviteOpen}>
-	<Sheet.Content side="right" class="flex h-full max-h-[100dvh] w-full max-w-lg flex-col sm:max-w-lg">
+	<Sheet.Content side="right" class="flex h-full max-h-dvh w-full max-w-lg flex-col sm:max-w-lg">
 		<div class="flex min-h-0 flex-1 flex-col">
 			<div class="shrink-0 border-b px-6 py-4">
 				<h2 class="text-lg font-semibold">Invite user</h2>
@@ -345,8 +356,13 @@
 						{/if}
 					</div>
 				</div>
-				<div class="shrink-0 flex justify-end gap-2 border-t p-4">
-					<Button type="button" variant="outline" onclick={() => (inviteOpen = false)} disabled={inviteSubmitting}>
+				<div class="flex shrink-0 justify-end gap-2 border-t p-4">
+					<Button
+						type="button"
+						variant="outline"
+						onclick={() => (inviteOpen = false)}
+						disabled={inviteSubmitting}
+					>
 						Cancel
 					</Button>
 					<Button type="submit" disabled={inviteSubmitting}>

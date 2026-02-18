@@ -151,9 +151,7 @@
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex items-center justify-between border-b pb-4">
 			<div class="flex items-center gap-2 text-sm text-muted-foreground">
-				<a href="/settings" class="flex items-center gap-1 hover:text-foreground">Settings</a>
-				<span>/</span>
-				<a href="/settings/users" class="flex items-center gap-1 hover:text-foreground">Manage Users</a>
+				<a href="/users" class="flex items-center gap-1 hover:text-foreground">Manage Users</a>
 				<span>/</span>
 				<span class="text-foreground">Users</span>
 			</div>

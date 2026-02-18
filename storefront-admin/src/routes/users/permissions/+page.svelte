@@ -78,16 +78,14 @@
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex items-center justify-between border-b pb-4">
 			<div class="flex items-center gap-2 text-sm text-muted-foreground">
-				<a href="/settings" class="flex items-center gap-1 hover:text-foreground">Settings</a>
-				<span>/</span>
-				<a href="/settings/permissions" class="flex items-center gap-1 hover:text-foreground">Manage Users</a>
+				<a href="/users" class="flex items-center gap-1 hover:text-foreground">Manage Users</a>
 				<span>/</span>
 				<span class="text-foreground">Permissions</span>
 			</div>
 		</div>
 		<div class="mb-6 flex flex-col gap-4">
 			<div>
-				<h1 class="text-lg font-semibold leading-none">Permissions</h1>
+				<h1 class="text-lg leading-none font-semibold">Permissions</h1>
 				<p class="mt-1 text-sm text-muted-foreground">
 					View system permissions. Permissions are seeded and managed via roles.
 				</p>

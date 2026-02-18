@@ -12,7 +12,10 @@ import {
 } from "@danimai/core";
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type ResendInviteProcessInput, ResendInviteSchema } from "./resend-invite.schema";
+import {
+  type ResendInviteProcessInput,
+  ResendInviteSchema,
+} from "./resend-invite.schema";
 import type { Database, Invite } from "../../../db/type";
 
 const INVITE_EXPIRY_DAYS = 7;
@@ -20,19 +23,24 @@ const INVITE_EXPIRY_DAYS = 7;
 export const RESEND_INVITE_PROCESS = Symbol("ResendInvite");
 
 @Process(RESEND_INVITE_PROCESS)
-export class ResendInviteProcess implements ProcessContract<Invite | undefined> {
+export class ResendInviteProcess implements ProcessContract<
+  Invite | undefined
+> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
     @InjectLogger()
     private readonly logger: Logger,
     @InjectEmail()
-    private readonly emailService: EmailInterface
-  ) { }
+    private readonly emailService: EmailInterface,
+  ) {}
 
-  async runOperations(@ProcessContext({
-    schema: ResendInviteSchema,
-  }) context: ProcessContextType<typeof ResendInviteSchema>) {
+  async runOperations(
+    @ProcessContext({
+      schema: ResendInviteSchema,
+    })
+    context: ProcessContextType<typeof ResendInviteSchema>,
+  ) {
     const { input } = context;
 
     const existing = await this.db
@@ -43,19 +51,23 @@ export class ResendInviteProcess implements ProcessContract<Invite | undefined> 
       .executeTakeFirst();
 
     if (!existing) {
-      throw new ValidationError("Invite not found", [{
-        type: "not_found",
-        message: "Invite not found",
-        path: "id",
-      }]);
+      throw new ValidationError("Invite not found", [
+        {
+          type: "not_found",
+          message: "Invite not found",
+          path: "id",
+        },
+      ]);
     }
 
     if (existing.accepted) {
-      throw new ValidationError("Invite has already been accepted", [{
-        type: "invalid_state",
-        message: "Invite has already been accepted",
-        path: "id",
-      }]);
+      throw new ValidationError("Invite has already been accepted", [
+        {
+          type: "invalid_state",
+          message: "Invite has already been accepted",
+          path: "id",
+        },
+      ]);
     }
 
     const token = randomBytes(32).toString("hex");
@@ -72,13 +84,12 @@ export class ResendInviteProcess implements ProcessContract<Invite | undefined> 
       .returningAll()
       .executeTakeFirst();
 
-    const inviteAcceptBaseUrl =
-      (typeof process !== "undefined" && process.env?.INVITE_ACCEPT_BASE_URL) ||
-      (typeof Bun !== "undefined" && (Bun as any).env?.INVITE_ACCEPT_BASE_URL) ||
+    const frontendUrl =
+      (typeof process !== "undefined" && process.env?.FRONTEND_URL) ||
+      (typeof Bun !== "undefined" && (Bun as any).env?.FRONTEND_URL) ||
       "";
-    const inviteLink = inviteAcceptBaseUrl
-      ? `${inviteAcceptBaseUrl}${inviteAcceptBaseUrl.includes("?") ? "&" : "?"}token=${token}`
-      : "";
+    const base = frontendUrl.replace(/\/+$/, "");
+    const inviteLink = base ? `${base}/accept-invite?token=${token}` : "";
 
     await this.emailService.sendEmail(existing.email, {
       subject: "You're invited",
