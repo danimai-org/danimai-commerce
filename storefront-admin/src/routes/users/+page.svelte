@@ -7,6 +7,7 @@
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import Search from '@lucide/svelte/icons/search';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
+	import Pencil from '@lucide/svelte/icons/pencil';
 
 	const API_BASE = 'http://localhost:8000';
 
@@ -281,12 +282,13 @@
 							<th class="px-4 py-3 text-left font-medium">Last Name</th>
 							<th class="px-4 py-3 text-left font-medium">Created</th>
 							<th class="px-4 py-3 text-left font-medium">Updated</th>
+							<th class="w-10 px-4 py-3"></th>
 						</tr>
 					</thead>
 					<tbody>
 						{#if users.length === 0}
 							<tr>
-								<td colspan="5" class="px-4 py-8 text-center text-muted-foreground">
+								<td colspan="6" class="px-4 py-8 text-center text-muted-foreground">
 									No users found.
 								</td>
 							</tr>
@@ -298,6 +300,16 @@
 									<td class="px-4 py-3 text-muted-foreground">{user.last_name ?? '–'}</td>
 									<td class="px-4 py-3 text-muted-foreground">{formatDate(user.created_at)}</td>
 									<td class="px-4 py-3 text-muted-foreground">{formatDate(user.updated_at)}</td>
+									<td class="px-4 py-3">
+										<button
+											type="button"
+											class="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+											title="Edit user"
+										>
+											<Pencil class="size-4" />
+											<span class="sr-only">Edit</span>
+										</button>
+									</td>
 								</tr>
 							{/each}
 						{/if}

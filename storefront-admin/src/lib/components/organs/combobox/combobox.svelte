@@ -128,7 +128,7 @@
 	{/if}
 	{#if open}
 		<ul
-			{id: listboxId}
+			id={listboxId}
 			role="listbox"
 			class={cn(
 				'absolute top-full left-0 z-50 mt-1 max-h-48 w-full min-w-0 overflow-auto rounded-md border border-input bg-popover py-1 text-popover-foreground shadow-md',
