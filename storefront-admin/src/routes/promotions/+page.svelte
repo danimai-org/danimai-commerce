@@ -2,13 +2,13 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import { DropdownMenu } from 'bits-ui';
 	import Search from '@lucide/svelte/icons/search';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
-	import X from '@lucide/svelte/icons/x';
 	import Info from '@lucide/svelte/icons/info';
 	import Clock from '@lucide/svelte/icons/clock';
 	import { cn } from '$lib/utils.js';
@@ -61,10 +61,34 @@
 		}
 	];
 
-	// In-memory state until backend API exists; matches panel design
-	let promotions = $state<Promotion[]>([
-		{ id: '1', code: 'SUMMER15', method: 'Automatic', status: 'Active' }
-	]);
+	// Load from localStorage or use default
+	function loadPromotions(): Promotion[] {
+		if (typeof window === 'undefined') {
+			return [{ id: '1', code: 'SUMMER15', method: 'Automatic', status: 'Active' }];
+		}
+		try {
+			const stored = localStorage.getItem('promotions');
+			if (stored) {
+				return JSON.parse(stored);
+			}
+		} catch (e) {
+			console.error('Failed to load promotions from localStorage:', e);
+		}
+		return [{ id: '1', code: 'SUMMER15', method: 'Automatic', status: 'Active' }];
+	}
+
+	function savePromotionsToStorage(proms: Promotion[]) {
+		if (typeof window !== 'undefined') {
+			try {
+				localStorage.setItem('promotions', JSON.stringify(proms));
+			} catch (e) {
+				console.error('Failed to save promotions to localStorage:', e);
+			}
+		}
+	}
+
+	// In-memory state with localStorage persistence
+	let promotions = $state<Promotion[]>(loadPromotions());
 	let searchQuery = $state('');
 	let page = $state(1);
 	const limit = 10;
@@ -88,6 +112,17 @@
 	let createOpen = $state(false);
 	let createStep = $state(1);
 	let createType = $state<PromotionTypeId>('amount_off_products');
+
+	// Edit promotion flow
+	let editOpen = $state(false);
+	let editingPromotion = $state<Promotion | null>(null);
+	let editCode = $state('');
+	let editMethod = $state<'promotion_code' | 'automatic'>('promotion_code');
+	let editStatus = $state<'draft' | 'active' | 'inactive'>('draft');
+
+	// Delete confirmation
+	let deleteModalOpen = $state(false);
+	let promotionToDelete = $state<Promotion | null>(null);
 
 	// Step 2 - Details (for "Amount off products" and similar)
 	let detailMethod = $state<'promotion_code' | 'automatic'>('promotion_code');
@@ -164,6 +199,34 @@
 		createStep = 3;
 	}
 
+	function savePromotion() {
+		// Validate required fields
+		if (detailMethod === 'promotion_code' && !detailCode.trim()) {
+			// Code is required for promotion_code method
+			return;
+		}
+
+		// Create new promotion
+		const newPromotion: Promotion = {
+			id: crypto.randomUUID(),
+			code: detailMethod === 'promotion_code' ? detailCode.trim() : '',
+			method: detailMethod === 'automatic' ? 'Automatic' : 'Manual',
+			status:
+				detailStatus === 'active'
+					? 'Active'
+					: detailStatus === 'draft'
+						? 'Draft'
+						: 'Inactive'
+		};
+
+		// Add to promotions array
+		promotions = [...promotions, newPromotion];
+		savePromotionsToStorage(promotions);
+
+		// Close the create sheet
+		closeCreate();
+	}
+
 	function addCodeCondition() {
 		detailCodeConditions = [
 			...detailCodeConditions,
@@ -219,11 +282,60 @@
 	}
 
 	function openEdit(p: Promotion) {
-		// Placeholder: open edit sheet when implemented
+		editingPromotion = p;
+		editCode = p.code;
+		editMethod = p.method === 'Manual' ? 'promotion_code' : 'automatic';
+		editStatus =
+			p.status === 'Active' ? 'active' : p.status === 'Inactive' ? 'inactive' : 'draft';
+		editOpen = true;
 	}
+
+	function closeEdit() {
+		editOpen = false;
+		editingPromotion = null;
+	}
+
+	function saveEdit() {
+		if (!editingPromotion) return;
+		promotions = promotions.map((x) =>
+			x.id === editingPromotion!.id
+				? {
+						...x,
+						code: editCode,
+						method: editMethod === 'promotion_code' ? 'Manual' : 'Automatic',
+						status:
+							editStatus === 'active'
+								? 'Active'
+								: editStatus === 'inactive'
+									? 'Inactive'
+									: 'Draft'
+					}
+				: x
+		);
+		savePromotionsToStorage(promotions);
+		closeEdit();
+	}
+
+	$effect(() => {
+		if (!editOpen) editingPromotion = null;
+	});
 
 	function deletePromotion(p: Promotion) {
 		promotions = promotions.filter((x) => x.id !== p.id);
+		savePromotionsToStorage(promotions);
+	}
+
+	function openDeleteModal(p: Promotion) {
+		promotionToDelete = p;
+		deleteModalOpen = true;
+	}
+
+	function handleConfirmDelete() {
+		if (promotionToDelete) {
+			deletePromotion(promotionToDelete);
+			promotionToDelete = null;
+			deleteModalOpen = false;
+		}
 	}
 </script>
 
@@ -310,6 +422,16 @@
 												class="size-2 shrink-0 rounded-full bg-green-500"
 												aria-hidden="true"
 											></span>
+										{:else if promotion.status === 'Draft'}
+											<span
+												class="size-2 shrink-0 rounded-full bg-amber-500"
+												aria-hidden="true"
+											></span>
+										{:else if promotion.status === 'Inactive'}
+											<span
+												class="size-2 shrink-0 rounded-full bg-muted-foreground"
+												aria-hidden="true"
+											></span>
 										{/if}
 										{promotion.status}
 									</span>
@@ -338,7 +460,7 @@
 												<DropdownMenu.Item
 													textValue="Delete"
 													class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-													onSelect={() => deletePromotion(promotion)}
+													onSelect={() => openDeleteModal(promotion)}
 												>
 													<Trash2 class="size-4" />
 													Delete
@@ -393,14 +515,6 @@
 		<div class="flex h-full flex-col">
 			<!-- Header: close + step indicator -->
 			<Sheet.Header class="flex flex-col gap-4 border-b px-6 py-4">
-				<div class="flex items-center justify-end">
-					<Sheet.Close
-						class="flex size-8 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
-						aria-label="Close (esc)"
-					>
-						<X class="size-4" />
-					</Sheet.Close>
-				</div>
 				<div class="flex items-center gap-2">
 					<div class="flex items-center gap-1.5">
 						<span
@@ -1044,12 +1158,12 @@
 											Start date <span class="font-normal text-muted-foreground">(Optional)</span>
 										</label>
 										<div class="relative">
-											<Clock class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+											<Clock class="absolute top-1/2 left-[3px] size-4 -translate-y-1/2 text-muted-foreground" />
 											<Input
 												id="campaign-start"
 												type="datetime-local"
 												bind:value={campaignStartDate}
-												class="h-9 pl-9"
+												class="h-9 pl-[18px]"
 											/>
 										</div>
 									</div>
@@ -1058,12 +1172,12 @@
 											End date <span class="font-normal text-muted-foreground">(Optional)</span>
 										</label>
 										<div class="relative">
-											<Clock class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+											<Clock class="absolute top-1/2 left-[3px] size-4 -translate-y-1/2 text-muted-foreground" />
 											<Input
 												id="campaign-end"
 												type="datetime-local"
 												bind:value={campaignEndDate}
-												class="h-9 pl-9"
+												class="h-9 pl-[18px]"
 											/>
 										</div>
 									</div>
@@ -1150,9 +1264,170 @@
 					<Button onclick={goToCampaign}>Continue</Button>
 				{:else}
 					<Button variant="outline" onclick={() => (createStep = 2)}>Back</Button>
-					<Button onclick={closeCreate}>Save</Button>
+					<Button onclick={savePromotion}>Save</Button>
 				{/if}
 			</Sheet.Footer>
 		</div>
 	</Sheet.Content>
 </Sheet.Root>
+
+<!-- Edit Promotion Sheet -->
+<Sheet.Root bind:open={editOpen}>
+	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
+		<div class="flex h-full flex-col">
+			<Sheet.Header class="flex flex-col gap-4 border-b px-6 py-4">
+				<h2 class="text-lg font-semibold">Edit promotion</h2>
+			</Sheet.Header>
+			<div class="flex-1 overflow-auto px-6 py-6">
+				<div class="flex flex-col gap-6">
+					<div class="flex flex-col gap-2">
+						<label for="edit-code" class="text-sm font-medium">Code</label>
+						<Input
+							id="edit-code"
+							bind:value={editCode}
+							placeholder="e.g. SUMMER15"
+							class="h-9"
+						/>
+					</div>
+					<div class="flex flex-col gap-2">
+						<span class="text-sm font-medium">Method</span>
+						<div class="flex flex-col gap-2">
+							<label
+								class={cn(
+									'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+									editMethod === 'promotion_code'
+										? 'border-primary bg-primary/5'
+										: 'border-input hover:bg-muted/30'
+								)}
+							>
+								<input
+									type="radio"
+									name="edit-method"
+									value="promotion_code"
+									checked={editMethod === 'promotion_code'}
+									onchange={() => (editMethod = 'promotion_code')}
+									class="mt-1 size-4 shrink-0 border-primary text-primary focus:ring-primary"
+								/>
+								<div>
+									<span class="font-medium">Promotion code</span>
+									<p class="mt-0.5 text-sm text-muted-foreground">
+										Customers must enter this code at checkout
+									</p>
+								</div>
+							</label>
+							<label
+								class={cn(
+									'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+									editMethod === 'automatic'
+										? 'border-primary bg-primary/5'
+										: 'border-input hover:bg-muted/30'
+								)}
+							>
+								<input
+									type="radio"
+									name="edit-method"
+									value="automatic"
+									checked={editMethod === 'automatic'}
+									onchange={() => (editMethod = 'automatic')}
+									class="mt-1 size-4 shrink-0 border-primary text-primary focus:ring-primary"
+								/>
+								<div>
+									<span class="font-medium">Automatic</span>
+									<p class="mt-0.5 text-sm text-muted-foreground">
+										Customers will see this promotion at checkout
+									</p>
+								</div>
+							</label>
+						</div>
+					</div>
+					<div class="flex flex-col gap-2">
+						<span class="text-sm font-medium">Status</span>
+						<div class="flex flex-col gap-2">
+							<label
+								class={cn(
+									'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+									editStatus === 'draft'
+										? 'border-primary bg-primary/5'
+										: 'border-input hover:bg-muted/30'
+								)}
+							>
+								<input
+									type="radio"
+									name="edit-status"
+									value="draft"
+									checked={editStatus === 'draft'}
+									onchange={() => (editStatus = 'draft')}
+									class="mt-1 size-4 shrink-0 border-primary text-primary focus:ring-primary"
+								/>
+								<div>
+									<span class="font-medium">Draft</span>
+									<p class="mt-0.5 text-sm text-muted-foreground">
+										Customers will not be able to use the code yet
+									</p>
+								</div>
+							</label>
+							<label
+								class={cn(
+									'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+									editStatus === 'active'
+										? 'border-primary bg-primary/5'
+										: 'border-input hover:bg-muted/30'
+								)}
+							>
+								<input
+									type="radio"
+									name="edit-status"
+									value="active"
+									checked={editStatus === 'active'}
+									onchange={() => (editStatus = 'active')}
+									class="mt-1 size-4 shrink-0 border-primary text-primary focus:ring-primary"
+								/>
+								<div>
+									<span class="font-medium">Active</span>
+									<p class="mt-0.5 text-sm text-muted-foreground">
+										Customers will be able to use the code
+									</p>
+								</div>
+							</label>
+							<label
+								class={cn(
+									'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+									editStatus === 'inactive'
+										? 'border-primary bg-primary/5'
+										: 'border-input hover:bg-muted/30'
+								)}
+							>
+								<input
+									type="radio"
+									name="edit-status"
+									value="inactive"
+									checked={editStatus === 'inactive'}
+									onchange={() => (editStatus = 'inactive')}
+									class="mt-1 size-4 shrink-0 border-primary text-primary focus:ring-primary"
+								/>
+								<div>
+									<span class="font-medium">Inactive</span>
+									<p class="mt-0.5 text-sm text-muted-foreground">
+										Promotion is disabled
+									</p>
+								</div>
+							</label>
+						</div>
+					</div>
+				</div>
+			</div>
+			<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
+				<Button variant="outline" onclick={closeEdit}>Cancel</Button>
+				<Button onclick={saveEdit}>Save</Button>
+			</Sheet.Footer>
+		</div>
+	</Sheet.Content>
+</Sheet.Root>
+
+<DeleteConfirmationModal
+	bind:open={deleteModalOpen}
+	entityName="promotion"
+	entityTitle={promotionToDelete?.code ?? ''}
+	onConfirm={handleConfirmDelete}
+	onCancel={() => (promotionToDelete = null)}
+/>

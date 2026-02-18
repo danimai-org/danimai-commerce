@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import * as Sheet from '$lib/components/ui/sheet';
 	import { DropdownMenu } from 'bits-ui';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
-	import { getAccessToken } from '$lib/auth.js';
+	import Pencil from '@lucide/svelte/icons/pencil';
+	import { getAccessToken, user as userStore } from '$lib/auth.js';
 
 	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
 
@@ -13,71 +15,170 @@
 		firstName: string;
 		lastName: string;
 		email: string;
-		language: string;
 	};
 
 	let profile = $state<Profile>({
 		firstName: '',
 		lastName: '',
 		email: '',
-		language: 'English',
 	});
 
 	let loading = $state(true);
 	let editOpen = $state(false);
+	let saving = $state(false);
+	let saveError = $state<string | null>(null);
+	let userId = $state<string | null>(null);
 
 	let draftFirstName = $state('');
 	let draftLastName = $state('');
-	let draftLanguage = $state('English');
-
-	$effect(() => {
-		draftFirstName = profile.firstName;
-		draftLastName = profile.lastName;
-		draftLanguage = profile.language;
-	});
 
 	onMount(async () => {
 		const token = getAccessToken();
 		if (!token) return;
+		
+		// Initialize from user store as fallback
+		const storedUser = get(userStore);
+		if (storedUser?.id) {
+			userId = storedUser.id;
+		}
+		if (storedUser?.email) {
+			profile.email = storedUser.email;
+		}
+		
 		try {
 			const res = await fetch(`${API_BASE}/auth/me`, {
 				headers: { Authorization: `Bearer ${token}` },
 			});
 			if (res.ok) {
 				const user = (await res.json()) as {
+					id?: string;
 					first_name?: string | null;
 					last_name?: string | null;
-					email?: string;
+					email?: string | null;
 				};
+				if (user.id) {
+					userId = user.id;
+				}
+				// Ensure we handle null/undefined values correctly - convert null to empty string
 				profile = {
 					firstName: user.first_name ?? '',
 					lastName: user.last_name ?? '',
-					email: user.email ?? '',
-					language: profile.language,
+					email: user.email ?? storedUser?.email ?? '',
 				};
+			} else {
+				console.error('Failed to fetch profile on mount:', res.status, await res.text());
 			}
-		} catch {
-			/* ignore */
+		} catch (error) {
+			console.error('Error fetching profile on mount:', error);
 		} finally {
 			loading = false;
 		}
 	});
 
+	async function fetchProfile() {
+		const token = getAccessToken();
+		if (!token) return;
+		
+		const storedUser = get(userStore);
+		try {
+			const res = await fetch(`${API_BASE}/auth/me`, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
+			if (res.ok) {
+				const user = (await res.json()) as {
+					id?: string;
+					first_name?: string | null;
+					last_name?: string | null;
+					email?: string | null;
+				};
+				if (user.id) {
+					userId = user.id;
+				}
+				// Ensure we handle null/undefined values correctly - convert null to empty string
+				profile = {
+					firstName: user.first_name ?? '',
+					lastName: user.last_name ?? '',
+					email: user.email ?? storedUser?.email ?? '',
+				};
+			} else {
+				console.error('Failed to fetch profile:', res.status, await res.text());
+			}
+		} catch (error) {
+			console.error('Error fetching profile:', error);
+		}
+	}
+
 	function openEdit() {
 		draftFirstName = profile.firstName;
 		draftLastName = profile.lastName;
-		draftLanguage = profile.language;
 		editOpen = true;
 	}
 
-	function saveProfile() {
-		profile = {
-			...profile,
-			firstName: draftFirstName.trim(),
-			lastName: draftLastName.trim(),
-			language: draftLanguage,
-		};
-		editOpen = false;
+	async function saveProfile() {
+		if (!userId) return;
+		
+		saving = true;
+		saveError = null;
+		
+		try {
+			const token = getAccessToken();
+			if (!token) {
+				saveError = 'Not authenticated';
+				return;
+			}
+			
+			const trimmedFirstName = draftFirstName.trim();
+			const trimmedLastName = draftLastName.trim();
+			
+			// Send null for empty strings, otherwise send the trimmed value
+			const payload = {
+				first_name: trimmedFirstName === '' ? null : trimmedFirstName,
+				last_name: trimmedLastName === '' ? null : trimmedLastName,
+			};
+			
+			const res = await fetch(`${API_BASE}/users/${userId}`, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${token}`,
+				},
+				body: JSON.stringify(payload),
+			});
+			
+			if (!res.ok) {
+				const text = await res.text();
+				let msg = text;
+				try {
+					const j = JSON.parse(text);
+					msg = j.message ?? text;
+				} catch {}
+				throw new Error(msg);
+			}
+			
+			// Parse the response and update profile immediately
+			const updatedUser = (await res.json()) as {
+				id?: string;
+				first_name?: string | null;
+				last_name?: string | null;
+				email?: string | null;
+			};
+			
+			// Update profile state immediately from the response
+			// Convert null to empty string for consistent display
+			profile = {
+				firstName: updatedUser.first_name ?? '',
+				lastName: updatedUser.last_name ?? '',
+				email: updatedUser.email ?? profile.email,
+			};
+			
+			// Close the edit dialog
+			editOpen = false;
+		} catch (e) {
+			console.error('Error saving profile:', e);
+			saveError = e instanceof Error ? e.message : String(e);
+		} finally {
+			saving = false;
+		}
 	}
 
 </script>
@@ -119,6 +220,7 @@
 									class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
 									onSelect={openEdit}
 								>
+									<Pencil class="size-4" />
 									Edit
 								</DropdownMenu.Item>
 							</DropdownMenu.Content>
@@ -140,18 +242,16 @@
 						</div>
 					</div>
 					<div class="grid grid-cols-[160px,1fr] items-center px-6 py-3">
-						<div class="text-muted-foreground">Email</div>
+						<div class="text-muted-foreground">Email ID</div>
 						<div>
 							{#if loading}
 								<span class="text-muted-foreground">Loading…</span>
+							{:else if profile.email}
+								{profile.email}
 							{:else}
-								{profile.email || '-'}
+								-
 							{/if}
 						</div>
-					</div>
-					<div class="grid grid-cols-[160px,1fr] items-center px-6 py-3">
-						<div class="text-muted-foreground">Language</div>
-						<div>{profile.language}</div>
 					</div>
 				</div>
 			</div>
@@ -168,6 +268,11 @@
 					</p>
 				</div>
 				<div class="flex-1 space-y-6 overflow-auto p-6">
+					{#if saveError}
+						<div class="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+							{saveError}
+						</div>
+					{/if}
 					<div class="grid gap-4 md:grid-cols-2">
 						<div class="space-y-1">
 							<label class="block text-sm font-medium" for="first-name">First Name</label>
@@ -178,27 +283,19 @@
 							<Input id="last-name" bind:value={draftLastName} />
 						</div>
 					</div>
-					<div class="space-y-1">
-						<label class="block text-sm font-medium" for="language">Language</label>
-						<select
-							id="language"
-							class="border-input bg-background ring-offset-background placeholder:text-muted-foreground flex h-9 w-full min-w-0 rounded-md border px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-							bind:value={draftLanguage}
-						>
-							<option value="English">English</option>
-						</select>
-						<p class="text-xs text-muted-foreground">
-							The language you want to use in the admin dashboard. This doesn't change the language
-							of your store.
-						</p>
-					</div>
 				</div>
 				<div class="flex justify-end gap-2 border-t p-4">
-					<Button type="button" variant="outline" onclick={() => (editOpen = false)}>
+					<Button type="button" variant="outline" onclick={() => { 
+						editOpen = false; 
+						saveError = null;
+						// Reset draft values to current profile when canceling
+						draftFirstName = profile.firstName;
+						draftLastName = profile.lastName;
+					}} disabled={saving}>
 						Cancel
 					</Button>
-					<Button type="button" onclick={saveProfile}>
-						Save
+					<Button type="button" onclick={saveProfile} disabled={saving}>
+						{saving ? 'Saving...' : 'Save'}
 					</Button>
 				</div>
 			</div>

@@ -452,7 +452,7 @@
 			const res = await fetch(`${API_BASE}/products/${product.id}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ category_id: null })
+				body: JSON.stringify({ category_id: '' })
 			});
 			if (!res.ok) {
 				const text = await res.text();
