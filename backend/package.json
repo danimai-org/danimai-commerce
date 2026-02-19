@@ -20,6 +20,7 @@
     "@danimai/currency": "../packages/currency",
     "@danimai/customer": "../packages/customer",
     "@danimai/inventory": "../packages/inventory",
+    "@danimai/order": "../packages/order",
     "@danimai/product": "../packages/product",
     "@danimai/region": "../packages/region",
     "@danimai/sales-channel": "../packages/sales-channel",
