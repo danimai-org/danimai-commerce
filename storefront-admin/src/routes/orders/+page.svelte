@@ -1,10 +1,22 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import * as Select from '$lib/components/ui/select/index.js';
 	import Search from '@lucide/svelte/icons/search';
 	import ShoppingCart from '@lucide/svelte/icons/shopping-cart';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+	import FileText from '@lucide/svelte/icons/file-text';
+	import Globe from '@lucide/svelte/icons/globe';
+	import Pencil from '@lucide/svelte/icons/pencil';
+	import Link2 from '@lucide/svelte/icons/link-2';
+	import Info from '@lucide/svelte/icons/info';
+	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+	import X from '@lucide/svelte/icons/x';
+	import ChevronDown from '@lucide/svelte/icons/chevron-down';
+	import { DropdownMenu } from 'bits-ui';
+	import { cn } from '$lib/utils.js';
 
 	const API_BASE =
 		import.meta.env.VITE_API_BASE ??
@@ -116,6 +128,161 @@
 				return `${base} bg-muted text-muted-foreground`;
 		}
 	}
+
+	// Create order dialog
+	type OrderItem = {
+		id: string;
+		title: string;
+		price: number;
+		quantity: number;
+		currency: string;
+	};
+
+	let createOrderOpen = $state(false);
+	let productSearch = $state('');
+	let customerSearch = $state('');
+	let selectedRegion = $state<string>('');
+	let selectedCurrency = $state<string>('');
+	let notes = $state('');
+	let tags = $state('');
+	let orderItems = $state<OrderItem[]>([]);
+	let discountAmount = $state<number>(0);
+	let shippingAmount = $state<number>(0);
+	let taxAmount = $state<number>(0);
+	let paymentDueLater = $state(false);
+	let selectedCustomer = $state<{
+		id: string;
+		name: string;
+		email: string;
+		phone: string | null;
+		orderCount: number;
+	} | null>(null);
+	let regions = $state<{ id: string; name: string; currency_code: string }[]>([]);
+	let currencies = $state<{ id: string; code: string; name: string; symbol: string }[]>([]);
+	let regionsLoading = $state(false);
+	let currenciesLoading = $state(false);
+
+	const subtotal = $derived(
+		orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+	);
+	const total = $derived(subtotal + discountAmount + shippingAmount + taxAmount);
+	const itemCount = $derived(orderItems.reduce((sum, item) => sum + item.quantity, 0));
+
+	function openCreateOrder() {
+		createOrderOpen = true;
+		productSearch = '';
+		customerSearch = '';
+		selectedRegion = '';
+		selectedCurrency = '';
+		notes = '';
+		tags = '';
+		orderItems = [];
+		discountAmount = 0;
+		shippingAmount = 0;
+		taxAmount = 0;
+		paymentDueLater = false;
+		selectedCustomer = null;
+		fetchRegions();
+		fetchCurrencies();
+	}
+
+	function addOrderItem(item: OrderItem) {
+		orderItems = [...orderItems, item];
+		// Calculate tax when items are added (simplified - 9% CGST)
+		if (orderItems.length > 0) {
+			taxAmount = Math.round(subtotal * 0.09 * 100) / 100;
+		}
+	}
+
+	function removeOrderItem(id: string) {
+		orderItems = orderItems.filter((item) => item.id !== id);
+		if (orderItems.length === 0) {
+			taxAmount = 0;
+		} else {
+			taxAmount = Math.round(subtotal * 0.09 * 100) / 100;
+		}
+	}
+
+	function updateItemQuantity(id: string, quantity: number) {
+		orderItems = orderItems.map((item) =>
+			item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item
+		);
+		taxAmount = Math.round(subtotal * 0.09 * 100) / 100;
+	}
+
+	function formatCurrency(amount: number): string {
+		const symbol = selectedCurrencyData?.symbol || '₹';
+		return `${symbol}${amount.toFixed(2)}`;
+	}
+
+	// Demo function to add sample items (for testing)
+	function addSampleItems() {
+		if (orderItems.length === 0) {
+			orderItems = [
+				{
+					id: '1',
+					title: 'Gift Card',
+					price: 100,
+					quantity: 1,
+					currency: selectedCurrency || 'INR'
+				},
+				{
+					id: '2',
+					title: 'The Multi-location Snowboard',
+					price: 729.95,
+					quantity: 1,
+					currency: selectedCurrency || 'INR'
+				}
+			];
+			taxAmount = Math.round(subtotal * 0.09 * 100) / 100;
+		}
+	}
+
+	function closeCreateOrder() {
+		createOrderOpen = false;
+	}
+
+	async function fetchRegions() {
+		regionsLoading = true;
+		try {
+			const res = await fetch(`${API_BASE}/regions?limit=100`, { cache: 'no-store' });
+			if (res.ok) {
+				const json = (await res.json()) as { data: { id: string; name: string; currency_code: string }[] };
+				regions = json.data;
+				if (regions.length > 0 && !selectedRegion) {
+					selectedRegion = regions[0].id;
+					selectedCurrency = regions[0].currency_code;
+				}
+			}
+		} catch (e) {
+			console.error('Failed to fetch regions:', e);
+		} finally {
+			regionsLoading = false;
+		}
+	}
+
+	async function fetchCurrencies() {
+		currenciesLoading = true;
+		try {
+			const res = await fetch(`${API_BASE}/currencies?limit=100`, { cache: 'no-store' });
+			if (res.ok) {
+				const json = (await res.json()) as {
+					data: { id: string; code: string; name: string; symbol: string }[];
+				};
+				currencies = json.data;
+			}
+		} catch (e) {
+			console.error('Failed to fetch currencies:', e);
+		} finally {
+			currenciesLoading = false;
+		}
+	}
+
+	const selectedRegionData = $derived(regions.find((r) => r.id === selectedRegion));
+	const selectedCurrencyData = $derived(
+		currencies.find((c) => c.code === selectedCurrency) ||
+			currencies.find((c) => c.code === selectedRegionData?.currency_code)
+	);
 </script>
 
 <div class="flex h-full flex-col">
@@ -125,6 +292,7 @@
 				<ShoppingCart class="size-4" />
 				<span class="font-semibold">Orders</span>
 			</div>
+			<Button size="sm" onclick={openCreateOrder}>Create</Button>
 		</div>
 		<div class="mb-6 flex flex-col gap-4">
 			<div class="flex flex-wrap items-center justify-between gap-2">
@@ -249,3 +417,331 @@
 		{/if}
 	</div>
 </div>
+
+<!-- Create Order Dialog -->
+<Dialog.Root bind:open={createOrderOpen}>
+	<Dialog.Content class="h-full w-full">
+		<div class="flex h-full flex-col bg-muted/30">
+			<!-- Header with breadcrumb -->
+			<div class="flex shrink-0 items-center gap-2 border-b bg-background px-6 py-4">
+				<div class="flex items-center gap-2 text-sm text-muted-foreground">
+					<FileText class="size-4" />
+					<span>></span>
+					<span class="text-foreground">Create order</span>
+				</div>
+			</div>
+
+			<!-- Main content -->
+			<div class="flex min-h-0 flex-1 gap-6 overflow-auto p-6">
+				<!-- Left Column -->
+				<div class="flex min-w-0 flex-1 flex-col gap-6">
+					<!-- Products Card -->
+					<div class="rounded-lg border bg-card p-4">
+						<div class="mb-4 flex items-center justify-between">
+							<h3 class="text-sm font-semibold">Products</h3>
+							<button
+								type="button"
+								class="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+							>
+								<MoreHorizontal class="size-4" />
+							</button>
+						</div>
+						<div class="flex flex-col gap-3">
+							<div class="relative">
+								<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+								<Input
+									type="search"
+									placeholder="Search products"
+									bind:value={productSearch}
+									class="h-9 rounded-md pl-9"
+								/>
+							</div>
+							<div class="flex gap-2">
+								<Button variant="outline" size="sm" class="flex-1">
+									Browse
+								</Button>
+								<Button variant="outline" size="sm" class="flex-1">
+									Add custom item
+								</Button>
+							</div>
+							{#if orderItems.length > 0}
+								<div class="mt-4 border-t pt-4">
+									<div class="mb-2 grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground">
+										<div class="col-span-6">Product</div>
+										<div class="col-span-3 text-center">Quantity</div>
+										<div class="col-span-3 text-right">Total</div>
+									</div>
+									<div class="flex flex-col gap-2">
+										{#each orderItems as item (item.id)}
+											<div class="grid grid-cols-12 items-center gap-4 rounded-md border p-2">
+												<div class="col-span-6">
+													<div class="text-sm font-medium">{item.title}</div>
+													<div class="text-xs text-muted-foreground">{formatCurrency(item.price)}</div>
+												</div>
+												<div class="col-span-3">
+													<Input
+														type="number"
+														min="1"
+														value={item.quantity}
+														oninput={(e) =>
+															updateItemQuantity(item.id, Number((e.target as HTMLInputElement).value))}
+														class="h-8 text-center"
+													/>
+												</div>
+												<div class="col-span-2 text-right text-sm font-medium">
+													{formatCurrency(item.price * item.quantity)}
+												</div>
+												<div class="col-span-1">
+													<button
+														type="button"
+														onclick={() => removeOrderItem(item.id)}
+														class="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+													>
+														<X class="size-4" />
+													</button>
+												</div>
+											</div>
+										{/each}
+									</div>
+								</div>
+							{/if}
+						</div>
+					</div>
+
+					<!-- Payment Card -->
+					<div class="rounded-lg border bg-card p-4">
+						<h3 class="mb-4 text-sm font-semibold">Payment</h3>
+						<div class="flex flex-col gap-3">
+							<div class="flex items-center justify-between text-sm">
+								<span class="text-muted-foreground">
+									Subtotal {itemCount > 0 ? `(${itemCount} ${itemCount === 1 ? 'item' : 'items'})` : ''}
+								</span>
+								<span class="font-medium">{formatCurrency(subtotal)}</span>
+							</div>
+							<button
+								type="button"
+								class="flex items-center justify-between text-sm text-muted-foreground transition-colors hover:text-foreground"
+								onclick={() => {
+									// TODO: Open discount dialog
+								}}
+							>
+								<span>Add discount</span>
+								<span>{discountAmount === 0 ? '—' : formatCurrency(discountAmount)}</span>
+							</button>
+							<button
+								type="button"
+								class="flex items-center justify-between text-sm text-muted-foreground transition-colors hover:text-foreground"
+								onclick={() => {
+									// TODO: Open shipping dialog
+								}}
+							>
+								<span>Add shipping or delivery</span>
+								<span>{shippingAmount === 0 ? '—' : formatCurrency(shippingAmount)}</span>
+							</button>
+							<div class="flex items-center justify-between text-sm">
+								<div class="flex items-center gap-1">
+									<span class="text-muted-foreground">Estimated tax</span>
+									<Info class="size-3.5 text-muted-foreground" />
+								</div>
+								{#if taxAmount > 0}
+									<div class="text-right">
+										<div class="text-xs text-muted-foreground">CGST 9%</div>
+										<div class="font-medium">{formatCurrency(taxAmount)}</div>
+									</div>
+								{:else}
+									<span class="text-muted-foreground">Not calculated</span>
+								{/if}
+							</div>
+							<div class="border-t pt-3">
+								<div class="flex items-center justify-between text-sm font-semibold">
+									<span>Total</span>
+									<span>{formatCurrency(total)}</span>
+								</div>
+							</div>
+						</div>
+						{#if orderItems.length > 0}
+							<div class="mt-4 flex flex-col gap-3">
+								<label class="flex items-center gap-2 text-sm">
+									<input
+										type="checkbox"
+										bind:checked={paymentDueLater}
+										class="rounded border-input"
+									/>
+									<span>Payment due later</span>
+								</label>
+								<div class="flex gap-2">
+									<Button variant="outline" size="sm" class="flex-1">
+										Send invoice
+									</Button>
+									<DropdownMenu.Root>
+										<DropdownMenu.Trigger
+											class="flex flex-1 items-center justify-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90"
+										>
+											Collect payment
+											<ChevronDown class="ml-1 size-4" />
+										</DropdownMenu.Trigger>
+										<DropdownMenu.Portal>
+											<DropdownMenu.Content
+												class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+											>
+												<DropdownMenu.Item>Credit card</DropdownMenu.Item>
+												<DropdownMenu.Item>Mark as paid</DropdownMenu.Item>
+											</DropdownMenu.Content>
+										</DropdownMenu.Portal>
+									</DropdownMenu.Root>
+								</div>
+							</div>
+						{:else}
+							<p class="mt-4 text-xs text-muted-foreground">
+								Add a product to calculate total and view payment options
+							</p>
+						{/if}
+					</div>
+				</div>
+
+				<!-- Right Column -->
+				<div class="flex w-80 flex-col gap-6">
+					<!-- Notes Card -->
+					<div class="rounded-lg border bg-card p-4">
+						<div class="mb-4 flex items-center justify-between">
+							<h3 class="text-sm font-semibold">Notes</h3>
+							<button
+								type="button"
+								class="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+							>
+								<Pencil class="size-3.5" />
+							</button>
+						</div>
+						<p class="text-sm text-muted-foreground">No notes</p>
+					</div>
+
+					<!-- Customer Card -->
+					<div class="rounded-lg border bg-card p-4">
+						<div class="mb-4 flex items-center justify-between">
+							<h3 class="text-sm font-semibold">Customer</h3>
+							<button
+								type="button"
+								class="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+							>
+								<MoreHorizontal class="size-4" />
+							</button>
+						</div>
+						{#if selectedCustomer}
+							<div class="flex flex-col gap-3">
+								<div>
+									<button
+										type="button"
+										class="text-sm font-medium text-primary hover:underline"
+										onclick={() => {
+											// TODO: Navigate to customer
+										}}
+									>
+										{selectedCustomer.name}
+									</button>
+									<div class="mt-1 text-xs text-muted-foreground">
+										{selectedCustomer.orderCount === 0
+											? 'No orders'
+											: `${selectedCustomer.orderCount} ${selectedCustomer.orderCount === 1 ? 'order' : 'orders'}`}
+									</div>
+								</div>
+								<div class="space-y-1 text-sm">
+									<div>
+										<button
+											type="button"
+											class="text-muted-foreground hover:text-foreground hover:underline"
+											onclick={() => {
+												// TODO: Open email
+											}}
+										>
+											{selectedCustomer.email}
+										</button>
+									</div>
+									{#if selectedCustomer.phone}
+										<div class="text-muted-foreground">{selectedCustomer.phone}</div>
+									{/if}
+								</div>
+								<div class="space-y-1 text-sm">
+									<div class="text-muted-foreground">No shipping address provided</div>
+									<div class="text-muted-foreground">Same as shipping address</div>
+								</div>
+							</div>
+						{:else}
+							<div class="relative">
+								<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+								<Input
+									type="search"
+									placeholder="Search or create a customer"
+									bind:value={customerSearch}
+									class="h-9 rounded-md pl-9"
+								/>
+							</div>
+						{/if}
+					</div>
+
+					<!-- Markets Card -->
+					<div class="rounded-lg border bg-card p-4">
+						<div class="mb-4 flex items-center justify-between">
+							<h3 class="text-sm font-semibold">Markets</h3>
+							<button
+								type="button"
+								class="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+							>
+								<Link2 class="size-3.5" />
+							</button>
+						</div>
+						<div class="flex flex-col gap-3">
+							{#if selectedRegionData}
+								<div class="inline-flex items-center gap-1.5 rounded-full border bg-muted/50 px-2.5 py-1 text-xs">
+									<Globe class="size-3.5" />
+									<span>{selectedRegionData.name}</span>
+								</div>
+							{/if}
+							<div class="flex flex-col gap-2">
+								<span class="text-xs text-muted-foreground">Currency</span>
+								<Select.Root
+									type="single"
+									value={selectedCurrency}
+									onValueChange={(v) => {
+										if (v) selectedCurrency = v;
+									}}
+								>
+									<Select.Trigger class="h-9 w-full">
+										{selectedCurrencyData
+											? `${selectedCurrencyData.name} (${selectedCurrencyData.code} ${selectedCurrencyData.symbol})`
+											: 'Select currency'}
+									</Select.Trigger>
+									<Select.Content>
+										{#each currencies as currency (currency.id)}
+											<Select.Item value={currency.code} label={`${currency.name} (${currency.code} ${currency.symbol})`}>
+												{currency.name} ({currency.code} {currency.symbol})
+											</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+							</div>
+						</div>
+					</div>
+
+					<!-- Tags Card -->
+					<div class="rounded-lg border bg-card p-4">
+						<div class="mb-4 flex items-center justify-between">
+							<h3 class="text-sm font-semibold">Tags</h3>
+							<button
+								type="button"
+								class="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+							>
+								<Pencil class="size-3.5" />
+							</button>
+						</div>
+						<Input
+							type="text"
+							placeholder="Add tags"
+							bind:value={tags}
+							class="h-9 rounded-md"
+						/>
+					</div>
+				</div>
+			</div>
+		</div>
+	</Dialog.Content>
+</Dialog.Root>

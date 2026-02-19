@@ -2,32 +2,32 @@ import { Elysia } from "elysia";
 import { DANIMAI_LOGGER, getService } from "@danimai/core";
 import type { Logger } from "@logtape/logtape";
 import {
-  PAGINATED_CUSTOMERS_PROCESS,
-  CREATE_CUSTOMERS_PROCESS,
-  PaginatedCustomersProcess,
-  CreateCustomersProcess,
-  type PaginatedCustomersProcessInput,
-  type CreateCustomersProcessInput,
-  PaginatedCustomersSchema,
-  CreateCustomersSchema,
+  PAGINATED_CUSTOMER_GROUPS_PROCESS,
+  CREATE_CUSTOMER_GROUPS_PROCESS,
+  PaginatedCustomerGroupsProcess,
+  CreateCustomerGroupsProcess,
+  type PaginatedCustomerGroupsProcessInput,
+  type CreateCustomerGroupsProcessInput,
+  PaginatedCustomerGroupsSchema,
+  CreateCustomerGroupsSchema,
 } from "@danimai/customer";
 import { handleProcessError } from "../utils/error-handler";
 import Value from "typebox/value";
 
-export const customerRoutes = new Elysia({ prefix: "/customers" })
+export const customerGroupRoutes = new Elysia({ prefix: "/customer-groups" })
   .get(
     "/",
     async ({ query, set }) => {
       try {
-        const process = getService<PaginatedCustomersProcess>(
-          PAGINATED_CUSTOMERS_PROCESS
+        const process = getService<PaginatedCustomerGroupsProcess>(
+          PAGINATED_CUSTOMER_GROUPS_PROCESS
         );
         const logger = getService<Logger>(DANIMAI_LOGGER);
         const result = await process.runOperations({
           input: Value.Convert(
-            PaginatedCustomersSchema,
+            PaginatedCustomerGroupsSchema,
             query
-          ) as PaginatedCustomersProcessInput,
+          ) as PaginatedCustomerGroupsProcessInput,
           logger,
         });
         return result;
@@ -37,9 +37,9 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
     },
     {
       detail: {
-        tags: ["customers"],
-        summary: "Get paginated customers",
-        description: "Gets a paginated list of customers",
+        tags: ["customer-groups"],
+        summary: "Get paginated customer groups",
+        description: "Gets a paginated list of customer groups",
         parameters: [
           { name: "page", in: "query", required: false, schema: { type: "number" } },
           { name: "limit", in: "query", required: false, schema: { type: "number" } },
@@ -53,9 +53,9 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
     "/",
     async ({ body, set }) => {
       try {
-        const process = getService<CreateCustomersProcess>(CREATE_CUSTOMERS_PROCESS);
+        const process = getService<CreateCustomerGroupsProcess>(CREATE_CUSTOMER_GROUPS_PROCESS);
         const logger = getService<Logger>(DANIMAI_LOGGER);
-        const input = Value.Convert(CreateCustomersSchema, body) as CreateCustomersProcessInput;
+        const input = Value.Convert(CreateCustomerGroupsSchema, body) as CreateCustomerGroupsProcessInput;
         const result = await process.runOperations({ input, logger });
         return result;
       } catch (err) {
@@ -64,19 +64,16 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
     },
     {
       detail: {
-        tags: ["customers"],
-        summary: "Create customer(s)",
-        description: "Creates one or more customers",
+        tags: ["customer-groups"],
+        summary: "Create customer group(s)",
+        description: "Creates one or more customer groups",
         requestBody: {
           content: {
             "application/json": {
               example: {
-                customers: [
+                customer_groups: [
                   {
-                    email: "customer@example.com",
-                    first_name: "John",
-                    last_name: "Doe",
-                    phone: "+1234567890",
+                    name: "VIP Customers",
                   },
                 ],
               },

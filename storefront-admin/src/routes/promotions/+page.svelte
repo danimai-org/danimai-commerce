@@ -19,6 +19,7 @@
 		code: string;
 		method: 'Automatic' | 'Manual';
 		status: 'Active' | 'Inactive' | 'Draft';
+		campaign_id?: string | null;
 	};
 
 	type PromotionTypeId =
@@ -90,17 +91,20 @@
 
 	// In-memory state with localStorage persistence
 	let promotions = $state<Promotion[]>(loadPromotions());
+	let campaigns = $state<Campaign[]>(loadCampaigns());
 	let searchQuery = $state('');
 	let page = $state(1);
 	const limit = 10;
 
 	const filtered = $derived(
 		searchQuery.trim()
-			? promotions.filter(
-					(p) =>
-						p.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-						p.method.toLowerCase().includes(searchQuery.toLowerCase())
-				)
+			? promotions.filter((p) => {
+					const codeMatch = p.code?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false;
+					const methodMatch = p.method.toLowerCase().includes(searchQuery.toLowerCase());
+					const campaign = p.campaign_id ? campaigns.find(c => c.id === p.campaign_id) : null;
+					const campaignMatch = campaign ? campaign.name.toLowerCase().includes(searchQuery.toLowerCase()) : false;
+					return codeMatch || methodMatch || campaignMatch;
+				})
 			: promotions
 	);
 	const total = $derived(filtered.length);
@@ -114,12 +118,20 @@
 	let createStep = $state(1);
 	let createType = $state<PromotionTypeId>('amount_off_products');
 
+	// Details promotion flow
+	let detailsOpen = $state(false);
+	let viewingPromotion = $state<Promotion | null>(null);
+
 	// Edit promotion flow
 	let editOpen = $state(false);
 	let editingPromotion = $state<Promotion | null>(null);
 	let editCode = $state('');
 	let editMethod = $state<'promotion_code' | 'automatic'>('promotion_code');
 	let editStatus = $state<'draft' | 'active' | 'inactive'>('draft');
+	let editValueType = $state<'fixed' | 'percentage'>('fixed');
+	let editAmount = $state<number | ''>('');
+	let editAllocation = $state<'each' | 'across' | 'once'>('each');
+	let editMaxQuantity = $state<number | ''>(1);
 
 	// Delete confirmation
 	let deleteModalOpen = $state(false);
@@ -139,6 +151,82 @@
 	let detailShippingConditions = $state<CodeCondition[]>([]);
 
 	// Step 3 - Campaign
+	type Campaign = {
+		id: string;
+		name: string;
+		description: string | null;
+		identifier: string;
+		start_date: string | null;
+		end_date: string | null;
+	};
+
+	function loadCampaigns(): Campaign[] {
+		if (typeof window === 'undefined') {
+			return [
+				{
+					id: '1',
+					name: 'Big Bang sale',
+					description: null,
+					identifier: 'BIGBANG',
+					start_date: null,
+					end_date: null
+				}
+			];
+		}
+		try {
+			const stored = localStorage.getItem('campaigns');
+			if (stored) {
+				return JSON.parse(stored);
+			}
+		} catch (e) {
+			console.error('Failed to load campaigns from localStorage:', e);
+		}
+		return [
+			{
+				id: '1',
+				name: 'Big Bang sale',
+				description: null,
+				identifier: 'BIGBANG',
+				start_date: null,
+				end_date: null
+			}
+		];
+	}
+
+	function saveCampaignsToStorage(camps: Campaign[]) {
+		if (typeof window !== 'undefined') {
+			try {
+				localStorage.setItem('campaigns', JSON.stringify(camps));
+			} catch (e) {
+				console.error('Failed to save campaigns to localStorage:', e);
+			}
+		}
+	}
+
+	let availableCampaigns = $state<Campaign[]>(loadCampaigns());
+	let campaignSearchQuery = $state('');
+	let selectedCampaignId = $state<string | null>(null);
+
+	const filteredCampaigns = $derived(
+		campaignSearchQuery.trim()
+			? availableCampaigns.filter(
+					(c) =>
+						c.name.toLowerCase().includes(campaignSearchQuery.toLowerCase()) ||
+						c.identifier.toLowerCase().includes(campaignSearchQuery.toLowerCase()) ||
+						(c.description?.toLowerCase().includes(campaignSearchQuery.toLowerCase()) ?? false)
+				)
+			: availableCampaigns
+	);
+
+	function formatDate(value: string | null) {
+		if (!value) return '';
+		return new Date(value).toLocaleDateString('en-US', {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric'
+		});
+	}
+
 	let campaignChoice = $state<'without' | 'existing' | 'new'>('new');
 	let campaignName = $state('');
 	let campaignIdentifier = $state('');
@@ -186,6 +274,10 @@
 		campaignEndDate = '';
 		campaignBudgetType = 'usage';
 		campaignBudgetLimit = '';
+		availableCampaigns = loadCampaigns();
+		campaigns = loadCampaigns();
+		campaignSearchQuery = '';
+		selectedCampaignId = null;
 	}
 
 	function closeCreate() {
@@ -207,7 +299,38 @@
 			return;
 		}
 
-		// Create new promotion
+		// Handle campaign creation/selection
+		let campaignId: string | null = null;
+		if (campaignChoice === 'new') {
+			// Validate campaign name
+			if (!campaignName.trim()) {
+				return;
+			}
+			
+			// Create new campaign
+			const newCampaign: Campaign = {
+				id: crypto.randomUUID(),
+				name: campaignName.trim(),
+				description: campaignDescription.trim() || null,
+				identifier: campaignIdentifier.trim() || campaignName.trim().toUpperCase().replace(/\s+/g, '_'),
+				start_date: campaignStartDate || null,
+				end_date: campaignEndDate || null
+			};
+			
+			campaignId = newCampaign.id;
+			// Add campaign to campaigns array
+			availableCampaigns = [...availableCampaigns, newCampaign];
+			campaigns = [...campaigns, newCampaign];
+			saveCampaignsToStorage(availableCampaigns);
+		} else if (campaignChoice === 'existing') {
+			// Validate campaign selection
+			if (!selectedCampaignId) {
+				return;
+			}
+			campaignId = selectedCampaignId;
+		}
+
+		// Create new promotion (always add to promotions list regardless of campaign)
 		const newPromotion: Promotion = {
 			id: crypto.randomUUID(),
 			code: detailMethod === 'promotion_code' ? detailCode.trim() : '',
@@ -217,10 +340,11 @@
 					? 'Active'
 					: detailStatus === 'draft'
 						? 'Draft'
-						: 'Inactive'
+						: 'Inactive',
+			campaign_id: campaignId || null
 		};
 
-		// Add to promotions array
+		// Always add promotion to promotions array
 		promotions = [...promotions, newPromotion];
 		savePromotionsToStorage(promotions);
 
@@ -282,12 +406,26 @@
 		detailShippingConditions = detailShippingConditions.filter((c) => c.id !== id);
 	}
 
+	function openDetails(p: Promotion) {
+		viewingPromotion = p;
+		detailsOpen = true;
+	}
+
+	function closeDetails() {
+		detailsOpen = false;
+		viewingPromotion = null;
+	}
+
 	function openEdit(p: Promotion) {
 		editingPromotion = p;
 		editCode = p.code;
 		editMethod = p.method === 'Manual' ? 'promotion_code' : 'automatic';
 		editStatus =
 			p.status === 'Active' ? 'active' : p.status === 'Inactive' ? 'inactive' : 'draft';
+		editValueType = 'fixed';
+		editAmount = 334.00;
+		editAllocation = 'each';
+		editMaxQuantity = 1;
 		editOpen = true;
 	}
 
@@ -319,6 +457,8 @@
 
 	$effect(() => {
 		if (!editOpen) editingPromotion = null;
+		// Reload campaigns when they change
+		campaigns = loadCampaigns();
 	});
 
 	function deletePromotion(p: Promotion) {
@@ -383,6 +523,7 @@
 					<tr>
 						<th class="px-4 py-3 text-left font-medium">Code</th>
 						<th class="px-4 py-3 text-left font-medium">Method</th>
+						<th class="px-4 py-3 text-left font-medium">Campaign</th>
 						<th class="px-4 py-3 text-left font-medium">Status</th>
 						<th class="w-10 px-4 py-3"></th>
 					</tr>
@@ -390,7 +531,7 @@
 				<tbody>
 					{#if pageData.length === 0}
 						<tr>
-							<td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
+							<td colspan="5" class="px-4 py-8 text-center text-muted-foreground">
 								No promotions found.
 							</td>
 						</tr>
@@ -401,12 +542,27 @@
 									<button
 										type="button"
 										class="font-medium text-foreground hover:underline"
-										onclick={() => openEdit(promotion)}
+										onclick={() => openDetails(promotion)}
 									>
-										{promotion.code}
+										{promotion.code || '-'}
 									</button>
 								</td>
 								<td class="px-4 py-3 text-muted-foreground">{promotion.method}</td>
+								<td class="px-4 py-3 text-muted-foreground">
+									{#if promotion.campaign_id}
+										{@const campaign = campaigns.find(c => c.id === promotion.campaign_id)}
+										{#if campaign}
+											<span class="inline-flex items-center gap-1.5">
+												<Folder class="size-3" />
+												{campaign.name}
+											</span>
+										{:else}
+											<span class="text-muted-foreground">-</span>
+										{/if}
+									{:else}
+										<span class="text-muted-foreground">-</span>
+									{/if}
+								</td>
 								<td class="px-4 py-3">
 									<span
 										class={cn(
@@ -1108,8 +1264,79 @@
 						</div>
 
 						{#if campaignChoice === 'existing'}
-							<div class="rounded-lg border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-								Select an existing campaign (dropdown when API available).
+							<div class="flex flex-col gap-4 border-t pt-6">
+								<div>
+									<h3 class="text-sm font-semibold">Select Campaign</h3>
+									<p class="mt-0.5 text-sm text-muted-foreground">
+										Choose an existing campaign to associate with this promotion.
+									</p>
+								</div>
+
+								<div class="flex flex-col gap-4">
+									<div class="relative w-full">
+										<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+										<Input
+											type="search"
+											placeholder="Search campaigns..."
+											bind:value={campaignSearchQuery}
+											class="h-9 rounded-md pl-9"
+										/>
+									</div>
+
+									<div class="max-h-96 overflow-auto rounded-lg border bg-card">
+										<table class="w-full text-sm">
+											<thead class="sticky top-0 border-b bg-muted/50">
+												<tr>
+													<th class="px-4 py-3 text-left font-medium">Name</th>
+													<th class="px-4 py-3 text-left font-medium">Identifier</th>
+													<th class="px-4 py-3 text-left font-medium">Start date</th>
+													<th class="px-4 py-3 text-left font-medium">End date</th>
+												</tr>
+											</thead>
+											<tbody>
+												{#if filteredCampaigns.length === 0}
+													<tr>
+														<td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
+															No campaigns found.
+														</td>
+													</tr>
+												{:else}
+													{#each filteredCampaigns as campaign (campaign.id)}
+														<tr
+															class={cn(
+																'border-b transition-colors cursor-pointer',
+																selectedCampaignId === campaign.id
+																	? 'bg-primary/10 hover:bg-primary/15'
+																	: 'hover:bg-muted/30'
+															)}
+															onclick={() => (selectedCampaignId = campaign.id)}
+														>
+															<td class="px-4 py-3 font-medium">{campaign.name}</td>
+															<td class="px-4 py-3 text-muted-foreground">
+																{campaign.identifier}
+															</td>
+															<td class="px-4 py-3 text-muted-foreground">
+																{formatDate(campaign.start_date) || '-'}
+															</td>
+															<td class="px-4 py-3 text-muted-foreground">
+																{formatDate(campaign.end_date) || '-'}
+															</td>
+														</tr>
+													{/each}
+												{/if}
+											</tbody>
+										</table>
+									</div>
+
+									{#if selectedCampaignId}
+										<div class="rounded-md border border-primary/50 bg-primary/5 px-3 py-2 text-sm">
+											<span class="font-medium">Selected:</span>
+											<span class="ml-2">
+												{availableCampaigns.find((c) => c.id === selectedCampaignId)?.name}
+											</span>
+										</div>
+									{/if}
+								</div>
 							</div>
 						{/if}
 
@@ -1270,12 +1497,186 @@
 	</Sheet.Content>
 </Sheet.Root>
 
+<!-- Details Promotion Sheet -->
+<Sheet.Root bind:open={detailsOpen}>
+	<Sheet.Content side="right" class="w-full max-w-2xl sm:max-w-2xl">
+		<div class="flex h-full flex-col">
+			<Sheet.Header class="flex flex-col gap-1 border-b px-6 py-4">
+				<div class="flex items-center justify-between">
+					<div>
+						<h2 class="text-lg font-semibold">Promotion Details</h2>
+						<p class="text-sm text-muted-foreground">View promotion information.</p>
+					</div>
+					{#if viewingPromotion}
+						<span
+							class={cn(
+								'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium capitalize',
+								viewingPromotion.status === 'Active' &&
+									'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400',
+								viewingPromotion.status === 'Inactive' &&
+									'bg-muted text-muted-foreground',
+								viewingPromotion.status === 'Draft' &&
+									'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
+							)}
+						>
+							{#if viewingPromotion.status === 'Active'}
+								<span
+									class="size-1.5 shrink-0 rounded-full bg-green-500"
+									aria-hidden="true"
+								></span>
+							{:else if viewingPromotion.status === 'Draft'}
+								<span
+									class="size-1.5 shrink-0 rounded-full bg-amber-500"
+									aria-hidden="true"
+								></span>
+							{:else if viewingPromotion.status === 'Inactive'}
+								<span
+									class="size-1.5 shrink-0 rounded-full bg-muted-foreground"
+									aria-hidden="true"
+								></span>
+							{/if}
+							{viewingPromotion.status}
+						</span>
+					{/if}
+				</div>
+			</Sheet.Header>
+			<div class="flex-1 overflow-auto px-6 py-6">
+				{#if viewingPromotion}
+					<div class="flex flex-col gap-8">
+						<!-- Overview Section -->
+						<div class="flex flex-col gap-4">
+							<h3 class="text-sm font-semibold">Overview</h3>
+							<div class="grid grid-cols-2 gap-4">
+								<div class="flex flex-col gap-2">
+									<div class="text-sm font-medium text-muted-foreground">Code</div>
+									<p class="text-sm font-medium">{viewingPromotion.code || '-'}</p>
+								</div>
+								<div class="flex flex-col gap-2">
+									<div class="text-sm font-medium text-muted-foreground">Method</div>
+									<p class="text-sm">{viewingPromotion.method}</p>
+								</div>
+							</div>
+						</div>
+
+						<!-- Configuration Section -->
+						<div class="flex flex-col gap-4">
+							<h3 class="text-sm font-semibold">Configuration</h3>
+							<div class="rounded-lg border bg-muted/30 p-4">
+								<div class="flex flex-col gap-4">
+									<div class="grid grid-cols-2 gap-4">
+										<div class="flex flex-col gap-2">
+											<div class="text-sm font-medium text-muted-foreground">Type</div>
+											<p class="text-sm">-</p>
+										</div>
+										<div class="flex flex-col gap-2">
+											<div class="text-sm font-medium text-muted-foreground">Value</div>
+											<p class="text-sm">-</p>
+										</div>
+									</div>
+									<div class="grid grid-cols-2 gap-4">
+										<div class="flex flex-col gap-2">
+											<div class="text-sm font-medium text-muted-foreground">Currency</div>
+											<p class="text-sm">-</p>
+										</div>
+										<div class="flex flex-col gap-2">
+											<div class="text-sm font-medium text-muted-foreground">Max Quantity</div>
+											<p class="text-sm">-</p>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<!-- Conditions Section -->
+						<div class="flex flex-col gap-4">
+							<h3 class="text-sm font-semibold">Conditions</h3>
+							<div class="flex flex-col gap-4">
+								<div class="rounded-lg border bg-muted/30 p-4">
+									<div class="flex flex-col gap-2">
+										<div class="text-sm font-medium">Code Conditions</div>
+										<p class="text-sm text-muted-foreground">No conditions set</p>
+									</div>
+								</div>
+								<div class="rounded-lg border bg-muted/30 p-4">
+									<div class="flex flex-col gap-2">
+										<div class="text-sm font-medium">Item Conditions</div>
+										<p class="text-sm text-muted-foreground">No conditions set</p>
+									</div>
+								</div>
+								<div class="rounded-lg border bg-muted/30 p-4">
+									<div class="flex flex-col gap-2">
+										<div class="text-sm font-medium">Cart Conditions</div>
+										<p class="text-sm text-muted-foreground">No conditions set</p>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<!-- Campaign Section -->
+						<div class="flex flex-col gap-4">
+							<h3 class="text-sm font-semibold">Campaign</h3>
+							<div class="rounded-lg border bg-muted/30 p-4">
+								{#if viewingPromotion.campaign_id}
+									{@const campaign = campaigns.find(c => c.id === viewingPromotion.campaign_id)}
+									{#if campaign}
+										<div class="flex flex-col gap-2">
+											<div class="flex items-center gap-2">
+												<Folder class="size-4 text-muted-foreground" />
+												<span class="text-sm font-medium">{campaign.name}</span>
+											</div>
+											<p class="text-sm text-muted-foreground">{campaign.identifier}</p>
+											{#if campaign.description}
+												<p class="text-sm text-muted-foreground">{campaign.description}</p>
+											{/if}
+										</div>
+									{:else}
+										<p class="text-sm text-muted-foreground">Campaign not found</p>
+									{/if}
+								{:else}
+									<p class="text-sm text-muted-foreground">No campaign assigned</p>
+								{/if}
+							</div>
+						</div>
+
+						<!-- Usage Section -->
+						<div class="flex flex-col gap-4">
+							<h3 class="text-sm font-semibold">Usage</h3>
+							<div class="grid grid-cols-2 gap-4">
+								<div class="rounded-lg border bg-muted/30 p-4">
+									<div class="flex flex-col gap-1">
+										<div class="text-sm font-medium text-muted-foreground">Total Uses</div>
+										<p class="text-lg font-semibold">-</p>
+									</div>
+								</div>
+								<div class="rounded-lg border bg-muted/30 p-4">
+									<div class="flex flex-col gap-1">
+										<div class="text-sm font-medium text-muted-foreground">Total Discount</div>
+										<p class="text-lg font-semibold">-</p>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				{/if}
+			</div>
+			<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
+				<Button variant="outline" onclick={closeDetails}>Close</Button>
+				{#if viewingPromotion}
+					<Button onclick={() => { closeDetails(); openEdit(viewingPromotion!); }}>
+						Edit
+					</Button>
+				{/if}
+			</Sheet.Footer>
+		</div>
+	</Sheet.Content>
+</Sheet.Root>
+
 <!-- Edit Promotion Sheet -->
 <Sheet.Root bind:open={editOpen}>
 	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
 		<div class="flex h-full flex-col">
-			<Sheet.Header class="flex flex-col gap-4 border-b px-6 py-4">
-				<h2 class="text-lg font-semibold">Edit promotion</h2>
+			<Sheet.Header class="flex flex-col gap-1 border-b px-6 py-4">
+				<h2 class="text-lg font-semibold text-center">Edit Promotion Details</h2>
 			</Sheet.Header>
 			<div class="flex-1 overflow-auto px-6 py-6">
 				<div class="flex flex-col gap-6">
@@ -1411,6 +1812,170 @@
 									</p>
 								</div>
 							</label>
+						</div>
+					</div>
+
+					<!-- Promotion Details -->
+					<div class="flex flex-col gap-4">
+						<div class="flex flex-col gap-2">
+							<span class="text-sm font-medium">Value Type</span>
+							<div class="flex flex-col gap-2">
+								<label
+									class={cn(
+										'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+										editValueType === 'fixed'
+											? 'border-primary bg-primary/5'
+											: 'border-input hover:bg-muted/30'
+									)}
+								>
+									<input
+										type="radio"
+										name="edit-value-type"
+										value="fixed"
+										checked={editValueType === 'fixed'}
+										onchange={() => (editValueType = 'fixed')}
+										class="mt-1 size-4 shrink-0 border-primary text-primary focus:ring-primary"
+									/>
+									<div>
+										<span class="font-medium">Fixed amount</span>
+										<p class="mt-0.5 text-sm text-muted-foreground">
+											The amount to be discounted. eg. 100
+										</p>
+									</div>
+								</label>
+								<label
+									class={cn(
+										'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+										editValueType === 'percentage'
+											? 'border-primary bg-primary/5'
+											: 'border-input hover:bg-muted/30'
+									)}
+								>
+									<input
+										type="radio"
+										name="edit-value-type"
+										value="percentage"
+										checked={editValueType === 'percentage'}
+										onchange={() => (editValueType = 'percentage')}
+										class="mt-1 size-4 shrink-0 border-primary text-primary focus:ring-primary"
+									/>
+									<div>
+										<span class="font-medium">Percentage</span>
+										<p class="mt-0.5 text-sm text-muted-foreground">
+											The percentage to discount off the amount. eg. 8%
+										</p>
+									</div>
+								</label>
+							</div>
+						</div>
+
+						<div class="flex flex-col gap-2">
+							<label for="edit-amount" class="text-sm font-medium">Amount</label>
+							<div class="relative flex items-center">
+								<span class="absolute left-3 text-sm text-muted-foreground">USD</span>
+								<Input
+									id="edit-amount"
+									type="number"
+									step="0.01"
+									min="0"
+									bind:value={editAmount}
+									class="h-9 pl-14 pr-8"
+									placeholder="0.00"
+								/>
+								<span class="absolute right-3 text-sm text-muted-foreground">$</span>
+							</div>
+						</div>
+
+						<div class="flex flex-col gap-2">
+							<div class="flex items-center gap-1.5">
+								<span class="text-sm font-medium">Allocation</span>
+								<Info class="size-4 text-muted-foreground" />
+							</div>
+							<div class="flex flex-col gap-2">
+								<label
+									class={cn(
+										'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+										editAllocation === 'each'
+											? 'border-primary bg-primary/5'
+											: 'border-input hover:bg-muted/30'
+									)}
+								>
+									<input
+										type="radio"
+										name="edit-allocation"
+										value="each"
+										checked={editAllocation === 'each'}
+										onchange={() => (editAllocation = 'each')}
+										class="mt-1 size-4 shrink-0 border-primary text-primary focus:ring-primary"
+									/>
+									<div>
+										<span class="font-medium">Each</span>
+										<p class="mt-0.5 text-sm text-muted-foreground">
+											Applies value on each item
+										</p>
+									</div>
+								</label>
+								<label
+									class={cn(
+										'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+										editAllocation === 'across'
+											? 'border-primary bg-primary/5'
+											: 'border-input hover:bg-muted/30'
+									)}
+								>
+									<input
+										type="radio"
+										name="edit-allocation"
+										value="across"
+										checked={editAllocation === 'across'}
+										onchange={() => (editAllocation = 'across')}
+										class="mt-1 size-4 shrink-0 border-primary text-primary focus:ring-primary"
+									/>
+									<div>
+										<span class="font-medium">Across</span>
+										<p class="mt-0.5 text-sm text-muted-foreground">
+											Applies value across items
+										</p>
+									</div>
+								</label>
+								<label
+									class={cn(
+										'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+										editAllocation === 'once'
+											? 'border-primary bg-primary/5'
+											: 'border-input hover:bg-muted/30'
+									)}
+								>
+									<input
+										type="radio"
+										name="edit-allocation"
+										value="once"
+										checked={editAllocation === 'once'}
+										onchange={() => (editAllocation = 'once')}
+										class="mt-1 size-4 shrink-0 border-primary text-primary focus:ring-primary"
+									/>
+									<div>
+										<span class="font-medium">Once</span>
+										<p class="mt-0.5 text-sm text-muted-foreground">
+											Applies value to a limited number of items
+										</p>
+									</div>
+								</label>
+							</div>
+						</div>
+
+						<div class="flex flex-col gap-2">
+							<label for="edit-max-quantity" class="text-sm font-medium">Maximum Quantity</label>
+							<Input
+								id="edit-max-quantity"
+								type="number"
+								min="1"
+								bind:value={editMaxQuantity}
+								class="h-9"
+							/>
+							<p class="text-sm text-muted-foreground">
+								Maximum quantity of items this promotion applies to.
+							</p>
 						</div>
 					</div>
 				</div>

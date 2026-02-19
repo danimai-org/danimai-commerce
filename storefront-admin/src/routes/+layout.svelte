@@ -55,6 +55,7 @@
 	let promotionsOpen = $state(false);
 	let rolesPermissionsOpen = $state(false);
 	let inventoryOpen = $state(false);
+	let customersOpen = $state(false);
 
 	$effect(() => {
 		if (path.startsWith('/products')) productsOpen = true;
@@ -71,6 +72,9 @@
 	});
 	$effect(() => {
 		if (path.startsWith('/inventory')) inventoryOpen = true;
+	});
+	$effect(() => {
+		if (path.startsWith('/customers')) customersOpen = true;
 	});
 </script>
 
@@ -285,14 +289,45 @@
 									</Collapsible.Root>
 								</SidebarMenuItem>
 								<SidebarMenuItem>
-									<SidebarMenuButton
-										isActive={path.startsWith('/customers')}
-										tooltipContent="Customers"
-										onclick={() => goto('/customers')}
-									>
-										<Users />
-										<span>Customers</span>
-									</SidebarMenuButton>
+									<Collapsible.Root bind:open={customersOpen} class="group/collapsible">
+										<Collapsible.Trigger>
+											{#snippet child({ props: triggerProps })}
+												<SidebarMenuButton
+													{...triggerProps}
+													isActive={path.startsWith('/customers')}
+													tooltipContent="Manage Customer"
+												>
+													<Users />
+													<span>Manage Customer</span>
+													<ChevronDown
+														class={cn(
+															'ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-180'
+														)}
+													/>
+												</SidebarMenuButton>
+											{/snippet}
+										</Collapsible.Trigger>
+										<Collapsible.Content>
+											<SidebarMenuSub>
+												<SidebarMenuSubItem>
+													<SidebarMenuSubButton
+														href="/customers"
+														isActive={path === '/customers' || path === '/customers/'}
+													>
+														Customers
+													</SidebarMenuSubButton>
+												</SidebarMenuSubItem>
+												<SidebarMenuSubItem>
+													<SidebarMenuSubButton
+														href="/customers/groups"
+														isActive={path.startsWith('/customers/groups')}
+													>
+														Customer Groups
+													</SidebarMenuSubButton>
+												</SidebarMenuSubItem>
+											</SidebarMenuSub>
+										</Collapsible.Content>
+									</Collapsible.Root>
 								</SidebarMenuItem>
 								<SidebarMenuItem>
 									<Collapsible.Root bind:open={promotionsOpen} class="group/collapsible">

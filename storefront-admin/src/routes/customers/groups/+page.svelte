@@ -9,18 +9,14 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
-	import Users from '@lucide/svelte/icons/users';
+	import Folder from '@lucide/svelte/icons/folder';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 
 	const API_BASE = 'http://localhost:8000';
 
-	type Customer = {
+	type CustomerGroup = {
 		id: string;
-		email: string;
-		first_name: string | null;
-		last_name: string | null;
-		phone: string | null;
-		has_account: boolean;
+		name: string;
 		metadata: unknown | null;
 		created_at: string;
 		updated_at: string;
@@ -39,11 +35,11 @@
 	let page = $state(1);
 	let limit = $state(10);
 	let searchQuery = $state('');
-	let data = $state<{ data: Customer[]; pagination: Pagination } | null>(null);
+	let data = $state<{ data: CustomerGroup[]; pagination: Pagination } | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
-	async function fetchCustomers() {
+	async function fetchCustomerGroups() {
 		loading = true;
 		error = null;
 		try {
@@ -53,9 +49,9 @@
 				sorting_field: 'created_at',
 				sorting_direction: 'desc'
 			});
-			const res = await fetch(`${API_BASE}/customers?${params}`, { cache: 'no-store' });
+			const res = await fetch(`${API_BASE}/customer-groups?${params}`, { cache: 'no-store' });
 			if (!res.ok) throw new Error(await res.text());
-			data = (await res.json()) as { data: Customer[]; pagination: Pagination };
+			data = (await res.json()) as { data: CustomerGroup[]; pagination: Pagination };
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			data = null;
@@ -67,57 +63,54 @@
 	$effect(() => {
 		page;
 		limit;
-		fetchCustomers();
+		fetchCustomerGroups();
 	});
 
-	const customers = $derived(data?.data ?? []);
+	const customerGroups = $derived(data?.data ?? []);
 	const pagination = $derived(data?.pagination ?? null);
 	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
 	const end = $derived(
 		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
 	);
 
-	const filteredCustomers = $derived(
+	const filteredCustomerGroups = $derived(
 		searchQuery.trim()
-			? customers.filter(
-					(c) =>
-						c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-						(c.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
-						(c.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
+			? customerGroups.filter((g) =>
+					g.name.toLowerCase().includes(searchQuery.toLowerCase())
 				)
-			: customers
+			: customerGroups
 	);
 
 	// Delete confirmation
 	let deleteModalOpen = $state(false);
-	let customerToDelete = $state<Customer | null>(null);
+	let groupToDelete = $state<CustomerGroup | null>(null);
 	let deleteSubmitting = $state(false);
 
-	function openDeleteModal(customer: Customer) {
-		customerToDelete = customer;
+	function openDeleteModal(group: CustomerGroup) {
+		groupToDelete = group;
 		deleteModalOpen = true;
 	}
 
 	function closeDeleteModal() {
 		if (!deleteSubmitting) {
 			deleteModalOpen = false;
-			customerToDelete = null;
+			groupToDelete = null;
 		}
 	}
 
 	async function handleConfirmDelete() {
-		if (!customerToDelete) return;
+		if (!groupToDelete) return;
 		deleteSubmitting = true;
 		try {
 			// TODO: Implement delete endpoint
-			// const res = await fetch(`${API_BASE}/customers`, {
+			// const res = await fetch(`${API_BASE}/customer-groups`, {
 			// 	method: 'DELETE',
 			// 	headers: { 'Content-Type': 'application/json' },
-			// 	body: JSON.stringify({ customer_ids: [customerToDelete.id] })
+			// 	body: JSON.stringify({ customer_group_ids: [groupToDelete.id] })
 			// });
 			// if (!res.ok) throw new Error(await res.text());
 			closeDeleteModal();
-			fetchCustomers();
+			fetchCustomerGroups();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -125,67 +118,53 @@
 		}
 	}
 
-	// Edit customer sheet
+	// Edit customer group sheet
 	let editOpen = $state(false);
-	let editingCustomer = $state<Customer | null>(null);
-	let editFirstName = $state('');
-	let editLastName = $state('');
-	let editEmail = $state('');
-	let editPhone = $state('');
-	let editCompany = $state('');
+	let editingGroup = $state<CustomerGroup | null>(null);
+	let editName = $state('');
 	let editError = $state<string | null>(null);
 	let editSubmitting = $state(false);
 
-	function openEdit(customer: Customer) {
-		editingCustomer = customer;
-		editFirstName = customer.first_name || '';
-		editLastName = customer.last_name || '';
-		editEmail = customer.email;
-		editPhone = customer.phone || '';
-		editCompany = (customer.metadata as { company?: string })?.company || '';
+	function openEdit(group: CustomerGroup) {
+		editingGroup = group;
+		editName = group.name;
 		editError = null;
 		editOpen = true;
 	}
 
 	function closeEdit() {
 		editOpen = false;
-		editingCustomer = null;
+		editingGroup = null;
 	}
 
 	async function saveEdit() {
-		if (!editingCustomer) return;
+		if (!editingGroup) return;
 		editError = null;
 		editSubmitting = true;
 
-		if (!editEmail.trim()) {
-			editError = 'Email is required';
+		if (!editName.trim()) {
+			editError = 'Name is required';
 			editSubmitting = false;
 			return;
 		}
 
 		try {
 			// TODO: Implement update endpoint
-			// const response = await fetch(`${API_BASE}/customers/${editingCustomer.id}`, {
+			// const response = await fetch(`${API_BASE}/customer-groups/${editingGroup.id}`, {
 			// 	method: 'PUT',
 			// 	headers: {
 			// 		'Content-Type': 'application/json'
 			// 	},
 			// 	body: JSON.stringify({
-			// 		email: editEmail.trim(),
-			// 		first_name: editFirstName.trim() || null,
-			// 		last_name: editLastName.trim() || null,
-			// 		phone: editPhone.trim() || null,
-			// 		...(editCompany.trim() && {
-			// 			metadata: { company: editCompany.trim() }
-			// 		})
+			// 		name: editName.trim()
 			// 	})
 			// });
 			// if (!response.ok) {
 			// 	const errorText = await response.text();
-			// 	throw new Error(errorText || 'Failed to update customer');
+			// 	throw new Error(errorText || 'Failed to update customer group');
 			// }
 			closeEdit();
-			fetchCustomers();
+			fetchCustomerGroups();
 		} catch (e) {
 			editError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -205,23 +184,15 @@
 		}
 	}
 
-	// Create customer sheet
+	// Create customer group sheet
 	let createOpen = $state(false);
-	let createFirstName = $state('');
-	let createLastName = $state('');
-	let createEmail = $state('');
-	let createCompany = $state('');
-	let createPhone = $state('');
+	let createName = $state('');
 	let createError = $state<string | null>(null);
 	let createSubmitting = $state(false);
 
 	function openCreate() {
 		createOpen = true;
-		createFirstName = '';
-		createLastName = '';
-		createEmail = '';
-		createCompany = '';
-		createPhone = '';
+		createName = '';
 		createError = null;
 	}
 
@@ -233,28 +204,22 @@
 		createError = null;
 		createSubmitting = true;
 
-		if (!createEmail.trim()) {
-			createError = 'Email is required';
+		if (!createName.trim()) {
+			createError = 'Name is required';
 			createSubmitting = false;
 			return;
 		}
 
 		try {
-			const response = await fetch(`${API_BASE}/customers`, {
+			const response = await fetch(`${API_BASE}/customer-groups`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					customers: [
+					customer_groups: [
 						{
-							email: createEmail.trim(),
-							first_name: createFirstName.trim() || null,
-							last_name: createLastName.trim() || null,
-							phone: createPhone.trim() || null,
-							...(createCompany.trim() && {
-								metadata: { company: createCompany.trim() }
-							})
+							name: createName.trim()
 						}
 					]
 				})
@@ -262,11 +227,11 @@
 
 			if (!response.ok) {
 				const errorText = await response.text();
-				throw new Error(errorText || 'Failed to create customer');
+				throw new Error(errorText || 'Failed to create customer group');
 			}
 
 			closeCreate();
-			fetchCustomers();
+			fetchCustomerGroups();
 		} catch (e) {
 			createError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -279,8 +244,8 @@
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
 			<div class="flex items-center gap-2">
-				<Users class="size-4" />
-				<span class="font-semibold">Customers</span>
+				<Folder class="size-4" />
+				<span class="font-semibold">Customer Groups</span>
 			</div>
 			<Button size="sm" onclick={openCreate}>Create</Button>
 		</div>
@@ -326,28 +291,22 @@
 				<table class="w-full text-sm">
 					<thead class="sticky top-0 border-b bg-muted/50">
 						<tr>
-							<th class="px-4 py-3 text-left font-medium">Email</th>
 							<th class="px-4 py-3 text-left font-medium">Name</th>
-							<th class="px-4 py-3 text-left font-medium">Orders</th>
+							<th class="px-4 py-3 text-left font-medium">Members</th>
 							<th class="w-10 px-4 py-3"></th>
 						</tr>
 					</thead>
 					<tbody>
-						{#if filteredCustomers.length === 0}
+						{#if filteredCustomerGroups.length === 0}
 							<tr>
-								<td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
-									No customers found.
+								<td colspan="3" class="px-4 py-8 text-center text-muted-foreground">
+									No customer groups found.
 								</td>
 							</tr>
 						{:else}
-							{#each filteredCustomers as customer (customer.id)}
+							{#each filteredCustomerGroups as group (group.id)}
 								<tr class="border-b transition-colors hover:bg-muted/30">
-									<td class="px-4 py-3 font-medium">{customer.email}</td>
-									<td class="px-4 py-3 text-muted-foreground">
-										{customer.first_name || customer.last_name
-											? `${customer.first_name ?? ''} ${customer.last_name ?? ''}`.trim()
-											: '–'}
-									</td>
+									<td class="px-4 py-3 font-medium">{group.name}</td>
 									<td class="px-4 py-3 text-muted-foreground">0</td>
 									<td class="px-4 py-3">
 										<DropdownMenu.Root>
@@ -365,7 +324,7 @@
 													<DropdownMenu.Item
 														textValue="Edit"
 														class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => openEdit(customer)}
+														onSelect={() => openEdit(group)}
 													>
 														<Pencil class="size-4" />
 														Edit
@@ -373,7 +332,7 @@
 													<DropdownMenu.Item
 														textValue="Delete"
 														class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => openDeleteModal(customer)}
+														onSelect={() => openDeleteModal(group)}
 													>
 														<Trash2 class="size-4" />
 														Delete
@@ -423,13 +382,13 @@
 	</div>
 </div>
 
-<!-- Create Customer Sheet -->
+<!-- Create Customer Group Sheet -->
 <Sheet.Root bind:open={createOpen}>
 	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
 		<div class="flex h-full flex-col">
 			<Sheet.Header class="flex flex-col gap-1 border-b px-6 py-4">
-				<Sheet.Title>Create Customer</Sheet.Title>
-				<Sheet.Description>Create a new customer and manage their details.</Sheet.Description>
+				<Sheet.Title>Create Customer Group</Sheet.Title>
+				<Sheet.Description>Create a new customer group to segment your customers.</Sheet.Description>
 			</Sheet.Header>
 
 			<div class="flex-1 overflow-auto px-6 py-6">
@@ -442,70 +401,16 @@
 				{/if}
 
 				<div class="flex flex-col gap-4">
-					<div class="grid grid-cols-2 gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="create-first-name" class="text-sm font-medium">
-								First Name <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="create-first-name"
-								bind:value={createFirstName}
-								placeholder="First name"
-								class="h-9"
-								disabled={createSubmitting}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="create-last-name" class="text-sm font-medium">
-								Last Name <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="create-last-name"
-								bind:value={createLastName}
-								placeholder="Last name"
-								class="h-9"
-								disabled={createSubmitting}
-							/>
-						</div>
-					</div>
 					<div class="flex flex-col gap-2">
-						<label for="create-email" class="text-sm font-medium">Email</label>
+						<label for="create-name" class="text-sm font-medium">Name</label>
 						<Input
-							id="create-email"
-							type="email"
-							bind:value={createEmail}
-							placeholder="Email"
+							id="create-name"
+							bind:value={createName}
+							placeholder="Customer group name"
 							class="h-9"
 							disabled={createSubmitting}
 							required
 						/>
-					</div>
-					<div class="grid grid-cols-2 gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="create-phone" class="text-sm font-medium">
-								Phone <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="create-phone"
-								type="tel"
-								bind:value={createPhone}
-								placeholder="Phone"
-								class="h-9"
-								disabled={createSubmitting}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="create-company" class="text-sm font-medium">
-								Company <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="create-company"
-								bind:value={createCompany}
-								placeholder="Company"
-								class="h-9"
-								disabled={createSubmitting}
-							/>
-						</div>
 					</div>
 				</div>
 			</div>
@@ -522,13 +427,13 @@
 		</Sheet.Content>
 	</Sheet.Root>
 
-<!-- Edit Customer Sheet -->
+<!-- Edit Customer Group Sheet -->
 <Sheet.Root bind:open={editOpen}>
 	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
 		<div class="flex h-full flex-col">
 			<Sheet.Header class="flex flex-col gap-1 border-b px-6 py-4">
-				<Sheet.Title>Edit Customer</Sheet.Title>
-				<Sheet.Description>Update customer details.</Sheet.Description>
+				<Sheet.Title>Edit Customer Group</Sheet.Title>
+				<Sheet.Description>Update customer group details.</Sheet.Description>
 			</Sheet.Header>
 
 			<div class="flex-1 overflow-auto px-6 py-6">
@@ -541,70 +446,16 @@
 				{/if}
 
 				<div class="flex flex-col gap-4">
-					<div class="grid grid-cols-2 gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="edit-first-name" class="text-sm font-medium">
-								First Name <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="edit-first-name"
-								bind:value={editFirstName}
-								placeholder="First name"
-								class="h-9"
-								disabled={editSubmitting}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="edit-last-name" class="text-sm font-medium">
-								Last Name <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="edit-last-name"
-								bind:value={editLastName}
-								placeholder="Last name"
-								class="h-9"
-								disabled={editSubmitting}
-							/>
-						</div>
-					</div>
 					<div class="flex flex-col gap-2">
-						<label for="edit-email" class="text-sm font-medium">Email</label>
+						<label for="edit-name" class="text-sm font-medium">Name</label>
 						<Input
-							id="edit-email"
-							type="email"
-							bind:value={editEmail}
-							placeholder="Email"
+							id="edit-name"
+							bind:value={editName}
+							placeholder="Customer group name"
 							class="h-9"
 							disabled={editSubmitting}
 							required
 						/>
-					</div>
-					<div class="grid grid-cols-2 gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="edit-phone" class="text-sm font-medium">
-								Phone <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="edit-phone"
-								type="tel"
-								bind:value={editPhone}
-								placeholder="Phone"
-								class="h-9"
-								disabled={editSubmitting}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="edit-company" class="text-sm font-medium">
-								Company <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="edit-company"
-								bind:value={editCompany}
-								placeholder="Company"
-								class="h-9"
-								disabled={editSubmitting}
-							/>
-						</div>
 					</div>
 				</div>
 			</div>
@@ -623,8 +474,8 @@
 
 <DeleteConfirmationModal
 	bind:open={deleteModalOpen}
-	entityName="customer"
-	entityTitle={customerToDelete?.email ?? ''}
+	entityName="customer group"
+	entityTitle={groupToDelete?.name ?? ''}
 	onConfirm={handleConfirmDelete}
 	onCancel={closeDeleteModal}
 	submitting={deleteSubmitting}
