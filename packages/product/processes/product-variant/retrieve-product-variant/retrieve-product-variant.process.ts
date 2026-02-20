@@ -7,13 +7,14 @@ import {
   type ProcessContract,
   ValidationError,
 } from "@danimai/core";
-import { Kysely } from "kysely";
+import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import { type RetrieveProductVariantProcessInput, RetrieveProductVariantSchema } from "./retrieve-product-variant.schema";
 import type { Database, ProductVariant } from "../../../db/type";
 
 export type RetrieveProductVariantResult = ProductVariant & {
   attributes: Array<{ id: string; title: string; type: string; value: string }>;
+  prices?: Array<{ amount: string; currency_code: string }>;
 };
 
 export const RETRIEVE_PRODUCT_VARIANT_PROCESS = Symbol("RetrieveProductVariant");
@@ -95,6 +96,31 @@ export class RetrieveProductVariantProcess
       }
     }
 
-    return { ...variant, attributes };
+    // Load prices for this variant
+    const prices: Array<{ amount: string; currency_code: string }> = [];
+    try {
+      const pricingDb = this.db as any;
+      const priceSet = await pricingDb
+        .selectFrom("price_sets")
+        .where(sql`metadata->>'variant_id'`, "=", input.id)
+        .where("deleted_at", "is", null)
+        .selectAll()
+        .executeTakeFirst();
+
+      if (priceSet) {
+        const priceRows = await pricingDb
+          .selectFrom("prices")
+          .where("price_set_id", "=", priceSet.id)
+          .where("deleted_at", "is", null)
+          .select(["amount", "currency_code"])
+          .execute();
+
+        prices.push(...priceRows.map((p) => ({ amount: p.amount, currency_code: p.currency_code })));
+      }
+    } catch {
+      // If price loading fails, continue without prices
+    }
+
+    return { ...variant, attributes, prices };
   }
 }

@@ -195,6 +195,7 @@
 			if (varRes.ok) {
 				const j = (await varRes.json()) as { data?: ProductVariant[] };
 				variants = (j.data ?? []).filter((v) => v.product_id === productId);
+				await loadVariantPrices();
 			} else {
 				variants = [];
 			}
@@ -840,9 +841,11 @@
 		sku: string;
 		manage_inventory: boolean;
 		allow_backorder: boolean;
+		priceAmount: string;
 		variantId?: string;
 	};
 	let editSheetVariantRows = $state<EditSheetVariantRow[]>([]);
+	let variantPricesMap = $state<Map<string, string>>(new Map());
 
 	function cartesian<T>(arrays: T[][]): T[][] {
 		if (arrays.length === 0) return [[]];
@@ -876,6 +879,9 @@
 				);
 			});
 			if (variant) {
+				// Get existing price for this variant, convert from cents to euros
+				const priceInCents = variantPricesMap.get(variant.id);
+				const priceAmount = priceInCents ? (parseFloat(priceInCents) / 100).toString() : '';
 				return {
 					key,
 					optionTitle,
@@ -883,6 +889,7 @@
 					sku: variant.sku ?? '',
 					manage_inventory: variant.manage_inventory,
 					allow_backorder: variant.allow_backorder ?? false,
+					priceAmount,
 					variantId: variant.id
 				};
 			}
@@ -892,9 +899,38 @@
 				title: optionTitle,
 				sku: '',
 				manage_inventory: false,
-				allow_backorder: false
+				allow_backorder: false,
+				priceAmount: ''
 			};
 		});
+	}
+
+	async function loadVariantPrices() {
+		const newPricesMap = new Map<string, string>();
+		if (variants.length === 0) {
+			variantPricesMap = newPricesMap;
+			return;
+		}
+		
+		// Try to load prices by fetching each variant individually
+		// The variant endpoint might return price information
+		for (const variant of variants) {
+			try {
+				const variantRes = await fetch(`${API_BASE}/product-variants/${variant.id}`, { cache: 'no-store' });
+				if (variantRes.ok) {
+					const variantData = (await variantRes.json()) as { prices?: Array<{ amount: string; currency_code: string }> };
+					if (variantData.prices) {
+						const eurPrice = variantData.prices.find((p) => p.currency_code.toLowerCase() === 'eur');
+						if (eurPrice) {
+							newPricesMap.set(variant.id, eurPrice.amount);
+						}
+					}
+				}
+			} catch {
+				// Continue if variant fetch fails
+			}
+		}
+		variantPricesMap = newPricesMap;
 	}
 
 	async function openVariantsEditSheet() {
@@ -903,6 +939,7 @@
 			if (!product || !product.id) return;
 		}
 		await loadOptionsAndVariants();
+		await loadVariantPrices();
 
 		variantsEditSheetOpen = true;
 		variantsEditError = null;
@@ -1027,43 +1064,61 @@
 				if (!res.ok) throw new Error(await res.text());
 			}
 
-			// 2. Update existing variants
+			// 2. Update existing variants (including prices)
 			for (const row of editSheetVariantRows) {
 				if (!row.variantId) continue;
 				const v = variants.find((x) => x.id === row.variantId);
 				if (!v) continue;
-				const changed =
-					v.title !== row.title ||
-					(v.sku ?? '') !== row.sku ||
-					v.manage_inventory !== row.manage_inventory ||
-					(v.allow_backorder ?? false) !== row.allow_backorder;
-				if (!changed) continue;
+				
+				const body: Record<string, unknown> = {
+					title: row.title,
+					sku: row.sku.trim() || null,
+					manage_inventory: row.manage_inventory,
+					allow_backorder: row.allow_backorder
+				};
+				
+				// Add prices if provided
+				const priceAmount = String(row.priceAmount || '').trim();
+				if (priceAmount) {
+					const priceInCents = Math.round(parseFloat(priceAmount) * 100);
+					if (!isNaN(priceInCents) && priceInCents > 0) {
+						body.prices = [{ amount: priceInCents, currency_code: 'EUR' }];
+					}
+				}
+				
 				const res = await fetch(`${API_BASE}/product-variants/${row.variantId}`, {
 					method: 'PUT',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						title: row.title,
-						sku: row.sku.trim() || null,
-						manage_inventory: row.manage_inventory,
-						allow_backorder: row.allow_backorder
-					})
+					body: JSON.stringify(body)
 				});
 				if (!res.ok) throw new Error(await res.text());
 			}
 
-			// 3. Create new variants
+			// 3. Create new variants (including prices)
 			for (const row of editSheetVariantRows) {
 				if (row.variantId) continue;
+				
+				const body: Record<string, unknown> = {
+					title: row.title,
+					product_id: productId,
+					sku: row.sku.trim() || null,
+					manage_inventory: row.manage_inventory,
+					allow_backorder: row.allow_backorder
+				};
+				
+				// Add prices if provided
+				const priceAmount = String(row.priceAmount || '').trim();
+				if (priceAmount) {
+					const priceInCents = Math.round(parseFloat(priceAmount) * 100);
+					if (!isNaN(priceInCents) && priceInCents > 0) {
+						body.prices = [{ amount: priceInCents, currency_code: 'EUR' }];
+					}
+				}
+				
 				const res = await fetch(`${API_BASE}/product-variants`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						title: row.title,
-						product_id: productId,
-						sku: row.sku.trim() || null,
-						manage_inventory: row.manage_inventory,
-						allow_backorder: row.allow_backorder
-					})
+					body: JSON.stringify(body)
 				});
 				if (!res.ok) throw new Error(await res.text());
 			}
@@ -1095,14 +1150,63 @@
 
 			// 6. Delete removed options (options that are no longer in editOptions by id)
 			const editOptionIds = new Set(editOptions.map((o) => o.id).filter(Boolean) as string[]);
-			const toDeleteOptionIds = options.filter((o) => !editOptionIds.has(o.id)).map((o) => o.id);
+			let toDeleteOptionIds = options.filter((o) => !editOptionIds.has(o.id)).map((o) => o.id);
 			if (toDeleteOptionIds.length > 0) {
 				const res = await fetch(`${API_BASE}/product-options`, {
 					method: 'DELETE',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ option_ids: toDeleteOptionIds })
 				});
-				if (!res.ok) throw new Error(await res.text());
+				if (!res.ok) {
+					const errorText = await res.text();
+					let errorMessage = errorText;
+					try {
+						const errorJson = JSON.parse(errorText);
+						errorMessage = errorJson.message || errorText;
+						// Extract option IDs from error message if it's about options in use
+						if (errorMessage.includes('Options:') && errorMessage.includes('Variants:')) {
+							const optionsMatch = errorMessage.match(/Options:\s*([^,]+(?:,\s*[^,]+)*)/);
+							if (optionsMatch) {
+								const usedOptionIds = optionsMatch[1].split(',').map(id => id.trim());
+								// Filter out used options and retry with remaining ones
+								const safeToDeleteIds = toDeleteOptionIds.filter(id => !usedOptionIds.includes(id));
+								if (safeToDeleteIds.length > 0) {
+									const retryRes = await fetch(`${API_BASE}/product-options`, {
+										method: 'DELETE',
+										headers: { 'Content-Type': 'application/json' },
+										body: JSON.stringify({ option_ids: safeToDeleteIds })
+									});
+									if (!retryRes.ok) {
+										const retryErrorText = await retryRes.text();
+										let retryErrorMessage = retryErrorText;
+										try {
+											const retryErrorJson = JSON.parse(retryErrorText);
+											retryErrorMessage = retryErrorJson.message || retryErrorText;
+										} catch {
+											// If parsing fails, use the text as-is
+										}
+										throw new Error(retryErrorMessage);
+									}
+									// Show warning about options that couldn't be deleted
+									variantsEditError = `Some options could not be deleted because they are still in use by variants: ${usedOptionIds.join(', ')}`;
+								} else {
+									// All options were in use, show the error
+									throw new Error(errorMessage);
+								}
+							} else {
+								throw new Error(errorMessage);
+							}
+						} else {
+							throw new Error(errorMessage);
+						}
+					} catch (parseError) {
+						// If it's not a JSON error or retry failed, throw the original error
+						if (parseError instanceof Error && parseError.message !== errorMessage) {
+							throw parseError;
+						}
+						throw new Error(errorMessage);
+					}
+				}
 			}
 
 			variantsEditSheetOpen = false;
@@ -1121,6 +1225,7 @@
 		Array<{ id: string; title: string; type: string; value: string }>
 	>([]);
 	let editVariantTitle = $state('');
+	let editVariantSize = $state('');
 	let editVariantMaterial = $state('');
 	let editVariantSku = $state('');
 	let editVariantEan = $state('');
@@ -1128,6 +1233,7 @@
 	let editVariantBarcode = $state('');
 	let editVariantManageInventory = $state(false);
 	let editVariantAllowBackorder = $state(false);
+	let editVariantPrice = $state('');
 	let editVariantError = $state<string | null>(null);
 	let editVariantSubmitting = $state(false);
 	let editVariantAddAttributeId = $state('');
@@ -1135,6 +1241,7 @@
 	async function openEditVariantSheet(v: ProductVariant) {
 		editingVariant = v;
 		editVariantTitle = v.title;
+		editVariantSize = '';
 		editVariantMaterial = '';
 		editVariantSku = v.sku ?? '';
 		editVariantEan = v.ean ?? '';
@@ -1147,23 +1254,55 @@
 		editVariantAddAttributeId = '';
 		editVariantSheetOpen = true;
 		loadAvailableAttributes();
-		try {
-			const res = await fetch(`${API_BASE}/product-variants/${v.id}`, { cache: 'no-store' });
-			if (res.ok) {
-				const data = await res.json();
-				editVariantAttributes = data.attributes ?? [];
-			} else {
+		
+		// Load price
+		const priceInCents = variantPricesMap.get(v.id);
+		editVariantPrice = priceInCents ? (parseFloat(priceInCents) / 100).toString() : '';
+		
+			try {
+				const res = await fetch(`${API_BASE}/product-variants/${v.id}`, { cache: 'no-store' });
+				if (res.ok) {
+					const data = await res.json();
+					editVariantAttributes = data.attributes ?? [];
+					// If there's a single option, set the Size field from the corresponding attribute
+					// Match by attribute title matching the option title, since options and attributes are separate entities
+					if (options.length === 1) {
+						const optionTitle = options[0].title;
+						if (editVariantAttributes.length > 0) {
+							const matchingAttr = editVariantAttributes.find((a) => 
+								a.title.toLowerCase() === optionTitle.toLowerCase()
+							);
+							if (matchingAttr && matchingAttr.value) {
+								editVariantSize = matchingAttr.value;
+							} else {
+								// Fallback: if no matching attribute found, use variant title as Size
+								// This handles backwards compatibility with variants that don't have attributes set
+								editVariantSize = v.title;
+							}
+						} else {
+							// No attributes exist, use variant title as Size for backwards compatibility
+							editVariantSize = v.title;
+						}
+					}
+					// If price wasn't in map, try to get it from the response
+					if (!priceInCents && data.prices) {
+						const eurPrice = data.prices.find((p: { currency_code: string }) => p.currency_code.toLowerCase() === 'eur');
+						if (eurPrice) {
+							editVariantPrice = (parseFloat(eurPrice.amount) / 100).toString();
+						}
+					}
+				} else {
+					editVariantAttributes = (product?.attributes ?? []).map((a) => ({
+						...a,
+						value: a.value ?? ''
+					}));
+				}
+			} catch {
 				editVariantAttributes = (product?.attributes ?? []).map((a) => ({
 					...a,
 					value: a.value ?? ''
 				}));
 			}
-		} catch {
-			editVariantAttributes = (product?.attributes ?? []).map((a) => ({
-				...a,
-				value: a.value ?? ''
-			}));
-		}
 	}
 
 	function addEditVariantAttribute() {
@@ -1185,6 +1324,8 @@
 		editVariantSheetOpen = false;
 		editingVariant = null;
 		editVariantAttributes = [];
+		editVariantPrice = '';
+		editVariantSize = '';
 		editVariantError = null;
 	}
 
@@ -1193,8 +1334,11 @@
 		editVariantError = null;
 		editVariantSubmitting = true;
 		try {
+			// Always use the Title field for the variant title
+			const finalTitle = editVariantTitle.trim() || editingVariant.title;
+			
 			const body: Record<string, unknown> = {
-				title: editVariantTitle.trim() || editingVariant.title,
+				title: finalTitle,
 				product_id: editingVariant.product_id ?? undefined,
 				sku: editVariantSku.trim() || null,
 				ean: editVariantEan.trim() || null,
@@ -1206,6 +1350,45 @@
 			if (editVariantMaterial.trim()) {
 				body.metadata = { material: editVariantMaterial.trim() };
 			}
+			
+			// Add price if provided
+			const priceAmount = String(editVariantPrice || '').trim();
+			if (priceAmount) {
+				const priceInCents = Math.round(parseFloat(priceAmount) * 100);
+				if (!isNaN(priceInCents) && priceInCents > 0) {
+					body.prices = [{ amount: priceInCents, currency_code: 'EUR' }];
+				}
+			}
+			
+			// Sync Size field with attributes if there's a single option
+			// This ensures Size is independent from Title - Size updates the attribute, Title updates the variant title
+			if (options.length === 1) {
+				const optionTitle = options[0].title;
+				const existingAttrIndex = editVariantAttributes.findIndex((a) => 
+					a.title.toLowerCase() === optionTitle.toLowerCase()
+				);
+				if (existingAttrIndex >= 0) {
+					// Update existing attribute with Size value
+					// Always update with the Size field value (even if empty) to allow clearing
+					editVariantAttributes[existingAttrIndex] = {
+						...editVariantAttributes[existingAttrIndex],
+						value: editVariantSize.trim()
+					};
+				} else if (editVariantSize.trim()) {
+					// Attribute doesn't exist yet, but Size has a value
+					// Try to find the attribute from available attributes list
+					const matchingAttr = availableAttributesList.find((a) => 
+						a.title.toLowerCase() === optionTitle.toLowerCase()
+					);
+					if (matchingAttr) {
+						editVariantAttributes = [
+							...editVariantAttributes,
+							{ id: matchingAttr.id, title: matchingAttr.title, type: matchingAttr.type, value: editVariantSize.trim() }
+						];
+					}
+				}
+			}
+			
 			body.attribute_values = editVariantAttributes.map((a) => ({
 				attribute_id: a.id,
 				value: a.value ?? ''
@@ -1673,12 +1856,8 @@
 											<th class="w-14 px-4 py-3 text-left font-medium">Image</th>
 											<th class="px-4 py-3 text-left font-medium">Title</th>
 											<th class="px-4 py-3 text-left font-medium">SKU</th>
-											{#if optionsWithValues.length === 1}
-												<th class="px-4 py-3 text-left font-medium"
-													>{optionsWithValues[0]?.option?.title ?? 'Option'}</th
-												>
-											{/if}
 											<th class="px-4 py-3 text-left font-medium">Inventory</th>
+											<th class="px-4 py-3 text-left font-medium">Price</th>
 											<th class="px-4 py-3 text-left font-medium">Created</th>
 											<th class="px-4 py-3 text-left font-medium">Updated</th>
 											<th class="w-10 px-4 py-3"></th>
@@ -1688,7 +1867,7 @@
 										{#if paginatedVariants.length === 0}
 											<tr>
 												<td
-													colspan={optionsWithValues.length === 1 ? 8 : 7}
+													colspan="8"
 													class="px-4 py-8 text-center text-muted-foreground"
 												>
 													No variants.
@@ -1696,6 +1875,7 @@
 											</tr>
 										{:else}
 											{#each paginatedVariants as v (v.id)}
+												{@const priceInCents = variantPricesMap.get(v.id)}
 												<tr class="border-b last:border-0">
 													<td class="px-4 py-3">
 														<div
@@ -1714,37 +1894,52 @@
 													</td>
 													<td class="px-4 py-3 font-medium">{v.title}</td>
 													<td class="px-4 py-3 text-muted-foreground">{v.sku || '—'}</td>
-													{#if optionsWithValues.length === 1}
-														<td class="px-4 py-3">{v.title}</td>
-													{/if}
 													<td class="px-4 py-3 text-muted-foreground">
 														{v.manage_inventory ? 'Managed' : 'Not managed'}
+													</td>
+													<td class="px-4 py-3">
+														{#if priceInCents}
+															<span class="font-medium">€{(parseFloat(priceInCents) / 100).toFixed(2)}</span>
+														{:else}
+															<span class="text-muted-foreground">—</span>
+														{/if}
 													</td>
 													<td class="px-4 py-3 text-muted-foreground">{formatDate(v.created_at)}</td
 													>
 													<td class="px-4 py-3 text-muted-foreground">{formatDate(v.updated_at)}</td
 													>
 													<td class="px-4 py-3">
-														<div class="flex items-center gap-2">
-															<Button
-																variant="ghost"
-																size="icon"
-																class="size-8 shrink-0"
-																onclick={() => openEditVariantSheet(v)}
-																aria-label="Edit variant"
+														<DropdownMenu.Root>
+															<DropdownMenu.Trigger
+																class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
 															>
-																<Pencil class="size-4" />
-															</Button>
-															<Button
-																variant="ghost"
-																size="icon"
-																class="size-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-																onclick={() => openDeleteVariantConfirm(v)}
-																aria-label="Delete variant"
-															>
-																<Trash2 class="size-4" />
-															</Button>
-														</div>
+																<MoreHorizontal class="size-4" />
+																<span class="sr-only">Actions</span>
+															</DropdownMenu.Trigger>
+															<DropdownMenu.Portal>
+																<DropdownMenu.Content
+																	class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+																	sideOffset={4}
+																>
+																	<DropdownMenu.Item
+																		textValue="Edit"
+																		class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+																		onSelect={() => openEditVariantSheet(v)}
+																	>
+																		<Pencil class="size-4" />
+																		Edit
+																	</DropdownMenu.Item>
+																	<DropdownMenu.Item
+																		textValue="Delete"
+																		class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
+																		onSelect={() => openDeleteVariantConfirm(v)}
+																	>
+																		<Trash2 class="size-4" />
+																		Delete
+																	</DropdownMenu.Item>
+																</DropdownMenu.Content>
+															</DropdownMenu.Portal>
+														</DropdownMenu.Root>
 													</td>
 												</tr>
 											{/each}
@@ -2497,7 +2692,22 @@
 														/>
 													</td>
 													<td class="px-3 py-2">
-														<Input type="text" value="€ 0" class="h-8 w-20" readonly />
+														<div class="relative w-20">
+															<span
+																class="absolute top-1/2 left-2 -translate-y-1/2 text-xs text-muted-foreground"
+																>€</span
+															>
+															<Input
+																type="text"
+																value={row.priceAmount}
+																oninput={(e) =>
+																	updateEditSheetVariantRow(row.key, {
+																		priceAmount: (e.currentTarget as HTMLInputElement).value
+																	})}
+																placeholder="0"
+																class="h-8 pl-6"
+															/>
+														</div>
 													</td>
 												</tr>
 											{/each}
@@ -2548,12 +2758,34 @@
 										>
 										<Input
 											id="edit-variant-option"
-											value={editingVariant.title}
-											class="h-9 bg-muted/50"
-											readonly
+											bind:value={editVariantSize}
+											class="h-9"
 										/>
 									</div>
 								{/if}
+								<div class="flex flex-col gap-2">
+									<p class="text-sm font-medium">Pricing</p>
+									<div>
+										<label for="edit-variant-price" class="text-xs text-muted-foreground"
+											>Price EUR (Optional)</label
+										>
+										<div class="relative mt-1">
+											<span
+												class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground"
+												>€</span
+											>
+											<Input
+												id="edit-variant-price"
+												bind:value={editVariantPrice}
+												type="number"
+												step="0.01"
+												min="0"
+												placeholder="0.00"
+												class="h-9 pl-8"
+											/>
+										</div>
+									</div>
+								</div>
 								<div class="flex flex-col gap-2">
 									<p class="text-sm font-medium">Stock & Inventory</p>
 									<div class="grid gap-3">

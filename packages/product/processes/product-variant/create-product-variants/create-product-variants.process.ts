@@ -11,6 +11,7 @@ import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import { type CreateProductVariantProcessInput, CreateProductVariantSchema } from "./create-product-variants.schema";
 import type { Database, ProductVariant, Product } from "../../../db/type";
+import { randomUUID } from "crypto";
 
 export const CREATE_PRODUCT_VARIANTS_PROCESS = Symbol("CreateProductVariants");
 
@@ -31,7 +32,13 @@ export class CreateProductVariantsProcess
 
     const product = await this.validateProduct(input);
 
-    return this.createProductVariant(input, product);
+    return this.db.transaction().execute(async (trx) => {
+      const variant = await this.createProductVariant(trx, input, product);
+      if (input.prices && input.prices.length > 0) {
+        await this.createVariantPrices(trx, variant.id, input.prices);
+      }
+      return variant;
+    });
   }
 
   async validateProduct(input: CreateProductVariantProcessInput): Promise<Product | null> {
@@ -57,10 +64,14 @@ export class CreateProductVariantsProcess
     return product;
   }
 
-  async createProductVariant(input: CreateProductVariantProcessInput, product: Product | null) {
+  async createProductVariant(
+    trx: Kysely<Database>,
+    input: CreateProductVariantProcessInput,
+    product: Product | null
+  ) {
     this.logger.info("Creating product variant", { input });
 
-    return this.db
+    const variant = await trx
       .insertInto("product_variants")
       .values({
         id: sql`gen_random_uuid()`,
@@ -78,5 +89,60 @@ export class CreateProductVariantsProcess
       })
       .returningAll()
       .executeTakeFirst();
+
+    if (!variant) {
+      throw new Error("Failed to create product variant");
+    }
+
+    return variant;
+  }
+
+  async createVariantPrices(
+    trx: Kysely<Database>,
+    variantId: string,
+    prices: Array<{
+      amount: number;
+      currency_code: string;
+      min_quantity?: number;
+      max_quantity?: number;
+      price_list_id?: string;
+    }>
+  ) {
+    if (prices.length === 0) {
+      return;
+    }
+
+    // Create price_set for the variant
+    // Using type assertion to access pricing tables
+    const pricingDb = trx as any;
+    const priceSet = await pricingDb
+      .insertInto("price_sets")
+      .values({
+        id: randomUUID(),
+        metadata: { variant_id: variantId },
+      })
+      .returningAll()
+      .executeTakeFirst();
+
+    if (!priceSet) {
+      throw new Error("Failed to create price_set");
+    }
+
+    // Bulk insert prices
+    await pricingDb
+      .insertInto("prices")
+      .values(
+        prices.map((priceInput) => ({
+          id: randomUUID(),
+          price_set_id: priceSet.id,
+          amount: priceInput.amount.toString(),
+          currency_code: priceInput.currency_code,
+          min_quantity: priceInput.min_quantity ?? null,
+          max_quantity: priceInput.max_quantity ?? null,
+          price_list_id: priceInput.price_list_id ?? null,
+          metadata: null,
+        }))
+      )
+      .execute();
   }
 }

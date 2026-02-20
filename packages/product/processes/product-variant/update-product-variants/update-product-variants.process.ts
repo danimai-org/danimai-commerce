@@ -7,10 +7,11 @@ import {
   type ProcessContract,
   ValidationError,
 } from "@danimai/core";
-import { Kysely } from "kysely";
+import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import { type UpdateProductVariantProcessInput, UpdateProductVariantSchema } from "./update-product-variants.schema";
 import type { Database, ProductVariant, Product } from "../../../db/type";
+import { randomUUID } from "crypto";
 
 export const UPDATE_PRODUCT_VARIANTS_PROCESS = Symbol("UpdateProductVariants");
 
@@ -36,6 +37,9 @@ export class UpdateProductVariantsProcess
       const variant = await this.updateProductVariant(trx, input, product);
       if (input.attribute_values !== undefined) {
         await this.syncVariantAttributeValues(trx, input.id, input.attribute_values);
+      }
+      if (input.prices !== undefined) {
+        await this.syncVariantPrices(trx, input.id, input.prices);
       }
       return variant;
     });
@@ -184,5 +188,74 @@ export class UpdateProductVariantsProcess
         }))
       )
       .execute();
+  }
+
+  async syncVariantPrices(
+    trx: Kysely<Database>,
+    variantId: string,
+    prices: Array<{
+      amount: number;
+      currency_code: string;
+      min_quantity?: number;
+      max_quantity?: number;
+      price_list_id?: string;
+    }>
+  ) {
+    // Using type assertion to access pricing tables
+    const pricingDb = trx as any;
+
+    // Find existing price_set for this variant
+    const existingPriceSet = await pricingDb
+      .selectFrom("price_sets")
+      .where(sql`metadata->>'variant_id'`, "=", variantId)
+      .where("deleted_at", "is", null)
+      .selectAll()
+      .executeTakeFirst();
+
+    let priceSetId: string;
+
+    if (existingPriceSet) {
+      priceSetId = existingPriceSet.id;
+      // Delete all existing prices for this price_set
+      await pricingDb
+        .deleteFrom("prices")
+        .where("price_set_id", "=", priceSetId)
+        .where("deleted_at", "is", null)
+        .execute();
+    } else {
+      // Create new price_set
+      const newPriceSet = await pricingDb
+        .insertInto("price_sets")
+        .values({
+          id: randomUUID(),
+          metadata: { variant_id: variantId },
+        })
+        .returningAll()
+        .executeTakeFirst();
+
+      if (!newPriceSet) {
+        throw new Error("Failed to create price_set");
+      }
+      priceSetId = newPriceSet.id;
+    }
+
+    // Insert new prices
+    if (prices.length > 0) {
+      await pricingDb
+        .insertInto("prices")
+        .values(
+          prices.map((priceInput) => ({
+            id: randomUUID(),
+            price_set_id: priceSetId,
+            amount: priceInput.amount.toString(),
+            currency_code: priceInput.currency_code,
+            min_quantity: priceInput.min_quantity ?? null,
+            max_quantity: priceInput.max_quantity ?? null,
+            price_list_id: priceInput.price_list_id ?? null,
+            metadata: null,
+          }))
+        )
+        .execute();
+    }
   }
 }

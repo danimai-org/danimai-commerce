@@ -3,6 +3,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import Search from '@lucide/svelte/icons/search';
 	import ShoppingCart from '@lucide/svelte/icons/shopping-cart';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
@@ -15,8 +16,15 @@
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import X from '@lucide/svelte/icons/x';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
+	import ImageIcon from '@lucide/svelte/icons/image';
+	import CreditCard from '@lucide/svelte/icons/credit-card';
+	import Lock from '@lucide/svelte/icons/lock';
+	import User from '@lucide/svelte/icons/user';
+	import Calendar from '@lucide/svelte/icons/calendar';
+	import DollarSign from '@lucide/svelte/icons/dollar-sign';
 	import { DropdownMenu } from 'bits-ui';
 	import { cn } from '$lib/utils.js';
+	import { goto } from '$app/navigation';
 
 	const API_BASE =
 		import.meta.env.VITE_API_BASE ??
@@ -136,6 +144,7 @@
 		price: number;
 		quantity: number;
 		currency: string;
+		thumbnail: string | null;
 	};
 
 	let createOrderOpen = $state(false);
@@ -150,6 +159,10 @@
 	let shippingAmount = $state<number>(0);
 	let taxAmount = $state<number>(0);
 	let paymentDueLater = $state(false);
+	let creditCardSheetOpen = $state(false);
+	let markAsPaidModalOpen = $state(false);
+	let notesModalOpen = $state(false);
+	let creatingOrder = $state(false);
 	let selectedCustomer = $state<{
 		id: string;
 		name: string;
@@ -224,14 +237,16 @@
 					title: 'Gift Card',
 					price: 100,
 					quantity: 1,
-					currency: selectedCurrency || 'INR'
+					currency: selectedCurrency || 'INR',
+					thumbnail: null
 				},
 				{
 					id: '2',
 					title: 'The Multi-location Snowboard',
 					price: 729.95,
 					quantity: 1,
-					currency: selectedCurrency || 'INR'
+					currency: selectedCurrency || 'INR',
+					thumbnail: null
 				}
 			];
 			taxAmount = Math.round(subtotal * 0.09 * 100) / 100;
@@ -283,6 +298,249 @@
 		currencies.find((c) => c.code === selectedCurrency) ||
 			currencies.find((c) => c.code === selectedRegionData?.currency_code)
 	);
+
+	// Product browser dialog
+	type Product = {
+		id: string;
+		title: string;
+		handle: string;
+		status: string;
+		thumbnail: string | null;
+		variants?: Array<{ id: string; title: string; prices?: Array<{ amount: number; currency_code: string }> }>;
+	};
+
+	let productBrowserOpen = $state(false);
+	let productBrowserPage = $state(1);
+	let productBrowserSearch = $state('');
+	let productBrowserRawData = $state<{
+		products?: Product[];
+		count?: number;
+		offset?: number;
+		limit?: number;
+	} | null>(null);
+	let productBrowserLoading = $state(false);
+	let selectedProductIds = $state<string[]>([]);
+
+	async function fetchProducts() {
+		productBrowserLoading = true;
+		try {
+			const params = new URLSearchParams({
+				page: String(productBrowserPage),
+				limit: '20',
+				sorting_field: 'created_at',
+				sorting_direction: 'desc'
+			});
+			if (productBrowserSearch.trim()) {
+				params.append('search', productBrowserSearch.trim());
+			}
+			const res = await fetch(`${API_BASE}/products?${params}`, { cache: 'no-store' });
+			if (!res.ok) throw new Error(await res.text());
+			productBrowserRawData = (await res.json()) as {
+				products?: Product[];
+				count?: number;
+				offset?: number;
+				limit?: number;
+			};
+		} catch {
+			productBrowserRawData = null;
+		} finally {
+			productBrowserLoading = false;
+		}
+	}
+
+	function openProductBrowser() {
+		selectedProductIds = [];
+		productBrowserPage = 1;
+		productBrowserSearch = '';
+		productBrowserOpen = true;
+	}
+
+	function closeProductBrowser() {
+		productBrowserOpen = false;
+		selectedProductIds = [];
+	}
+
+	const productBrowserProducts = $derived(productBrowserRawData?.products ?? []);
+	const productBrowserLimit = $derived(productBrowserRawData?.limit ?? 20);
+	const productBrowserTotal = $derived(productBrowserRawData?.count ?? 0);
+	const productBrowserOffset = $derived(productBrowserRawData?.offset ?? 0);
+	const productBrowserPageNum = $derived(
+		productBrowserLimit > 0 ? Math.floor(productBrowserOffset / productBrowserLimit) + 1 : 1
+	);
+	const productBrowserTotalPages = $derived(
+		productBrowserLimit > 0 ? Math.ceil(productBrowserTotal / productBrowserLimit) : 1
+	);
+	const productBrowserPagination = $derived({
+		total: productBrowserTotal,
+		page: productBrowserPageNum,
+		limit: productBrowserLimit,
+		total_pages: productBrowserTotalPages,
+		has_next_page: productBrowserPageNum < productBrowserTotalPages,
+		has_previous_page: productBrowserPageNum > 1
+	});
+	const productBrowserStart = $derived((productBrowserPageNum - 1) * productBrowserLimit + 1);
+	const productBrowserEnd = $derived(Math.min(productBrowserPageNum * productBrowserLimit, productBrowserTotal));
+
+	function toggleProductSelection(productId: string) {
+		selectedProductIds = selectedProductIds.includes(productId)
+			? selectedProductIds.filter((id) => id !== productId)
+			: [...selectedProductIds, productId];
+	}
+
+	async function addSelectedProducts() {
+		if (selectedProductIds.length === 0) {
+			closeProductBrowser();
+			return;
+		}
+
+		for (const productId of selectedProductIds) {
+			const product = productBrowserProducts.find((p) => p.id === productId);
+			if (!product) continue;
+
+			try {
+				// Fetch variants for this product
+				const variantsRes = await fetch(`${API_BASE}/product-variants?limit=100`, { cache: 'no-store' });
+				let variants: Array<{
+					id: string;
+					title: string;
+					product_id: string | null;
+					thumbnail: string | null;
+				}> = [];
+				
+				if (variantsRes.ok) {
+					const variantsData = (await variantsRes.json()) as { data?: Array<{
+						id: string;
+						title: string;
+						product_id: string | null;
+						thumbnail: string | null;
+					}> };
+					variants = (variantsData.data ?? []).filter((v) => v.product_id === productId);
+				}
+
+				// Get first variant or use product itself
+				const variant = variants[0];
+				let price = 0;
+				let currency = selectedCurrency || 'INR';
+
+				// Try to fetch prices for the variant
+				if (variant) {
+					try {
+						const variantRes = await fetch(`${API_BASE}/product-variants/${variant.id}`, { cache: 'no-store' });
+						if (variantRes.ok) {
+							const variantData = (await variantRes.json()) as { prices?: Array<{ amount: string; currency_code: string }> };
+							if (variantData.prices && variantData.prices.length > 0) {
+								// Find price matching selected currency, or use first available price
+								const matchingPrice = variantData.prices.find((p) => p.currency_code.toLowerCase() === currency.toLowerCase());
+								const priceToUse = matchingPrice || variantData.prices[0];
+								if (priceToUse) {
+									// Convert from cents to the actual currency amount
+									price = parseFloat(priceToUse.amount) / 100;
+									currency = priceToUse.currency_code;
+								}
+							}
+						}
+					} catch {
+						// Price fetch failed, will use 0
+					}
+				}
+
+				// Use variant thumbnail or product thumbnail
+				const thumbnail = variant?.thumbnail ?? product.thumbnail;
+
+				addOrderItem({
+					id: variant?.id ?? productId,
+					title: product.title,
+					price: price,
+					quantity: 1,
+					currency,
+					thumbnail
+				});
+			} catch {
+				// Fallback: add product without variant details
+				addOrderItem({
+					id: productId,
+					title: product.title,
+					price: 0,
+					quantity: 1,
+					currency: selectedCurrency || 'INR',
+					thumbnail: product.thumbnail
+				});
+			}
+		}
+
+		closeProductBrowser();
+	}
+
+	let previousProductBrowserSearch = $state('');
+	$effect(() => {
+		if (productBrowserSearch !== previousProductBrowserSearch) {
+			previousProductBrowserSearch = productBrowserSearch;
+			productBrowserPage = 1;
+		}
+	});
+
+	$effect(() => {
+		if (!productBrowserOpen) return;
+		productBrowserPage;
+		productBrowserSearch;
+		fetchProducts();
+	});
+
+	async function createOrder() {
+		if (orderItems.length === 0) return;
+		if (!selectedCurrency || !selectedRegion) return;
+
+		creatingOrder = true;
+		try {
+			const orderData = {
+				orders: [
+					{
+						currency_code: selectedCurrency,
+						region_id: selectedRegion,
+						customer_id: selectedCustomer?.id ?? null,
+						email: selectedCustomer?.email ?? null,
+						payment_status: 'captured',
+						status: 'pending',
+						fulfillment_status: 'not_fulfilled',
+						metadata: {
+							notes: notes || null,
+							tags: tags || null,
+							subtotal: subtotal,
+							discount_amount: discountAmount,
+							shipping_amount: shippingAmount,
+							tax_amount: taxAmount,
+							total: total
+						}
+					}
+				]
+			};
+
+			const res = await fetch(`${API_BASE}/orders`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(orderData)
+			});
+
+			if (!res.ok) {
+				const errorText = await res.text();
+				throw new Error(errorText || 'Failed to create order');
+			}
+
+			const result = (await res.json()) as { data: Order[] };
+			if (result.data && result.data.length > 0) {
+				const createdOrder = result.data[0];
+				createOrderOpen = false;
+				markAsPaidModalOpen = false;
+				await fetchOrders();
+				goto(`/orders/${createdOrder.id}`);
+			}
+		} catch (e) {
+			console.error('Failed to create order:', e);
+			alert(e instanceof Error ? e.message : 'Failed to create order');
+		} finally {
+			creatingOrder = false;
+		}
+	}
 </script>
 
 <div class="flex h-full flex-col">
@@ -457,7 +715,7 @@
 								/>
 							</div>
 							<div class="flex gap-2">
-								<Button variant="outline" size="sm" class="flex-1">
+								<Button variant="outline" size="sm" class="flex-1" onclick={openProductBrowser}>
 									Browse
 								</Button>
 								<Button variant="outline" size="sm" class="flex-1">
@@ -475,8 +733,25 @@
 										{#each orderItems as item (item.id)}
 											<div class="grid grid-cols-12 items-center gap-4 rounded-md border p-2">
 												<div class="col-span-6">
-													<div class="text-sm font-medium">{item.title}</div>
-													<div class="text-xs text-muted-foreground">{formatCurrency(item.price)}</div>
+													<div class="flex items-center gap-3">
+														{#if item.thumbnail}
+															<img
+																src={item.thumbnail}
+																alt=""
+																class="size-10 shrink-0 rounded-md object-cover"
+															/>
+														{:else}
+															<div
+																class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
+															>
+																<ImageIcon class="size-5" />
+															</div>
+														{/if}
+														<div class="flex-1 min-w-0">
+															<div class="text-sm font-medium truncate">{item.title}</div>
+															<div class="text-xs text-muted-foreground">{formatCurrency(item.price)}</div>
+														</div>
+													</div>
 												</div>
 												<div class="col-span-3">
 													<Input
@@ -584,8 +859,11 @@
 											<DropdownMenu.Content
 												class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
 											>
-												<DropdownMenu.Item>Credit card</DropdownMenu.Item>
-												<DropdownMenu.Item>Mark as paid</DropdownMenu.Item>
+												<DropdownMenu.Item onSelect={() => (creditCardSheetOpen = true)} class="flex items-center gap-2 cursor-pointer">
+													<CreditCard class="size-4" />
+													Credit card
+												</DropdownMenu.Item>
+												<DropdownMenu.Item onSelect={() => (markAsPaidModalOpen = true)} class="cursor-pointer">Mark as paid</DropdownMenu.Item>
 											</DropdownMenu.Content>
 										</DropdownMenu.Portal>
 									</DropdownMenu.Root>
@@ -607,12 +885,13 @@
 							<h3 class="text-sm font-semibold">Notes</h3>
 							<button
 								type="button"
+								onclick={() => (notesModalOpen = true)}
 								class="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 							>
 								<Pencil class="size-3.5" />
 							</button>
 						</div>
-						<p class="text-sm text-muted-foreground">No notes</p>
+						<p class="text-sm text-muted-foreground">{notes || 'No notes'}</p>
 					</div>
 
 					<!-- Customer Card -->
@@ -743,5 +1022,293 @@
 				</div>
 			</div>
 		</div>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Product Browser Dialog -->
+<Dialog.Root bind:open={productBrowserOpen}>
+	<Dialog.Content
+		class="max-w-3xl h-auto max-h-[85vh] m-auto flex flex-col rounded-xl border shadow-lg"
+	>
+		<div class="flex flex-1 flex-col overflow-hidden">
+			<Dialog.Header class="flex flex-row items-center justify-between border-b px-6 py-4">
+				<Dialog.Title class="text-base font-semibold">Browse Products</Dialog.Title>
+			</Dialog.Header>
+
+			<!-- Filter and search row -->
+			<div class="flex flex-wrap items-center justify-between gap-4 border-b px-6 py-4">
+				<Button variant="outline" size="sm" class="rounded-md">
+					<SlidersHorizontal class="mr-1.5 size-4" />
+					Add filter
+				</Button>
+				<div class="flex items-center gap-2 ml-auto">
+					<div class="relative w-64">
+						<Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							type="search"
+							placeholder="Search products"
+							bind:value={productBrowserSearch}
+							class="h-9 rounded-md pl-9"
+						/>
+					</div>
+					<button
+						type="button"
+						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+						aria-label="Sort"
+					>
+						<ArrowUpDown class="size-4" />
+					</button>
+				</div>
+			</div>
+
+			<div class="flex flex-1 flex-col overflow-auto p-6">
+				{#if productBrowserLoading}
+					<div class="flex items-center justify-center py-12">
+						<p class="text-sm text-muted-foreground">Loading…</p>
+					</div>
+				{:else}
+					<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+						<table class="w-full text-sm">
+							<thead class="sticky top-0 border-b bg-muted/50">
+								<tr>
+									<th class="w-10 px-4 py-3 text-left font-medium"></th>
+									<th class="px-4 py-3 text-left font-medium">Product</th>
+									<th class="px-4 py-3 text-left font-medium">Status</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#if productBrowserProducts.length === 0}
+									<tr>
+										<td colspan="3" class="px-4 py-8 text-center text-muted-foreground">
+											No products found.
+										</td>
+									</tr>
+								{:else}
+									{#each productBrowserProducts as product (product.id)}
+										<tr
+											class="border-b transition-colors hover:bg-muted/30 cursor-pointer last:border-b-0"
+											role="button"
+											tabindex="0"
+											onclick={() => toggleProductSelection(product.id)}
+											onkeydown={(e) => e.key === 'Enter' && toggleProductSelection(product.id)}
+										>
+											<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
+												<input
+													type="checkbox"
+													checked={selectedProductIds.includes(product.id)}
+													class="size-4 rounded border-input"
+													tabindex="-1"
+													onclick={(e) => e.stopPropagation()}
+													onchange={() => toggleProductSelection(product.id)}
+												/>
+											</td>
+											<td class="px-4 py-3">
+												<div class="flex items-center gap-3">
+													{#if product.thumbnail}
+														<img
+															src={product.thumbnail}
+															alt=""
+															class="size-10 shrink-0 rounded-md object-cover"
+														/>
+													{:else}
+														<div
+															class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
+														>
+															<ImageIcon class="size-5" />
+														</div>
+													{/if}
+													<span class="font-medium">{product.title}</span>
+												</div>
+											</td>
+											<td class="px-4 py-3 text-muted-foreground">
+												<span class={statusBadgeClass(product.status)}>
+													{product.status.replace(/_/g, ' ')}
+												</span>
+											</td>
+										</tr>
+									{/each}
+								{/if}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			</div>
+
+			<Dialog.Footer class="flex flex-wrap items-center justify-between gap-4 border-t px-6 py-4">
+				<div class="flex items-center justify-between gap-4">
+					<div class="flex items-center gap-4">
+						<div class="flex items-center gap-2">
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={!productBrowserPagination?.has_previous_page}
+								onclick={() => (productBrowserPage = productBrowserPage - 1)}
+							>
+								Prev
+							</Button>
+							<span class="text-sm text-muted-foreground">
+								{productBrowserPagination?.page ?? 1} of {productBrowserPagination?.total_pages ?? 1} pages
+							</span>
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={!productBrowserPagination?.has_next_page}
+								onclick={() => (productBrowserPage = productBrowserPage + 1)}
+							>
+								Next
+							</Button>
+						</div>
+						<p class="text-sm text-muted-foreground">
+							{#if productBrowserPagination && productBrowserPagination.total > 0}
+								{productBrowserStart} – {productBrowserEnd} of {productBrowserPagination.total} results
+							{:else}
+								0 results
+							{/if}
+						</p>
+					</div>
+				</div>
+				<div class="flex items-center gap-2 ml-auto">
+					<Button variant="outline" onclick={closeProductBrowser}>Cancel</Button>
+					<Button onclick={addSelectedProducts} disabled={selectedProductIds.length === 0}>
+						Add {selectedProductIds.length > 0 ? `(${selectedProductIds.length})` : ''}
+					</Button>
+				</div>
+			</Dialog.Footer>
+		</div>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Mark as Paid Modal -->
+<Dialog.Root bind:open={markAsPaidModalOpen}>
+	<Dialog.Content class="max-w-md h-auto max-h-[85vh] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full flex flex-col rounded-xl border shadow-lg p-0">
+		<Dialog.Header class="px-6 py-4 border-b">
+			<Dialog.Title class="text-base font-semibold">Mark as paid</Dialog.Title>
+		</Dialog.Header>
+		<div class="px-6 py-4">
+			<p class="text-sm text-muted-foreground">
+				Mark this order as paid if you received {formatCurrency(total)} from another payment method. This will create an order.
+			</p>
+		</div>
+		<Dialog.Footer class="px-6 py-4 border-t !flex-row justify-end gap-2">
+			<Button variant="outline" onclick={() => (markAsPaidModalOpen = false)} disabled={creatingOrder}>
+				Cancel
+			</Button>
+			<Button onclick={createOrder} disabled={creatingOrder || orderItems.length === 0}>
+				{creatingOrder ? 'Creating...' : 'Create order'}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Credit Card Payment Sheet -->
+<Sheet.Root bind:open={creditCardSheetOpen}>
+	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
+		<div class="flex h-full flex-col">
+			<Sheet.Header class="flex flex-col gap-1 border-b px-6 py-4">
+				<div class="flex items-center gap-2">
+					<CreditCard class="size-5 text-muted-foreground" />
+					<Sheet.Title>Collect Payment</Sheet.Title>
+				</div>
+				<Sheet.Description>Process credit card payment for this order.</Sheet.Description>
+			</Sheet.Header>
+			<div class="min-h-0 flex-1 overflow-auto px-6 py-6">
+				<div class="flex flex-col gap-6">
+					<!-- Payment Amount Card -->
+					<div class="rounded-lg border bg-muted/30 p-4">
+						<div class="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+							<DollarSign class="size-4" />
+							<span>Payment Amount</span>
+						</div>
+						<div class="text-3xl font-bold">{formatCurrency(total)}</div>
+					</div>
+
+					<!-- Card Number -->
+					<div class="flex flex-col gap-2">
+						<label for="card-number" class="flex items-center gap-2 text-sm font-medium">
+							<CreditCard class="size-4 text-muted-foreground" />
+							Card Number
+						</label>
+						<div class="relative">
+							<CreditCard class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+							<Input 
+								id="card-number" 
+								type="text" 
+								placeholder="1234 5678 9012 3456" 
+								class="h-10 pl-10" 
+							/>
+						</div>
+					</div>
+
+					<!-- Expiry Date and CVV -->
+					<div class="grid grid-cols-2 gap-4">
+						<div class="flex flex-col gap-2">
+							<label for="expiry-date" class="flex items-center gap-2 text-sm font-medium">
+								<Calendar class="size-4 text-muted-foreground" />
+								Expiry Date
+							</label>
+							<Input id="expiry-date" type="text" placeholder="MM/YY" class="h-10" />
+						</div>
+						<div class="flex flex-col gap-2">
+							<label for="cvv" class="flex items-center gap-2 text-sm font-medium">
+								<Lock class="size-4 text-muted-foreground" />
+								CVV
+							</label>
+							<Input id="cvv" type="text" placeholder="123" class="h-10" />
+						</div>
+					</div>
+
+					<!-- Cardholder Name -->
+					<div class="flex flex-col gap-2">
+						<label for="cardholder-name" class="flex items-center gap-2 text-sm font-medium">
+							<User class="size-4 text-muted-foreground" />
+							Cardholder Name
+						</label>
+						<Input id="cardholder-name" type="text" placeholder="John Doe" class="h-10" />
+					</div>
+
+					<!-- Security Notice -->
+					<div class="flex items-start gap-2 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+						<Lock class="size-4 shrink-0 mt-0.5" />
+						<span>Your payment information is encrypted and secure.</span>
+					</div>
+				</div>
+			</div>
+			<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
+				<Button variant="outline" onclick={() => (creditCardSheetOpen = false)}>
+					Cancel
+				</Button>
+				<Button onclick={() => {
+					// TODO: Process payment
+					creditCardSheetOpen = false;
+				}} class="flex items-center gap-2">
+					<CreditCard class="size-4" />
+					Process Payment
+				</Button>
+			</Sheet.Footer>
+		</div>
+	</Sheet.Content>
+</Sheet.Root>
+
+<!-- Notes Edit Modal -->
+<Dialog.Root bind:open={notesModalOpen}>
+	<Dialog.Content class="max-w-md h-auto max-h-[85vh] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full flex flex-col rounded-xl border shadow-lg p-0">
+		<Dialog.Header class="px-6 py-4 border-b">
+			<Dialog.Title class="text-base font-semibold">Edit Notes</Dialog.Title>
+		</Dialog.Header>
+		<div class="px-6 py-4">
+			<textarea
+				placeholder="Add notes..."
+				bind:value={notes}
+				class="flex min-h-32 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+			></textarea>
+		</div>
+		<Dialog.Footer class="px-6 py-4 border-t !flex-row justify-end gap-2">
+			<Button variant="outline" onclick={() => (notesModalOpen = false)}>
+				Cancel
+			</Button>
+			<Button onclick={() => (notesModalOpen = false)}>
+				Save
+			</Button>
+		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

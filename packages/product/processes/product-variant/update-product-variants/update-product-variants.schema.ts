@@ -5,6 +5,14 @@ export const AttributeValueSchema = Type.Object({
   value: Type.String(),
 });
 
+const ProductVariantPriceSchema = Type.Object({
+  amount: Type.Number(),
+  currency_code: Type.String(),
+  min_quantity: Type.Optional(Type.Number()),
+  max_quantity: Type.Optional(Type.Number()),
+  price_list_id: Type.Optional(Type.String()),
+});
+
 export const UpdateProductVariantSchema = Type.Object({
   id: Type.String(),
   title: Type.Optional(Type.String()),
@@ -19,6 +27,7 @@ export const UpdateProductVariantSchema = Type.Object({
   thumbnail: Type.Optional(Type.String()),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
   attribute_values: Type.Optional(Type.Array(AttributeValueSchema)),
+  prices: Type.Optional(Type.Array(ProductVariantPriceSchema)),
 });
 
 export type UpdateProductVariantProcessInput = Static<

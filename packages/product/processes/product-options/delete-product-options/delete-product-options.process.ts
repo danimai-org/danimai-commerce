@@ -29,7 +29,8 @@ export class DeleteProductOptionsProcess implements ProcessContract<void> {
     const { input } = context;
 
     await this.validateOptions(input);
-    await this.checkOptionUsage(input);
+    await this.deleteVariantOptionRelations(input);
+    await this.deleteOptionValues(input);
     await this.deleteOptions(input);
   }
 
@@ -57,50 +58,42 @@ export class DeleteProductOptionsProcess implements ProcessContract<void> {
     return options;
   }
 
-  async checkOptionUsage(input: DeleteProductOptionsProcessInput) {
-    // Check if any option has option values
-    const optionsWithValues = await this.db
+  async deleteVariantOptionRelations(input: DeleteProductOptionsProcessInput) {
+    // Delete variant-option relations for the options being deleted
+    // This allows deletion of options even when they're used by variants
+    const optionValueIds = await this.db
       .selectFrom("product_option_values")
       .where("option_id", "in", input.option_ids)
       .where("deleted_at", "is", null)
-      .select("option_id")
-      .execute();
+      .select("id")
+      .execute()
+      .then((rows) => rows.map((r) => r.id));
 
-    if (optionsWithValues.length > 0) {
-      const usedOptionIds = [
-        ...new Set(optionsWithValues.map((ov) => ov.option_id)),
-      ].filter((id): id is string => id !== null);
-      throw new ValidationError(
-        `Product options are in use by option values: ${usedOptionIds.join(", ")}`,
-        [{
-          type: "not_found",
-          message: `Product options are in use by option values: ${usedOptionIds.join(", ")}`,
-          path: "option_ids",
-        }]
-      );
+    if (optionValueIds.length > 0) {
+      this.logger.info("Deleting variant-option relations", {
+        option_ids: input.option_ids,
+        option_value_ids: optionValueIds,
+      });
+
+      await this.db
+        .deleteFrom("product_variant_option_relations")
+        .where("option_value_id", "in", optionValueIds)
+        .execute();
     }
+  }
 
-    // Check if any option is used in variant option relations
-    const optionsInVariants = await this.db
-      .selectFrom("product_variant_option_relations")
-      .innerJoin("product_option_values", "product_option_values.id", "product_variant_option_relations.option_value_id")
-      .where("product_option_values.option_id", "in", input.option_ids)
-      .select("product_option_values.option_id")
+  async deleteOptionValues(input: DeleteProductOptionsProcessInput) {
+    this.logger.info("Deleting product option values", {
+      option_ids: input.option_ids,
+    });
+
+    // Soft delete all option values associated with these options
+    await this.db
+      .updateTable("product_option_values")
+      .set({ deleted_at: new Date().toISOString() })
+      .where("option_id", "in", input.option_ids)
+      .where("deleted_at", "is", null)
       .execute();
-
-    if (optionsInVariants.length > 0) {
-      const usedOptionIds = [
-        ...new Set(optionsInVariants.map((r) => r.option_id)),
-      ].filter((id): id is string => id !== null);
-      throw new ValidationError(
-        `Product options are in use by product variants: ${usedOptionIds.join(", ")}`,
-        [{
-          type: "not_found",
-          message: `Product options are in use by product variants: ${usedOptionIds.join(", ")}`,
-          path: "option_ids",
-        }]
-      );
-    }
   }
 
   async deleteOptions(input: DeleteProductOptionsProcessInput) {
