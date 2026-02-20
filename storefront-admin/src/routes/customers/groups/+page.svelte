@@ -102,15 +102,18 @@
 		if (!groupToDelete) return;
 		deleteSubmitting = true;
 		try {
-			// TODO: Implement delete endpoint
-			// const res = await fetch(`${API_BASE}/customer-groups`, {
-			// 	method: 'DELETE',
-			// 	headers: { 'Content-Type': 'application/json' },
-			// 	body: JSON.stringify({ customer_group_ids: [groupToDelete.id] })
-			// });
-			// if (!res.ok) throw new Error(await res.text());
-			closeDeleteModal();
-			fetchCustomerGroups();
+			const res = await fetch(`${API_BASE}/customer-groups`, {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ customer_group_ids: [groupToDelete.id] })
+			});
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				throw new Error((err as { message?: string })?.message ?? 'Failed to delete customer group');
+			}
+			deleteModalOpen = false;
+			groupToDelete = null;
+			await fetchCustomerGroups();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -149,20 +152,19 @@
 		}
 
 		try {
-			// TODO: Implement update endpoint
-			// const response = await fetch(`${API_BASE}/customer-groups/${editingGroup.id}`, {
-			// 	method: 'PUT',
-			// 	headers: {
-			// 		'Content-Type': 'application/json'
-			// 	},
-			// 	body: JSON.stringify({
-			// 		name: editName.trim()
-			// 	})
-			// });
-			// if (!response.ok) {
-			// 	const errorText = await response.text();
-			// 	throw new Error(errorText || 'Failed to update customer group');
-			// }
+			const response = await fetch(`${API_BASE}/customer-groups/${editingGroup.id}`, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					name: editName.trim()
+				})
+			});
+			if (!response.ok) {
+				const err = await response.json().catch(() => ({}));
+				throw new Error((err as { message?: string })?.message ?? 'Failed to update customer group');
+			}
 			closeEdit();
 			fetchCustomerGroups();
 		} catch (e) {
@@ -292,22 +294,41 @@
 					<thead class="sticky top-0 border-b bg-muted/50">
 						<tr>
 							<th class="px-4 py-3 text-left font-medium">Name</th>
-							<th class="px-4 py-3 text-left font-medium">Members</th>
+							<th class="px-4 py-3 text-left font-medium">Customers</th>
+							<th class="px-4 py-3 text-left font-medium">Created</th>
+							<th class="px-4 py-3 text-left font-medium">Updated</th>
 							<th class="w-10 px-4 py-3"></th>
 						</tr>
 					</thead>
 					<tbody>
 						{#if filteredCustomerGroups.length === 0}
 							<tr>
-								<td colspan="3" class="px-4 py-8 text-center text-muted-foreground">
+								<td colspan="5" class="px-4 py-8 text-center text-muted-foreground">
 									No customer groups found.
 								</td>
 							</tr>
 						{:else}
 							{#each filteredCustomerGroups as group (group.id)}
 								<tr class="border-b transition-colors hover:bg-muted/30">
-									<td class="px-4 py-3 font-medium">{group.name}</td>
+									<td class="px-4 py-3 font-medium">
+										<a
+											href="/customers/groups/{group.id}"
+											class="text-primary underline-offset-4 hover:underline"
+										>
+											{group.name}
+										</a>
+									</td>
 									<td class="px-4 py-3 text-muted-foreground">0</td>
+									<td class="px-4 py-3 text-muted-foreground">
+										{group.created_at
+											? new Date(group.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })
+											: '–'}
+									</td>
+									<td class="px-4 py-3 text-muted-foreground">
+										{group.updated_at
+											? new Date(group.updated_at).toLocaleDateString(undefined, { dateStyle: 'medium' })
+											: '–'}
+									</td>
 									<td class="px-4 py-3">
 										<DropdownMenu.Root>
 											<DropdownMenu.Trigger

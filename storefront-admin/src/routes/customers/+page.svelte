@@ -328,27 +328,40 @@
 						<tr>
 							<th class="px-4 py-3 text-left font-medium">Email</th>
 							<th class="px-4 py-3 text-left font-medium">Name</th>
-							<th class="px-4 py-3 text-left font-medium">Orders</th>
+							<th class="px-4 py-3 text-left font-medium">Account type</th>
+							<th class="px-4 py-3 text-left font-medium">Create date</th>
 							<th class="w-10 px-4 py-3"></th>
 						</tr>
 					</thead>
 					<tbody>
 						{#if filteredCustomers.length === 0}
 							<tr>
-								<td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
+								<td colspan="5" class="px-4 py-8 text-center text-muted-foreground">
 									No customers found.
 								</td>
 							</tr>
 						{:else}
 							{#each filteredCustomers as customer (customer.id)}
 								<tr class="border-b transition-colors hover:bg-muted/30">
-									<td class="px-4 py-3 font-medium">{customer.email}</td>
+									<td class="px-4 py-3 font-medium">
+										<a
+											href="/customers/{customer.id}"
+											class="text-primary hover:underline focus:outline-none focus:underline"
+										>
+											{customer.email}
+										</a>
+									</td>
 									<td class="px-4 py-3 text-muted-foreground">
 										{customer.first_name || customer.last_name
 											? `${customer.first_name ?? ''} ${customer.last_name ?? ''}`.trim()
 											: '–'}
 									</td>
-									<td class="px-4 py-3 text-muted-foreground">0</td>
+									<td class="px-4 py-3 text-muted-foreground">
+										{customer.has_account ? 'Account' : 'Guest'}
+									</td>
+									<td class="px-4 py-3 text-muted-foreground">
+										{formatDate(customer.created_at)}
+									</td>
 									<td class="px-4 py-3">
 										<DropdownMenu.Root>
 											<DropdownMenu.Trigger
