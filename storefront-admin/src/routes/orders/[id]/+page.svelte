@@ -57,6 +57,20 @@
 		sku?: string | null;
 	};
 
+	type BillingAddress = {
+		first_name?: string | null;
+		last_name?: string | null;
+		company?: string | null;
+		address_1?: string | null;
+		address_2?: string | null;
+		city?: string | null;
+		state?: string | null;
+		postal_code?: string | null;
+		country?: string | null;
+		phone_code?: string | null;
+		phone?: string | null;
+	};
+
 	type OrderMetadata = {
 		notes?: string | null;
 		tags?: string | null;
@@ -66,6 +80,7 @@
 		shipping_amount?: number;
 		tax_amount?: number;
 		total?: number;
+		billing_address?: string | BillingAddress | null;
 	};
 
 	const orderId = $derived($page.params.id);
@@ -74,6 +89,7 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let customerSearch = $state('');
+	let customerPhone = $state<string | null>(null);
 	let timelineComment = $state('');
 	let editContactOpen = $state(false);
 	let editShippingOpen = $state(false);
@@ -82,6 +98,7 @@
 		if (!orderId) return;
 		loading = true;
 		error = null;
+		customerPhone = null;
 		try {
 			const res = await fetch(`${API_BASE}/orders/${orderId}`, { cache: 'no-store' });
 			if (!res.ok) {
@@ -91,6 +108,15 @@
 				return;
 			}
 			order = (await res.json()) as Order;
+			if (order.customer_id) {
+				const custRes = await fetch(`${API_BASE}/customers/${order.customer_id}`, {
+					cache: 'no-store'
+				});
+				if (custRes.ok) {
+					const cust = (await custRes.json()) as { phone?: string | null };
+					customerPhone = cust.phone ?? null;
+				}
+			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			order = null;
@@ -109,6 +135,23 @@
 		if (!meta || typeof meta !== 'object' || meta === null) return {};
 		return meta as OrderMetadata;
 	});
+
+	const billingAddress = $derived((): BillingAddress | null => {
+		const raw = orderMetadata()?.billing_address;
+		if (raw == null) return null;
+		if (typeof raw === 'string') {
+			try {
+				return JSON.parse(raw) as BillingAddress;
+			} catch {
+				return null;
+			}
+		}
+		return raw as BillingAddress;
+	});
+	const hasBillingAddress = $derived(
+		billingAddress() &&
+			(billingAddress()!.first_name || billingAddress()!.last_name || billingAddress()!.address_1)
+	);
 
 	const orderItems = $derived(orderMetadata().items ?? []);
 	const subtotal = $derived(orderMetadata().subtotal ?? 0);
@@ -222,8 +265,8 @@
 						</div>
 					</div>
 					<div class="flex items-center gap-2">
-						<Button variant="outline" size="sm">Refund</Button>
-						<Button variant="outline" size="sm">Edit</Button>
+						<Button variant="outline" size="sm" onclick={() => goto(`/orders/${orderId}/refund`)}>Refund</Button>
+						<Button variant="outline" size="sm" onclick={() => goto(`/orders/${orderId}/edit`)}>Edit</Button>
 						<DropdownMenu.Root>
 							<DropdownMenu.Trigger
 								class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
@@ -491,7 +534,11 @@
 									{:else}
 										<div>No email provided</div>
 									{/if}
-									<div>No phone number</div>
+									{#if customerPhone}
+										<div>{customerPhone}</div>
+									{:else}
+										<div>No phone number</div>
+									{/if}
 								</div>
 							</div>
 							<div>
@@ -500,7 +547,36 @@
 							</div>
 							<div>
 								<div class="mb-1.5 font-medium">Billing address</div>
-								<div class="text-muted-foreground">No billing address provided</div>
+								{#if hasBillingAddress && billingAddress()}
+									{@const addr = billingAddress()!}
+									<div class="space-y-0.5 text-sm text-muted-foreground">
+										{#if addr.first_name || addr.last_name}
+											<div>{[addr.first_name, addr.last_name].filter(Boolean).join(' ')}</div>
+										{/if}
+										{#if addr.company}
+											<div>{addr.company}</div>
+										{/if}
+										{#if addr.address_1}
+											<div>{addr.address_1}</div>
+											{#if addr.address_2}
+												<div>{addr.address_2}</div>
+											{/if}
+										{/if}
+										{#if addr.city || addr.state || addr.postal_code}
+											<div>
+												{[addr.city, addr.state, addr.postal_code].filter(Boolean).join(', ')}
+											</div>
+										{/if}
+										{#if addr.country}
+											<div>{addr.country}</div>
+										{/if}
+										{#if addr.phone}
+											<div>{addr.phone_code ? `${addr.phone_code} ` : ''}{addr.phone}</div>
+										{/if}
+									</div>
+								{:else}
+									<div class="text-muted-foreground">No billing address provided</div>
+								{/if}
 							</div>
 						</div>
 					</div>

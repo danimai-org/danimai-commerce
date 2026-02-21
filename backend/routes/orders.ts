@@ -10,6 +10,10 @@ import {
   CreateOrdersProcess,
   type CreateOrdersProcessInput,
   CreateOrdersSchema,
+  UPDATE_ORDERS_PROCESS,
+  UpdateOrdersProcess,
+  type UpdateOrderProcessInput,
+  UpdateOrderSchema,
   type Order,
   type Database,
 } from "@danimai/order";
@@ -108,6 +112,45 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
         tags: ["orders"],
         summary: "Get an order by ID",
         description: "Retrieves a single order by its ID",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+      },
+    }
+  )
+  .patch(
+    "/:id",
+    async ({ params, body, set }) => {
+      try {
+        const process = getService<UpdateOrdersProcess>(UPDATE_ORDERS_PROCESS);
+        const logger = getService<Logger>(DANIMAI_LOGGER);
+        const input = Value.Convert(UpdateOrderSchema, {
+          ...body,
+          id: params.id,
+        }) as UpdateOrderProcessInput;
+        const result = await process.runOperations({
+          input,
+          logger,
+        });
+        if (!result) {
+          set.status = 404;
+          return { message: "Order not found" };
+        }
+        return result;
+      } catch (err) {
+        return handleProcessError(err, set);
+      }
+    },
+    {
+      detail: {
+        tags: ["orders"],
+        summary: "Update an order",
+        description: "Updates an order by ID",
         parameters: [
           {
             name: "id",

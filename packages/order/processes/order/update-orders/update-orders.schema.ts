@@ -41,12 +41,7 @@ export const UpdateOrderSchema = Type.Object({
   region_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   billing_address_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   shipping_address_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-  metadata: Type.Optional(
-    Type.Record(
-      Type.String(),
-      Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()])
-    )
-  ),
+  metadata: Type.Optional(Type.Unknown()),
 });
 
 export type UpdateOrderProcessInput = Static<typeof UpdateOrderSchema>;
