@@ -82,7 +82,7 @@
 			const optionsRecord: Record<string, string> = {};
 			const parts: string[] = [];
 			options.forEach((opt, j) => {
-				optionsRecord[opt.title] = combo[j] as string;
+				optionsRecord[opt.title.trim()] = (combo[j] as string)?.trim() ?? '';
 				parts.push(combo[j] as string);
 			});
 			return {
@@ -211,6 +211,13 @@
 	let createHandle = $state('');
 	let createDescription = $state('');
 	let createHasVariants = $state(true);
+	let createMediaModalOpen = $state(false);
+	let createMediaImageUrl = $state('');
+	let createMediaChosenFile = $state<File | null>(null);
+	let createMediaFileInput = $state<HTMLInputElement | undefined>();
+	// Saved choice: either URL or one file
+	let createMediaUrl = $state('');
+	let createMediaFile = $state<File | null>(null);
 
 	// Organize
 	let createDiscountable = $state(true);
@@ -289,6 +296,8 @@
 		createSalesChannelInput = '';
 		createOptions = [];
 		createAttributeEntries = [];
+		createMediaUrl = '';
+		createMediaFile = null;
 		createError = null;
 		syncVariantsFromOptions();
 		// Fetch collections, categories, attributes
@@ -483,7 +492,10 @@
 		const optionTitles = createOptions.map((o) => o.title).filter(Boolean);
 		const optionsForApi = createOptions
 			.filter((o) => o.title.trim() && o.values.length > 0)
-			.map((o) => ({ title: o.title.trim(), values: o.values }));
+			.map((o) => ({
+				title: o.title.trim(),
+				values: o.values.map((val) => (typeof val === 'string' ? val.trim() : val))
+			}));
 
 		const variantsForApi = createVariants.map((v, i) => {
 			const prices = v.priceAmount.trim()
@@ -491,9 +503,12 @@
 				: [];
 			const availableCountStr = String(v.availableCount || '').trim();
 			const availableCountNum = availableCountStr ? parseInt(availableCountStr, 10) : null;
+			const optionsTrimmed = Object.fromEntries(
+				Object.entries(v.options).map(([k, val]) => [k.trim(), typeof val === 'string' ? val.trim() : val])
+			);
 			return {
 				title: v.title,
-				options: v.options,
+				options: optionsTrimmed,
 				sku: v.sku || undefined,
 				manage_inventory: availableCountNum !== null && availableCountNum >= 0,
 				allow_backorder: v.allow_backorder,
@@ -980,13 +995,96 @@
 								Media <span class="font-normal text-muted-foreground">(Optional)</span>
 							</span>
 							<div
-								role="group"
+								role="button"
+								tabindex="0"
 								aria-label="Media upload"
-								class="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground"
+								class="flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:bg-muted/50"
+								onclick={() => {
+									createMediaImageUrl = createMediaUrl;
+									createMediaChosenFile = createMediaFile;
+									createMediaModalOpen = true;
+								}}
+								onkeydown={(e) => e.key === 'Enter' && (createMediaModalOpen = true)}
 							>
 								<Upload class="size-8 text-muted-foreground" />
 								<p>Drag and drop images here or click to upload.</p>
+								{#if createMediaUrl || createMediaFile}
+									<p class="text-xs text-muted-foreground">
+										{createMediaUrl ? 'Image URL set' : createMediaFile?.name ?? '1 image selected'}
+									</p>
+								{/if}
 							</div>
+							<!-- Image URL / Choose file modal (centered, not full-screen sheet) -->
+							<Dialog.Root bind:open={createMediaModalOpen}>
+								<Dialog.Content
+									class="my-auto mx-auto h-max w-full max-w-md max-h-[90dvh] overflow-auto rounded-lg border shadow-lg"
+								>
+									<Dialog.Header>
+										<Dialog.Title>Provide an image</Dialog.Title>
+									</Dialog.Header>
+									<div class="grid gap-4 p-[10px]">
+										<div class="flex flex-col gap-2">
+											<label for="create-media-url" class="text-sm font-medium">Image URL</label>
+											<Input
+												id="create-media-url"
+												type="url"
+												placeholder="https://..."
+												bind:value={createMediaImageUrl}
+												class="w-full"
+											/>
+										</div>
+										<p class="text-sm text-muted-foreground">Or choose file</p>
+										<div class="flex items-center gap-2">
+											<input
+												type="file"
+												accept="image/*"
+												class="hidden"
+												bind:this={createMediaFileInput}
+												onchange={(e) => {
+													const f = e.currentTarget.files?.[0];
+													if (f) createMediaChosenFile = f;
+													e.currentTarget.value = '';
+												}}
+											/>
+											<Button
+												type="button"
+												variant="outline"
+												onclick={() => createMediaFileInput?.click()}
+											>
+												Choose file
+											</Button>
+											<span class="text-sm text-muted-foreground">
+												{createMediaChosenFile?.name ?? 'No file chosen'}
+											</span>
+										</div>
+									</div>
+									<Dialog.Footer class="flex flex-row justify-end gap-2 border-t p-4">
+										<Button
+											type="button"
+											variant="outline"
+											onclick={() => (createMediaModalOpen = false)}
+										>
+											Cancel
+										</Button>
+										<Button
+											type="button"
+											onclick={() => {
+												if (createMediaImageUrl.trim()) {
+													createMediaUrl = createMediaImageUrl.trim();
+													createMediaFile = null;
+												}
+												if (createMediaChosenFile) {
+													createMediaFile = createMediaChosenFile;
+													createMediaUrl = '';
+												}
+												createMediaModalOpen = false;
+											}}
+										>
+											Save
+										</Button>
+									</Dialog.Footer>
+								</Dialog.Content>
+							</Dialog.Root>
 						</div>
 						<div class="flex flex-col gap-2">
 							<label for="create-has-variants" class="text-sm font-medium">Variants</label>
