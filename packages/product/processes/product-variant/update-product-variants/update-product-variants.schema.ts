@@ -1,10 +1,5 @@
 import { Type, type Static } from "typebox";
 
-export const AttributeValueSchema = Type.Object({
-  attribute_id: Type.String(),
-  value: Type.String(),
-});
-
 const ProductVariantPriceSchema = Type.Object({
   amount: Type.Number(),
   currency_code: Type.String(),
@@ -26,7 +21,6 @@ export const UpdateProductVariantSchema = Type.Object({
   variant_rank: Type.Optional(Type.Number()),
   thumbnail: Type.Optional(Type.String()),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
-  attribute_values: Type.Optional(Type.Array(AttributeValueSchema)),
   prices: Type.Optional(Type.Array(ProductVariantPriceSchema)),
 });
 

@@ -36,9 +36,17 @@ const SalesChannelSchema = Type.Object({
   id: Type.String(),
 });
 
-// Attribute Schema
-const AttributeSchema = Type.Object({
-  id: Type.String(),
+// Attribute group relation (product linked to group)
+const AttributeGroupRelationSchema = Type.Object({
+  attribute_group_id: Type.String(),
+  required: Type.Optional(Type.Boolean()),
+  rank: Type.Optional(Type.Number()),
+});
+
+// Attribute value (scoped to group + attribute)
+const AttributeValueSchema = Type.Object({
+  attribute_group_id: Type.String(),
+  attribute_id: Type.String(),
   value: Type.Any(),
 });
 
@@ -53,13 +61,15 @@ export const CreateProductSchema = Type.Object({
   thumbnail: Type.Optional(Type.String()),
   external_id: Type.Optional(Type.String()),
   category_id: Type.Optional(Type.String()),
+  attribute_group_id: Type.Optional(Type.String()),
   options: Type.Optional(Type.Array(ProductOptionSchema)),
   variants: Type.Optional(Type.Array(ProductVariantSchema)),
   sales_channels: Type.Optional(Type.Array(SalesChannelSchema)),
   tag_ids: Type.Optional(Type.Array(Type.String())),
   shipping_profile_id: Type.Optional(Type.String()),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
-  attributes: Type.Optional(Type.Array(AttributeSchema)),
+  attribute_groups: Type.Optional(Type.Array(AttributeGroupRelationSchema)),
+  attributes: Type.Optional(Type.Array(AttributeValueSchema)),
 });
 
 export type CreateProductProcessInput = Static<

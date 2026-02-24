@@ -33,8 +33,11 @@ export class UpdateProductProcess
     await this.validateProduct(input);
     const category = await this.validateCategory(input);
     const handle = await this.validateHandle(input);
+    if (input.attribute_groups !== undefined) {
+      await this.validateAttributeGroupIds(input.attribute_groups.map((g) => g.attribute_group_id));
+    }
     if (input.attributes !== undefined) {
-      await this.validateAttributeIds(input.attributes.map((a) => a.attribute_id));
+      await this.validateAttributeValuesForGroups(input.id, input.attributes);
     }
     if (input.tag_ids !== undefined) {
       await this.validateTagIds(input.tag_ids);
@@ -44,6 +47,9 @@ export class UpdateProductProcess
     }
 
     const updated = await this.updateProduct(input, category, handle);
+    if (input.attribute_groups !== undefined) {
+      await this.syncAttributeGroupRelations(input.id, input.attribute_groups);
+    }
     if (input.attributes !== undefined) {
       await this.syncAttributeValues(input.id, input.attributes);
     }
@@ -140,6 +146,7 @@ export class UpdateProductProcess
       thumbnail?: string | null;
       external_id?: string | null;
       category_id?: string | null;
+      attribute_group_id?: string | null;
       metadata?: unknown;
     } = {};
 
@@ -183,6 +190,10 @@ export class UpdateProductProcess
       updateData.category_id = category?.id ?? null;
     }
 
+    if (input.attribute_group_id !== undefined) {
+      updateData.attribute_group_id = input.attribute_group_id ?? null;
+    }
+
     if (input.metadata !== undefined) {
       updateData.metadata = input.metadata;
     }
@@ -200,28 +211,105 @@ export class UpdateProductProcess
       .executeTakeFirst();
   }
 
-  async validateAttributeIds(attributeIds: string[]) {
-    if (attributeIds.length === 0) return;
+  async validateAttributeGroupIds(groupIds: string[]) {
+    if (groupIds.length === 0) return;
     const existing = await this.db
-      .selectFrom("product_attributes")
-      .where("id", "in", attributeIds)
+      .selectFrom("product_attribute_groups")
+      .where("id", "in", groupIds)
       .where("deleted_at", "is", null)
       .select("id")
       .execute();
     const found = new Set(existing.map((r) => r.id));
-    const missing = attributeIds.filter((id) => !found.has(id));
+    const missing = groupIds.filter((id) => !found.has(id));
     if (missing.length > 0) {
-      throw new ValidationError("One or more attributes not found", [{
+      throw new ValidationError("One or more attribute groups not found", [{
         type: "not_found",
-        message: `Attributes not found: ${missing.join(", ")}`,
-        path: "attributes",
+        message: `Attribute groups not found: ${missing.join(", ")}`,
+        path: "attribute_groups",
       }]);
     }
   }
 
+  async validateAttributeValuesForGroups(
+    productId: string,
+    attributes: Array<{ attribute_group_id: string; attribute_id: string; value: string }>
+  ) {
+    if (attributes.length === 0) return;
+    const attrIds = [...new Set(attributes.map((a) => a.attribute_id))];
+    const existingAttrs = await this.db
+      .selectFrom("product_attributes")
+      .where("id", "in", attrIds)
+      .where("deleted_at", "is", null)
+      .select("id")
+      .execute();
+    const foundAttrs = new Set(existingAttrs.map((r) => r.id));
+    const missingAttrs = attrIds.filter((id) => !foundAttrs.has(id));
+    if (missingAttrs.length > 0) {
+      throw new ValidationError("One or more attributes not found", [{
+        type: "not_found",
+        message: `Attributes not found: ${missingAttrs.join(", ")}`,
+        path: "attributes",
+      }]);
+    }
+    const groupAttrPairs = await this.db
+      .selectFrom("product_attribute_group_attributes")
+      .select(["attribute_group_id", "attribute_id"])
+      .execute();
+    const validPairs = new Set(groupAttrPairs.map((r) => `${r.attribute_group_id}:${r.attribute_id}`));
+    for (const a of attributes) {
+      if (!validPairs.has(`${a.attribute_group_id}:${a.attribute_id}`)) {
+        throw new ValidationError("Attribute not assigned to group", [{
+          type: "invalid",
+          message: `Attribute ${a.attribute_id} is not assigned to group ${a.attribute_group_id}`,
+          path: "attributes",
+        }]);
+      }
+    }
+    const productGroupIds = await this.db
+      .selectFrom("product_attribute_group_relations")
+      .where("product_id", "=", productId)
+      .select("attribute_group_id")
+      .execute()
+      .then((rows) => new Set(rows.map((r) => r.attribute_group_id)));
+    for (const a of attributes) {
+      if (!productGroupIds.has(a.attribute_group_id)) {
+        throw new ValidationError("Product must be linked to attribute group", [{
+          type: "invalid",
+          message: `Product is not linked to group ${a.attribute_group_id}. Set attribute_groups first.`,
+          path: "attributes",
+        }]);
+      }
+    }
+  }
+
+  async syncAttributeGroupRelations(
+    productId: string,
+    groups: Array<{ attribute_group_id: string; required?: boolean; rank?: number }>
+  ) {
+    await this.db
+      .deleteFrom("product_attribute_group_relations")
+      .where("product_id", "=", productId)
+      .execute();
+
+    if (groups.length === 0) return;
+
+    await this.db
+      .insertInto("product_attribute_group_relations")
+      .values(
+        groups.map((g, i) => ({
+          id: randomUUID(),
+          product_id: productId,
+          attribute_group_id: g.attribute_group_id,
+          required: g.required ?? false,
+          rank: g.rank ?? i,
+        }))
+      )
+      .execute();
+  }
+
   async syncAttributeValues(
     productId: string,
-    attributes: Array<{ attribute_id: string; value: string }>
+    attributes: Array<{ attribute_group_id: string; attribute_id: string; value: string }>
   ) {
     await this.db
       .deleteFrom("product_attribute_values")
@@ -232,6 +320,7 @@ export class UpdateProductProcess
 
     const values = attributes.map((a) => ({
       id: randomUUID(),
+      attribute_group_id: a.attribute_group_id,
       attribute_id: a.attribute_id,
       product_id: productId,
       value: a.value,

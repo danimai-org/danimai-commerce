@@ -43,7 +43,11 @@ export const collectionRoutes = new Elysia({ prefix: "/collections" })
       try {
         const process = getService<PaginatedCollectionsProcess>(PAGINATED_COLLECTIONS_PROCESS);
         const logger = getService<Logger>(DANIMAI_LOGGER);
-        const result = await process.runOperations({ input: Value.Convert(PaginatedCollectionsSchema, query) as PaginatedCollectionsProcessInput, logger });
+        const cleanedQuery: Record<string, unknown> = { ...query };
+        if (typeof cleanedQuery.sales_channel_ids === "string") {
+          cleanedQuery.sales_channel_ids = (cleanedQuery.sales_channel_ids as string).split(",").map((s) => s.trim()).filter(Boolean);
+        }
+        const result = await process.runOperations({ input: Value.Convert(PaginatedCollectionsSchema, cleanedQuery) as PaginatedCollectionsProcessInput, logger });
         return result;
       } catch (err) {
         return handleProcessError(err, set);

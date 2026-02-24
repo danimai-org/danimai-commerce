@@ -12,7 +12,8 @@ export type ProductGridItem = {
 type ApiCollection = {
 	id: string;
 	title: string;
-	handle: string;
+	handle?: string;
+	slug?: string;
 };
 
 type ApiProduct = {
@@ -61,12 +62,51 @@ export async function load({ params }: { params: { handle: string } }) {
 	let collection: ApiCollection | null = null;
 	const products: ProductGridItem[] = [];
 
+	function normalizeHandle(h: string): string {
+		return h
+			.replace(/^\/+/, '')
+			.trim()
+			.toLowerCase()
+			.replace(/\s+/g, '-')
+			.replace(/_/g, '-');
+	}
+	const normalizedHandle = normalizeHandle(handle);
+	const handlesToTry = [normalizedHandle];
+
+	function parseCollectionsList(body: unknown): ApiCollection[] {
+		if (Array.isArray(body)) return body as ApiCollection[];
+		if (body && typeof body === 'object') {
+			const o = body as Record<string, unknown>;
+			const arr = (o.data ?? o.collections ?? o.items) as unknown;
+			if (Array.isArray(arr)) return arr as ApiCollection[];
+		}
+		return [];
+	}
+
 	try {
-		const listRes = await fetch(`${API_BASE}/collections?limit=100&page=1`, { cache: 'no-store' });
-		if (!listRes.ok) return { collection: null, products: [], error: 'Failed to load collections' };
-		const listData = (await listRes.json()) as { data?: ApiCollection[] };
-		const collections = listData.data ?? [];
-		collection = collections.find((c) => c.handle === handle) ?? null;
+		let collections: ApiCollection[] = [];
+		let page = 1;
+		const limit = 100;
+		let totalPages = 1;
+
+		do {
+			const listRes = await fetch(
+				`${API_BASE}/collections?limit=${limit}&page=${page}`,
+				{ cache: 'no-store' }
+			);
+			if (!listRes.ok) return { collection: null, products: [], error: 'Failed to load collections' };
+			const listData = (await listRes.json()) as { data?: ApiCollection[]; pagination?: { total_pages?: number } };
+			const chunk = parseCollectionsList(listData);
+			collections = collections.concat(chunk);
+			totalPages = listData.pagination?.total_pages ?? 1;
+			const collectionHandle = (c: ApiCollection) => (c.slug ?? c.handle ?? '').trim();
+			collection = collections.find((c) => {
+				const h = collectionHandle(c);
+				return h && handlesToTry.includes(normalizeHandle(h));
+			}) ?? null;
+			if (collection) break;
+			page++;
+		} while (page <= totalPages && collections.length > 0);
 
 		if (!collection) {
 			return { collection: null, products: [], error: 'Collection not found' };
@@ -77,8 +117,8 @@ export async function load({ params }: { params: { handle: string } }) {
 			{ cache: 'no-store' }
 		);
 		if (!productsRes.ok) return { collection: { ...collection }, products: [], error: null };
-		const productsData = (await productsRes.json()) as { products?: ApiProduct[] };
-		const list = productsData.products ?? [];
+		const productsData = (await productsRes.json()) as { products?: ApiProduct[]; data?: ApiProduct[] };
+		const list = productsData.products ?? productsData.data ?? [];
 
 		const variantIds = list
 			.map((p) => p.variants?.[0]?.id)
@@ -98,7 +138,7 @@ export async function load({ params }: { params: { handle: string } }) {
 					priceStr =
 						pr.currency_code === 'USD'
 							? `$${pr.amount.toFixed(2)}`
-							: `${pr.currency_code} ${pr.amount.toFixed(2)}`;
+							: `${pr.currency_code.toUpperCase()} ${pr.amount.toFixed(2)}`;
 				}
 			}
 			products.push({
@@ -118,7 +158,13 @@ export async function load({ params }: { params: { handle: string } }) {
 	}
 
 	return {
-		collection: collection ? { id: collection.id, title: collection.title, handle: collection.handle } : null,
+		collection: collection
+			? {
+					id: collection.id,
+					title: collection.title,
+					handle: (collection.slug ?? collection.handle ?? '').trim() || normalizedHandle
+				}
+			: null,
 		products,
 		error: null
 	};

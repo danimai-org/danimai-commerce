@@ -25,30 +25,29 @@
 		<a href="/" class="brand">ESSENTIALS</a>
 		<ul class="nav-links">
 			<li class="nav-dropdown">
-				<a href="/tops">Tops <span class="caret">▼</span></a>
+				<a class="nav-dropdown-item">Tops <span class="caret">▼</span></a>
 				<div class="dropdown-menu" aria-hidden="true">
-					<a href="/tops">All Tops</a>
-					<a href="/tops/sweatshirts">Sweatshirts</a>
-					<a href="/tops/long-sleeves">Long Sleeves</a>
-					<a href="/tops/t-shirts">T-Shirts</a>
-					<a href="/tops/bras">Bras</a>
-					<a href="/tops/jackets">Jackets</a>
-					<a href="/tops/hoodies">Hoodies</a>
+					<a href="/categories/tops">All Tops</a>
+					<a href="/categories/sweatshirts">Sweatshirts</a>
+					<a href="/categories/long-sleeves">Long Sleeves</a>
+					<a href="/categories/t-shirts">T-Shirts</a>
+					<a href="/categories/jackets">Jackets</a>
+					<a href="/categories/hoodies">Hoodies</a>
 				</div>
 			</li>
 			<li class="nav-dropdown">
-				<a href="/bottoms">Bottoms <span class="caret">▼</span></a>
+				<a class="nav-dropdown-item">Bottoms <span class="caret">▼</span></a>
 				<div class="dropdown-menu" aria-hidden="true">
-					<a href="/bottoms">All Bottoms</a>
-					<a href="/bottoms/leggings">Leggings</a>
-					<a href="/bottoms/shorts">Shorts</a>
-					<a href="/bottoms/joggers">Joggers</a>
+					<a href="/categories/bottoms">All Bottoms</a>
+					<a href="/categories/leggings">Leggings</a>
+					<a href="/categories/shorts">Shorts</a>
+					<a href="/categories/joggers">Joggers</a>
 				</div>
 			</li>
 			<li class="nav-dropdown">
-				<a href="/collections">Collections <span class="caret">▼</span></a>
+				<a class="nav-dropdown-item">Collections <span class="caret">▼</span></a>
 				<div class="dropdown-menu" aria-hidden="true">
-					<a href="/collections">All Collections</a>
+					<a href="/store">Shop All</a>
 					<a href="/collections/core-essentials">Core Essentials</a>
 					<a href="/collections/studio-training">Studio & Training</a>
 					<a href="/collections/outer-layers">Outer Layers</a>

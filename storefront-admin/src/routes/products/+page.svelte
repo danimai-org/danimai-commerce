@@ -21,6 +21,7 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Plus from '@lucide/svelte/icons/plus';
+	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import { DropdownMenu } from 'bits-ui';
 	import { cn } from '$lib/utils.js';
 
@@ -118,6 +119,105 @@
 
 	let selectedProducts = $state<Set<string>>(new Set());
 
+	type FilterType =
+		| 'categories'
+		| 'sales_channel'
+		| 'vendors'
+		| 'tag'
+		| 'statuses'
+		| 'region_catalog'
+		| 'b2b_catalog'
+		| 'company_location_catalog'
+		| 'retail_catalog'
+		| 'unassigned_catalog'
+		| 'types'
+		| 'collection'
+		| 'publishing_error'
+		| 'gift_card'
+		| 'combined_listings';
+	let activeFilterTypes = $state<Set<FilterType>>(
+		new Set(['vendors', 'tag', 'statuses'])
+	);
+	const FILTER_OPTIONS: { id: FilterType; label: string }[] = [
+		{ id: 'categories', label: 'Categories' },
+		{ id: 'sales_channel', label: 'Sales channel' },
+		{ id: 'region_catalog', label: 'Region catalog' },
+		{ id: 'b2b_catalog', label: 'B2B catalog' },
+		{ id: 'company_location_catalog', label: 'Company location catalog' },
+		{ id: 'retail_catalog', label: 'Retail catalog' },
+		{ id: 'unassigned_catalog', label: 'Unassigned catalog' },
+		{ id: 'vendors', label: 'Vendors' },
+		{ id: 'tag', label: 'Tag' },
+		{ id: 'types', label: 'Types' },
+		{ id: 'collection', label: 'Collection' },
+		{ id: 'statuses', label: 'Statuses' },
+		{ id: 'publishing_error', label: 'Publishing error' },
+		{ id: 'gift_card', label: 'Gift card' },
+		{ id: 'combined_listings', label: 'Combined listings' }
+	];
+	function toggleFilterType(id: FilterType) {
+		activeFilterTypes = new Set(activeFilterTypes);
+		if (activeFilterTypes.has(id)) activeFilterTypes.delete(id);
+		else activeFilterTypes.add(id);
+	}
+	function clearFilters() {
+		activeFilterTypes = new Set();
+	}
+
+	const VENDORS_LIST = [
+		'ddanimai',
+		'Hydrogen Vendor',
+		'Multi-managed Vendor',
+		'Snowboard Vendor'
+	] as const;
+	const STATUS_OPTIONS = ['published', 'draft', 'proposed', 'rejected'] as const;
+	let selectedVendors = $state<Set<string>>(new Set());
+	let selectedTagIds = $state<Set<string>>(new Set());
+	let selectedStatuses = $state<Set<string>>(new Set());
+	let selectedCategoryIds = $state<Set<string>>(new Set());
+	let selectedSalesChannelIds = $state<Set<string>>(new Set());
+
+	function toggleCategory(id: string) {
+		selectedCategoryIds = new Set(selectedCategoryIds);
+		if (selectedCategoryIds.has(id)) selectedCategoryIds.delete(id);
+		else selectedCategoryIds.add(id);
+	}
+	function clearCategoryFilter() {
+		selectedCategoryIds = new Set();
+	}
+	function toggleSalesChannel(id: string) {
+		selectedSalesChannelIds = new Set(selectedSalesChannelIds);
+		if (selectedSalesChannelIds.has(id)) selectedSalesChannelIds.delete(id);
+		else selectedSalesChannelIds.add(id);
+	}
+	function clearSalesChannelFilter() {
+		selectedSalesChannelIds = new Set();
+	}
+	function toggleVendor(v: string) {
+		selectedVendors = new Set(selectedVendors);
+		if (selectedVendors.has(v)) selectedVendors.delete(v);
+		else selectedVendors.add(v);
+	}
+	function clearVendorFilter() {
+		selectedVendors = new Set();
+	}
+	function toggleTag(id: string) {
+		selectedTagIds = new Set(selectedTagIds);
+		if (selectedTagIds.has(id)) selectedTagIds.delete(id);
+		else selectedTagIds.add(id);
+	}
+	function clearTagFilter() {
+		selectedTagIds = new Set();
+	}
+	function toggleStatus(s: string) {
+		selectedStatuses = new Set(selectedStatuses);
+		if (selectedStatuses.has(s)) selectedStatuses.delete(s);
+		else selectedStatuses.add(s);
+	}
+	function clearStatusFilter() {
+		selectedStatuses = new Set();
+	}
+
 	async function fetchProducts() {
 		loading = true;
 		error = null;
@@ -131,6 +231,9 @@
 			});
 			if (searchQuery.trim()) {
 				params.append('search', searchQuery.trim());
+			}
+			if (selectedCategoryIds.size > 0) {
+				params.append('category_ids', [...selectedCategoryIds].join(','));
 			}
 			const res = await fetch(`${API_BASE}/products?${params}`, { cache: 'no-store' });
 			if (!res.ok) {
@@ -168,9 +271,17 @@
 	}
 
 	let previousSearchQuery = $state('');
+	let previousCategoryFilterSize = $state(0);
 	$effect(() => {
 		if (searchQuery !== previousSearchQuery) {
 			previousSearchQuery = searchQuery;
+			page = 1;
+		}
+	});
+	$effect(() => {
+		const size = selectedCategoryIds.size;
+		if (size !== previousCategoryFilterSize) {
+			previousCategoryFilterSize = size;
 			page = 1;
 		}
 	});
@@ -181,6 +292,7 @@
 		sortingField;
 		sortingDirection;
 		searchQuery;
+		selectedCategoryIds;
 		fetchProducts();
 	});
 
@@ -190,6 +302,47 @@
 		};
 		document.addEventListener('visibilitychange', handler);
 		return () => document.removeEventListener('visibilitychange', handler);
+	});
+
+	let tagsLoadedForFilter = $state(false);
+	$effect(() => {
+		if (tagsLoadedForFilter) return;
+		tagsLoadedForFilter = true;
+		fetch(`${API_BASE}/product-tags?limit=100`)
+			.then((r) => (r.ok ? r.json() : { data: [] }))
+			.then((j) => {
+				tagsList = j.data ?? [];
+			})
+			.catch(() => {
+				tagsList = [];
+			});
+	});
+	let filterCategoriesLoaded = $state(false);
+	let filterSalesChannelsLoaded = $state(false);
+	$effect(() => {
+		if (filterCategoriesLoaded) return;
+		filterCategoriesLoaded = true;
+		fetch(`${API_BASE}/product-categories?limit=100`)
+			.then((r) => (r.ok ? r.json() : { data: [] }))
+			.then((j) => {
+				categoriesList = j.data ?? [];
+			})
+			.catch(() => {
+				categoriesList = [];
+			});
+	});
+	$effect(() => {
+		if (filterSalesChannelsLoaded) return;
+		filterSalesChannelsLoaded = true;
+		fetch(`${API_BASE}/sales-channels?limit=100`)
+			.then((r) => (r.ok ? r.json() : { data: [] }))
+			.then((j) => {
+				const ch = j.data ?? [];
+				salesChannelsList = ch.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }));
+			})
+			.catch(() => {
+				salesChannelsList = [];
+			});
 	});
 
 	const products = $derived(data?.data ?? []);
@@ -632,10 +785,221 @@
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex flex-col gap-4">
 			<div class="flex flex-wrap items-center justify-between gap-2">
-				<Button variant="outline" size="sm" class="rounded-md">
-					<SlidersHorizontal class="mr-1.5 size-4" />
-					Add filter
-				</Button>
+				<div class="flex flex-wrap items-center gap-2">
+					{#each FILTER_OPTIONS as opt (opt.id)}
+						{#if activeFilterTypes.has(opt.id)}
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger
+									class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+								>
+									{opt.label}
+									<ChevronDown class="size-4" />
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Portal>
+									<DropdownMenu.Content
+										class="z-50 min-w-48 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+										sideOffset={4}
+									>
+										{#if opt.id === 'categories'}
+											<div class="max-h-48 overflow-auto py-1">
+												{#each categoriesList as cat (cat.id)}
+													<button
+														type="button"
+														class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
+														onclick={() => toggleCategory(cat.id)}
+													>
+														<span
+															class={cn(
+																'flex size-4 shrink-0 items-center justify-center rounded border border-input bg-background',
+																selectedCategoryIds.has(cat.id) && 'ring-2 ring-ring'
+															)}
+														>
+															{#if selectedCategoryIds.has(cat.id)}
+																<Check class="size-2.5" />
+															{/if}
+														</span>
+														{cat.value}
+													</button>
+												{/each}
+												<button
+													type="button"
+													class="w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+													onclick={clearCategoryFilter}
+												>
+													Clear
+												</button>
+											</div>
+										{:else if opt.id === 'sales_channel'}
+											<div class="max-h-48 overflow-auto py-1">
+												{#each salesChannelsList as ch (ch.id)}
+													<button
+														type="button"
+														class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
+														onclick={() => toggleSalesChannel(ch.id)}
+													>
+														<span
+															class={cn(
+																'flex size-4 shrink-0 items-center justify-center rounded border border-input bg-background',
+																selectedSalesChannelIds.has(ch.id) && 'ring-2 ring-ring'
+															)}
+														>
+															{#if selectedSalesChannelIds.has(ch.id)}
+																<Check class="size-2.5" />
+															{/if}
+														</span>
+														{ch.name}
+													</button>
+												{/each}
+												<button
+													type="button"
+													class="w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+													onclick={clearSalesChannelFilter}
+												>
+													Clear
+												</button>
+											</div>
+										{:else if opt.id === 'vendors'}
+											<div class="max-h-48 overflow-auto py-1">
+												{#each VENDORS_LIST as vendor (vendor)}
+													<button
+														type="button"
+														class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
+														onclick={() => toggleVendor(vendor)}
+													>
+														<span
+															class={cn(
+																'flex size-4 shrink-0 items-center justify-center rounded border border-input bg-background',
+																selectedVendors.has(vendor) && 'ring-2 ring-ring'
+															)}
+														>
+															{#if selectedVendors.has(vendor)}
+																<Check class="size-2.5" />
+															{/if}
+														</span>
+														{vendor}
+													</button>
+												{/each}
+												<button
+													type="button"
+													class="w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+													onclick={clearVendorFilter}
+												>
+													Clear
+												</button>
+											</div>
+										{:else if opt.id === 'tag'}
+											<div class="max-h-48 overflow-auto py-1">
+												{#each tagsList as tag (tag.id)}
+													<button
+														type="button"
+														class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
+														onclick={() => toggleTag(tag.id)}
+													>
+														<span
+															class={cn(
+																'flex size-4 shrink-0 items-center justify-center rounded border border-input bg-background',
+																selectedTagIds.has(tag.id) && 'ring-2 ring-ring'
+															)}
+														>
+															{#if selectedTagIds.has(tag.id)}
+																<Check class="size-2.5" />
+															{/if}
+														</span>
+														{tag.value}
+													</button>
+												{/each}
+												<button
+													type="button"
+													class="w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+													onclick={clearTagFilter}
+												>
+													Clear
+												</button>
+											</div>
+										{:else if opt.id === 'statuses'}
+											<div class="max-h-48 overflow-auto py-1">
+												{#each STATUS_OPTIONS as status (status)}
+													<button
+														type="button"
+														class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
+														onclick={() => toggleStatus(status)}
+													>
+														<span
+															class={cn(
+																'flex size-4 shrink-0 items-center justify-center rounded border border-input bg-background',
+																selectedStatuses.has(status) && 'ring-2 ring-ring'
+															)}
+														>
+															{#if selectedStatuses.has(status)}
+																<Check class="size-2.5" />
+															{/if}
+														</span>
+														{status}
+													</button>
+												{/each}
+												<button
+													type="button"
+													class="w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+													onclick={clearStatusFilter}
+												>
+													Clear
+												</button>
+											</div>
+										{:else}
+											<div class="max-h-48 overflow-auto py-1">
+												<p class="px-2 py-1.5 text-sm text-muted-foreground">No options</p>
+											</div>
+										{/if}
+									</DropdownMenu.Content>
+								</DropdownMenu.Portal>
+							</DropdownMenu.Root>
+						{/if}
+					{/each}
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger
+							class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+						>
+							<SlidersHorizontal class="mr-1.5 size-4" />
+							Add filter
+							<ChevronDown class="size-4" />
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Portal>
+							<DropdownMenu.Content
+								class="z-50 min-w-48 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+								sideOffset={4}
+							>
+								<div class="max-h-48 overflow-auto py-1">
+									{#each FILTER_OPTIONS as opt (opt.id)}
+										<button
+											type="button"
+											class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
+											onclick={() => toggleFilterType(opt.id)}
+										>
+											<span
+												class={cn(
+													'flex size-4 items-center justify-center rounded border border-input bg-background',
+													activeFilterTypes.has(opt.id) && 'ring-2 ring-ring'
+												)}
+											>
+												{#if activeFilterTypes.has(opt.id)}
+													<Check class="size-2.5" />
+												{/if}
+											</span>
+											{opt.label}
+										</button>
+									{/each}
+									<button
+										type="button"
+										class="mt-1 w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+										onclick={clearFilters}
+									>
+										Clear
+									</button>
+								</div>
+							</DropdownMenu.Content>
+						</DropdownMenu.Portal>
+					</DropdownMenu.Root>
+				</div>
 				<div class="flex items-center gap-2">
 					<div class="relative max-w-md min-w-[200px] flex-1">
 						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />

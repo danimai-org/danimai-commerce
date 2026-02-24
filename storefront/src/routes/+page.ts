@@ -83,7 +83,7 @@ export async function load() {
 					priceStr =
 						pr.currency_code === 'USD'
 							? `$${pr.amount.toFixed(2)}`
-							: `${pr.currency_code} ${pr.amount.toFixed(2)}`;
+							: `${pr.currency_code.toUpperCase()} ${pr.amount.toFixed(2)}`;
 				}
 			}
 			products.push({

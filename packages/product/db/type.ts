@@ -9,14 +9,16 @@ export interface Database {
   product_collections: ProductCollectionTable;
   product_collection_relations: ProductCollectionRelationTable;
 
+  product_attribute_groups: ProductAttributeGroupTable;
   product_attributes: ProductAttributeTable;
+  product_attribute_group_relations: ProductAttributeGroupRelationTable;
+  product_attribute_group_attributes: ProductAttributeGroupAttributeTable;
   product_attribute_values: ProductAttributeValueTable;
 
   product_options: ProductOptionTable;
   product_option_values: ProductOptionValueTable;
 
   product_variants: ProductVariantTable;
-  variant_attribute_values: VariantAttributeValueTable;
   product_variant_option_relations: ProductVariantOptionRelationTable;
   product_variant_image_relations: ProductVariantImageRelationTable;
 
@@ -41,10 +43,25 @@ export interface ProductTable {
   created_at: Generated<string>;
   updated_at: Generated<string>;
   deleted_at: string | null;
+  attribute_group_id: string | null;
 }
 export type Product = Selectable<ProductTable>;
 export type NewProduct = Insertable<ProductTable>;
 export type ProductUpdate = Updateable<ProductTable>;
+
+// table product_attribute_groups
+export interface ProductAttributeGroupTable {
+  id: Generated<string>;
+  title: string;
+  metadata: unknown | null;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
+  deleted_at: string | null;
+}
+
+export type ProductAttributeGroup = Selectable<ProductAttributeGroupTable>;
+export type NewProductAttributeGroup = Insertable<ProductAttributeGroupTable>;
+export type ProductAttributeGroupUpdate = Updateable<ProductAttributeGroupTable>;
 
 // table product_attributes
 export interface ProductAttributeTable {
@@ -64,6 +81,7 @@ export type ProductAttributeUpdate = Updateable<ProductAttributeTable>;
 export interface ProductAttributeValueTable {
   id: Generated<string>;
   value: string;
+  attribute_group_id: string | null;
   attribute_id: string | null;
   product_id: string | null;
   metadata: unknown | null;
@@ -76,21 +94,27 @@ export type NewProductAttributeValue = Insertable<ProductAttributeValueTable>;
 export type ProductAttributeValueUpdate =
   Updateable<ProductAttributeValueTable>;
 
-// table variant_attribute_values
-export interface VariantAttributeValueTable {
+// table product_attribute_group_relations
+export interface ProductAttributeGroupRelationTable {
   id: Generated<string>;
-  value: string;
-  attribute_id: string | null;
-  variant_id: string | null;
-  metadata: unknown | null;
+  product_id: string;
+  attribute_group_id: string;
+  required: boolean;
+  rank: number;
   created_at: Generated<string>;
   updated_at: Generated<string>;
-  deleted_at: string | null;
 }
-export type VariantAttributeValue = Selectable<VariantAttributeValueTable>;
-export type NewVariantAttributeValue = Insertable<VariantAttributeValueTable>;
-export type VariantAttributeValueUpdate =
-  Updateable<VariantAttributeValueTable>;
+export type ProductAttributeGroupRelation = Selectable<ProductAttributeGroupRelationTable>;
+export type NewProductAttributeGroupRelation = Insertable<ProductAttributeGroupRelationTable>;
+export type ProductAttributeGroupRelationUpdate = Updateable<ProductAttributeGroupRelationTable>;
+
+// table product_attribute_group_attributes (junction: attribute assigned to group)
+export interface ProductAttributeGroupAttributeTable {
+  attribute_group_id: string;
+  attribute_id: string;
+}
+export type ProductAttributeGroupAttribute = Selectable<ProductAttributeGroupAttributeTable>;
+export type NewProductAttributeGroupAttribute = Insertable<ProductAttributeGroupAttributeTable>;
 
 // table product_variants
 export interface ProductVariantTable {

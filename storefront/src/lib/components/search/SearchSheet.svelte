@@ -98,7 +98,7 @@
 					pr && pr.currency_code === 'USD'
 						? `$${amount.toFixed(2)}`
 						: pr
-							? `${pr.currency_code} ${amount.toFixed(2)}`
+							? `${pr.currency_code.toUpperCase()} ${amount.toFixed(2)}`
 							: '—';
 				return {
 					name: p.title,
@@ -145,15 +145,6 @@
 				bind:value={query}
 				autocomplete="off"
 			/>
-			<button
-				type="button"
-				class="search-clear"
-				aria-label="Clear search"
-				onclick={clearInput}
-				tabindex="-1"
-			>
-				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-			</button>
 			<button type="button" class="search-close-btn" aria-label="Close search" onclick={handleClose}>
 				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
 			</button>
@@ -233,20 +224,6 @@
 	}
 	.search-input:focus {
 		outline: none;
-	}
-	.search-clear {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: none;
-		border: none;
-		padding: 0.25rem;
-		cursor: pointer;
-		color: #888;
-		flex-shrink: 0;
-	}
-	.search-clear:hover {
-		color: #1a1a1a;
 	}
 	.search-close-btn {
 		display: flex;

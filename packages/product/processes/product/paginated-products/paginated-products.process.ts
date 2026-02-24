@@ -62,12 +62,15 @@ export class PaginatedProductsProcess implements ProcessContract<PaginatedProduc
       sorting_field = "created_at",
       sorting_direction = SortOrder.DESC,
       category_id,
+      category_ids,
       search,
     } = input;
 
     let query = this.db.selectFrom("products").where("deleted_at", "is", null);
 
-    if (category_id) {
+    if (category_ids?.length) {
+      query = query.where("category_id", "in", category_ids);
+    } else if (category_id) {
       query = query.where("category_id", "=", category_id);
     }
 

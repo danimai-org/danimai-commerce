@@ -177,9 +177,17 @@
 												<SidebarMenuSubItem>
 													<SidebarMenuSubButton
 														href="/products/attributes"
-														isActive={path.startsWith('/products/attributes')}
+														isActive={path.startsWith('/products/attributes') && !path.startsWith('/products/attribute-groups')}
 													>
 														Attributes
+													</SidebarMenuSubButton>
+												</SidebarMenuSubItem>
+												<SidebarMenuSubItem>
+													<SidebarMenuSubButton
+														href="/products/attribute-groups"
+														isActive={path.startsWith('/products/attribute-groups')}
+													>
+														Attribute Groups
 													</SidebarMenuSubButton>
 												</SidebarMenuSubItem>
 											</SidebarMenuSub>

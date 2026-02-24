@@ -31,13 +31,35 @@ export class PaginatedCollectionsProcess
     schema: PaginatedCollectionsSchema,
   }) context: ProcessContextType<typeof PaginatedCollectionsSchema>) {
     const { input } = context;
-    const { page = 1, limit = 10, sorting_field = "created_at", sorting_direction = SortOrder.DESC } = input;
+    const { page = 1, limit = 10, sorting_field = "created_at", sorting_direction = SortOrder.DESC, search, sales_channel_ids } = input;
+
+    let baseQuery = this.db
+      .selectFrom("product_collections")
+      .where("product_collections.deleted_at", "is", null);
+
+    if (search && search.trim()) {
+      const searchTerm = `%${search.trim().toLowerCase()}%`;
+      baseQuery = baseQuery.where((eb) =>
+        eb.or([
+          eb("product_collections.title", "ilike", searchTerm),
+          eb("product_collections.handle", "ilike", searchTerm),
+        ])
+      );
+    }
+
+    if (sales_channel_ids && sales_channel_ids.length > 0) {
+      const collectionIdsInChannel = this.db
+        .selectFrom("product_collection_relations")
+        .innerJoin("product_sales_channels", "product_sales_channels.product_id", "product_collection_relations.product_id")
+        .where("product_sales_channels.sales_channel_id", "in", sales_channel_ids)
+        .select("product_collection_relations.product_collection_id")
+        .distinct();
+      baseQuery = baseQuery.where("product_collections.id", "in", collectionIdsInChannel);
+    }
 
     // Get total count before pagination
-    const countResult = await this.db
-      .selectFrom("product_collections")
-      .where("deleted_at", "is", null)
-      .select(({ fn }) => fn.count<number>("id").as("count"))
+    const countResult = await baseQuery
+      .select(({ fn }) => fn.count<number>("product_collections.id").as("count"))
       .executeTakeFirst();
 
     const total = Number(countResult?.count || 0);
@@ -50,9 +72,7 @@ export class PaginatedCollectionsProcess
 
     // Apply pagination and include product count
     const offset = (page - 1) * limit;
-    const dataWithCount = await this.db
-      .selectFrom("product_collections")
-      .where("product_collections.deleted_at", "is", null)
+    const dataWithCount = await baseQuery
       .leftJoin(
         "product_collection_relations",
         "product_collection_relations.product_collection_id",

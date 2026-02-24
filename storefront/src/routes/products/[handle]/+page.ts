@@ -83,7 +83,7 @@ export async function load({ params }) {
 					const p = prices[0];
 					const amount = parseInt(p.amount, 10) / 100;
 					const priceDisplay =
-						p.currency_code === 'USD' ? `$${amount.toFixed(2)}` : `${p.currency_code} ${amount.toFixed(2)}`;
+						p.currency_code === 'USD' ? `$${amount.toFixed(2)}` : `${p.currency_code.toUpperCase()} ${amount.toFixed(2)}`;
 					return { ...v, prices: data.prices, priceDisplay };
 				} catch {
 					return { ...v, priceDisplay: '—' };
@@ -112,7 +112,7 @@ export async function load({ params }) {
 							const pr = d.prices?.[0];
 							if (pr) {
 								const amt = parseInt(pr.amount, 10) / 100;
-								priceStr = pr.currency_code === 'USD' ? `$${amt.toFixed(2)}` : `${pr.currency_code} ${amt.toFixed(2)}`;
+								priceStr = pr.currency_code === 'USD' ? `$${amt.toFixed(2)}` : `${pr.currency_code.toUpperCase()} ${amt.toFixed(2)}`;
 							}
 						}
 					} catch {}

@@ -10,6 +10,7 @@ export const PaginatedProductsSchema = Type.Intersect([
   PaginationSchema,
   Type.Object({
     category_id: Type.Optional(Type.String()),
+    category_ids: Type.Optional(Type.Array(Type.String())),
     search: Type.Optional(Type.String()),
     filters: Type.Optional(
       createFilterableColumnsSchema<
