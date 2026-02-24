@@ -5,6 +5,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
+	import { MultiSelectCombobox } from '$lib/components/organs/multi-select-combobox/index.js';
 	import ListFilter from '@lucide/svelte/icons/list-filter';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import Pencil from '@lucide/svelte/icons/pencil';
@@ -14,6 +15,8 @@
 	import List from '@lucide/svelte/icons/list';
 	import Copy from '@lucide/svelte/icons/copy';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
+	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+	import { DropdownMenu } from 'bits-ui';
 	import { cn } from '$lib/utils.js';
 
 	const API_BASE = 'http://localhost:8000';
@@ -237,26 +240,37 @@
 					<section class="flex flex-col gap-6">
 						<div class="flex items-center justify-between gap-4">
 							<h1 class="text-2xl font-semibold tracking-tight">{group.title}</h1>
-							<div class="flex items-center gap-1">
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									onclick={openEdit}
-									aria-label="Edit attribute group"
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger
+									class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
 								>
-									<Pencil class="size-4" />
-								</Button>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-									onclick={openDeleteConfirm}
-									aria-label="Delete attribute group"
-								>
-									<Trash2 class="size-4" />
-								</Button>
-							</div>
+									<MoreHorizontal class="size-4" />
+									<span class="sr-only">Actions</span>
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Portal>
+									<DropdownMenu.Content
+										class="z-50 min-w-32 rounded-xl border bg-popover p-1 text-popover-foreground shadow-md"
+										sideOffset={4}
+									>
+										<DropdownMenu.Item
+											textValue="Edit"
+											class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+											onSelect={openEdit}
+										>
+											<Pencil class="size-4" />
+											Edit
+										</DropdownMenu.Item>
+										<DropdownMenu.Item
+											textValue="Delete"
+											class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
+											onSelect={openDeleteConfirm}
+										>
+											<Trash2 class="size-4" />
+											Delete
+										</DropdownMenu.Item>
+									</DropdownMenu.Content>
+								</DropdownMenu.Portal>
+							</DropdownMenu.Root>
 						</div>
 						<dl class="grid gap-3 text-sm sm:grid-cols-2">
 							<div>
@@ -392,36 +406,25 @@
 							class={cn('h-9', editError === 'Title is required' && 'border-destructive')}
 						/>
 					</div>
-					<div class="flex flex-col gap-2">
-						<span class="text-sm font-medium">Attributes</span>
-						<p class="text-xs text-muted-foreground">Select attributes to assign to this group.</p>
+					<div class="rounded-lg border bg-card p-4 shadow-sm">
+						<div class="flex items-center gap-2 mb-2">
+							<List class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+							<h3 class="text-sm font-semibold">Attributes</h3>
+						</div>
+						<p class="mb-3 text-xs text-muted-foreground">
+							Assign attributes to this group. They will be shown when this group is used on a product.
+						</p>
 						{#if allAttributesLoading}
 							<p class="py-3 text-sm text-muted-foreground">Loading attributes…</p>
 						{:else}
-							<div class="mt-1 flex flex-col gap-0 rounded-md border bg-muted/30 p-1">
-								{#if allAttributes.length === 0}
-									<p class="px-3 py-4 text-center text-sm text-muted-foreground">No attributes available.</p>
-								{:else}
-									{#each allAttributes as attr (attr.id)}
-										<label
-											class="flex cursor-pointer items-center gap-3 rounded px-3 py-2.5 text-sm transition-colors hover:bg-muted/60 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
-										>
-											<input
-												type="checkbox"
-												checked={editSelectedAttributeIds.includes(attr.id)}
-												onchange={() => {
-													editSelectedAttributeIds = editSelectedAttributeIds.includes(attr.id)
-														? editSelectedAttributeIds.filter((id) => id !== attr.id)
-														: [...editSelectedAttributeIds, attr.id];
-												}}
-												class="size-4 shrink-0 rounded border-input accent-primary"
-											/>
-											<span class="min-w-0 flex-1 font-medium">{attr.title}</span>
-											<span class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground capitalize">{attr.type}</span>
-										</label>
-									{/each}
-								{/if}
-							</div>
+							<MultiSelectCombobox
+								id="edit-attributes"
+								options={allAttributes.map((a) => ({ id: a.id, value: a.title }))}
+								bind:value={editSelectedAttributeIds}
+								placeholder="Type to add…"
+								emptyMessage="No attributes available."
+								class="mt-1"
+							/>
 						{/if}
 					</div>
 				</div>

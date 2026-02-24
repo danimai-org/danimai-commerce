@@ -77,6 +77,8 @@ export type ProductAttribute = Selectable<ProductAttributeTable>;
 export type NewProductAttribute = Insertable<ProductAttributeTable>;
 export type ProductAttributeUpdate = Updateable<ProductAttributeTable>;
 
+
+
 // table product_attribute_values
 export interface ProductAttributeValueTable {
   id: Generated<string>;
@@ -110,9 +112,15 @@ export type ProductAttributeGroupRelationUpdate = Updateable<ProductAttributeGro
 
 // table product_attribute_group_attributes (junction: attribute assigned to group)
 export interface ProductAttributeGroupAttributeTable {
+  id: Generated<string>;
   attribute_group_id: string;
   attribute_id: string;
+  rank: number;
+  required: boolean;
+  created_at: Generated<string>;
+  updated_at: Generated<string>;
 }
+
 export type ProductAttributeGroupAttribute = Selectable<ProductAttributeGroupAttributeTable>;
 export type NewProductAttributeGroupAttribute = Insertable<ProductAttributeGroupAttributeTable>;
 
@@ -220,7 +228,7 @@ export interface ProductImageTable {
   url: string;
   metadata: unknown | null;
   rank: number;
-  product_id: string;
+  product_id: string | null;
   variant_id: string | null;
   created_at: Generated<string>;
   updated_at: Generated<string>;

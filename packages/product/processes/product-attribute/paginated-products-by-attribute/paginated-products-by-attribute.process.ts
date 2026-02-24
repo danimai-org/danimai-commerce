@@ -71,9 +71,27 @@ export class PaginatedProductsByAttributeProcess
 
     const productIdsRows = await this.db
       .selectFrom("product_attribute_values")
-      .where("attribute_id", "=", attribute_id)
-      .where("product_id", "is not", null)
-      .select("product_id")
+      .innerJoin(
+        "product_attribute_group_attributes",
+        (join) =>
+          join
+            .onRef("product_attribute_group_attributes.attribute_group_id", "=", "product_attribute_values.attribute_group_id")
+            .onRef("product_attribute_group_attributes.attribute_id", "=", "product_attribute_values.attribute_id")
+      )
+      .innerJoin("products", "products.id", "product_attribute_values.product_id")
+      .where("product_attribute_values.attribute_id", "=", attribute_id)
+      .where("product_attribute_values.product_id", "is not", null)
+      .where(
+        sql`(
+          EXISTS (
+            SELECT 1 FROM product_attribute_group_relations pagr
+            WHERE pagr.product_id = product_attribute_values.product_id
+              AND pagr.attribute_group_id = product_attribute_values.attribute_group_id
+          )
+          OR products.attribute_group_id = product_attribute_values.attribute_group_id
+        )`
+      )
+      .select("product_attribute_values.product_id")
       .execute();
 
     const ids = productIdsRows

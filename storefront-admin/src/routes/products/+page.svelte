@@ -406,10 +406,12 @@
 	let categoriesList = $state<{ id: string; value: string; handle: string }[]>([]);
 	let tagsList = $state<{ id: string; value: string }[]>([]);
 	let attributesList = $state<{ id: string; title: string; type: string }[]>([]);
+	let attributeGroupsList = $state<{ id: string; title: string }[]>([]);
 	let salesChannelsList = $state<{ id: string; name: string }[]>([]);
 
 	// Step 2: Attributes
 	type CreateAttributeEntry = { attributeId: string; attributeTitle: string; value: string };
+	let createAttributeGroupId = $state('');
 	let createAttributeEntries = $state<CreateAttributeEntry[]>([]);
 
 	function addAttributeEntry() {
@@ -448,6 +450,7 @@
 		createSalesChannels = [];
 		createSalesChannelInput = '';
 		createOptions = [];
+		createAttributeGroupId = '';
 		createAttributeEntries = [];
 		createMediaUrl = '';
 		createMediaFile = null;
@@ -485,6 +488,14 @@
 			})
 			.catch(() => {
 				attributesList = [];
+			});
+		fetch(`${API_BASE}/product-attribute-groups?limit=100`)
+			.then((r) => (r.ok ? r.json() : { data: [] }))
+			.then((j) => {
+				attributeGroupsList = j.data ?? [];
+			})
+			.catch(() => {
+				attributeGroupsList = [];
 			});
 		// Fetch sales channels and set defaults
 		fetch(`${API_BASE}/sales-channels?limit=100`)
@@ -671,10 +682,21 @@
 			};
 		});
 
+		const attributesFiltered = createAttributeEntries.filter(
+			(e) => e.attributeId && e.value.trim()
+		);
 		const attributesForApi =
-			createAttributeEntries
-				.filter((e) => e.attributeId && e.value.trim())
-				.map((e) => ({ id: e.attributeId, value: e.value.trim() }));
+			createAttributeGroupId && attributesFiltered.length > 0
+				? attributesFiltered.map((e) => ({
+						attribute_group_id: createAttributeGroupId,
+						attribute_id: e.attributeId,
+						value: e.value.trim()
+					}))
+				: undefined;
+		const attributeGroupsForApi =
+			createAttributeGroupId && attributesFiltered.length > 0
+				? [{ attribute_group_id: createAttributeGroupId, required: false, rank: 0 }]
+				: undefined;
 
 		return {
 			title: createTitle.trim(),
@@ -689,7 +711,8 @@
 			options: createHasVariants ? optionsForApi : undefined,
 			variants: createHasVariants && variantsForApi.length > 0 ? variantsForApi : undefined,
 			sales_channels: createSalesChannels.length > 0 ? createSalesChannels.map((ch) => ({ id: ch.id })) : undefined,
-			attributes: attributesForApi.length > 0 ? attributesForApi : undefined
+			attribute_groups: attributeGroupsForApi,
+			attributes: attributesForApi
 		};
 	}
 
@@ -697,6 +720,13 @@
 		createError = null;
 		if (!createTitle.trim()) {
 			createError = 'Title is required';
+			return;
+		}
+		const hasAttributeEntries = createAttributeEntries.some(
+			(e) => e.attributeId && e.value.trim()
+		);
+		if (hasAttributeEntries && !createAttributeGroupId) {
+			createError = 'Select an attribute group when setting attributes.';
 			return;
 		}
 		// Validate that SKU is provided if available count is set, and available count is non-negative
@@ -1495,6 +1525,33 @@
 						Assign product attributes and their values. You can manage attributes from the product detail page after creation.
 					</p>
 					<div class="mt-6 flex flex-col gap-4">
+						<div class="flex flex-col gap-2">
+							<label for="create-attr-group-select" class="text-sm font-medium">Attribute group</label>
+							<Select.Root
+								type="single"
+								value={createAttributeGroupId}
+								onValueChange={(v) => (createAttributeGroupId = v ?? '')}
+								allowDeselect
+							>
+								<Select.Trigger id="create-attr-group-select" class="w-full max-w-xs">
+									{attributeGroupsList.find((g) => g.id === createAttributeGroupId)?.title ?? 'Select attribute group'}
+								</Select.Trigger>
+								<Select.Content>
+									<Select.Group>
+										<Select.Label>Attribute group</Select.Label>
+										<Select.Item value="" label="Select attribute group">
+											Select attribute group
+										</Select.Item>
+										{#each attributeGroupsList as ag (ag.id)}
+											<Select.Item value={ag.id} label={ag.title}>
+												{ag.title}
+											</Select.Item>
+										{/each}
+									</Select.Group>
+								</Select.Content>
+							</Select.Root>
+							<p class="text-xs text-muted-foreground">Required when adding attributes. Attributes must belong to the selected group.</p>
+						</div>
 						{#each createAttributeEntries as entry, entryIndex (entryIndex)}
 							<div class="rounded-lg border p-4">
 								<div class="flex items-start justify-between gap-2">

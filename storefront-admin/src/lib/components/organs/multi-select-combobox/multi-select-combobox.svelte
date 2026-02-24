@@ -17,6 +17,8 @@
 		listboxClass?: string;
 		chipsClass?: string;
 		filterFn?: (options: MultiSelectOption[], query: string) => MultiSelectOption[];
+		/** Called when the dropdown is first opened (e.g. for lazy-loading options). */
+		onOpen?: () => void;
 	};
 
 	let {
@@ -31,6 +33,7 @@
 		listboxClass = '',
 		chipsClass = '',
 		filterFn,
+		onOpen,
 	}: Props = $props();
 
 	const listboxId = $derived(propId ? `${propId}-listbox` : `multi-select-listbox-${Math.random().toString(36).slice(2, 9)}`);
@@ -38,6 +41,7 @@
 
 	let open = $state(false);
 	let input = $state('');
+	let hasOpened = $state(false);
 
 	const defaultFilter = (opts: MultiSelectOption[], query: string) =>
 		opts.filter((o) => !query.trim() || o.value.toLowerCase().includes(query.trim().toLowerCase()));
@@ -77,12 +81,23 @@
 		aria-haspopup="listbox"
 		aria-controls={listboxId}
 		tabindex={disabled ? -1 : 0}
-		onclick={() => !disabled && (open = true)}
+		onclick={(e) => {
+			if (disabled) return;
+			if (e.isTrusted && !hasOpened) {
+				hasOpened = true;
+				onOpen?.();
+			}
+			open = true;
+		}}
 		onfocusout={handleFocusout}
 		onkeydown={(e) => {
 			if (e.key === 'Escape') open = false;
 			if (e.key === 'Enter' || e.key === ' ') {
 				e.preventDefault();
+				if (e.isTrusted && !hasOpened) {
+					hasOpened = true;
+					onOpen?.();
+				}
 				open = true;
 			}
 		}}
@@ -136,23 +151,35 @@
 		{/if}
 	</div>
 	{#if selectedOptions.length > 0}
-		<div class={cn('flex flex-wrap gap-1.5', chipsClass)}>
-			{#each selectedOptions as option (option.id)}
-				<span
-					class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm"
-				>
-					{option.value}
-					<button
-						type="button"
-						class="rounded p-0.5 hover:bg-muted-foreground/20"
-						aria-label="Remove"
-						onclick={() => remove(option.id)}
-						disabled={disabled}
-					>
-						<X class="size-3" />
-					</button>
-				</span>
-			{/each}
+		<div class={cn('w-full overflow-hidden rounded-md border', chipsClass)}>
+			<table class="w-full text-sm">
+				<thead class="border-b bg-muted/50">
+					<tr>
+						<th class="px-3 py-2 text-left font-medium">Name</th>
+						<th class="w-10 px-3 py-2 text-right font-medium">Remove</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each selectedOptions as option (option.id)}
+						<tr class="border-b last:border-0 hover:bg-muted/30">
+							<td class="px-3 py-2">
+								<span class="min-w-0 truncate">{option.value}</span>
+							</td>
+							<td class="px-3 py-2 text-right">
+								<button
+									type="button"
+									class="inline-flex rounded p-0.5 hover:bg-muted-foreground/20"
+									aria-label="Remove {option.value}"
+									onclick={() => remove(option.id)}
+									disabled={disabled}
+								>
+									<X class="size-3" />
+								</button>
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
 		</div>
 	{/if}
 </div>

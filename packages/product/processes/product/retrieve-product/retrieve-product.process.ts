@@ -7,7 +7,7 @@ import {
   type ProcessContract,
   ValidationError,
 } from "@danimai/core";
-import { Kysely } from "kysely";
+import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import { RetrieveProductSchema } from "./retrieve-product.schema";
 import type { Database, Product } from "../../../db/type";
@@ -81,9 +81,27 @@ export class RetrieveProductProcess
         "product_attributes.id",
         "product_attribute_values.attribute_id"
       )
+      .innerJoin(
+        "product_attribute_group_attributes",
+        (join) =>
+          join
+            .onRef("product_attribute_group_attributes.attribute_group_id", "=", "product_attribute_values.attribute_group_id")
+            .onRef("product_attribute_group_attributes.attribute_id", "=", "product_attribute_values.attribute_id")
+      )
+      .innerJoin("products", "products.id", "product_attribute_values.product_id")
       .where("product_attribute_values.product_id", "=", input.id)
       .where("product_attribute_values.deleted_at", "is", null)
       .where("product_attributes.deleted_at", "is", null)
+      .where(
+        sql`(
+          EXISTS (
+            SELECT 1 FROM product_attribute_group_relations pagr
+            WHERE pagr.product_id = product_attribute_values.product_id
+              AND pagr.attribute_group_id = product_attribute_values.attribute_group_id
+          )
+          OR products.attribute_group_id = product_attribute_values.attribute_group_id
+        )`
+      )
       .select([
         "product_attributes.id",
         "product_attributes.title",

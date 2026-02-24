@@ -35,6 +35,17 @@ export async function up(db: Kysely<any>) {
     .addColumn("deleted_at", "timestamptz")
   );
 
+  // Product Collection Relations
+  await createTableIfNotExists(db, () =>
+    db.schema
+      .createTable("product_collection_relations")
+    .addColumn("product_id", "uuid", (col) => col.notNull().references("products.id"))
+    .addColumn("product_collection_id", "uuid", (col) => col.notNull().references("product_collections.id"))
+    .addColumn("created_at", "timestamptz", (col) => col.notNull().defaultTo(sql`now()`)
+    )
+    .addColumn("updated_at", "timestamptz", (col) => col.notNull().defaultTo(sql`now()`)
+    )
+  );
   // Product Categories
   await createTableIfNotExists(db, () =>
     db.schema
@@ -57,6 +68,7 @@ export async function up(db: Kysely<any>) {
     .addColumn("deleted_at", "timestamptz")
   );
 
+  
   // Product Tags
   await createTableIfNotExists(db, () =>
     db.schema
@@ -231,17 +243,27 @@ export async function up(db: Kysely<any>) {
   await createTableIfNotExists(db, () =>
     db.schema
       .createTable("product_attribute_group_attributes")
+      .addColumn("id", "uuid", (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
       .addColumn("attribute_group_id", "uuid", (col) =>
         col.notNull().references("product_attribute_groups.id").onDelete("cascade")
       )
       .addColumn("attribute_id", "uuid", (col) =>
         col.notNull().references("product_attributes.id").onDelete("cascade")
       )
-      .addPrimaryKeyConstraint("product_attribute_group_attributes_pk", [
+      .addColumn("rank", "integer", (col) => col.notNull().defaultTo(0))
+      .addColumn("required", "boolean", (col) => col.notNull().defaultTo(false))
+      .addColumn("created_at", "timestamptz", (col) =>
+        col.notNull().defaultTo(sql`now()`)
+      )
+      .addColumn("updated_at", "timestamptz", (col) =>
+        col.notNull().defaultTo(sql`now()`)
+      )
+      .addUniqueConstraint("product_attribute_group_attributes_group_attribute_unique", [
         "attribute_group_id",
         "attribute_id",
       ])
   );
+  
 
   // Product Options (global; no product_id)
   await createTableIfNotExists(db, () =>

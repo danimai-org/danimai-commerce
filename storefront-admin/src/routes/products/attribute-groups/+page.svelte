@@ -4,6 +4,7 @@
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import { DropdownMenu } from 'bits-ui';
+	import { MultiSelectCombobox } from '$lib/components/organs/multi-select-combobox/index.js';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -134,6 +135,7 @@
 	let availableAttributes = $state<ProductAttribute[]>([]);
 	let attributesLoading = $state(false);
 	let attributesLoadError = $state<string | null>(null);
+	let attributesRequested = $state(false);
 
 	async function fetchAvailableAttributes() {
 		attributesLoading = true;
@@ -161,7 +163,7 @@
 		createAttributeIds = [];
 		createError = null;
 		attributesLoadError = null;
-		fetchAvailableAttributes();
+		attributesRequested = false;
 	}
 
 	function closeCreate() {
@@ -412,9 +414,12 @@
 							class={cn('h-9', createError === 'Title is required' && 'border-destructive')}
 						/>
 					</div>
-					<div class="flex flex-col gap-2">
-						<span class="text-sm font-medium">Attributes</span>
-						<p class="text-xs text-muted-foreground">
+					<div class="rounded-lg border bg-card p-4">
+						<div class="mb-3 flex items-center gap-2">
+							<ListFilter class="size-4 text-muted-foreground" />
+							<label for="create-attributes" class="text-sm font-semibold">Attributes</label>
+						</div>
+						<p class="mb-3 text-xs text-muted-foreground">
 							Optional. Assign attributes to this group to use them on products.
 						</p>
 						{#if attributesLoading}
@@ -422,30 +427,20 @@
 						{:else if attributesLoadError}
 							<p class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-3 text-sm text-destructive">{attributesLoadError}</p>
 						{:else}
-							<div class="mt-1 flex flex-col gap-0 rounded-md border bg-muted/30 p-1">
-								{#if availableAttributes.length === 0}
-									<p class="px-3 py-4 text-center text-sm text-muted-foreground">No attributes available.</p>
-								{:else}
-									{#each availableAttributes as attr (attr.id)}
-										<label
-											class="flex cursor-pointer items-center gap-3 rounded px-3 py-2.5 text-sm transition-colors hover:bg-muted/60 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
-										>
-											<input
-												type="checkbox"
-												checked={createAttributeIds.includes(attr.id)}
-												onchange={() => {
-													createAttributeIds = createAttributeIds.includes(attr.id)
-														? createAttributeIds.filter((id) => id !== attr.id)
-														: [...createAttributeIds, attr.id];
-												}}
-												class="size-4 shrink-0 rounded border-input accent-primary"
-											/>
-											<span class="min-w-0 flex-1 font-medium">{attr.title}</span>
-											<span class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground capitalize">{attr.type}</span>
-										</label>
-									{/each}
-								{/if}
-							</div>
+							<MultiSelectCombobox
+								id="create-attributes"
+								options={availableAttributes.map((a) => ({ id: a.id, value: a.title }))}
+								bind:value={createAttributeIds}
+								placeholder="Type to add…"
+								emptyMessage="No attributes available."
+								class="mt-1"
+								onOpen={() => {
+									if (!attributesRequested) {
+										attributesRequested = true;
+										fetchAvailableAttributes();
+									}
+								}}
+							/>
 						{/if}
 					</div>
 				</div>
