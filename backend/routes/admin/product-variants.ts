@@ -2,34 +2,34 @@ import { Elysia } from "elysia";
 import { DANIMAI_LOGGER, getService } from "@danimai/core";
 import type { Logger } from "@logtape/logtape";
 import {
-  CREATE_PRODUCT_OPTIONS_PROCESS,
-  UPDATE_PRODUCT_OPTIONS_PROCESS,
-  DELETE_PRODUCT_OPTIONS_PROCESS,
-  PAGINATED_PRODUCT_OPTIONS_PROCESS,
-  CreateProductOptionsProcess,
-  UpdateProductOptionsProcess,
-  DeleteProductOptionsProcess,
-  PaginatedProductOptionsProcess,
-  type CreateProductOptionProcessInput,
-  type UpdateProductOptionProcessInput,
-  type DeleteProductOptionsProcessInput,
-  type PaginatedProductOptionsProcessInput,
-  PaginatedProductOptionsSchema,
-  RETRIEVE_PRODUCT_OPTION_PROCESS,
-  RetrieveProductOptionProcess,
-  type RetrieveProductOptionProcessInput,
+  CREATE_PRODUCT_VARIANTS_PROCESS,
+  UPDATE_PRODUCT_VARIANTS_PROCESS,
+  DELETE_PRODUCT_VARIANTS_PROCESS,
+  PAGINATED_PRODUCT_VARIANTS_PROCESS,
+  CreateProductVariantsProcess,
+  UpdateProductVariantsProcess,
+  DeleteProductVariantsProcess,
+  PaginatedProductVariantsProcess,
+  type CreateProductVariantProcessInput,
+  type UpdateProductVariantProcessInput,
+  type DeleteProductVariantsProcessInput,
+  type PaginatedProductVariantsProcessInput,
+  PaginatedProductVariantsSchema,
+  RETRIEVE_PRODUCT_VARIANT_PROCESS,
+  RetrieveProductVariantProcess,
+  type RetrieveProductVariantProcessInput,
 } from "@danimai/product";
-import { handleProcessError } from "../utils/error-handler";
+import { handleProcessError } from "../../utils/error-handler";
 import Value from "typebox/value";
 
-export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
+export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
   .get(
     "/",
     async ({ query, set }) => {
       try {
-        const process = getService<PaginatedProductOptionsProcess>(PAGINATED_PRODUCT_OPTIONS_PROCESS);
+        const process = getService<PaginatedProductVariantsProcess>(PAGINATED_PRODUCT_VARIANTS_PROCESS);
         const logger = getService<Logger>(DANIMAI_LOGGER);
-        const result = await process.runOperations({ input: Value.Convert(PaginatedProductOptionsSchema, query) as PaginatedProductOptionsProcessInput, logger });
+        const result = await process.runOperations({ input: Value.Convert(PaginatedProductVariantsSchema, query) as PaginatedProductVariantsProcessInput, logger });
         return result;
       } catch (err) {
         return handleProcessError(err, set);
@@ -37,9 +37,9 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
     },
     {
       detail: {
-        tags: ["product-options"],
-        summary: "Get paginated product options",
-        description: "Gets a paginated list of product options",
+        tags: ["product-variants"],
+        summary: "Get paginated product variants",
+        description: "Gets a paginated list of product variants",
         parameters: [
           {
             name: "page",
@@ -77,9 +77,9 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
     "/:id",
     async ({ params, set }) => {
       try {
-        const process = getService<RetrieveProductOptionProcess>(RETRIEVE_PRODUCT_OPTION_PROCESS);
+        const process = getService<RetrieveProductVariantProcess>(RETRIEVE_PRODUCT_VARIANT_PROCESS);
         const logger = getService<Logger>(DANIMAI_LOGGER);
-        const result = await process.runOperations({ input: { id: params.id } as RetrieveProductOptionProcessInput, logger });
+        const result = await process.runOperations({ input: { id: params.id } as RetrieveProductVariantProcessInput, logger });
         return result;
       } catch (err) {
         return handleProcessError(err, set);
@@ -87,9 +87,9 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
     },
     {
       detail: {
-        tags: ["product-options"],
-        summary: "Get a product option by ID",
-        description: "Retrieves a single product option by its ID",
+        tags: ["product-variants"],
+        summary: "Get a product variant by ID",
+        description: "Retrieves a single product variant by its ID",
         parameters: [
           {
             name: "id",
@@ -106,9 +106,9 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
     "/",
     async ({ body, set }) => {
       try {
-        const process = getService<CreateProductOptionsProcess>(CREATE_PRODUCT_OPTIONS_PROCESS);
         const logger = getService<Logger>(DANIMAI_LOGGER);
-        const result = await process.runOperations({ input: body as CreateProductOptionProcessInput, logger });
+        const process = getService<CreateProductVariantsProcess>(CREATE_PRODUCT_VARIANTS_PROCESS);
+        const result = await process.runOperations({ input: body as CreateProductVariantProcessInput, logger });
         return result;
       } catch (err) {
         return handleProcessError(err, set);
@@ -116,17 +116,24 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
     },
     {
       detail: {
-        tags: ["product-options"],
-        summary: "Create a new product option",
-        description: "Creates a single product option with the provided details",
+        tags: ["product-variants"],
+        summary: "Create a new product variant",
+        description: "Creates a single product variant with the provided details",
         requestBody: {
           content: {
             "application/json": {
               example: {
-                title: "Size",
+                title: "Small / Red",
                 product_id: "550e8400-e29b-41d4-a716-446655440000",
+                sku: "TSHIRT-S-RED",
+                barcode: "1234567890123",
+                allow_backorder: false,
+                manage_inventory: true,
+                variant_rank: 1,
+                thumbnail: "https://example.com/images/variant.jpg",
                 metadata: {
-                  type: "size",
+                  size: "S",
+                  color: "red",
                 },
               },
             },
@@ -139,10 +146,10 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
     "/:id",
     async ({ params, body, set }) => {
       try {
-        const process = getService<UpdateProductOptionsProcess>(UPDATE_PRODUCT_OPTIONS_PROCESS);
         const logger = getService<Logger>(DANIMAI_LOGGER);
+        const process = getService<UpdateProductVariantsProcess>(UPDATE_PRODUCT_VARIANTS_PROCESS);
         const result = await process.runOperations({
-          input: { ...(body as Omit<UpdateProductOptionProcessInput, "id">), id: params.id },
+          input: { ...(body as Omit<UpdateProductVariantProcessInput, "id">), id: params.id },
           logger,
         });
         return result;
@@ -152,9 +159,9 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
     },
     {
       detail: {
-        tags: ["product-options"],
-        summary: "Update a product option",
-        description: "Updates an existing product option by ID",
+        tags: ["product-variants"],
+        summary: "Update a product variant",
+        description: "Updates an existing product variant by ID",
         parameters: [
           {
             name: "id",
@@ -168,8 +175,9 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
           content: {
             "application/json": {
               example: {
-                title: "Updated Option Title",
-                product_id: "660e8400-e29b-41d4-a716-446655440001",
+                title: "Updated Variant Title",
+                sku: "UPDATED-SKU",
+                allow_backorder: true,
               },
             },
           },
@@ -181,9 +189,9 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
     "/",
     async ({ body, set }) => {
       try {
-        const process = getService<DeleteProductOptionsProcess>(DELETE_PRODUCT_OPTIONS_PROCESS);
         const logger = getService<Logger>(DANIMAI_LOGGER);
-        const input = body as unknown as DeleteProductOptionsProcessInput;
+        const process = getService<DeleteProductVariantsProcess>(DELETE_PRODUCT_VARIANTS_PROCESS);
+        const input = body as unknown as DeleteProductVariantsProcessInput;
         await process.runOperations({ input, logger });
         return new Response(null, { status: 204 });
       } catch (err) {
@@ -192,14 +200,14 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
     },
     {
       detail: {
-        tags: ["product-options"],
-        summary: "Delete product options",
-        description: "Deletes multiple product options by their IDs",
+        tags: ["product-variants"],
+        summary: "Delete product variants",
+        description: "Deletes multiple product variants by their IDs",
         requestBody: {
           content: {
             "application/json": {
               example: {
-                option_ids: [
+                variant_ids: [
                   "550e8400-e29b-41d4-a716-446655440000",
                   "660e8400-e29b-41d4-a716-446655440001",
                 ],

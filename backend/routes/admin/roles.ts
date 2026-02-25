@@ -21,7 +21,7 @@ import {
   UpdateRoleSchema,
   DeleteRolesSchema,
 } from "@danimai/user";
-import { handleProcessError } from "../utils/error-handler";
+import { handleProcessError } from "../../utils/error-handler";
 import Value from "typebox/value";
 
 export const roleRoutes = new Elysia({ prefix: "/roles" })

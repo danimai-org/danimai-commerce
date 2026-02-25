@@ -102,7 +102,6 @@ const app = new Elysia()
           { name: "users", description: "User management endpoints" },
           { name: "roles", description: "Role management endpoints" },
           { name: "permissions", description: "Permission management endpoints" },
-          { name: "auth", description: "Authentication endpoints" },
           { name: "invites", description: "User invite endpoints" },
           { name: "customers", description: "Customer management endpoints" },
           { name: "customer-groups", description: "Customer group management endpoints" },

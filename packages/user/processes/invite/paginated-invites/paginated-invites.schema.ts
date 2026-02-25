@@ -1,6 +1,5 @@
-import { Type, type Static } from "typebox";
-import { PaginationSchema } from "@danimai/core";
+import { PaginationSchema, type PaginationType } from "@danimai/core";
 
 export const PaginatedInvitesSchema = PaginationSchema;
 
-export type PaginatedInvitesProcessInput = Static<typeof PaginatedInvitesSchema>;
+export type PaginatedInvitesProcessInput = PaginationType;

@@ -38,7 +38,7 @@ import {
   LIST_PRODUCT_VARIANTS_BY_SKU_PROCESS,
   ListProductVariantsBySkuProcess,
 } from "@danimai/product";
-import { handleProcessError } from "../utils/error-handler";
+import { handleProcessError } from "../../utils/error-handler";
 import Value from "typebox/value";
 
 export const inventoryRoutes = new Elysia({ prefix: "/inventory" })

@@ -17,7 +17,7 @@ import {
   type Order,
   type Database,
 } from "@danimai/order";
-import { handleProcessError } from "../utils/error-handler";
+import { handleProcessError } from "../../utils/error-handler";
 import Value from "typebox/value";
 import { getService, DANIMAI_DB } from "@danimai/core";
 import type { Kysely } from "kysely";

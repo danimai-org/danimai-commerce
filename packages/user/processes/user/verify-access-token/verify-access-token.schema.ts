@@ -1,7 +1,11 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
 
 export const VerifyAccessTokenSchema = Type.Object({
-  access_token: Type.String({ minLength: 1 }),
+  access_token: Type.String({
+    minLength: 1,
+    description: "The JWT access token",
+    examples: ["eyJ..."],
+  }),
 });
 
 export type VerifyAccessTokenProcessInput = Static<typeof VerifyAccessTokenSchema>;

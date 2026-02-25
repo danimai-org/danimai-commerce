@@ -19,7 +19,7 @@ import {
   type RetrieveProductAttributeGroupProcessInput,
   PaginatedProductAttributeGroupsSchema,
 } from "@danimai/product";
-import { handleProcessError } from "../utils/error-handler";
+import { handleProcessError } from "../../utils/error-handler";
 import Value from "typebox/value";
 
 const productAttributeGroupsListHandler = async ({ query, set }: { query: Record<string, string>; set: any }) => {

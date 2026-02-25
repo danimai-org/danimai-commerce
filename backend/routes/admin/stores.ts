@@ -29,7 +29,7 @@ import {
   UpdateStoreSchema,
   DeleteStoresSchema,
 } from "@danimai/store";
-import { handleProcessError } from "../utils/error-handler";
+import { handleProcessError } from "../../utils/error-handler";
 import Value from "typebox/value";
 
 export const storeRoutes = new Elysia({ prefix: "/stores" })

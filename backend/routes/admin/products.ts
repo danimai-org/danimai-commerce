@@ -30,7 +30,7 @@ import {
   LIST_SALES_CHANNELS_BY_IDS_PROCESS,
   ListSalesChannelsByIdsProcess,
 } from "@danimai/sales-channel";
-import { handleProcessError } from "../utils/error-handler";
+import { handleProcessError } from "../../utils/error-handler";
 import Value from "typebox/value";
 
 export const productRoutes = new Elysia({ prefix: "/products" })

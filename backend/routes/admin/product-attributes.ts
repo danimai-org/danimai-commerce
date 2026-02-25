@@ -23,7 +23,7 @@ import {
   PaginatedProductAttributesSchema,
   PaginatedProductsByAttributeSchema,
 } from "@danimai/product";
-import { handleProcessError } from "../utils/error-handler";
+import { handleProcessError } from "../../utils/error-handler";
 import Value from "typebox/value";
 
 const productAttributesListHandler = async ({ query, set }: { query: Record<string, string>; set: any }) => {

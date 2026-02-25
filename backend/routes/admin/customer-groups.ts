@@ -26,7 +26,7 @@ import {
   DeleteCustomerGroupsSchema,
   ListCustomersInGroupSchema,
 } from "@danimai/customer";
-import { handleProcessError } from "../utils/error-handler";
+import { handleProcessError } from "../../utils/error-handler";
 import Value from "typebox/value";
 
 export const customerGroupRoutes = new Elysia({ prefix: "/customer-groups" })

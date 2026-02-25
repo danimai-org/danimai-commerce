@@ -3,7 +3,7 @@ import { join } from "path";
 import { mkdir, writeFile, readFile } from "fs/promises";
 import { existsSync } from "fs";
 
-const UPLOAD_DIR = join(import.meta.dir, "..", "uploads");
+const UPLOAD_DIR = join(import.meta.dir, "..", "..", "uploads");
 const API_BASE = process.env.API_BASE_URL || "http://localhost:8000";
 
 function imageContentType(name: string): string {

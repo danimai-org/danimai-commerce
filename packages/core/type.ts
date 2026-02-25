@@ -26,7 +26,6 @@ export interface DanimaiInitialize {
 
 export interface ProcessContextType<TInput extends TSchema> {
   input: Type.Static<TInput>;
-  logger: Logger;
 };
 
 export interface ProcessContract<TProcessReturn = void> {

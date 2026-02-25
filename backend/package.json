@@ -16,6 +16,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@danimai/cli": "../packages/cli",
     "@danimai/core": "../packages/core",
     "@danimai/currency": "../packages/currency",
     "@danimai/customer": "../packages/customer",
@@ -28,10 +29,11 @@
     "@danimai/store": "../packages/store",
     "@danimai/tax": "../packages/tax",
     "@danimai/user": "../packages/user",
-    "@danimai/cli": "../packages/cli",
+    "@elysiajs/bearer": "^1.4.3",
     "@elysiajs/cors": "^1.4.1",
     "@elysiajs/swagger": "^1.1.0",
-    "elysia": "^1.4.19",
+    "@sinclair/typebox": "^0.34.48",
+    "elysia": "^1.4.25",
     "typebox": "^1.0.79"
   }
 }

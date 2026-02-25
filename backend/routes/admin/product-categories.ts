@@ -22,7 +22,7 @@ import {
   RetrieveProductCategoryProcess,
   type RetrieveProductCategoryProcessInput,
 } from "@danimai/product";
-import { handleProcessError } from "../utils/error-handler";
+import { handleProcessError } from "../../utils/error-handler";
 import Value from "typebox/value";
 
 export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" })
