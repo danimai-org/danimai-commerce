@@ -60,38 +60,41 @@ export class RetrieveProductVariantProcess
           "product_attributes.id",
           "product_attribute_values.attribute_id"
         )
+        .innerJoin(
+          "product_attribute_group_attributes",
+          (join) =>
+            join
+              .onRef("product_attribute_group_attributes.attribute_group_id", "=", "product_attribute_values.attribute_group_id")
+              .onRef("product_attribute_group_attributes.attribute_id", "=", "product_attribute_values.attribute_id")
+        )
+        .innerJoin("products", "products.id", "product_attribute_values.product_id")
         .where("product_attribute_values.product_id", "=", productId)
         .where("product_attribute_values.deleted_at", "is", null)
         .where("product_attributes.deleted_at", "is", null)
+        .where(
+          sql`(
+            EXISTS (
+              SELECT 1 FROM product_attribute_group_relations pagr
+              WHERE pagr.product_id = product_attribute_values.product_id
+                AND pagr.attribute_group_id = product_attribute_values.attribute_group_id
+            )
+            OR products.attribute_group_id = product_attribute_values.attribute_group_id
+          )`
+        )
         .select([
           "product_attributes.id",
           "product_attributes.title",
           "product_attributes.type",
-          "product_attribute_values.value as product_value",
+          "product_attribute_values.value",
         ])
         .execute();
 
-      const variantAttrRows = await this.db
-        .selectFrom("variant_attribute_values")
-        .where("variant_id", "=", input.id)
-        .where("deleted_at", "is", null)
-        .select(["attribute_id", "value as variant_value"])
-        .execute();
-
-      const variantValueByAttrId = new Map<string, string>();
-      for (const r of variantAttrRows) {
-        if (r.attribute_id != null && r.variant_value != null) {
-          variantValueByAttrId.set(r.attribute_id, r.variant_value);
-        }
-      }
-
       for (const row of productAttrRows) {
-        const value = variantValueByAttrId.get(row.id) ?? row.product_value ?? "";
         attributes.push({
           id: row.id,
           title: row.title,
           type: row.type,
-          value: typeof value === "string" ? value : "",
+          value: row.value ?? "",
         });
       }
     }

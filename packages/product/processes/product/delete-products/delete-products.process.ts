@@ -99,6 +99,11 @@ export class DeleteProductsProcess implements ProcessContract<void> {
       .execute();
 
     await trx
+      .deleteFrom("product_attribute_group_relations")
+      .where("product_id", "in", productIds)
+      .execute();
+
+    await trx
       .deleteFrom("product_tag_relations")
       .where("product_id", "in", productIds)
       .execute();

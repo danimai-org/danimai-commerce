@@ -35,9 +35,6 @@ export class UpdateProductVariantsProcess
 
     return this.db.transaction().execute(async (trx) => {
       const variant = await this.updateProductVariant(trx, input, product);
-      if (input.attribute_values !== undefined) {
-        await this.syncVariantAttributeValues(trx, input.id, input.attribute_values);
-      }
       if (input.prices !== undefined) {
         await this.syncVariantPrices(trx, input.id, input.prices);
       }
@@ -161,33 +158,6 @@ export class UpdateProductVariantsProcess
       .executeTakeFirst();
 
     return updated;
-  }
-
-  async syncVariantAttributeValues(
-    trx: Kysely<Database>,
-    variantId: string,
-    attributeValues: Array<{ attribute_id: string; value: string }>
-  ) {
-    await trx
-      .deleteFrom("variant_attribute_values")
-      .where("variant_id", "=", variantId)
-      .execute();
-
-    const toInsert = attributeValues.filter((a) => a.value.trim() !== "");
-    if (toInsert.length === 0) {
-      return;
-    }
-
-    await trx
-      .insertInto("variant_attribute_values")
-      .values(
-        toInsert.map((a) => ({
-          variant_id: variantId,
-          attribute_id: a.attribute_id,
-          value: a.value.trim(),
-        }))
-      )
-      .execute();
   }
 
   async syncVariantPrices(

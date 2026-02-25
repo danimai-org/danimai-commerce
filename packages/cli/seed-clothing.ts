@@ -47,6 +47,9 @@ const CATEGORIES: Array<{ value: string; parentValue: string | null }> = [
 ];
 
 const COLLECTIONS: Array<{ title: string; handle: string }> = [
+  { title: "Core Essentials", handle: "core-essentials" },
+  { title: "Studio & Training", handle: "studio-training" },
+  { title: "Outer Layers", handle: "outer-layers" },
   { title: "New Arrivals", handle: "new-arrivals" },
   { title: "Summer Collection", handle: "summer-collection" },
   { title: "Winter Collection", handle: "winter-collection" },

@@ -50,6 +50,7 @@
 		status: string;
 		thumbnail: string | null;
 		category_id: string | null;
+		attribute_group_id?: string | null;
 		discountable?: boolean;
 		metadata?: Record<string, string | number> | null;
 		collection?: { id: string; title: string; handle: string } | null;
@@ -463,8 +464,10 @@
 	let collectionsList = $state<ProductCollection[]>([]);
 	let categoriesList = $state<ProductCategory[]>([]);
 	let tagsList = $state<Array<{ id: string; value: string }>>([]);
+	let attributeGroupsList = $state<Array<{ id: string; title: string }>>([]);
 
 	type EditAttributeRow = { attribute_id: string; title: string; value: string };
+	let editAttributeGroupId = $state('');
 	let editAttributesSheetOpen = $state(false);
 	let editAttributesList = $state<EditAttributeRow[]>([]);
 	let availableAttributesList = $state<Array<{ id: string; title: string; type: string }>>([]);
@@ -494,10 +497,12 @@
 			title: a.title,
 			value: a.value
 		}));
+		editAttributeGroupId = product.attribute_group_id ?? '';
 		editProductAddAttributeId = '';
 		editProductAddAttributeValue = '';
 		editError = null;
 		loadAvailableAttributes();
+		loadAttributeGroups();
 	}
 
 	const editProductAttributesAvailableToAdd = $derived(
@@ -580,10 +585,19 @@
 				handle,
 				status: editStatus,
 				discountable: editDiscountable,
-				attributes: editProductAttributesList.map((a) => ({
-					attribute_id: a.attribute_id,
-					value: a.value
-				}))
+				attribute_group_id: editAttributeGroupId || undefined,
+				attribute_groups:
+					editAttributeGroupId && editProductAttributesList.length > 0
+						? [{ attribute_group_id: editAttributeGroupId, required: false, rank: 0 }]
+						: undefined,
+				attributes:
+					editAttributeGroupId && editProductAttributesList.length > 0
+						? editProductAttributesList.map((a) => ({
+								attribute_group_id: editAttributeGroupId,
+								attribute_id: a.attribute_id,
+								value: a.value
+							}))
+						: undefined
 			};
 			const res = await fetch(`${API_BASE}/products/${product.id}`, {
 				method: 'PUT',
@@ -629,11 +643,13 @@
 			title: a.title,
 			value: a.value
 		}));
+		editAttributeGroupId = product.attribute_group_id ?? '';
 		addAttributeId = '';
 		addAttributeValue = '';
 		editAttributesError = null;
 		editAttributesSheetOpen = true;
 		loadAvailableAttributes();
+		loadAttributeGroups();
 	}
 
 	function closeEditAttributesSheet() {
@@ -661,16 +677,43 @@
 		availableAttributesList.filter((a) => !editAttributesList.some((e) => e.attribute_id === a.id))
 	);
 
+	async function loadAttributeGroups() {
+		try {
+			const res = await fetch(`${API_BASE}/product-attribute-groups?limit=100`, { cache: 'no-store' });
+			if (res.ok) {
+				const j = (await res.json()) as { data?: Array<{ id: string; title: string }> };
+				attributeGroupsList = j.data ?? [];
+			} else {
+				attributeGroupsList = [];
+			}
+		} catch {
+			attributeGroupsList = [];
+		}
+	}
+
 	async function submitEditAttributes() {
 		if (!product) return;
+		if (editAttributesList.length > 0 && !editAttributeGroupId) {
+			editAttributesError = 'Select an attribute group when setting attributes.';
+			return;
+		}
 		editAttributesError = null;
 		editAttributesSubmitting = true;
 		try {
 			const body = {
-				attributes: editAttributesList.map((a) => ({
-					attribute_id: a.attribute_id,
-					value: a.value
-				}))
+				attribute_group_id: editAttributeGroupId || undefined,
+				attribute_groups:
+					editAttributeGroupId && editAttributesList.length > 0
+						? [{ attribute_group_id: editAttributeGroupId, required: false, rank: 0 }]
+						: undefined,
+				attributes:
+					editAttributeGroupId && editAttributesList.length > 0
+						? editAttributesList.map((a) => ({
+								attribute_group_id: editAttributeGroupId,
+								attribute_id: a.attribute_id,
+								value: a.value
+							}))
+						: []
 			};
 			const res = await fetch(`${API_BASE}/products/${product.id}`, {
 				method: 'PUT',

@@ -63,9 +63,19 @@ export class CreateProductProcess
         await this.linkProductTags(trx, product.id, input.tag_ids);
       }
 
-      // Link product attributes
+      // Link product to attribute groups (explicit list or derived from attributes)
+      const groupsToLink = input.attribute_groups && input.attribute_groups.length > 0
+        ? input.attribute_groups
+        : (input.attributes && input.attributes.length > 0
+          ? [...new Set(input.attributes.map((a) => a.attribute_group_id))].map((attribute_group_id) => ({ attribute_group_id, required: false, rank: 0 }))
+          : []);
+      if (groupsToLink.length > 0) {
+        await this.linkProductAttributeGroups(trx, product.id, groupsToLink);
+      }
+
+      // Link product attribute values (group-scoped)
       if (input.attributes && input.attributes.length > 0) {
-        await this.linkProductAttributes(trx, product.id, input.attributes);
+        await this.linkProductAttributes(trx, product.id, input.attributes, groupsToLink);
       }
 
       return product;
@@ -75,24 +85,50 @@ export class CreateProductProcess
   async linkProductAttributes(
     trx: Kysely<Database>,
     productId: string,
-    attributes: Array<{ id: string; value: unknown }>
+    attributes: Array<{ attribute_group_id: string; attribute_id: string; value: unknown }>,
+    attributeGroups: Array<{ attribute_group_id: string }>
   ) {
     if (attributes.length === 0) return;
 
-    const attributeIds = [...new Set(attributes.map((a) => a.id))];
-    const existingAttributes = await trx
+    const groupIds = new Set(attributeGroups.map((g) => g.attribute_group_id));
+    for (const a of attributes) {
+      if (!groupIds.has(a.attribute_group_id)) {
+        throw new ValidationError("Product must be linked to attribute group before setting attribute values", [{
+          type: "invalid",
+          message: `Attribute group ${a.attribute_group_id} not in product's attribute_groups`,
+          path: "attributes",
+        }]);
+      }
+    }
+
+    const pairs = attributes.map((a) => ({ attribute_group_id: a.attribute_group_id, attribute_id: a.attribute_id }));
+    const existingInGroup = await trx
+      .selectFrom("product_attribute_group_attributes")
+      .select(["attribute_group_id", "attribute_id"])
+      .execute();
+    const validSet = new Set(existingInGroup.map((r) => `${r.attribute_group_id}:${r.attribute_id}`));
+    for (const a of attributes) {
+      if (!validSet.has(`${a.attribute_group_id}:${a.attribute_id}`)) {
+        throw new ValidationError("Attribute not assigned to group", [{
+          type: "invalid",
+          message: `Attribute ${a.attribute_id} is not assigned to group ${a.attribute_group_id}`,
+          path: "attributes",
+        }]);
+      }
+    }
+
+    const existingAttrs = await trx
       .selectFrom("product_attributes")
-      .where("id", "in", attributeIds)
+      .where("id", "in", [...new Set(attributes.map((a) => a.attribute_id))])
       .where("deleted_at", "is", null)
       .select("id")
       .execute();
-
-    const existingIds = new Set(existingAttributes.map((a) => a.id));
-    for (const id of attributeIds) {
-      if (!existingIds.has(id)) {
+    const attrIds = new Set(existingAttrs.map((r) => r.id));
+    for (const a of attributes) {
+      if (!attrIds.has(a.attribute_id)) {
         throw new ValidationError("Product attribute not found", [{
           type: "not_found",
-          message: `Product attribute not found: ${id}`,
+          message: `Product attribute not found: ${a.attribute_id}`,
           path: "attributes",
         }]);
       }
@@ -100,7 +136,8 @@ export class CreateProductProcess
 
     const values = attributes.map((a) => ({
       id: randomUUID(),
-      attribute_id: a.id,
+      attribute_group_id: a.attribute_group_id,
+      attribute_id: a.attribute_id,
       product_id: productId,
       value: typeof a.value === "string" ? a.value : JSON.stringify(a.value),
       metadata: null,
@@ -219,10 +256,49 @@ export class CreateProductProcess
         thumbnail: input.thumbnail ?? null,
         external_id: input.external_id ?? null,
         category_id: category?.id ?? null,
+        attribute_group_id: input.attribute_group_id ?? null,
         metadata: input.metadata ?? null,
       })
       .returningAll()
       .executeTakeFirst();
+  }
+
+  async linkProductAttributeGroups(
+    trx: Kysely<Database>,
+    productId: string,
+    groups: Array<{ attribute_group_id: string; required?: boolean; rank?: number }>
+  ) {
+    if (groups.length === 0) return;
+
+    const groupIds = [...new Set(groups.map((g) => g.attribute_group_id))];
+    const existing = await trx
+      .selectFrom("product_attribute_groups")
+      .where("id", "in", groupIds)
+      .where("deleted_at", "is", null)
+      .select("id")
+      .execute();
+    const foundIds = new Set(existing.map((r) => r.id));
+    const missing = groupIds.filter((id) => !foundIds.has(id));
+    if (missing.length > 0) {
+      throw new ValidationError("Product attribute group not found", [{
+        type: "not_found",
+        message: `Product attribute groups not found: ${missing.join(", ")}`,
+        path: "attribute_groups",
+      }]);
+    }
+
+    await trx
+      .insertInto("product_attribute_group_relations")
+      .values(
+        groups.map((g, i) => ({
+          id: randomUUID(),
+          product_id: productId,
+          attribute_group_id: g.attribute_group_id,
+          required: g.required ?? false,
+          rank: g.rank ?? i,
+        }))
+      )
+      .execute();
   }
 
   /**

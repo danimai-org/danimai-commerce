@@ -41,9 +41,12 @@ export const productRoutes = new Elysia({ prefix: "/products" })
         const process = getService<PaginatedProductsProcess>(PAGINATED_PRODUCTS_PROCESS);
         const logger = getService<Logger>(DANIMAI_LOGGER);
         // Clean query parameters: remove empty strings, null, or undefined values
-        const cleanedQuery = Object.fromEntries(
+        const cleanedQuery: Record<string, unknown> = Object.fromEntries(
           Object.entries(query).filter(([_, value]) => value !== null && value !== undefined && value !== "")
         );
+        if (typeof cleanedQuery.category_ids === "string") {
+          cleanedQuery.category_ids = (cleanedQuery.category_ids as string).split(",").map((s) => s.trim()).filter(Boolean);
+        }
         const result = await process.runOperations({ input: Value.Convert(PaginatedProductsSchema, cleanedQuery) as PaginatedProductsProcessInput, logger });
         const allScIds = [...new Set(result.products.flatMap((p) => p.sales_channel_ids))];
         let scMap: Record<string, { id: string; name: string; description: string | null; is_default: boolean; metadata: unknown; created_at: string; updated_at: string; deleted_at: string | null }> = {};

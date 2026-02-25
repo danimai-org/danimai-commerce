@@ -29,8 +29,28 @@ export class DeleteProductCategoriesProcess implements ProcessContract<void> {
     const { input } = context;
 
     await this.validateCategories(input);
+    await this.unassignProductsFromCategories(input);
+    await this.unassignChildCategories(input);
     await this.checkCategoryUsage(input);
     await this.deleteCategories(input);
+  }
+
+  async unassignProductsFromCategories(input: DeleteProductCategoriesProcessInput) {
+    await this.db
+      .updateTable("products")
+      .set({ category_id: null })
+      .where("category_id", "in", input.category_ids)
+      .where("deleted_at", "is", null)
+      .execute();
+  }
+
+  async unassignChildCategories(input: DeleteProductCategoriesProcessInput) {
+    await this.db
+      .updateTable("product_categories")
+      .set({ parent_id: null })
+      .where("parent_id", "in", input.category_ids)
+      .where("deleted_at", "is", null)
+      .execute();
   }
 
   async validateCategories(input: DeleteProductCategoriesProcessInput) {
@@ -74,28 +94,6 @@ export class DeleteProductCategoriesProcess implements ProcessContract<void> {
         [{
           type: "not_found",
           message: `Categories are in use by products: ${usedCategoryIds.join(", ")}`,
-          path: "category_ids",
-        }]
-      );
-    }
-
-    // Check if any category has children
-    const categoriesWithChildren = await this.db
-      .selectFrom("product_categories")
-      .where("parent_id", "in", input.category_ids)
-      .where("deleted_at", "is", null)
-      .select("parent_id")
-      .execute();
-
-    if (categoriesWithChildren.length > 0) {
-      const parentIds = [
-        ...new Set(categoriesWithChildren.map((c) => c.parent_id)),
-      ].filter((id): id is string => id !== null);
-      throw new ValidationError(
-        `Categories have child categories: ${parentIds.join(", ")}`,
-        [{
-          type: "not_found",
-          message: `Categories have child categories: ${parentIds.join(", ")}`,
           path: "category_ids",
         }]
       );

@@ -13,6 +13,9 @@
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Info from '@lucide/svelte/icons/info';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
+	import ChevronDown from '@lucide/svelte/icons/chevron-down';
+	import X from '@lucide/svelte/icons/x';
+	import Check from '@lucide/svelte/icons/check';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { cn } from '$lib/utils.js';
 
@@ -43,15 +46,77 @@
 		pagination: Pagination;
 	};
 
+	type FilterKind = 'sales_channel' | 'type';
+	const FILTER_OPTIONS: { id: FilterKind; label: string }[] = [
+		{ id: 'sales_channel', label: 'Sales channel' },
+		{ id: 'type', label: 'Type' }
+	];
+
+	const COLLECTION_TYPE_OPTIONS = ['manual', 'automated'] as const;
+
 	let searchQuery = $state('');
 	let page = $state(1);
 	let limit = $state(10);
 	let sortingField = $state('created_at');
 	let sortingDirection = $state<'asc' | 'desc'>('desc');
+	let activeFilterTypes = $state<Set<FilterKind>>(new Set());
+	let selectedSalesChannelIds = $state<Set<string>>(new Set());
+	let selectedCollectionTypes = $state<Set<string>>(new Set());
+	let salesChannelsList = $state<Array<{ id: string; name: string }>>([]);
 
 	let data = $state<CollectionsResponse | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+
+	function toggleFilterType(id: FilterKind) {
+		activeFilterTypes = new Set(activeFilterTypes);
+		if (activeFilterTypes.has(id)) activeFilterTypes.delete(id);
+		else activeFilterTypes.add(id);
+	}
+
+	function toggleSalesChannel(id: string) {
+		selectedSalesChannelIds = new Set(selectedSalesChannelIds);
+		if (selectedSalesChannelIds.has(id)) selectedSalesChannelIds.delete(id);
+		else selectedSalesChannelIds.add(id);
+		page = 1;
+	}
+
+	function clearSalesChannelFilter() {
+		selectedSalesChannelIds = new Set();
+		page = 1;
+	}
+
+	function toggleCollectionType(t: string) {
+		selectedCollectionTypes = new Set(selectedCollectionTypes);
+		if (selectedCollectionTypes.has(t)) selectedCollectionTypes.delete(t);
+		else selectedCollectionTypes.add(t);
+		page = 1;
+	}
+
+	function clearCollectionTypeFilter() {
+		selectedCollectionTypes = new Set();
+		page = 1;
+	}
+
+	function clearFilters() {
+		activeFilterTypes = new Set();
+		searchQuery = '';
+		selectedSalesChannelIds = new Set();
+		selectedCollectionTypes = new Set();
+		page = 1;
+	}
+
+	function removeFilterChip() {
+		searchQuery = '';
+		page = 1;
+	}
+
+	const hasActiveFilters = $derived(
+		searchQuery.trim() !== '' ||
+			activeFilterTypes.size > 0 ||
+			selectedSalesChannelIds.size > 0 ||
+			selectedCollectionTypes.size > 0
+	);
 
 	async function fetchCollections() {
 		loading = true;
@@ -63,6 +128,15 @@
 				sorting_field: sortingField,
 				sorting_direction: sortingDirection
 			});
+			if (searchQuery.trim()) {
+				params.append('search', searchQuery.trim());
+			}
+			if (selectedSalesChannelIds.size > 0) {
+				params.append('sales_channel_ids', [...selectedSalesChannelIds].join(','));
+			}
+			if (selectedCollectionTypes.size > 0) {
+				params.append('collection_type', [...selectedCollectionTypes].join(','));
+			}
 			const res = await fetch(`${API_BASE}/collections?${params}`);
 			if (!res.ok) {
 				const text = await res.text();
@@ -77,11 +151,37 @@
 		}
 	}
 
+	let prevSearch = $state('');
+	$effect(() => {
+		if (searchQuery !== prevSearch) {
+			prevSearch = searchQuery;
+			page = 1;
+		}
+	});
+
+	let salesChannelsLoaded = $state(false);
+	$effect(() => {
+		if (salesChannelsLoaded) return;
+		salesChannelsLoaded = true;
+		fetch(`${API_BASE}/sales-channels?limit=100`)
+			.then((r) => (r.ok ? r.json() : { data: [] }))
+			.then((j) => {
+				const list = j.data ?? [];
+				salesChannelsList = list.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }));
+			})
+			.catch(() => {
+				salesChannelsList = [];
+			});
+	});
+
 	$effect(() => {
 		page;
 		limit;
 		sortingField;
 		sortingDirection;
+		searchQuery;
+		selectedSalesChannelIds;
+		selectedCollectionTypes;
 		fetchCollections();
 	});
 
@@ -248,16 +348,205 @@
 		</div>
 		<div class="mb-6 flex flex-col gap-4">
 			<div class="flex flex-wrap items-center justify-between gap-2">
-				<Button variant="outline" size="sm" class="rounded-md">
-					<SlidersHorizontal class="mr-1.5 size-4" />
-					Add filter
-				</Button>
+				<div class="flex flex-wrap items-center gap-2">
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger
+							class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4"
+						>
+							<SlidersHorizontal class="mr-1.5 size-4" />
+							Add filter
+							<ChevronDown class="size-4" />
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Portal>
+							<DropdownMenu.Content
+								class="z-50 min-w-48 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+								sideOffset={4}
+							>
+								<div class="max-h-48 overflow-auto py-1">
+									{#each FILTER_OPTIONS as opt (opt.id)}
+										<button
+											type="button"
+											class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
+											onclick={() => toggleFilterType(opt.id)}
+										>
+											<span
+												class={cn(
+													'flex size-4 items-center justify-center rounded border border-input bg-background',
+													activeFilterTypes.has(opt.id) && 'ring-2 ring-ring'
+												)}
+											>
+												{#if activeFilterTypes.has(opt.id)}
+													<Check class="size-2.5" />
+												{/if}
+											</span>
+											{opt.label}
+										</button>
+									{/each}
+									<button
+										type="button"
+										class="mt-1 w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+										onclick={clearFilters}
+									>
+										Clear
+									</button>
+								</div>
+							</DropdownMenu.Content>
+						</DropdownMenu.Portal>
+					</DropdownMenu.Root>
+					{#if activeFilterTypes.has('sales_channel')}
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger
+								class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none [&_svg]:size-4"
+							>
+								Sales channel
+								<ChevronDown class="size-4" />
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Portal>
+								<DropdownMenu.Content
+									class="z-50 min-w-48 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+									sideOffset={4}
+								>
+									<div class="max-h-48 overflow-auto py-1">
+										{#each salesChannelsList as ch (ch.id)}
+											<button
+												type="button"
+												class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
+												onclick={() => toggleSalesChannel(ch.id)}
+											>
+												<span
+													class={cn(
+														'flex size-4 shrink-0 items-center justify-center rounded border border-input bg-background',
+														selectedSalesChannelIds.has(ch.id) && 'ring-2 ring-ring'
+													)}
+												>
+													{#if selectedSalesChannelIds.has(ch.id)}
+														<Check class="size-2.5" />
+													{/if}
+												</span>
+												{ch.name}
+											</button>
+										{/each}
+										<button
+											type="button"
+											class="mt-1 w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+											onclick={clearSalesChannelFilter}
+										>
+											Clear
+										</button>
+									</div>
+								</DropdownMenu.Content>
+							</DropdownMenu.Portal>
+						</DropdownMenu.Root>
+					{/if}
+					{#if activeFilterTypes.has('type')}
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger
+								class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none [&_svg]:size-4"
+							>
+								Type
+								<ChevronDown class="size-4" />
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Portal>
+								<DropdownMenu.Content
+									class="z-50 min-w-48 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+									sideOffset={4}
+								>
+									<div class="max-h-48 overflow-auto py-1">
+										{#each COLLECTION_TYPE_OPTIONS as t (t)}
+											<button
+												type="button"
+												class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent capitalize"
+												onclick={() => toggleCollectionType(t)}
+											>
+												<span
+													class={cn(
+														'flex size-4 shrink-0 items-center justify-center rounded border border-input bg-background',
+														selectedCollectionTypes.has(t) && 'ring-2 ring-ring'
+													)}
+												>
+													{#if selectedCollectionTypes.has(t)}
+														<Check class="size-2.5" />
+													{/if}
+												</span>
+												{t}
+											</button>
+										{/each}
+										<button
+											type="button"
+											class="mt-1 w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+											onclick={clearCollectionTypeFilter}
+										>
+											Clear
+										</button>
+									</div>
+								</DropdownMenu.Content>
+							</DropdownMenu.Portal>
+						</DropdownMenu.Root>
+					{/if}
+					{#if hasActiveFilters}
+						<div class="flex flex-wrap items-center gap-1.5">
+							{#if searchQuery.trim()}
+								<span
+									class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-xs font-medium"
+								>
+									Search: {searchQuery.trim()}
+									<button
+										type="button"
+										class="rounded p-0.5 hover:bg-muted"
+										onclick={removeFilterChip}
+										aria-label="Remove filter"
+									>
+										<X class="size-3" />
+									</button>
+								</span>
+							{/if}
+							{#each [...selectedSalesChannelIds] as scId (scId)}
+								{@const sc = salesChannelsList.find((c) => c.id === scId)}
+								<span
+									class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-xs font-medium"
+								>
+									Sales channel: {sc?.name ?? scId}
+									<button
+										type="button"
+										class="rounded p-0.5 hover:bg-muted"
+										onclick={() => toggleSalesChannel(scId)}
+										aria-label="Remove sales channel filter"
+									>
+										<X class="size-3" />
+									</button>
+								</span>
+							{/each}
+							{#each [...selectedCollectionTypes] as ct (ct)}
+								<span
+									class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-xs font-medium capitalize"
+								>
+									Type: {ct}
+									<button
+										type="button"
+										class="rounded p-0.5 hover:bg-muted"
+										onclick={() => toggleCollectionType(ct)}
+										aria-label="Remove type filter"
+									>
+										<X class="size-3" />
+									</button>
+								</span>
+							{/each}
+							<button
+								type="button"
+								class="text-xs text-muted-foreground underline hover:text-foreground"
+								onclick={clearFilters}
+							>
+								Clear all
+							</button>
+						</div>
+					{/if}
+				</div>
 				<div class="flex items-center gap-2">
 					<div class="relative w-64">
 						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 						<Input
 							type="search"
-							placeholder="Search"
+							placeholder="Search collections..."
 							bind:value={searchQuery}
 							class="h-9 rounded-md pl-9"
 						/>
@@ -265,9 +554,9 @@
 					<button
 						type="button"
 						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+						aria-label="Sort"
 					>
 						<ArrowUpDown class="size-4" />
-						<span class="sr-only">Sort</span>
 					</button>
 				</div>
 			</div>

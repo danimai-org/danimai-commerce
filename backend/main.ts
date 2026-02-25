@@ -12,7 +12,7 @@ const logger = getLogger();
 // TODO: Replace with actual database configuration from environment variables
 initialize({
   db: {
-    url: process.env.DATABASE_URL || "",
+    url: Bun.env.DATABASE_URL || "",
   },
   logger,
   config: {
