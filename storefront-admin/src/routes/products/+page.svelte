@@ -1,4 +1,6 @@
 <script lang="ts">
+	/// <reference lib="esnext" />
+	/// <reference lib="dom" />
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -71,17 +73,17 @@
 		if (arrays.length === 0) return [[]];
 		const [first, ...rest] = arrays;
 		const restProduct = cartesian(rest);
-		return first.flatMap((item) => restProduct.map((combo) => [item, ...combo]));
+		return first.flatMap((item: T) => restProduct.map((combo: T[]) => [item, ...combo]));
 	}
 
 	function generateVariantsFromOptions(options: ProductOption[]): ProductVariantForm[] {
-		if (options.length === 0 || options.some((o) => o.values.length === 0)) return [];
-		const valueArrays = options.map((o) => o.values);
+		if (options.length === 0 || options.some((o: ProductOption) => o.values.length === 0)) return [];
+		const valueArrays = options.map((o: ProductOption) => o.values);
 		const combinations = cartesian(valueArrays);
-		return combinations.map((combo, i) => {
+		return combinations.map((combo: string[], i: number) => {
 			const optionsRecord: Record<string, string> = {};
 			const parts: string[] = [];
-			options.forEach((opt, j) => {
+			options.forEach((opt: ProductOption, j: number) => {
 				optionsRecord[opt.title] = combo[j] as string;
 				parts.push(combo[j] as string);
 			});
@@ -159,7 +161,7 @@
 					has_previous_page: pageNum > 1
 				}
 			} as ProductsResponse;
-		} catch (e) {
+		} catch (e: unknown) {
 			error = e instanceof Error ? e.message : String(e);
 			data = null;
 		} finally {
@@ -175,12 +177,11 @@
 		}
 	});
 
+	let lastFetchKey = $state('');
 	$effect(() => {
-		page;
-		limit;
-		sortingField;
-		sortingDirection;
-		searchQuery;
+		const key = `${page}-${limit}-${sortingField}-${sortingDirection}-${searchQuery}`;
+		if (key === lastFetchKey) return;
+		lastFetchKey = key;
 		fetchProducts();
 	});
 
@@ -226,8 +227,8 @@
 
 	function syncVariantsFromOptions() {
 		const newV = generateVariantsFromOptions(createOptions);
-		const oldByTitle = new Map(createVariants.map((v) => [v.title, v]));
-		createVariants = newV.map((v) => {
+		const oldByTitle = new Map(createVariants.map((v: ProductVariantForm) => [v.title, v]));
+		createVariants = newV.map((v: ProductVariantForm) => {
 			const ex = oldByTitle.get(v.title);
 			return ex
 				? {
@@ -253,22 +254,25 @@
 	let createAttributeEntries = $state<CreateAttributeEntry[]>([]);
 
 	function addAttributeEntry() {
-		createAttributeEntries = [...createAttributeEntries, { attributeId: '', attributeTitle: '', value: '' }];
+		createAttributeEntries = [
+			...createAttributeEntries,
+			{ attributeId: '', attributeTitle: '', value: '' }
+		];
 	}
 
 	function removeAttributeEntry(index: number) {
-		createAttributeEntries = createAttributeEntries.filter((_, i) => i !== index);
+		createAttributeEntries = createAttributeEntries.filter((_: CreateAttributeEntry, i: number) => i !== index);
 	}
 
 	function setAttributeEntryAttribute(index: number, attributeId: string) {
-		const attr = attributesList.find((a) => a.id === attributeId);
-		createAttributeEntries = createAttributeEntries.map((e, i) =>
+		const attr = attributesList.find((a: { id: string; title: string; type: string }) => a.id === attributeId);
+		createAttributeEntries = createAttributeEntries.map((e: CreateAttributeEntry, i: number) =>
 			i === index ? { ...e, attributeId: attributeId, attributeTitle: attr?.title ?? '' } : e
 		);
 	}
 
 	function setAttributeEntryValue(entryIndex: number, value: string) {
-		createAttributeEntries = createAttributeEntries.map((e, i) =>
+		createAttributeEntries = createAttributeEntries.map((e: CreateAttributeEntry, i: number) =>
 			i === entryIndex ? { ...e, value } : e
 		);
 	}
@@ -293,32 +297,32 @@
 		syncVariantsFromOptions();
 		// Fetch collections, categories, attributes
 		fetch(`${API_BASE}/collections?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
-			.then((j) => {
+			.then((r: Response) => (r.ok ? r.json() : { data: [] }))
+			.then((j: { data?: { id: string; title: string; handle: string }[] }) => {
 				collectionsList = j.data ?? [];
 			})
 			.catch(() => {
 				collectionsList = [];
 			});
 		fetch(`${API_BASE}/product-categories?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
-			.then((j) => {
+			.then((r: Response) => (r.ok ? r.json() : { data: [] }))
+			.then((j: { data?: { id: string; value: string; handle: string }[] }) => {
 				categoriesList = j.data ?? [];
 			})
 			.catch(() => {
 				categoriesList = [];
 			});
 		fetch(`${API_BASE}/product-tags?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
-			.then((j) => {
+			.then((r: Response) => (r.ok ? r.json() : { data: [] }))
+			.then((j: { data?: { id: string; value: string }[] }) => {
 				tagsList = j.data ?? [];
 			})
 			.catch(() => {
 				tagsList = [];
 			});
 		fetch(`${API_BASE}/product-attributes?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
-			.then((j) => {
+			.then((r: Response) => (r.ok ? r.json() : { data: [] }))
+			.then((j: { data?: { id: string; title: string; type: string }[] }) => {
 				attributesList = j.data ?? [];
 			})
 			.catch(() => {
@@ -326,14 +330,16 @@
 			});
 		// Fetch sales channels and set defaults
 		fetch(`${API_BASE}/sales-channels?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
-			.then((j) => {
+			.then((r: Response) => (r.ok ? r.json() : { data: [] }))
+			.then((j: { data?: Array<{ id: string; name: string; is_default?: boolean }> }) => {
 				const salesChannels = j.data ?? [];
 				salesChannelsList = salesChannels.map((ch: { id: string; name: string }) => ({
 					id: ch.id,
 					name: ch.name
 				}));
-				const defaultChannels = salesChannels.filter((ch: { is_default: boolean }) => ch.is_default);
+				const defaultChannels = salesChannels.filter(
+					(ch: { id: string; name: string; is_default?: boolean }) => ch.is_default === true
+				);
 				if (defaultChannels.length > 0) {
 					createSalesChannels = defaultChannels.map((ch: { id: string; name: string }) => ({
 						id: ch.id,
@@ -428,7 +434,7 @@
 	}
 
 	function removeOption(index: number) {
-		createOptions = createOptions.filter((_, i) => i !== index);
+		createOptions = createOptions.filter((_: ProductOption, i: number) => i !== index);
 		syncVariantsFromOptions();
 	}
 
@@ -436,28 +442,28 @@
 		if (!value.trim()) return;
 		const opt = createOptions[optIndex];
 		if (opt.values.includes(value.trim())) return;
-		createOptions = createOptions.map((o, i) =>
+		createOptions = createOptions.map((o: ProductOption, i: number) =>
 			i === optIndex ? { ...o, values: [...o.values, value.trim()] } : o
 		);
 		syncVariantsFromOptions();
 	}
 
 	function removeOptionValue(optIndex: number, valIndex: number) {
-		createOptions = createOptions.map((o, i) =>
-			i === optIndex ? { ...o, values: o.values.filter((_, j) => j !== valIndex) } : o
+		createOptions = createOptions.map((o: ProductOption, i: number) =>
+			i === optIndex ? { ...o, values: o.values.filter((_: string, j: number) => j !== valIndex) } : o
 		);
 		syncVariantsFromOptions();
 	}
 
 	function updateOptionTitle(optIndex: number, title: string) {
-		createOptions = createOptions.map((o, i) => (i === optIndex ? { ...o, title } : o));
+		createOptions = createOptions.map((o: ProductOption, i: number) => (i === optIndex ? { ...o, title } : o));
 		syncVariantsFromOptions();
 	}
 
 	function addSalesChannel() {
 		const id = createSalesChannelInput.trim();
-		if (id && !createSalesChannels.some((s) => s.id === id)) {
-			const channel = salesChannelsList.find((ch) => ch.id === id);
+		if (id && !createSalesChannels.some((s: { id: string; name: string }) => s.id === id)) {
+			const channel = salesChannelsList.find((ch: { id: string; name: string }) => ch.id === id);
 			if (channel) {
 				createSalesChannels = [...createSalesChannels, { id: channel.id, name: channel.name }];
 				createSalesChannelInput = '';
@@ -480,12 +486,12 @@
 	}
 
 	function buildPayload(status: 'draft' | 'published') {
-		const optionTitles = createOptions.map((o) => o.title).filter(Boolean);
+		const optionTitles = createOptions.map((o: ProductOption) => o.title).filter(Boolean);
 		const optionsForApi = createOptions
-			.filter((o) => o.title.trim() && o.values.length > 0)
-			.map((o) => ({ title: o.title.trim(), values: o.values }));
+			.filter((o: ProductOption) => o.title.trim() && o.values.length > 0)
+			.map((o: ProductOption) => ({ title: o.title.trim(), values: o.values }));
 
-		const variantsForApi = createVariants.map((v, i) => {
+		const variantsForApi = createVariants.map((v: ProductVariantForm, i: number) => {
 			const prices = v.priceAmount.trim()
 				? [{ amount: Math.round(parseFloat(v.priceAmount) * 100), currency_code: 'eur' }]
 				: [];
@@ -503,10 +509,9 @@
 			};
 		});
 
-		const attributesForApi =
-			createAttributeEntries
-				.filter((e) => e.attributeId && e.value.trim())
-				.map((e) => ({ id: e.attributeId, value: e.value.trim() }));
+		const attributesForApi = createAttributeEntries
+			.filter((e: CreateAttributeEntry) => e.attributeId && e.value.trim())
+			.map((e: CreateAttributeEntry) => ({ id: e.attributeId, value: e.value.trim() }));
 
 		return {
 			title: createTitle.trim(),
@@ -520,7 +525,10 @@
 			tag_ids: createTagIds.length > 0 ? createTagIds : undefined,
 			options: createHasVariants ? optionsForApi : undefined,
 			variants: createHasVariants && variantsForApi.length > 0 ? variantsForApi : undefined,
-			sales_channels: createSalesChannels.length > 0 ? createSalesChannels.map((ch) => ({ id: ch.id })) : undefined,
+			sales_channels:
+				createSalesChannels.length > 0
+					? createSalesChannels.map((ch: { id: string; name: string }) => ({ id: ch.id }))
+					: undefined,
 			attributes: attributesForApi.length > 0 ? attributesForApi : undefined
 		};
 	}
@@ -533,7 +541,7 @@
 		}
 		// Validate that SKU is provided if available count is set, and available count is non-negative
 		if (createHasVariants) {
-			for (const variant of createVariants) {
+			for (const variant of createVariants as ProductVariantForm[]) {
 				const availableCountStr = String(variant.availableCount || '').trim();
 				if (availableCountStr) {
 					if (!variant.sku.trim()) {
@@ -549,7 +557,7 @@
 			}
 			// Validate that at least one variant has a price > 0 (only for published products)
 			if (status === 'published') {
-				const hasValidPrice = createVariants.some((variant) => {
+				const hasValidPrice = createVariants.some((variant: ProductVariantForm) => {
 					const priceStr = variant.priceAmount.trim();
 					if (!priceStr) return false;
 					const price = parseFloat(priceStr);
@@ -583,7 +591,7 @@
 			}
 			closeCreate();
 			fetchProducts();
-		} catch (e) {
+		} catch (e: unknown) {
 			createError = e instanceof Error ? e.message : String(e);
 		} finally {
 			createSubmitting = false;
@@ -683,7 +691,7 @@
 										<input
 											type="checkbox"
 											checked={isSelected}
-											onchange={(e) => {
+											onchange={(e: Event) => {
 												const checked = (e.currentTarget as HTMLInputElement).checked;
 												if (checked) {
 													selectedProducts = new Set([...selectedProducts, product.id]);
@@ -723,16 +731,11 @@
 										{product.category?.value ?? '—'}
 									</td>
 									<td class="px-4 py-3 text-muted-foreground">
-										<a
-											href="/products/{product.id}"
-											class="text-primary hover:underline"
-										>
-											View
-										</a>
+										<a href="/products/{product.id}" class="text-primary hover:underline"> View </a>
 									</td>
 									<td class="px-4 py-3 text-muted-foreground">
 										{product.sales_channels?.length
-											? product.sales_channels.map((sc) => sc.name).join(', ')
+											? product.sales_channels.map((sc: { id: string; name: string }) => sc.name).join(', ')
 											: '—'}
 									</td>
 									<td class="px-4 py-3 text-muted-foreground">
@@ -762,7 +765,11 @@
 											{product.status}
 										</span>
 									</td>
-									<td class="px-4 py-3" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+									<td
+										class="px-4 py-3"
+										onclick={(e: MouseEvent) => e.stopPropagation()}
+										onkeydown={(e: KeyboardEvent) => e.stopPropagation()}
+									>
 										<DropdownMenu.Root>
 											<DropdownMenu.Trigger
 												class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
@@ -1011,7 +1018,7 @@
 									<span
 										class={cn(
 											'pointer-events-none block size-5 shrink-0 rounded-full border border-input bg-white shadow ring-0 transition-transform',
-											createHasVariants ? 'translate-x-5' : 'translate-x-[1px]'
+											createHasVariants ? 'translate-x-5' : 'translate-x-px'
 										)}
 									></span>
 								</button>
@@ -1030,7 +1037,8 @@
 				<div class="flex-1 overflow-auto p-6 pt-4">
 					<h2 class="text-lg font-semibold">Attributes</h2>
 					<p class="mt-1 text-sm text-muted-foreground">
-						Assign product attributes and their values. You can manage attributes from the product detail page after creation.
+						Assign product attributes and their values. You can manage attributes from the product
+						detail page after creation.
 					</p>
 					<div class="mt-6 flex flex-col gap-4">
 						{#each createAttributeEntries as entry, entryIndex (entryIndex)}
@@ -1038,7 +1046,9 @@
 								<div class="flex items-start justify-between gap-2">
 									<div class="min-w-0 flex-1 space-y-3">
 										<div class="flex flex-col gap-2">
-											<label for="create-attr-select-{entryIndex}" class="text-sm font-medium">Attribute</label>
+											<label for="create-attr-select-{entryIndex}" class="text-sm font-medium"
+												>Attribute</label
+											>
 											<Select.Root
 												type="single"
 												value={entry.attributeId}
@@ -1054,7 +1064,7 @@
 														<Select.Item value="" label="Select attribute">
 															Select attribute
 														</Select.Item>
-														{#each attributesList.filter((a) => !createAttributeEntries.some((e2, i2) => i2 !== entryIndex && e2.attributeId === a.id)) as attr (attr.id)}
+														{#each attributesList.filter((a: { id: string; title: string; type: string }) => !createAttributeEntries.some((e2: CreateAttributeEntry, i2: number) => i2 !== entryIndex && e2.attributeId === a.id)) as attr (attr.id)}
 															<Select.Item value={attr.id} label={attr.title}>
 																{attr.title}
 															</Select.Item>
@@ -1064,13 +1074,19 @@
 											</Select.Root>
 										</div>
 										<div class="flex flex-col gap-2">
-											<label for="create-attr-value-{entryIndex}" class="text-sm font-medium">Value</label>
+											<label for="create-attr-value-{entryIndex}" class="text-sm font-medium"
+												>Value</label
+											>
 											<Input
 												id="create-attr-value-{entryIndex}"
 												class="h-9"
 												placeholder="Value"
 												value={entry.value}
-												oninput={(e) => setAttributeEntryValue(entryIndex, (e.currentTarget as HTMLInputElement).value)}
+												oninput={(e: Event) =>
+													setAttributeEntryValue(
+														entryIndex,
+														(e.currentTarget as HTMLInputElement).value
+													)}
 											/>
 										</div>
 									</div>
@@ -1122,7 +1138,7 @@
 									<span
 										class={cn(
 											'pointer-events-none block size-5 shrink-0 rounded-full border border-input bg-white shadow ring-0 transition-transform',
-											createDiscountable ? 'translate-x-5' : 'translate-x-[1px]'
+											createDiscountable ? 'translate-x-5' : 'translate-x-px'
 										)}
 									></span>
 								</button>
@@ -1171,7 +1187,7 @@
 							</label>
 							<div class="flex flex-wrap items-center gap-2">
 								{#each createTagIds as tagId (tagId)}
-									{@const tag = tagsList.find((t) => t.id === tagId)}
+									{@const tag = tagsList.find((t: { id: string; value: string }) => t.id === tagId)}
 									{#if tag}
 										<span
 											class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm"
@@ -1191,8 +1207,8 @@
 								<select
 									id="create-tags-select"
 									class="flex h-8 min-w-[120px] rounded-md border border-input bg-background px-2 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-									onchange={(e) => {
-										const el = e.currentTarget;
+									onchange={(e: Event) => {
+										const el = e.currentTarget as HTMLSelectElement;
 										const id = el.value;
 										if (id) {
 											addTag(id);
@@ -1201,7 +1217,7 @@
 									}}
 								>
 									<option value="">Add tag</option>
-									{#each tagsList.filter((t) => !createTagIds.includes(t.id)) as tag (tag.id)}
+									{#each tagsList.filter((t: { id: string; value: string }) => !createTagIds.includes(t.id)) as tag (tag.id)}
 										<option value={tag.id}>{tag.value}</option>
 									{/each}
 								</select>
@@ -1246,7 +1262,7 @@
 										}}
 									>
 										<option value="">Add sales channel</option>
-										{#each salesChannelsList.filter((ch) => !createSalesChannels.some((s) => s.id === ch.id)) as channel (channel.id)}
+										{#each salesChannelsList.filter((ch: { id: string; name: string }) => !createSalesChannels.some((s: { id: string; name: string }) => s.id === ch.id)) as channel (channel.id)}
 											<option value={channel.id}>{channel.name}</option>
 										{/each}
 									</select>
@@ -1284,7 +1300,7 @@
 											<Input
 												placeholder="Title (e.g. Size)"
 												value={opt.title}
-												oninput={(e) =>
+												oninput={(e: Event) =>
 													updateOptionTitle(optIndex, (e.target as HTMLInputElement).value)}
 												class="h-8 flex-1"
 											/>
@@ -1315,9 +1331,9 @@
 											{/each}
 											<form
 												class="inline-flex gap-1"
-												onsubmit={(e) => {
+												onsubmit={(e: SubmitEvent) => {
 													e.preventDefault();
-													const input = e.currentTarget.querySelector('input') as HTMLInputElement;
+													const input = (e.currentTarget as HTMLFormElement).querySelector('input') as HTMLInputElement;
 													addOptionValue(optIndex, input?.value ?? '');
 													if (input) input.value = '';
 												}}
@@ -1325,7 +1341,7 @@
 												<Input
 													placeholder="Add value"
 													class="h-7 w-24"
-													onkeydown={(e) => {
+													onkeydown={(e: KeyboardEvent) => {
 														if (e.key === 'Enter') {
 															e.preventDefault();
 															const t = e.target as HTMLInputElement;
@@ -1377,13 +1393,15 @@
 														placeholder="0"
 														min="0"
 														class={cn(
-															"h-8 w-20",
-															String(v.availableCount || '').trim() && !v.sku.trim() && "border-destructive"
+															'h-8 w-20',
+															String(v.availableCount || '').trim() &&
+																!v.sku.trim() &&
+																'border-destructive'
 														)}
 														disabled={!v.sku.trim()}
 													/>
 													{#if String(v.availableCount || '').trim() && !v.sku.trim()}
-														<p class="text-xs text-destructive mt-0.5">SKU required</p>
+														<p class="mt-0.5 text-xs text-destructive">SKU required</p>
 													{/if}
 												</td>
 												<td class="px-3 py-2">

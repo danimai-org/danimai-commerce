@@ -1,9 +1,9 @@
-import { getLogger, configureSync, getConsoleSink } from "@logtape/logtape";
+import { getLogger, configureSync, getConsoleSink, ansiColorFormatter } from "@logtape/logtape";
 
 export const createConsoleLogger = (processName: string) => {
   configureSync({
     sinks: {
-      console: getConsoleSink(),
+      console: getConsoleSink({ formatter: ansiColorFormatter }),
     },
     loggers: [
       { category: [processName], lowestLevel: "debug", sinks: ["console"] },

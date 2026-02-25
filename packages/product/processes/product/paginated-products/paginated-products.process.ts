@@ -63,6 +63,7 @@ export class PaginatedProductsProcess implements ProcessContract<PaginatedProduc
       sorting_direction = SortOrder.DESC,
       category_id,
       search,
+      filters
     } = input;
 
     let query = this.db.selectFrom("products").where("deleted_at", "is", null);

@@ -3,8 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "scripts": {},
+  "scripts": {
+    "install-packages": "./install-packages.sh"
+  },
   "bin": {
-    "danimai": "./packages/cli/danimai.ts"
+    "danimai": "./packages/cli/danimai.ts",
+    "install-packages": "./install-packages.sh"
   }
 }
