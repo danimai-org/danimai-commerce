@@ -29,44 +29,43 @@ const uploadsStatic = new Elysia()
         headers: { "Content-Type": type },
       });
     },
-    { detail: { tags: ["upload"] } }
+    { detail: { tags: ["Upload"] } }
   );
 
 export const uploadRoutes = new Elysia()
   .use(uploadsStatic)
   .use(new Elysia({ prefix: "/upload" })
+  .onError(({ error, set }) => {
+    set.status = 500;
+    return { error: error instanceof Error ? error.message : "Upload failed" };
+  })
   .post(
     "/",
     async ({ request, set }) => {
-      try {
-        const formData = await request.formData();
-        const file = formData.get("file");
-        if (!file || !(file instanceof File)) {
-          set.status = 400;
-          return { error: "Missing file" };
-        }
-        if (!file.type.startsWith("image/")) {
-          set.status = 400;
-          return { error: "File must be an image" };
-        }
-        const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
-        const safeExt = ["jpg", "jpeg", "png", "gif", "webp"].includes(ext) ? ext : "jpg";
-        const name = `${Date.now()}-${Math.random().toString(36).slice(2)}.${safeExt}`;
-        const dir = UPLOAD_DIR;
-        await mkdir(dir, { recursive: true });
-        const filePath = join(dir, name);
-        const buffer = Buffer.from(await file.arrayBuffer());
-        await writeFile(filePath, buffer);
-        const url = `${API_BASE.replace(/\/$/, "")}/uploads/${name}`;
-        return { url };
-      } catch (err) {
-        set.status = 500;
-        return { error: err instanceof Error ? err.message : "Upload failed" };
+      const formData = await request.formData();
+      const file = formData.get("file");
+      if (!file || !(file instanceof File)) {
+        set.status = 400;
+        return { error: "Missing file" };
       }
+      if (!file.type.startsWith("image/")) {
+        set.status = 400;
+        return { error: "File must be an image" };
+      }
+      const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
+      const safeExt = ["jpg", "jpeg", "png", "gif", "webp"].includes(ext) ? ext : "jpg";
+      const name = `${Date.now()}-${Math.random().toString(36).slice(2)}.${safeExt}`;
+      const dir = UPLOAD_DIR;
+      await mkdir(dir, { recursive: true });
+      const filePath = join(dir, name);
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await writeFile(filePath, buffer);
+      const url = `${API_BASE.replace(/\/$/, "")}/uploads/${name}`;
+      return { url };
     },
     {
       detail: {
-        tags: ["upload"],
+        tags: ["Upload"],
         summary: "Upload image",
         description: "Upload an image file; returns a public URL for the stored file.",
       },

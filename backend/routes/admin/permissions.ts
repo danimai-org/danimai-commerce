@@ -1,4 +1,5 @@
 import { Elysia } from "elysia";
+import { Type } from "@sinclair/typebox";
 import { DANIMAI_LOGGER, getService } from "@danimai/core";
 import type { Logger } from "@logtape/logtape";
 import {
@@ -8,92 +9,58 @@ import {
   PaginatedPermissionsProcess,
   RetrievePermissionProcess,
   UpdatePermissionProcess,
-  type PaginatedPermissionsProcessInput,
-  type UpdatePermissionProcessInput,
   PaginatedPermissionsSchema,
   UpdatePermissionSchema,
 } from "@danimai/user";
 import { handleProcessError } from "../../utils/error-handler";
-import Value from "typebox/value";
 
 export const permissionRoutes = new Elysia({ prefix: "/permissions" })
+  .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query, set }) => {
-      try {
-        const process = getService<PaginatedPermissionsProcess>(PAGINATED_PERMISSIONS_PROCESS);
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const result = await process.runOperations({
-          input: Value.Convert(PaginatedPermissionsSchema, query) as PaginatedPermissionsProcessInput,
-          logger,
-        });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ query: input }) => {
+      const process = getService<PaginatedPermissionsProcess>(PAGINATED_PERMISSIONS_PROCESS);
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      return process.runOperations({ input, logger } as any);
     },
     {
+      query: PaginatedPermissionsSchema as any,
       detail: {
-        tags: ["permissions"],
+        tags: ["Permissions"],
         summary: "Get paginated permissions",
-        parameters: [
-          { name: "page", in: "query", required: false, schema: { type: "number" } },
-          { name: "limit", in: "query", required: false, schema: { type: "number" } },
-          { name: "sorting_field", in: "query", required: false, schema: { type: "string" } },
-          { name: "sorting_direction", in: "query", required: false, schema: { type: "string" } },
-        ],
       },
     }
   )
   .get(
     "/:id",
-    async ({ params, set }) => {
-      try {
-        const process = getService<RetrievePermissionProcess>(RETRIEVE_PERMISSION_PROCESS);
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const result = await process.runOperations({
-          input: { id: params.id },
-          logger,
-        });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ params }) => {
+      const process = getService<RetrievePermissionProcess>(RETRIEVE_PERMISSION_PROCESS);
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      return process.runOperations({ input: { id: params.id }, logger } as any);
     },
     {
+      params: Type.Object({ id: Type.String() }) as any,
       detail: {
-        tags: ["permissions"],
+        tags: ["Permissions"],
         summary: "Get permission by ID",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
       },
     }
   )
   .put(
     "/:id",
-    async ({ params, body, set }) => {
-      try {
-        const process = getService<UpdatePermissionProcess>(UPDATE_PERMISSION_PROCESS);
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const input = Value.Convert(UpdatePermissionSchema, { ...(body as object), id: params.id }) as UpdatePermissionProcessInput;
-        const result = await process.runOperations({ input, logger });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ params, body }) => {
+      const process = getService<UpdatePermissionProcess>(UPDATE_PERMISSION_PROCESS);
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      const input = { ...(body as Record<string, unknown>), id: params.id };
+      return process.runOperations({ input, logger } as any);
     },
     {
+      params: Type.Object({ id: Type.String() }) as any,
+      body: Type.Omit(UpdatePermissionSchema, ["id"]) as any,
       detail: {
-        tags: ["permissions"],
+        tags: ["Permissions"],
         summary: "Update permission",
         description: "Updates a permission by ID (name and/or description)",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
-        requestBody: {
-          content: {
-            "application/json": {
-              example: { name: "product:create", description: "Permission to create products" },
-            },
-          },
-        },
       },
     }
   );

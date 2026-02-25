@@ -12,13 +12,8 @@ import {
   CreateStockLocationsProcess,
   UpdateStockLocationsProcess,
   DeleteStockLocationsProcess,
-  type CreateStockLocationsProcessInput,
-  type UpdateStockLocationProcessInput,
-  type DeleteStockLocationsProcessInput,
-  type PaginatedStockLocationsProcessInput,
   PaginatedStockLocationsSchema,
   CreateStockLocationsSchema,
-  UpdateStockLocationSchema,
   DeleteStockLocationsSchema,
 } from "@danimai/stock-location";
 import {
@@ -26,80 +21,66 @@ import {
   CheckLocationsInUseProcess,
 } from "@danimai/inventory";
 import { handleProcessError } from "../../utils/error-handler";
-import Value from "typebox/value";
+import {
+  InternalErrorResponseSchema,
+  NoContentResponseSchema,
+  ValidationErrorResponseSchema,
+} from "../../utils/response-schemas";
+import { Type } from "@sinclair/typebox";
+
+const UpdateStockLocationBodySchema = Type.Object({
+  name: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  address_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()]))),
+});
 
 export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
+  .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query, set }) => {
-      try {
-        const process = getService<PaginatedStockLocationsProcess>(
-          PAGINATED_STOCK_LOCATIONS_PROCESS
-        );
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const result = await process.runOperations({
-          input: Value.Convert(PaginatedStockLocationsSchema, query) as PaginatedStockLocationsProcessInput,
-          logger,
-        });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ query: input }) => {
+      const process = getService<PaginatedStockLocationsProcess>(
+        PAGINATED_STOCK_LOCATIONS_PROCESS
+      );
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      return process.runOperations({ input, logger } as any);
     },
     {
+      query: PaginatedStockLocationsSchema as any,
       detail: {
-        tags: ["stock-locations"],
+        tags: ["Stock Locations"],
         summary: "Get paginated stock locations",
         description: "Gets a paginated list of stock locations",
-        parameters: [
-          { name: "page", in: "query", required: false, schema: { type: "number" } },
-          { name: "limit", in: "query", required: false, schema: { type: "number" } },
-          { name: "sorting_field", in: "query", required: false, schema: { type: "string" } },
-          { name: "sorting_direction", in: "query", required: false, schema: { type: "string" } },
-        ],
       },
     }
   )
   .get(
     "/:id",
-    async ({ params, set }) => {
-      try {
-        const process = getService<RetrieveStockLocationProcess>(RETRIEVE_STOCK_LOCATION_PROCESS);
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const result = await process.runOperations({
-          input: { id: params.id },
-          logger,
-        });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ params }) => {
+      const process = getService<RetrieveStockLocationProcess>(RETRIEVE_STOCK_LOCATION_PROCESS);
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      return process.runOperations({ input: { id: params.id }, logger } as any);
     },
     {
+      params: Type.Object({ id: Type.String() }) as any,
       detail: {
-        tags: ["stock-locations"],
+        tags: ["Stock Locations"],
         summary: "Retrieve stock location",
         description: "Retrieve a single stock location by id",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
       },
     }
   )
   .post(
     "/",
-    async ({ body, set }) => {
-      try {
-        const process = getService<CreateStockLocationsProcess>(CREATE_STOCK_LOCATIONS_PROCESS);
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const input = body as CreateStockLocationsProcessInput;
-        const result = await process.runOperations({ input, logger });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ body: input }) => {
+      const process = getService<CreateStockLocationsProcess>(CREATE_STOCK_LOCATIONS_PROCESS);
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      return process.runOperations({ input, logger } as any);
     },
     {
+      body: CreateStockLocationsSchema as any,
       detail: {
-        tags: ["stock-locations"],
+        tags: ["Stock Locations"],
         summary: "Create stock location(s)",
         description: "Creates one or more stock locations",
         requestBody: {
@@ -121,68 +102,50 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
   )
   .put(
     "/:id",
-    async ({ params, body, set }) => {
-      try {
-        const process = getService<UpdateStockLocationsProcess>(UPDATE_STOCK_LOCATIONS_PROCESS);
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const result = await process.runOperations({
-          input: { ...(body as Omit<UpdateStockLocationProcessInput, "id">), id: params.id },
-          logger,
-        });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ params, body }) => {
+      const process = getService<UpdateStockLocationsProcess>(UPDATE_STOCK_LOCATIONS_PROCESS);
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      return process.runOperations({
+        input: { ...(body as Record<string, unknown>), id: params.id },
+        logger,
+      } as any);
     },
     {
+      params: Type.Object({ id: Type.String() }) as any,
+      body: UpdateStockLocationBodySchema as any,
       detail: {
-        tags: ["stock-locations"],
+        tags: ["Stock Locations"],
         summary: "Update a stock location",
         description: "Updates an existing stock location by id",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
-        requestBody: {
-          content: {
-            "application/json": {
-              example: {
-                name: "Updated Warehouse Name",
-                address_id: null,
-              },
-            },
-          },
-        },
       },
     }
   )
   .delete(
     "/",
-    async ({ body, set }) => {
-      try {
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const input = body as unknown as DeleteStockLocationsProcessInput;
-        const checkProcess = getService<CheckLocationsInUseProcess>(CHECK_LOCATIONS_IN_USE_PROCESS);
-        await checkProcess.runOperations({
-          input: { location_ids: input.stock_location_ids },
-          logger,
-        });
-        const process = getService<DeleteStockLocationsProcess>(DELETE_STOCK_LOCATIONS_PROCESS);
-        await process.runOperations({ input, logger });
-        return new Response(null, { status: 204 });
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ body: input, set }) => {
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      const checkProcess = getService<CheckLocationsInUseProcess>(CHECK_LOCATIONS_IN_USE_PROCESS);
+      const { stock_location_ids } = input as { stock_location_ids: string[] };
+      await checkProcess.runOperations({
+        input: { location_ids: stock_location_ids },
+        logger,
+      } as any);
+      const process = getService<DeleteStockLocationsProcess>(DELETE_STOCK_LOCATIONS_PROCESS);
+      await process.runOperations({ input, logger } as any);
+      set.status = 204;
+      return undefined;
     },
     {
+      body: DeleteStockLocationsSchema as any,
+      response: {
+        204: NoContentResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
-        tags: ["stock-locations"],
+        tags: ["Stock Locations"],
         summary: "Delete stock locations",
         description: "Soft-deletes multiple stock locations by their IDs",
-        requestBody: {
-          content: {
-            "application/json": {
-              example: { stock_location_ids: ["550e8400-e29b-41d4-a716-446655440000"] },
-            },
-          },
-        },
       },
     }
   );

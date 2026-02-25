@@ -1,5 +1,6 @@
 import { Elysia } from "elysia";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
+import { Type } from "@sinclair/typebox";
+import { DANIMAI_LOGGER, getService, PaginationSchema } from "@danimai/core";
 import type { Logger } from "@logtape/logtape";
 import {
   PAGINATED_CUSTOMER_GROUPS_PROCESS,
@@ -14,210 +15,130 @@ import {
   UpdateCustomerGroupProcess,
   DeleteCustomerGroupsProcess,
   ListCustomersInGroupProcess,
-  type PaginatedCustomerGroupsProcessInput,
-  type CreateCustomerGroupsProcessInput,
-  type UpdateCustomerGroupProcessInput,
-  type DeleteCustomerGroupsProcessInput,
-  type ListCustomersInGroupProcessInput,
   PaginatedCustomerGroupsSchema,
   CreateCustomerGroupsSchema,
   RetrieveCustomerGroupSchema,
-  UpdateCustomerGroupSchema,
   DeleteCustomerGroupsSchema,
-  ListCustomersInGroupSchema,
 } from "@danimai/customer";
 import { handleProcessError } from "../../utils/error-handler";
-import Value from "typebox/value";
+
+const UpdateCustomerGroupBodySchema = Type.Object({
+  name: Type.Optional(Type.String()),
+  metadata: Type.Optional(
+    Type.Record(Type.String(), Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()]))
+  ),
+});
 
 export const customerGroupRoutes = new Elysia({ prefix: "/customer-groups" })
+  .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/:id/customers",
-    async ({ params, query, set }) => {
-      try {
-        const process = getService<ListCustomersInGroupProcess>(
-          LIST_CUSTOMERS_IN_GROUP_PROCESS
-        );
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const input = Value.Convert(ListCustomersInGroupSchema, {
-          ...query,
-          customer_group_id: params.id,
-        }) as ListCustomersInGroupProcessInput;
-        const result = await process.runOperations({ input, logger });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ params, query }) => {
+      const process = getService<ListCustomersInGroupProcess>(
+        LIST_CUSTOMERS_IN_GROUP_PROCESS
+      );
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      const input = { ...query, customer_group_id: params.id };
+      return process.runOperations({ input, logger } as any);
     },
     {
+      params: Type.Object({ id: Type.String() }) as any,
+      query: PaginationSchema as any,
       detail: {
-        tags: ["customer-groups"],
+        tags: ["Customer Groups"],
         summary: "List customers in a group",
         description: "Gets a paginated list of customers in a customer group",
-        parameters: [
-          { name: "id", in: "path", required: true, schema: { type: "string" } },
-          { name: "page", in: "query", required: false, schema: { type: "number" } },
-          { name: "limit", in: "query", required: false, schema: { type: "number" } },
-          { name: "sorting_field", in: "query", required: false, schema: { type: "string" } },
-          { name: "sorting_direction", in: "query", required: false, schema: { type: "string" } },
-        ],
       },
     }
   )
   .get(
     "/:id",
-    async ({ params, set }) => {
-      try {
-        const process = getService<RetrieveCustomerGroupProcess>(
-          RETRIEVE_CUSTOMER_GROUP_PROCESS
-        );
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const input = Value.Convert(RetrieveCustomerGroupSchema, {
-          id: params.id,
-        });
-        const result = await process.runOperations({ input, logger });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ params }) => {
+      const process = getService<RetrieveCustomerGroupProcess>(
+        RETRIEVE_CUSTOMER_GROUP_PROCESS
+      );
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      return process.runOperations({ input: { id: params.id }, logger } as any);
     },
     {
+      params: RetrieveCustomerGroupSchema as any,
       detail: {
-        tags: ["customer-groups"],
+        tags: ["Customer Groups"],
         summary: "Get a customer group",
         description: "Retrieves a customer group by ID",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
       },
     }
   )
   .get(
     "/",
-    async ({ query, set }) => {
-      try {
-        const process = getService<PaginatedCustomerGroupsProcess>(
-          PAGINATED_CUSTOMER_GROUPS_PROCESS
-        );
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const result = await process.runOperations({
-          input: Value.Convert(
-            PaginatedCustomerGroupsSchema,
-            query
-          ) as PaginatedCustomerGroupsProcessInput,
-          logger,
-        });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ query: input }) => {
+      const process = getService<PaginatedCustomerGroupsProcess>(
+        PAGINATED_CUSTOMER_GROUPS_PROCESS
+      );
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      return process.runOperations({ input, logger } as any);
     },
     {
+      query: PaginatedCustomerGroupsSchema as any,
       detail: {
-        tags: ["customer-groups"],
+        tags: ["Customer Groups"],
         summary: "Get paginated customer groups",
         description: "Gets a paginated list of customer groups",
-        parameters: [
-          { name: "page", in: "query", required: false, schema: { type: "number" } },
-          { name: "limit", in: "query", required: false, schema: { type: "number" } },
-          { name: "sorting_field", in: "query", required: false, schema: { type: "string" } },
-          { name: "sorting_direction", in: "query", required: false, schema: { type: "string" } },
-        ],
       },
     }
   )
   .post(
     "/",
-    async ({ body, set }) => {
-      try {
-        const process = getService<CreateCustomerGroupsProcess>(CREATE_CUSTOMER_GROUPS_PROCESS);
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const input = Value.Convert(CreateCustomerGroupsSchema, body) as CreateCustomerGroupsProcessInput;
-        const result = await process.runOperations({ input, logger });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ body: input }) => {
+      const process = getService<CreateCustomerGroupsProcess>(CREATE_CUSTOMER_GROUPS_PROCESS);
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      return process.runOperations({ input, logger } as any);
     },
     {
+      body: CreateCustomerGroupsSchema as any,
       detail: {
-        tags: ["customer-groups"],
+        tags: ["Customer Groups"],
         summary: "Create customer group(s)",
         description: "Creates one or more customer groups",
-        requestBody: {
-          content: {
-            "application/json": {
-              example: {
-                customer_groups: [
-                  {
-                    name: "VIP Customers",
-                  },
-                ],
-              },
-            },
-          },
-        },
       },
     }
   )
   .put(
     "/:id",
-    async ({ params, body, set }) => {
-      try {
-        const process = getService<UpdateCustomerGroupProcess>(
-          UPDATE_CUSTOMER_GROUP_PROCESS
-        );
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const input = Value.Convert(UpdateCustomerGroupSchema, {
-          ...(body as object),
-          id: params.id,
-        }) as UpdateCustomerGroupProcessInput;
-        const result = await process.runOperations({ input, logger });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ params, body }) => {
+      const process = getService<UpdateCustomerGroupProcess>(
+        UPDATE_CUSTOMER_GROUP_PROCESS
+      );
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      const input = { ...(body as Record<string, unknown>), id: params.id };
+      return process.runOperations({ input, logger } as any);
     },
     {
+      params: Type.Object({ id: Type.String() }) as any,
+      body: UpdateCustomerGroupBodySchema as any,
       detail: {
-        tags: ["customer-groups"],
+        tags: ["Customer Groups"],
         summary: "Update a customer group",
         description: "Updates a customer group by ID",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
-        requestBody: {
-          content: {
-            "application/json": {
-              schema: { name: { type: "string" } },
-            },
-          },
-        },
       },
     }
   )
   .delete(
     "/",
-    async ({ body, set }) => {
-      try {
-        const process = getService<DeleteCustomerGroupsProcess>(
-          DELETE_CUSTOMER_GROUPS_PROCESS
-        );
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const input = Value.Convert(DeleteCustomerGroupsSchema, body) as DeleteCustomerGroupsProcessInput;
-        await process.runOperations({ input, logger });
-        return { success: true };
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ body: input }) => {
+      const process = getService<DeleteCustomerGroupsProcess>(
+        DELETE_CUSTOMER_GROUPS_PROCESS
+      );
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      await process.runOperations({ input, logger } as any);
+      return { success: true };
     },
     {
+      body: DeleteCustomerGroupsSchema as any,
       detail: {
-        tags: ["customer-groups"],
+        tags: ["Customer Groups"],
         summary: "Delete customer group(s)",
         description: "Deletes one or more customer groups",
-        requestBody: {
-          content: {
-            "application/json": {
-              schema: { customer_group_ids: { type: "array", items: { type: "string" } } },
-            },
-          },
-        },
       },
     }
   );

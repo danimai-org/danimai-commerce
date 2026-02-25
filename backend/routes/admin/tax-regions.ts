@@ -1,4 +1,5 @@
 import { Elysia } from "elysia";
+import { Type } from "@sinclair/typebox";
 import { DANIMAI_LOGGER, getService } from "@danimai/core";
 import type { Logger } from "@logtape/logtape";
 import {
@@ -10,133 +11,99 @@ import {
   CreateTaxRegionsProcess,
   UpdateTaxRegionsProcess,
   DeleteTaxRegionsProcess,
-  type PaginatedTaxRegionsProcessInput,
-  type CreateTaxRegionsProcessInput,
-  type UpdateTaxRegionProcessInput,
-  type DeleteTaxRegionsProcessInput,
   PaginatedTaxRegionsSchema,
+  CreateTaxRegionsSchema,
+  UpdateTaxRegionSchema,
+  DeleteTaxRegionsSchema,
 } from "@danimai/tax";
 import { handleProcessError } from "../../utils/error-handler";
-import Value from "typebox/value";
+import {
+  InternalErrorResponseSchema,
+  NoContentResponseSchema,
+  ValidationErrorResponseSchema,
+} from "../../utils/response-schemas";
+
+const UpdateTaxRegionBodySchema = Type.Object({
+  name: Type.Optional(Type.String()),
+  tax_provider_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+});
 
 export const taxRegionRoutes = new Elysia({ prefix: "/tax-regions" })
+  .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query, set }) => {
-      try {
-        const process = getService<PaginatedTaxRegionsProcess>(
-          PAGINATED_TAX_REGIONS_PROCESS
-        );
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const result = await process.runOperations({
-          input: Value.Convert(PaginatedTaxRegionsSchema, query) as PaginatedTaxRegionsProcessInput,
-          logger,
-        });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ query: input }) => {
+      const process = getService<PaginatedTaxRegionsProcess>(
+        PAGINATED_TAX_REGIONS_PROCESS
+      );
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      return process.runOperations({ input, logger } as any);
     },
     {
+      query: PaginatedTaxRegionsSchema as any,
       detail: {
-        tags: ["tax-regions"],
+        tags: ["Tax Regions"],
         summary: "Get paginated tax regions",
         description: "Gets a paginated list of tax regions",
-        parameters: [
-          { name: "page", in: "query", required: false, schema: { type: "number" } },
-          { name: "limit", in: "query", required: false, schema: { type: "number" } },
-          { name: "sorting_field", in: "query", required: false, schema: { type: "string" } },
-          { name: "sorting_direction", in: "query", required: false, schema: { type: "string" } },
-        ],
       },
     }
   )
   .post(
     "/",
-    async ({ body, set }) => {
-      try {
-        const process = getService<CreateTaxRegionsProcess>(CREATE_TAX_REGIONS_PROCESS);
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const input = body as CreateTaxRegionsProcessInput;
-        const result = await process.runOperations({ input, logger });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ body: input }) => {
+      const process = getService<CreateTaxRegionsProcess>(CREATE_TAX_REGIONS_PROCESS);
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      return process.runOperations({ input, logger } as any);
     },
     {
+      body: CreateTaxRegionsSchema as any,
       detail: {
-        tags: ["tax-regions"],
+        tags: ["Tax Regions"],
         summary: "Create tax region(s)",
         description: "Creates one or more tax regions",
-        requestBody: {
-          content: {
-            "application/json": {
-              example: {
-                tax_regions: [{ name: "India", tax_provider_id: null }],
-              },
-            },
-          },
-        },
       },
     }
   )
   .put(
     "/:id",
-    async ({ params, body, set }) => {
-      try {
-        const process = getService<UpdateTaxRegionsProcess>(UPDATE_TAX_REGIONS_PROCESS);
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const result = await process.runOperations({
-          input: { ...(body as Omit<UpdateTaxRegionProcessInput, "id">), id: params.id },
-          logger,
-        });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ params, body }) => {
+      const process = getService<UpdateTaxRegionsProcess>(UPDATE_TAX_REGIONS_PROCESS);
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      return process.runOperations({
+        input: { ...(body as Record<string, unknown>), id: params.id },
+        logger,
+      } as any);
     },
     {
+      params: Type.Object({ id: Type.String() }) as any,
+      body: UpdateTaxRegionBodySchema as any,
       detail: {
-        tags: ["tax-regions"],
+        tags: ["Tax Regions"],
         summary: "Update a tax region",
         description: "Updates an existing tax region by ID",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
-        requestBody: {
-          content: {
-            "application/json": {
-              example: { name: "Updated Name", tax_provider_id: null },
-            },
-          },
-        },
       },
     }
   )
   .delete(
     "/",
-    async ({ body, set }) => {
-      try {
-        const process = getService<DeleteTaxRegionsProcess>(DELETE_TAX_REGIONS_PROCESS);
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const input = body as unknown as DeleteTaxRegionsProcessInput;
-        await process.runOperations({ input, logger });
-        return new Response(null, { status: 204 });
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ body: input, set }) => {
+      const process = getService<DeleteTaxRegionsProcess>(DELETE_TAX_REGIONS_PROCESS);
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      await process.runOperations({ input, logger } as any);
+      set.status = 204;
+      return undefined;
     },
     {
+      body: DeleteTaxRegionsSchema as any,
+      response: {
+        204: NoContentResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
-        tags: ["tax-regions"],
+        tags: ["Tax Regions"],
         summary: "Delete tax regions",
         description: "Deletes multiple tax regions by their IDs",
-        requestBody: {
-          content: {
-            "application/json": {
-              example: { tax_region_ids: ["550e8400-e29b-41d4-a716-446655440000"] },
-            },
-          },
-        },
       },
     }
   );

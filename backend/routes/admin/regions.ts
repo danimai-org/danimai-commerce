@@ -1,4 +1,5 @@
 import { Elysia } from "elysia";
+import { Type } from "@sinclair/typebox";
 import { DANIMAI_LOGGER, getService } from "@danimai/core";
 import type { Logger } from "@logtape/logtape";
 import {
@@ -10,131 +11,98 @@ import {
   CreateRegionsProcess,
   UpdateRegionsProcess,
   DeleteRegionsProcess,
-  type PaginatedRegionsProcessInput,
-  type CreateRegionsProcessInput,
-  type UpdateRegionProcessInput,
-  type DeleteRegionsProcessInput,
   PaginatedRegionsSchema,
+  CreateRegionsSchema,
+  UpdateRegionSchema,
+  DeleteRegionsSchema,
 } from "@danimai/region";
 import { handleProcessError } from "../../utils/error-handler";
-import Value from "typebox/value";
+import {
+  InternalErrorResponseSchema,
+  NoContentResponseSchema,
+  ValidationErrorResponseSchema,
+} from "../../utils/response-schemas";
+
+const UpdateRegionBodySchema = Type.Object({
+  name: Type.Optional(Type.String()),
+  currency_code: Type.Optional(Type.String()),
+  metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()]))),
+});
 
 export const regionRoutes = new Elysia({ prefix: "/regions" })
+  .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query, set }) => {
-      try {
-        const process = getService<PaginatedRegionsProcess>(PAGINATED_REGIONS_PROCESS);
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const result = await process.runOperations({
-          input: Value.Convert(PaginatedRegionsSchema, query) as PaginatedRegionsProcessInput,
-          logger,
-        });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ query: input }) => {
+      const process = getService<PaginatedRegionsProcess>(PAGINATED_REGIONS_PROCESS);
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      return process.runOperations({ input, logger } as any);
     },
     {
+      query: PaginatedRegionsSchema as any,
       detail: {
-        tags: ["regions"],
+        tags: ["Regions"],
         summary: "Get paginated regions",
         description: "Gets a paginated list of regions",
-        parameters: [
-          { name: "page", in: "query", required: false, schema: { type: "number" } },
-          { name: "limit", in: "query", required: false, schema: { type: "number" } },
-          { name: "sorting_field", in: "query", required: false, schema: { type: "string" } },
-          { name: "sorting_direction", in: "query", required: false, schema: { type: "string" } },
-        ],
       },
     }
   )
   .post(
     "/",
-    async ({ body, set }) => {
-      try {
-        const process = getService<CreateRegionsProcess>(CREATE_REGIONS_PROCESS);
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const input = body as CreateRegionsProcessInput;
-        const result = await process.runOperations({ input, logger });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ body: input }) => {
+      const process = getService<CreateRegionsProcess>(CREATE_REGIONS_PROCESS);
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      return process.runOperations({ input, logger } as any);
     },
     {
+      body: CreateRegionsSchema as any,
       detail: {
-        tags: ["regions"],
+        tags: ["Regions"],
         summary: "Create region(s)",
         description: "Creates one or more regions",
-        requestBody: {
-          content: {
-            "application/json": {
-              example: {
-                regions: [{ name: "South Asia", currency_code: "INR" }],
-              },
-            },
-          },
-        },
       },
     }
   )
   .put(
     "/:id",
-    async ({ params, body, set }) => {
-      try {
-        const process = getService<UpdateRegionsProcess>(UPDATE_REGIONS_PROCESS);
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const result = await process.runOperations({
-          input: { ...(body as Omit<UpdateRegionProcessInput, "id">), id: params.id },
-          logger,
-        });
-        return result;
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ params, body }) => {
+      const process = getService<UpdateRegionsProcess>(UPDATE_REGIONS_PROCESS);
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      return process.runOperations({
+        input: { ...(body as Record<string, unknown>), id: params.id },
+        logger,
+      } as any);
     },
     {
+      params: Type.Object({ id: Type.String() }) as any,
+      body: UpdateRegionBodySchema as any,
       detail: {
-        tags: ["regions"],
+        tags: ["Regions"],
         summary: "Update a region",
         description: "Updates an existing region by ID",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
-        requestBody: {
-          content: {
-            "application/json": {
-              example: { name: "Updated Name", currency_code: "USD" },
-            },
-          },
-        },
       },
     }
   )
   .delete(
     "/",
-    async ({ body, set }) => {
-      try {
-        const process = getService<DeleteRegionsProcess>(DELETE_REGIONS_PROCESS);
-        const logger = getService<Logger>(DANIMAI_LOGGER);
-        const input = body as unknown as DeleteRegionsProcessInput;
-        await process.runOperations({ input, logger });
-        return new Response(null, { status: 204 });
-      } catch (err) {
-        return handleProcessError(err, set);
-      }
+    async ({ body: input, set }) => {
+      const process = getService<DeleteRegionsProcess>(DELETE_REGIONS_PROCESS);
+      const logger = getService<Logger>(DANIMAI_LOGGER);
+      await process.runOperations({ input, logger } as any);
+      set.status = 204;
+      return undefined;
     },
     {
+      body: DeleteRegionsSchema as any,
+      response: {
+        204: NoContentResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
-        tags: ["regions"],
+        tags: ["Regions"],
         summary: "Delete regions",
         description: "Deletes multiple regions by their IDs",
-        requestBody: {
-          content: {
-            "application/json": {
-              example: { region_ids: ["550e8400-e29b-41d4-a716-446655440000"] },
-            },
-          },
-        },
       },
     }
   );

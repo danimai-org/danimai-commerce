@@ -1,12 +1,10 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
 import { bearer } from "@elysiajs/bearer";
 import { getService } from "@danimai/core";
 import {
   AuthTokensResponseSchema,
   EXPIRE_SESSION_PROCESS,
   ExpireSessionProcess,
-  ExpireSessionSchema,
   LOGIN_PROCESS,
   LoginProcess,
   LoginSchema,
@@ -17,23 +15,17 @@ import {
   RefreshTokenSchema,
   RETRIEVE_USER_PROCESS,
   RetrieveUserProcess,
-  RetrieveUserSchema,
   VERIFY_ACCESS_TOKEN_PROCESS,
   VerifyAccessTokenProcess,
-  VerifyAccessTokenSchema,
 } from "@danimai/user";
 import { handleProcessError } from "../../utils/error-handler";
+import {
+  InternalErrorResponseSchema,
+  NoContentResponseSchema,
+  UnauthorizedResponseSchema,
+  ValidationErrorResponseSchema,
+} from "../../utils/response-schemas";
 import { loginRateLimitMacro } from "../../macros/login-rate-limit";
-
-const UnauthorizedResponseSchema = Type.Object(
-  {
-    error: Type.String({ description: "Error code" }),
-    message: Type.String({ description: "Error message" }),
-  },
-  {
-    examples: [{ error: "Unauthorized", message: "Missing Authorization header" }],
-  }
-);
 
 const loginRoute = new Elysia()
   .use(loginRateLimitMacro)
@@ -48,6 +40,8 @@ const loginRoute = new Elysia()
       rateLimit: true,
       response: {
         200: AuthTokensResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
       },
       detail: {
         tags: ["Auth"],
@@ -72,6 +66,8 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
       body: RefreshTokenSchema as any,
       response: {
         200: AuthTokensResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
       },
       detail: {
         tags: ["Auth"],
@@ -98,7 +94,7 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
     },
     {
       response: {
-        204: Type.Undefined({ description: "No content" }),
+        204: NoContentResponseSchema,
         401: UnauthorizedResponseSchema,
       },
       detail: {
@@ -127,6 +123,7 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
       response: {
         200: MeResponseSchema,
         401: UnauthorizedResponseSchema,
+        500: InternalErrorResponseSchema,
       },
       detail: {
         tags: ["Auth"],
