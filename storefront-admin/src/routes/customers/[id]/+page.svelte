@@ -20,7 +20,7 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 
-	const API_BASE = 'http://localhost:8000';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type Customer = {
 		id: string;

@@ -26,8 +26,7 @@
 	import BarChart3 from '@lucide/svelte/icons/bar-chart-3';
 
 	const API_BASE =
-		import.meta.env.VITE_API_BASE ??
-		(import.meta.env.DEV ? '/api' : 'http://localhost:8000');
+		'http://localhost:8000/admin';
 
 	type Order = {
 		id: string;

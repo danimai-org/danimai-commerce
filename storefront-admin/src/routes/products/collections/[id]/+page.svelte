@@ -23,7 +23,7 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import { cn } from '$lib/utils.js';
 
-	const API_BASE = 'http://localhost:8000';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type ProductCollection = {
 		id: string;

@@ -23,7 +23,7 @@
 	import Info from '@lucide/svelte/icons/info';
 	import { cn } from '$lib/utils.js';
 
-	const API_BASE = 'http://localhost:8000';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type ProductCategory = {
 		id: string;

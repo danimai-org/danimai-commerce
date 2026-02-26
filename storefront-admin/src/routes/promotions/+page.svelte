@@ -13,6 +13,7 @@
 	import Info from '@lucide/svelte/icons/info';
 	import Clock from '@lucide/svelte/icons/clock';
 	import { cn } from '$lib/utils.js';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type Promotion = {
 		id: string;
@@ -1616,8 +1617,9 @@
 						<div class="flex flex-col gap-4">
 							<h3 class="text-sm font-semibold">Campaign</h3>
 							<div class="rounded-lg border bg-muted/30 p-4">
-								{#if viewingPromotion.campaign_id}
-									{@const campaign = campaigns.find(c => c.id === viewingPromotion.campaign_id)}
+								{#if viewingPromotion?.campaign_id}
+									{@const campaignId = viewingPromotion.campaign_id}
+									{@const campaign = campaigns.find(c => c.id === campaignId)}
 									{#if campaign}
 										<div class="flex flex-col gap-2">
 											<div class="flex items-center gap-2">

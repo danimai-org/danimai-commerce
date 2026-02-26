@@ -9,14 +9,13 @@
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import Eye from '@lucide/svelte/icons/eye';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import ListFilter from '@lucide/svelte/icons/list-filter';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import { cn } from '$lib/utils.js';
 
-	const API_BASE = 'http://localhost:8000';
-
+	const API_BASE = 'http://localhost:8000/admin';
+		
 	const ATTRIBUTE_TYPES = [
 		{ value: 'string', label: 'String' },
 		{ value: 'number', label: 'Number' },

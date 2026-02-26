@@ -16,7 +16,7 @@
 	import Search from '@lucide/svelte/icons/search';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 
-	const API_BASE = 'http://localhost:8000';
+	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
 	type CustomerGroupDetail = {
 		id: string;

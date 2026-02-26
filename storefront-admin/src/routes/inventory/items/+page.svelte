@@ -11,12 +11,12 @@
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 
-	const API_BASE = 'http://localhost:8000';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type InventoryItem = {
 		id: string;
 		sku: string | null;
-		requires_shipping: boolean;
+		requires_shipping: boolean;	
 		metadata: unknown | null;
 		created_at: string;
 		updated_at: string;

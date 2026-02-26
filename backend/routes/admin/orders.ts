@@ -6,7 +6,7 @@ import type { Kysely } from "kysely";
 import {
   PAGINATED_ORDERS_PROCESS,
   PaginatedOrdersProcess,
-  PaginatedOrdersSchema,
+  PaginatedOrdersQuerySchema,
   PaginatedOrdersResponseSchema,
   CREATE_ORDERS_PROCESS,
   CreateOrdersProcess,
@@ -69,13 +69,22 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedOrdersProcess>(PAGINATED_ORDERS_PROCESS);
       const logger = getService<Logger>(DANIMAI_LOGGER);
+      const input: Record<string, unknown> = { ...query };
+      if (query.page !== undefined) {
+        const p = typeof query.page === "string" ? parseInt(query.page, 10) : query.page;
+        input.page = Number.isNaN(p) ? 1 : Math.max(1, p);
+      }
+      if (query.limit !== undefined) {
+        const l = typeof query.limit === "string" ? parseInt(query.limit, 10) : query.limit;
+        input.limit = Number.isNaN(l) ? 10 : Math.max(1, Math.min(100, l));
+      }
       return process.runOperations({ input, logger } as any);
     },
     {
-      query: PaginatedOrdersSchema as any,
+      query: PaginatedOrdersQuerySchema,
       response: {
         200: PaginatedOrdersResponseSchema,
         400: ValidationErrorResponseSchema,

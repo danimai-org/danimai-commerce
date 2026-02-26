@@ -80,7 +80,7 @@ export class LoginProcess implements ProcessContract<LoginResult> {
       }]);
     }
 
-    const valid = await this.passwordService.verify(input.password, user.password_hash);
+    const valid = await this.passwordService.verify(input.password.trim(), user.password_hash);
     if (!valid) {
       throw new ValidationError("Invalid email or password", [{
         type: "invalid",
@@ -97,7 +97,6 @@ export class LoginProcess implements ProcessContract<LoginResult> {
         user_id: user.id,
         expires_at: sessionExpiresAt.toISOString(),
       },
-      logger: context.logger,
     });
 
     if (!session) {
@@ -119,7 +118,6 @@ export class LoginProcess implements ProcessContract<LoginResult> {
 
     await this.updateSessionProcess.runOperations({
       input: { id: session.id, refresh_token },
-      logger: context.logger,
     });
 
     return {

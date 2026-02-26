@@ -6,7 +6,7 @@
 	import Eye from '@lucide/svelte/icons/eye';
 	import EyeOff from '@lucide/svelte/icons/eye-off';
 
-	const API_BASE = 'http://localhost:8000';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	let email = $state('');
 	let password = $state('');
@@ -30,14 +30,17 @@
 			const res = await fetch(`${API_BASE}/auth/login`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ email: e, password }),
+				body: JSON.stringify({
+					email: e.trim().toLowerCase(),
+					password: password.trim(),
+				}),
 			});
 			const text = await res.text();
 			if (!res.ok) {
 				let msg = text;
 				try {
-					const j = JSON.parse(text);
-					msg = j.message ?? msg;
+					const j = JSON.parse(text) as { message?: string; errors?: Array<{ message?: string }> };
+					msg = j.errors?.[0]?.message ?? j.message ?? msg;
 				} catch {}
 				throw new Error(msg);
 			}

@@ -13,9 +13,7 @@
 	import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
 	import Search from '@lucide/svelte/icons/search';
 
-	const API_BASE =
-		import.meta.env.VITE_API_BASE ??
-		(import.meta.env.DEV ? '/api' : 'http://localhost:8000');
+	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
 	type Order = {
 		id: string;
@@ -93,7 +91,11 @@
 				.map((raw, i) => normalizeMetaItem(raw, i))
 				.filter((it): it is OrderItem => it !== null && it.quantity > 0);
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			const msg = e instanceof Error ? e.message : String(e);
+			error =
+				msg === 'Failed to fetch' || msg.includes('NetworkError')
+					? 'Could not reach the API. Ensure the backend is running (e.g. bun dev in backend).'
+					: msg;
 			order = null;
 		} finally {
 			loading = false;

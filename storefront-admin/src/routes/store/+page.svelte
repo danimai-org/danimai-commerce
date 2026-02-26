@@ -14,7 +14,7 @@
 	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import Combobox from '$lib/components/organs/combobox/combobox.svelte';
 
-	const API_BASE = 'http://localhost:8000';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type Currency = {
 		id: string;

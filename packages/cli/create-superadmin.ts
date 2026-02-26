@@ -96,7 +96,7 @@ async function runCreateSuperadmin() {
       process.exit(1);
     }
 
-    const passwordHash = await passwordService.hash(password);
+    const passwordHash = await passwordService.hash(password.trim());
     await db
       .withSchema("public")
       .insertInto("users")

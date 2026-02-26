@@ -11,7 +11,7 @@
 	import ListFilter from '@lucide/svelte/icons/list-filter';
 	import { cn } from '$lib/utils.js';
 
-	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type ProductAttribute = {
 		id: string;

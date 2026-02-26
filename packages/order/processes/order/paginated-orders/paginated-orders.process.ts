@@ -12,8 +12,7 @@ import {
 import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
-  type PaginatedOrdersProcessInput,
-  PaginatedOrdersSchema,
+  PaginatedOrdersQuerySchema,
 } from "./paginated-orders.schema";
 import type { Database, Order } from "@danimai/order/db";
 
@@ -30,13 +29,13 @@ export class PaginatedOrdersProcess
   ) { }
 
   async runOperations(
-    @ProcessContext({ schema: PaginatedOrdersSchema })
-    context: ProcessContextType<typeof PaginatedOrdersSchema>
+    @ProcessContext({ schema: PaginatedOrdersQuerySchema })
+    context: ProcessContextType<typeof PaginatedOrdersQuerySchema>
   ) {
     const { input } = context;
+    const page = typeof input.page === "number" ? input.page : (typeof input.page === "string" ? Math.max(1, parseInt(input.page, 10) || 1) : 1);
+    const limit = typeof input.limit === "number" ? input.limit : (typeof input.limit === "string" ? Math.min(100, Math.max(1, parseInt(input.limit, 10) || 10)) : 10);
     const {
-      page = 1,
-      limit = 10,
       sorting_field = "created_at",
       sorting_direction = SortOrder.DESC,
     } = input;
@@ -73,6 +72,6 @@ export class PaginatedOrdersProcess
 
     const offset = (page - 1) * limit;
     const data = await query.selectAll().limit(limit).offset(offset).execute();
-    return paginationResponse<Order>(data, total, input);
+    return paginationResponse<Order>(data, total, { ...input, page, limit });
   }
 }

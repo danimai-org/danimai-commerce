@@ -1,10 +1,15 @@
 import "reflect-metadata";
 import type { TSchema } from "@sinclair/typebox";
+import { FormatRegistry } from "@sinclair/typebox";
 import { Check } from "@sinclair/typebox/value";
 import { Errors, ValueErrorType as SchemaValueErrorType } from "@sinclair/typebox/errors";
 import type { ProcessContextType } from "../type";
 import { ValidationError } from "../errors/validation.error";
 import type { ValueErrorType } from "../errors/value-error-type";
+
+// Register "uuid" format so schemas with format: "uuid" validate (TypeBox does not include it by default)
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+FormatRegistry.Set("uuid", (value) => typeof value === "string" && UUID_REGEX.test(value));
 
 const PARAMETER_METADATA_KEY = Symbol("process_context_parameters");
 const WRAPPED_FLAG = Symbol("process_context_wrapped");

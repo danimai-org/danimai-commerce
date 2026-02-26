@@ -12,7 +12,7 @@
 	import Users from '@lucide/svelte/icons/users';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 
-	const API_BASE = 'http://localhost:8000';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type Customer = {
 		id: string;

@@ -12,7 +12,7 @@
 	import Folder from '@lucide/svelte/icons/folder';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 
-	const API_BASE = 'http://localhost:8000';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type CustomerGroup = {
 		id: string;

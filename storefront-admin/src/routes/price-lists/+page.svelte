@@ -19,7 +19,7 @@
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import { cn } from '$lib/utils.js';
 
-	const API_BASE = 'http://localhost:8000';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type Product = {
 		id: string;

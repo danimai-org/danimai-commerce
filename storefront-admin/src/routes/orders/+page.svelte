@@ -27,8 +27,8 @@
 	import { goto } from '$app/navigation';
 
 	const API_BASE =
-		import.meta.env.VITE_API_BASE ??
-		(import.meta.env.DEV ? '/api' : 'http://localhost:8000');
+		'http://localhost:8000/admin';
+	
 
 	type Order = {
 		id: string;

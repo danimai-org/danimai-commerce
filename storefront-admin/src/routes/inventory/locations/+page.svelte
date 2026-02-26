@@ -11,8 +11,8 @@
 	import MapPin from '@lucide/svelte/icons/map-pin';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
-
-	const API_BASE = 'http://localhost:8000';
+	
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type StockLocationAddress = {
 		address_1: string | null;

@@ -1,6 +1,31 @@
+<script lang="ts">
+	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { cn } from '$lib/utils.js';
 
+	interface Props {
+		open: boolean;
+		createName: string;
+		createCurrencyCode: string;
+		createError: string | null;
+		createSubmitting: boolean;
+		closeCreate: () => void;
+		submitCreate: () => void;
+	}
 
-<Sheet.Root bind:open={createOpen}>
+	let {
+		open = $bindable(false),
+		createName = $bindable(''),
+		createCurrencyCode = $bindable(''),
+		createError = null,
+		createSubmitting = false,
+		closeCreate,
+		submitCreate
+	}: Props = $props();
+</script>
+
+<Sheet.Root bind:open>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
 		<div class="flex h-full flex-col">
 			<div class="flex-1 overflow-auto p-6 pt-12">

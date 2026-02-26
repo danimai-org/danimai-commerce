@@ -80,7 +80,7 @@ export class AcceptInviteProcess implements ProcessContract<User | undefined> {
       roleId = role?.id ?? null;
     }
 
-    const passwordHash = await this.passwordService.hash(input.password);
+    const passwordHash = await this.passwordService.hash(input.password.trim());
 
     const user = await this.db
       .insertInto("users")

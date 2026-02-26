@@ -1,7 +1,14 @@
 import { ValidationError } from "@danimai/core";
 import type { Context } from "elysia";
 
+function ensureCorsHeaders(set: Context["set"]) {
+  if (!set.headers) set.headers = {};
+  (set.headers as Record<string, string>)["Access-Control-Allow-Origin"] =
+    process.env.CORS_ORIGIN || "*";
+}
+
 export function handleProcessError(err: unknown, set: Context["set"]) {
+  ensureCorsHeaders(set);
   if (err instanceof ValidationError) {
     set.status = 400;
     return {

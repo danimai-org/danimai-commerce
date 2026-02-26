@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
+	import CreateRegion from '$lib/components/organs/region/create-region.svelte';
+	import EditRegion from '$lib/components/organs/region/edit-region.svelte';
 	import { DropdownMenu } from 'bits-ui';
 	import Search from '@lucide/svelte/icons/search';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
@@ -11,9 +12,18 @@
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import Globe from '@lucide/svelte/icons/globe';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
-	import { cn } from '$lib/utils.js';
 	import { client } from '$lib/client.js';
 	import { createQuery } from '@tanstack/svelte-query';
+
+	type Region = {
+		id: string;
+		name: string;
+		currency_code: string;
+		created_at: string;
+		updated_at: string;
+	};
+
+	const API_BASE = 'http://localhost:8000/admin';
 
 	let searchQuery = $state('');
 	let page = $state(1);
@@ -21,22 +31,34 @@
 	let sortingField = $state('created_at');
 	let sortingDirection = $state<'asc' | 'desc'>('desc');
 
-	let data = $state<RegionsResponse | null>(null);
-	let loading = $state(true);
 	let error = $state<string | null>(null);
-	
-	const query = createQuery(() => ({
-    queryKey: ['regions', page, limit, sortingField, sortingDirection],
-    queryFn: () => client.regions.get({
-      page: page,
-      limit: limit,
-      sorting_field: sortingField,
-      sorting_direction: sortingDirection
-    }),
-  }))
 
-	const regions = $derived(query.data?.data ?? []);
-	const pagination = $derived(query.data?.pagination ?? null);
+	const query = createQuery(() => ({
+		queryKey: ['regions', page, limit, sortingField, sortingDirection],
+		queryFn: () =>
+			client.regions.get({
+				query: {
+					page,
+					limit,
+					sorting_field: sortingField,
+					sorting_direction: sortingDirection
+				}
+			})
+	}));
+
+	type Pagination = {
+		page: number;
+		limit: number;
+		total: number;
+		total_pages: number;
+		has_next_page: boolean;
+		has_previous_page: boolean;
+	};
+
+	const responseBody = $derived(query.data?.data as { data?: Region[]; pagination?: Pagination } | undefined);
+	const regions = $derived(responseBody?.data ?? []);
+	const pagination = $derived(responseBody?.pagination ?? null);
+	const loading = $derived(query.isPending);
 	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
 	const end = $derived(
 		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
@@ -190,7 +212,7 @@
 				throw new Error(text || `HTTP ${res.status}`);
 			}
 			closeEdit();
-			fetchRegions();
+			query.refetch();
 		} catch (e) {
 			editError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -358,9 +380,26 @@
 </div>
 
 <!-- Create Region Sheet -->
-
+<CreateRegion
+	bind:open={createOpen}
+	bind:createName={createName}
+	bind:createCurrencyCode={createCurrencyCode}
+	createError={createError}
+	createSubmitting={createSubmitting}
+	closeCreate={closeCreate}
+	submitCreate={submitCreate}
+/>
 
 <!-- Edit Region Sheet -->
+<EditRegion
+	bind:open={editOpen}
+	bind:editName={editName}
+	bind:editCurrencyCode={editCurrencyCode}
+	editError={editError}
+	editSubmitting={editSubmitting}
+	closeEdit={closeEdit}
+	submitEdit={submitEdit}
+/>
 
 
 <!-- Delete region confirmation -->

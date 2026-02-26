@@ -33,7 +33,7 @@
 		{ value: 'Singapore', label: 'Singapore' }
 	];
 
-	const API_BASE = 'http://localhost:8000';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type TaxRegion = {
 		id: string;

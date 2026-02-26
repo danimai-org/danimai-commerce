@@ -2,7 +2,7 @@ import { Type, type Static } from "@sinclair/typebox";
 
 export const LoginSchema = Type.Object({
   email: Type.String({
-    format: "email",
+    minLength: 1,
     description: "The email of the user",
     examples: ["test@example.com"],
   }),

@@ -12,8 +12,8 @@
 	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import { DropdownMenu } from 'bits-ui';
 
-	const API_BASE = 'http://localhost:8000';
-
+	const API_BASE = 'http://localhost:8000/admin';
+	
 	const itemId = $derived($page.params.id);
 
 	type InventoryItem = {

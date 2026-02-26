@@ -9,7 +9,7 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import { getAccessToken, user as userStore } from '$lib/auth.js';
 
-	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type Profile = {
 		firstName: string;
