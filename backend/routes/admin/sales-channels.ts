@@ -16,11 +16,15 @@ import {
   SyncProductSalesChannelsProcess,
   GetProductSalesChannelsProcess,
   PaginatedSalesChannelsSchema,
+  PaginatedSalesChannelsResponseSchema,
   CreateSalesChannelsSchema,
+  CreateSalesChannelsResponseSchema,
   UpdateSalesChannelSchema,
+  UpdateSalesChannelsResponseSchema,
   DeleteSalesChannelsSchema,
   SyncProductSalesChannelsSchema,
   GetProductSalesChannelsSchema,
+  GetProductSalesChannelsResponseSchema,
 } from "@danimai/sales-channel";
 import { handleProcessError } from "../../utils/error-handler";
 import {
@@ -51,6 +55,11 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
     },
     {
       query: PaginatedSalesChannelsSchema as any,
+      response: {
+        200: PaginatedSalesChannelsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Sales Channels"],
         summary: "Get paginated sales channels",
@@ -67,6 +76,11 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
     },
     {
       body: CreateSalesChannelsSchema as any,
+      response: {
+        200: CreateSalesChannelsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Sales Channels"],
         summary: "Create sales channel(s)",
@@ -87,6 +101,11 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateSalesChannelBodySchema as any,
+      response: {
+        200: UpdateSalesChannelsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Sales Channels"],
         summary: "Update a sales channel",
@@ -156,6 +175,11 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
     },
     {
       params: Type.Object({ productId: Type.String() }) as any,
+      response: {
+        200: GetProductSalesChannelsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Sales Channels"],
         summary: "Get product sales channels",

@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { ProductResponseSchema } from "../retrieve-product/retrieve-product.schema";
 
 // Product Option Schema
 const ProductOptionSchema = Type.Object({
@@ -74,4 +75,12 @@ export const CreateProductSchema = Type.Object({
 
 export type CreateProductProcessInput = Static<
   typeof CreateProductSchema
+>;
+
+export const CreateProductResponseSchema = Type.Union([
+  ProductResponseSchema,
+  Type.Undefined(),
+]);
+export type CreateProductProcessOutput = Static<
+  typeof CreateProductResponseSchema
 >;

@@ -22,7 +22,15 @@ import {
   AddCustomerToGroupProcess,
   RemoveCustomerFromGroupProcess,
   PaginatedCustomersSchema,
+  PaginatedCustomersResponseSchema,
+  RetrieveCustomerResponseSchema,
+  ListCustomerAddressesResponseSchema,
+  AddCustomerToGroupResponseSchema,
+  CreateCustomerAddressResponseSchema,
+  UpdateCustomerAddressResponseSchema,
+  DeleteCustomerAddressResponseSchema,
   CreateCustomersSchema,
+  CreateCustomersResponseSchema,
   CreateCustomerAddressSchema,
   ListCustomerAddressesSchema,
   UpdateCustomerAddressSchema,
@@ -31,6 +39,10 @@ import {
   RemoveCustomerFromGroupSchema,
 } from "@danimai/customer";
 import { handleProcessError } from "../../utils/error-handler";
+import {
+  InternalErrorResponseSchema,
+  ValidationErrorResponseSchema,
+} from "../../utils/response-schemas";
 
 const AddCustomerToGroupBodySchema = Type.Object({
   customer_group_id: Type.String(),
@@ -49,6 +61,11 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
     },
     {
       query: PaginatedCustomersSchema as any,
+      response: {
+        200: PaginatedCustomersResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Customers"],
         summary: "Get paginated customers",
@@ -70,6 +87,11 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: ListCustomerAddressesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Customers"],
         summary: "List customer addresses",
@@ -86,6 +108,11 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: RetrieveCustomerResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Customers"],
         summary: "Get a customer by ID",
@@ -106,6 +133,11 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: AddCustomerToGroupBodySchema as any,
+      response: {
+        200: AddCustomerToGroupResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Customers"],
         summary: "Add customer to group",
@@ -127,6 +159,11 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       query: RemoveCustomerFromGroupSchema as any,
+      response: {
+        200: Type.Object({ success: Type.Literal(true) }),
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Customers"],
         summary: "Remove customer from group",
@@ -147,6 +184,11 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: CreateCustomerAddressSchema as any,
+      response: {
+        200: CreateCustomerAddressResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Customers"],
         summary: "Create customer address",
@@ -167,6 +209,11 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
     {
       params: Type.Object({ id: Type.String(), addressId: Type.String() }) as any,
       body: UpdateCustomerAddressSchema as any,
+      response: {
+        200: UpdateCustomerAddressResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Customers"],
         summary: "Update customer address",
@@ -186,6 +233,11 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
     },
     {
       params: Type.Object({ id: Type.String(), addressId: Type.String() }) as any,
+      response: {
+        200: DeleteCustomerAddressResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Customers"],
         summary: "Delete customer address",
@@ -202,6 +254,11 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
     },
     {
       body: CreateCustomersSchema as any,
+      response: {
+        200: CreateCustomersResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Customers"],
         summary: "Create customer(s)",

@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { OrderResponseSchema } from "../update-orders/update-orders.schema";
 
 const Metadata = Type.Optional(
   Type.Record(
@@ -58,3 +59,8 @@ export const CreateOrdersSchema = Type.Object({
 
 export type CreateOrderProcessInput = Static<typeof CreateOrderSchema>;
 export type CreateOrdersProcessInput = Static<typeof CreateOrdersSchema>;
+
+export const CreateOrdersResponseSchema = Type.Array(OrderResponseSchema);
+export type CreateOrdersProcessOutput = Static<
+  typeof CreateOrdersResponseSchema
+>;

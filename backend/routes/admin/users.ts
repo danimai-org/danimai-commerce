@@ -6,11 +6,17 @@ import {
   PAGINATED_USERS_PROCESS,
   PaginatedUsersProcess,
   PaginatedUsersSchema,
+  PaginatedUsersResponseSchema,
   UPDATE_USER_PROCESS,
   UpdateUserProcess,
   UpdateUserSchema,
+  UpdateUserResponseSchema,
 } from "@danimai/user";
 import { handleProcessError } from "../../utils/error-handler";
+import {
+  InternalErrorResponseSchema,
+  ValidationErrorResponseSchema,
+} from "../../utils/response-schemas";
 
 const UpdateUserBodySchema = Type.Object({
   first_name: Type.Optional(Type.String()),
@@ -28,6 +34,11 @@ export const userRoutes = new Elysia({ prefix: "/users" })
     },
     {
       query: PaginatedUsersSchema as any,
+      response: {
+        200: PaginatedUsersResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Users"],
         summary: "Get paginated users",
@@ -51,7 +62,11 @@ export const userRoutes = new Elysia({ prefix: "/users" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateUserBodySchema as any,
-      
+      response: {
+        200: UpdateUserResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Users"],
         summary: "Update user",

@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { StoreResponseSchema } from "../retrieve-store/retrieve-store.schema";
 
 export const ListStoresSchema = Type.Object({
   name: Type.Optional(Type.String()),
@@ -7,3 +8,7 @@ export const ListStoresSchema = Type.Object({
 });
 
 export type ListStoresProcessInput = Static<typeof ListStoresSchema>;
+
+export const ListStoresResponseSchema = Type.Array(StoreResponseSchema);
+
+export type ListStoresProcessOutput = Static<typeof ListStoresResponseSchema>;

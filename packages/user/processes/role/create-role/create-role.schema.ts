@@ -1,4 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
+import { RoleResponseSchema } from "../retrieve-role/retrieve-role.schema";
 
 export const CreateRoleSchema = Type.Object({
   name: Type.String({
@@ -14,3 +15,9 @@ export const CreateRoleSchema = Type.Object({
 });
 
 export type CreateRoleProcessInput = Static<typeof CreateRoleSchema>;
+
+export const CreateRoleResponseSchema = Type.Union([
+  RoleResponseSchema,
+  Type.Undefined(),
+]);
+export type CreateRoleProcessOutput = Static<typeof CreateRoleResponseSchema>;

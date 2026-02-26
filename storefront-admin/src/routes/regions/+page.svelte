@@ -12,32 +12,8 @@
 	import Globe from '@lucide/svelte/icons/globe';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import { cn } from '$lib/utils.js';
-
-	const API_BASE = 'http://localhost:8000';
-
-	type Region = {
-		id: string;
-		name: string;
-		currency_code: string;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	type Pagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
-
-	type RegionsResponse = {
-		data: Region[];
-		pagination: Pagination;
-	};
+	import { client } from '$lib/client.js';
+	import { createQuery } from '@tanstack/svelte-query';
 
 	let searchQuery = $state('');
 	let page = $state(1);
@@ -48,41 +24,19 @@
 	let data = $state<RegionsResponse | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+	
+	const query = createQuery(() => ({
+    queryKey: ['regions', page, limit, sortingField, sortingDirection],
+    queryFn: () => client.regions.get({
+      page: page,
+      limit: limit,
+      sorting_field: sortingField,
+      sorting_direction: sortingDirection
+    }),
+  }))
 
-	async function fetchRegions() {
-		loading = true;
-		error = null;
-		try {
-			const params = new URLSearchParams({
-				page: String(page),
-				limit: String(limit),
-				sorting_field: sortingField,
-				sorting_direction: sortingDirection
-			});
-			const res = await fetch(`${API_BASE}/regions?${params}`, { cache: 'no-store' });
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			data = (await res.json()) as RegionsResponse;
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			data = null;
-		} finally {
-			loading = false;
-		}
-	}
-
-	$effect(() => {
-		page;
-		limit;
-		sortingField;
-		sortingDirection;
-		fetchRegions();
-	});
-
-	const regions = $derived(data?.data ?? []);
-	const pagination = $derived(data?.pagination ?? null);
+	const regions = $derived(query.data?.data ?? []);
+	const pagination = $derived(query.data?.pagination ?? null);
 	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
 	const end = $derived(
 		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
@@ -126,7 +80,7 @@
 			if (!res.ok) throw new Error(await res.text());
 			deleteConfirmOpen = false;
 			regionToDelete = null;
-			fetchRegions();
+			query.refetch();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -181,7 +135,7 @@
 				throw new Error(text || `HTTP ${res.status}`);
 			}
 			closeCreate();
-			fetchRegions();
+			query.refetch();
 		} catch (e) {
 			createError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -404,98 +358,10 @@
 </div>
 
 <!-- Create Region Sheet -->
-<Sheet.Root bind:open={createOpen}>
-	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-		<div class="flex h-full flex-col">
-			<div class="flex-1 overflow-auto p-6 pt-12">
-				<h2 class="text-lg font-semibold">Create Region</h2>
-				<p class="mt-1 text-sm text-muted-foreground">
-					Manage tax rates and providers for a set of countries.
-				</p>
-				{#if createError && !createSubmitting}
-					<div
-						class="mt-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-					>
-						{createError}
-					</div>
-				{/if}
-				<div class="mt-6 flex flex-col gap-4">
-					<div class="flex flex-col gap-2">
-						<label for="create-name" class="text-sm font-medium">Name</label>
-						<Input
-							id="create-name"
-							bind:value={createName}
-							placeholder="e.g. South Asia"
-							class={cn('h-9', createError === 'Name is required' && 'border-destructive')}
-						/>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="create-currency" class="text-sm font-medium">Currency</label>
-						<Input
-							id="create-currency"
-							bind:value={createCurrencyCode}
-							placeholder="e.g. INR"
-							class={cn('h-9', createError === 'Currency code is required' && 'border-destructive')}
-						/>
-					</div>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeCreate}>Cancel</Button>
-				<Button onclick={submitCreate} disabled={createSubmitting}>
-					{createSubmitting ? 'Creating…' : 'Create'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
+
 
 <!-- Edit Region Sheet -->
-<Sheet.Root bind:open={editOpen}>
-	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-		<div class="flex h-full flex-col">
-			<div class="flex-1 overflow-auto p-6 pt-12">
-				<h2 class="text-lg font-semibold">Edit Region</h2>
-				<p class="mt-1 text-sm text-muted-foreground">
-					Update the region details.
-				</p>
-				{#if editError && !editSubmitting}
-					<div
-						class="mt-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-					>
-						{editError}
-					</div>
-				{/if}
-				<div class="mt-6 flex flex-col gap-4">
-					<div class="flex flex-col gap-2">
-						<label for="edit-name" class="text-sm font-medium">Name</label>
-						<Input
-							id="edit-name"
-							bind:value={editName}
-							placeholder="e.g. South Asia"
-							class={cn('h-9', editError === 'Name is required' && 'border-destructive')}
-						/>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="edit-currency" class="text-sm font-medium">Currency</label>
-						<Input
-							id="edit-currency"
-							bind:value={editCurrencyCode}
-							placeholder="e.g. INR"
-							class={cn('h-9', editError === 'Currency code is required' && 'border-destructive')}
-						/>
-					</div>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeEdit}>Cancel</Button>
-				<Button onclick={submitEdit} disabled={editSubmitting}>
-					{editSubmitting ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
+
 
 <!-- Delete region confirmation -->
 <DeleteConfirmationModal

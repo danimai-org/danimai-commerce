@@ -1,4 +1,4 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
 
 export const DeleteProductCategoriesSchema = Type.Object({
   category_ids: Type.Array(Type.String()),
@@ -8,3 +8,6 @@ export const DeleteProductCategoriesSchema = Type.Object({
 export type DeleteProductCategoriesProcessInput = Static<
   typeof DeleteProductCategoriesSchema
 >;
+
+export const DeleteProductCategoriesResponseSchema = Type.Undefined();
+export type DeleteProductCategoriesProcessOutput = void;

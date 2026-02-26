@@ -12,11 +12,18 @@ import {
   RESEND_INVITE_PROCESS,
   ResendInviteProcess,
   PaginatedInvitesSchema,
+  PaginatedInvitesResponseSchema,
   CreateInviteSchema,
+  CreateInviteResponseSchema,
   AcceptInviteSchema,
-  ResendInviteSchema,
+  AcceptInviteResponseSchema,
+  ResendInviteResponseSchema,
 } from "@danimai/user";
 import { handleProcessError } from "../../utils/error-handler";
+import {
+  InternalErrorResponseSchema,
+  ValidationErrorResponseSchema,
+} from "../../utils/response-schemas";
 
 export const inviteRoutes = new Elysia({ prefix: "/invites" })
   .onError(({ error, set }) => handleProcessError(error, set))
@@ -31,6 +38,11 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
     },
     {
       query: PaginatedInvitesSchema as any,
+      response: {
+        200: PaginatedInvitesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Invites"],
         summary: "List invites",
@@ -47,6 +59,11 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
     },
     {
       body: CreateInviteSchema as any,
+      response: {
+        200: CreateInviteResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Invites"],
         summary: "Create invite",
@@ -66,6 +83,11 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
     },
     {
       body: AcceptInviteSchema as any,
+      response: {
+        200: AcceptInviteResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Invites"],
         summary: "Accept invite",
@@ -86,6 +108,11 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: ResendInviteResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Invites"],
         summary: "Resend invite",

@@ -1,4 +1,4 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
 
 export const CreateCustomerAddressSchema = Type.Object({
   customer_id: Type.String(),
@@ -16,4 +16,31 @@ export const CreateCustomerAddressSchema = Type.Object({
 
 export type CreateCustomerAddressProcessInput = Static<
   typeof CreateCustomerAddressSchema
+>;
+
+export const CustomerAddressResponseSchema = Type.Object({
+  id: Type.String(),
+  customer_id: Type.String(),
+  first_name: Type.Union([Type.String(), Type.Null()]),
+  last_name: Type.Union([Type.String(), Type.Null()]),
+  phone: Type.Union([Type.String(), Type.Null()]),
+  company: Type.Union([Type.String(), Type.Null()]),
+  address_1: Type.String(),
+  address_2: Type.Union([Type.String(), Type.Null()]),
+  city: Type.String(),
+  country_code: Type.String(),
+  province: Type.Union([Type.String(), Type.Null()]),
+  postal_code: Type.Union([Type.String(), Type.Null()]),
+  metadata: Type.Union([Type.Unknown(), Type.Null()]),
+  created_at: Type.String(),
+  updated_at: Type.String(),
+  deleted_at: Type.Union([Type.String(), Type.Null()]),
+});
+
+export const CreateCustomerAddressResponseSchema = Type.Union([
+  CustomerAddressResponseSchema,
+  Type.Undefined(),
+]);
+export type CreateCustomerAddressProcessOutput = Static<
+  typeof CreateCustomerAddressResponseSchema
 >;

@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { CurrencyResponseSchema } from "../retrieve-currency/retrieve-currency.schema";
 
 /**
  * Danimai-style listCurrencies: list currencies with optional filters.
@@ -11,3 +12,7 @@ export const ListCurrenciesSchema = Type.Object({
 });
 
 export type ListCurrenciesProcessInput = Static<typeof ListCurrenciesSchema>;
+
+export const ListCurrenciesResponseSchema = Type.Array(CurrencyResponseSchema);
+
+export type ListCurrenciesProcessOutput = Static<typeof ListCurrenciesResponseSchema>;

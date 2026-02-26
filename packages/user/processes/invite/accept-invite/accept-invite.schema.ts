@@ -1,4 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
+import { MeResponseSchema } from "../../user/retrieve-user/retrieve-user.schema";
 
 export const AcceptInviteSchema = Type.Object({
   token: Type.String({
@@ -14,3 +15,11 @@ export const AcceptInviteSchema = Type.Object({
 });
 
 export type AcceptInviteProcessInput = Static<typeof AcceptInviteSchema>;
+
+export const AcceptInviteResponseSchema = Type.Union([
+  MeResponseSchema,
+  Type.Undefined(),
+]);
+export type AcceptInviteProcessOutput = Static<
+  typeof AcceptInviteResponseSchema
+>;

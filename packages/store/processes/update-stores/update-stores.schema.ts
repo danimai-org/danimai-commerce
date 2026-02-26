@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { StoreResponseSchema } from "../retrieve-store/retrieve-store.schema";
 
 export const UpdateStoreSchema = Type.Object({
   id: Type.String(),
@@ -16,3 +17,7 @@ export const UpdateStoreSchema = Type.Object({
 });
 
 export type UpdateStoreProcessInput = Static<typeof UpdateStoreSchema>;
+
+export const UpdateStoreResponseSchema = Type.Union([StoreResponseSchema, Type.Undefined()]);
+
+export type UpdateStoreProcessOutput = Static<typeof UpdateStoreResponseSchema>;

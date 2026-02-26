@@ -12,8 +12,11 @@ import {
   UpdateTaxRegionsProcess,
   DeleteTaxRegionsProcess,
   PaginatedTaxRegionsSchema,
+  PaginatedTaxRegionsResponseSchema,
   CreateTaxRegionsSchema,
+  CreateTaxRegionsResponseSchema,
   UpdateTaxRegionSchema,
+  UpdateTaxRegionsResponseSchema,
   DeleteTaxRegionsSchema,
 } from "@danimai/tax";
 import { handleProcessError } from "../../utils/error-handler";
@@ -41,6 +44,11 @@ export const taxRegionRoutes = new Elysia({ prefix: "/tax-regions" })
     },
     {
       query: PaginatedTaxRegionsSchema as any,
+      response: {
+        200: PaginatedTaxRegionsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Tax Regions"],
         summary: "Get paginated tax regions",
@@ -57,6 +65,11 @@ export const taxRegionRoutes = new Elysia({ prefix: "/tax-regions" })
     },
     {
       body: CreateTaxRegionsSchema as any,
+      response: {
+        200: CreateTaxRegionsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Tax Regions"],
         summary: "Create tax region(s)",
@@ -77,6 +90,11 @@ export const taxRegionRoutes = new Elysia({ prefix: "/tax-regions" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateTaxRegionBodySchema as any,
+      response: {
+        200: UpdateTaxRegionsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Tax Regions"],
         summary: "Update a tax region",

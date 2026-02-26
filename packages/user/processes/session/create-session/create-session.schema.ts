@@ -15,3 +15,24 @@ export const CreateSessionSchema = Type.Object({
 });
 
 export type CreateSessionProcessInput = Static<typeof CreateSessionSchema>;
+
+export const SessionResponseSchema = Type.Object({
+  id: Type.String(),
+  user_id: Type.String(),
+  refresh_token_hash: Type.Union([Type.String(), Type.Null()]),
+  ip_address: Type.Union([Type.String(), Type.Null()]),
+  user_agent: Type.Union([Type.String(), Type.Null()]),
+  expires_at: Type.String(),
+  logged_out_at: Type.Union([Type.String(), Type.Null()]),
+  metadata: Type.Union([Type.Unknown(), Type.Null()]),
+  created_at: Type.String(),
+  updated_at: Type.String(),
+});
+
+export const CreateSessionResponseSchema = Type.Union([
+  SessionResponseSchema,
+  Type.Undefined(),
+]);
+export type CreateSessionProcessOutput = Static<
+  typeof CreateSessionResponseSchema
+>;

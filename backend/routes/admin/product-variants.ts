@@ -12,10 +12,14 @@ import {
   DeleteProductVariantsProcess,
   PaginatedProductVariantsProcess,
   PaginatedProductVariantsSchema,
+  PaginatedProductVariantsResponseSchema,
   RETRIEVE_PRODUCT_VARIANT_PROCESS,
   RetrieveProductVariantProcess,
+  RetrieveProductVariantResponseSchema,
   CreateProductVariantSchema,
+  CreateProductVariantsResponseSchema,
   UpdateProductVariantSchema,
+  UpdateProductVariantsResponseSchema,
   DeleteProductVariantsSchema,
 } from "@danimai/product";
 import { handleProcessError } from "../../utils/error-handler";
@@ -47,6 +51,11 @@ export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
     },
     {
       query: PaginatedProductVariantsSchema as any,
+      response: {
+        200: PaginatedProductVariantsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Variants"],
         summary: "Get paginated product variants",
@@ -63,6 +72,11 @@ export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: RetrieveProductVariantResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Variants"],
         summary: "Get a product variant by ID",
@@ -79,6 +93,11 @@ export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
     },
     {
       body: CreateProductVariantSchema as any,
+      response: {
+        200: CreateProductVariantsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Variants"],
         summary: "Create a new product variant",
@@ -99,6 +118,11 @@ export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateProductVariantBodySchema as any,
+      response: {
+        200: UpdateProductVariantsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Variants"],
         summary: "Update a product variant",

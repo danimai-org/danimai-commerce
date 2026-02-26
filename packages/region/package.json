@@ -20,6 +20,6 @@
     "@medusajs/js-sdk": "^2.12.3",
     "@medusajs/types": "^2.12.3",
     "kysely": "^0.28.9",
-    "typebox": "^1.0.79"
+    "@sinclair/typebox": "^0.34.48"
   }
 }

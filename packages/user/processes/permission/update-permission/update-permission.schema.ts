@@ -1,4 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
+import { PermissionResponseSchema } from "../retrieve-permission/retrieve-permission.schema";
 
 export const UpdatePermissionSchema = Type.Object({
   id: Type.String({
@@ -21,4 +22,12 @@ export const UpdatePermissionSchema = Type.Object({
 
 export type UpdatePermissionProcessInput = Static<
   typeof UpdatePermissionSchema
+>;
+
+export const UpdatePermissionResponseSchema = Type.Union([
+  PermissionResponseSchema,
+  Type.Undefined(),
+]);
+export type UpdatePermissionProcessOutput = Static<
+  typeof UpdatePermissionResponseSchema
 >;

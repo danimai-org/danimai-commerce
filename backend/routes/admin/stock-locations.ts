@@ -13,7 +13,11 @@ import {
   UpdateStockLocationsProcess,
   DeleteStockLocationsProcess,
   PaginatedStockLocationsSchema,
+  PaginatedStockLocationsResponseSchema,
+  StockLocationResponseSchema,
   CreateStockLocationsSchema,
+  CreateStockLocationsResponseSchema,
+  UpdateStockLocationsResponseSchema,
   DeleteStockLocationsSchema,
 } from "@danimai/stock-location";
 import {
@@ -47,6 +51,11 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
     },
     {
       query: PaginatedStockLocationsSchema as any,
+      response: {
+        200: PaginatedStockLocationsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Stock Locations"],
         summary: "Get paginated stock locations",
@@ -63,6 +72,11 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: StockLocationResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Stock Locations"],
         summary: "Retrieve stock location",
@@ -79,6 +93,11 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
     },
     {
       body: CreateStockLocationsSchema as any,
+      response: {
+        200: CreateStockLocationsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Stock Locations"],
         summary: "Create stock location(s)",
@@ -113,6 +132,11 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateStockLocationBodySchema as any,
+      response: {
+        200: UpdateStockLocationsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Stock Locations"],
         summary: "Update a stock location",

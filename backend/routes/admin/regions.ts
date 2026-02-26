@@ -12,8 +12,11 @@ import {
   UpdateRegionsProcess,
   DeleteRegionsProcess,
   PaginatedRegionsSchema,
+  PaginatedRegionsResponseSchema,
   CreateRegionsSchema,
+  CreateRegionsResponseSchema,
   UpdateRegionSchema,
+  UpdateRegionResponseSchema,
   DeleteRegionsSchema,
 } from "@danimai/region";
 import { handleProcessError } from "../../utils/error-handler";
@@ -40,6 +43,11 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
     },
     {
       query: PaginatedRegionsSchema as any,
+      response: {
+        200: PaginatedRegionsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Regions"],
         summary: "Get paginated regions",
@@ -56,6 +64,11 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
     },
     {
       body: CreateRegionsSchema as any,
+      response: {
+        200: CreateRegionsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Regions"],
         summary: "Create region(s)",
@@ -76,6 +89,11 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateRegionBodySchema as any,
+      response: {
+        200: UpdateRegionResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Regions"],
         summary: "Update a region",

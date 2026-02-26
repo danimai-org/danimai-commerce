@@ -1,4 +1,4 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
 
 export const BatchLinkProductsToCategorySchema = Type.Object({
   product_ids: Type.Array(Type.String()),
@@ -9,3 +9,6 @@ export const BatchLinkProductsToCategorySchema = Type.Object({
 export type BatchLinkProductsToCategoryProcessInput = Static<
   typeof BatchLinkProductsToCategorySchema
 >;
+
+export const BatchLinkProductsToCategoryResponseSchema = Type.Undefined();
+export type BatchLinkProductsToCategoryProcessOutput = void;

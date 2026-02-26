@@ -1,8 +1,11 @@
 {
-  "name": "backend",
+  "name": "@danimai/backend",
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "exports": {
+    ".": "./index.ts"
+  },
   "scripts": {
     "dev": "bun --watch main.ts",
     "migrate": "bun node_modules/@danimai/cli/migrate.ts",
@@ -31,9 +34,9 @@
     "@danimai/user": "../packages/user",
     "@elysiajs/bearer": "^1.4.3",
     "@elysiajs/cors": "^1.4.1",
+    "@elysiajs/eden": "^1.4.8",
     "@elysiajs/swagger": "^1.1.0",
     "@sinclair/typebox": "^0.34.48",
-    "elysia": "^1.4.25",
-    "typebox": "^1.0.79"
+    "elysia": "^1.4.25"
   }
 }

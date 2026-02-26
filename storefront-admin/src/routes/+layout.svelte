@@ -42,6 +42,16 @@
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import { TooltipProvider } from '$lib/components/ui/tooltip/index.js';
 	import { cn } from '$lib/utils.js';
+	 import { browser } from '$app/environment'
+  import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query'
+
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        enabled: browser,
+      },
+    },
+  })
 
 	let { children } = $props();
 
@@ -81,8 +91,11 @@
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
 {#if isPublicPath(path)}
-	{@render children()}
+	<QueryClientProvider client={queryClient}>
+		{@render children()}
+	</QueryClientProvider>
 {:else}
+	<QueryClientProvider client={queryClient}>
 	<TooltipProvider>
 		<SidebarProvider>
 			<SidebarRoot>
@@ -523,4 +536,5 @@
 			</SidebarInset>
 		</SidebarProvider>
 	</TooltipProvider>
+	</QueryClientProvider>
 {/if}

@@ -1,4 +1,4 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
 
 export const SyncProductSalesChannelsSchema = Type.Object({
   product_id: Type.String(),
@@ -8,3 +8,6 @@ export const SyncProductSalesChannelsSchema = Type.Object({
 export type SyncProductSalesChannelsProcessInput = Static<
   typeof SyncProductSalesChannelsSchema
 >;
+
+export const SyncProductSalesChannelsResponseSchema = Type.Undefined();
+export type SyncProductSalesChannelsProcessOutput = void;

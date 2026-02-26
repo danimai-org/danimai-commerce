@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { TaxRegionResponseSchema } from "../update-tax-regions/update-tax-regions.schema";
 
 const Metadata = Type.Optional(
   Type.Record(
@@ -20,3 +21,8 @@ export const CreateTaxRegionsSchema = Type.Object({
 
 export type CreateTaxRegionProcessInput = Static<typeof CreateTaxRegionSchema>;
 export type CreateTaxRegionsProcessInput = Static<typeof CreateTaxRegionsSchema>;
+
+export const CreateTaxRegionsResponseSchema = Type.Array(TaxRegionResponseSchema);
+export type CreateTaxRegionsProcessOutput = Static<
+  typeof CreateTaxRegionsResponseSchema
+>;

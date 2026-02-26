@@ -14,7 +14,11 @@ import {
   PaginatedProductAttributeGroupsProcess,
   RetrieveProductAttributeGroupProcess,
   PaginatedProductAttributeGroupsSchema,
+  PaginatedProductAttributeGroupsResponseSchema,
+  RetrieveProductAttributeGroupResponseSchema,
   CreateProductAttributeGroupSchema,
+  CreateProductAttributeGroupsResponseSchema,
+  UpdateProductAttributeGroupsResponseSchema,
   DeleteProductAttributeGroupsSchema,
 } from "@danimai/product";
 import { handleProcessError } from "../../utils/error-handler";
@@ -41,6 +45,11 @@ export const productAttributeGroupRoutes = new Elysia({ prefix: "/product-attrib
     },
     {
       query: PaginatedProductAttributeGroupsSchema as any,
+      response: {
+        200: PaginatedProductAttributeGroupsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Attribute Groups"],
         summary: "Get paginated product attribute groups",
@@ -57,6 +66,11 @@ export const productAttributeGroupRoutes = new Elysia({ prefix: "/product-attrib
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: RetrieveProductAttributeGroupResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Attribute Groups"],
         summary: "Get a product attribute group by ID",
@@ -73,6 +87,11 @@ export const productAttributeGroupRoutes = new Elysia({ prefix: "/product-attrib
     },
     {
       body: CreateProductAttributeGroupSchema as any,
+      response: {
+        200: CreateProductAttributeGroupsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Attribute Groups"],
         summary: "Create a new product attribute group",
@@ -93,6 +112,11 @@ export const productAttributeGroupRoutes = new Elysia({ prefix: "/product-attrib
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateProductAttributeGroupBodySchema as any,
+      response: {
+        200: UpdateProductAttributeGroupsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Attribute Groups"],
         summary: "Update a product attribute group",

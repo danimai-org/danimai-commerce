@@ -1,7 +1,6 @@
 import type { Logger } from "@logtape/logtape";
 import type { BunPostgresDialectConfig } from "kysely-bun-sql";
-import type { TSchema } from "typebox";
-import Type from "typebox";
+import type { TSchema, Static } from "@sinclair/typebox";
 
 export interface DanimaiInitialize {
   db: BunPostgresDialectConfig;
@@ -25,7 +24,7 @@ export interface DanimaiInitialize {
 }
 
 export interface ProcessContextType<TInput extends TSchema> {
-  input: Type.Static<TInput>;
+  input: Static<TInput>;
 };
 
 export interface ProcessContract<TProcessReturn = void> {

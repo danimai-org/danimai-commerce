@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { ReturnReasonResponseSchema } from "../update-return-reasons/update-return-reasons.schema";
 
 const Metadata = Type.Optional(
   Type.Record(
@@ -19,3 +20,10 @@ export const CreateReturnReasonsSchema = Type.Object({
 
 export type CreateReturnReasonProcessInput = Static<typeof CreateReturnReasonSchema>;
 export type CreateReturnReasonsProcessInput = Static<typeof CreateReturnReasonsSchema>;
+
+export const CreateReturnReasonsResponseSchema = Type.Array(
+  ReturnReasonResponseSchema
+);
+export type CreateReturnReasonsProcessOutput = Static<
+  typeof CreateReturnReasonsResponseSchema
+>;

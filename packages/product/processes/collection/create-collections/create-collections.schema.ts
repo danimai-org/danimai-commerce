@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { ProductCollectionResponseSchema } from "../retrieve-collection/retrieve-collection.schema";
 
 export const CreateCollectionSchema = Type.Object({
   title: Type.String(),
@@ -8,4 +9,12 @@ export const CreateCollectionSchema = Type.Object({
 
 export type CreateCollectionProcessInput = Static<
   typeof CreateCollectionSchema
+>;
+
+export const CreateCollectionsResponseSchema = Type.Union([
+  ProductCollectionResponseSchema,
+  Type.Undefined(),
+]);
+export type CreateCollectionsProcessOutput = Static<
+  typeof CreateCollectionsResponseSchema
 >;

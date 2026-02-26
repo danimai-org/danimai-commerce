@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { TaxRateResponseSchema } from "../update-tax-rates/update-tax-rates.schema";
 
 const Metadata = Type.Optional(
   Type.Record(
@@ -22,3 +23,8 @@ export const CreateTaxRatesSchema = Type.Object({
 
 export type CreateTaxRateProcessInput = Static<typeof CreateTaxRateSchema>;
 export type CreateTaxRatesProcessInput = Static<typeof CreateTaxRatesSchema>;
+
+export const CreateTaxRatesResponseSchema = Type.Array(TaxRateResponseSchema);
+export type CreateTaxRatesProcessOutput = Static<
+  typeof CreateTaxRatesResponseSchema
+>;

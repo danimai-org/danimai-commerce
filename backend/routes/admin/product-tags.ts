@@ -14,11 +14,16 @@ import {
   PaginatedProductTagsProcess,
   PaginatedProductsByTagProcess,
   PaginatedProductTagsSchema,
+  PaginatedProductTagsResponseSchema,
   PaginatedProductsByTagSchema,
+  PaginatedProductsByTagResponseSchema,
   RETRIEVE_PRODUCT_TAG_PROCESS,
   RetrieveProductTagProcess,
+  RetrieveProductTagResponseSchema,
   CreateProductTagSchema,
+  CreateProductTagsResponseSchema,
   UpdateProductTagSchema,
+  UpdateProductTagsResponseSchema,
   DeleteProductTagsSchema,
 } from "@danimai/product";
 import { handleProcessError } from "../../utils/error-handler";
@@ -44,6 +49,11 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
     },
     {
       query: PaginatedProductTagsSchema as any,
+      response: {
+        200: PaginatedProductTagsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Tags"],
         summary: "Get paginated product tags",
@@ -60,6 +70,11 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: RetrieveProductTagResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Tags"],
         summary: "Get a product tag by ID",
@@ -78,6 +93,11 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       query: PaginationSchema as any,
+      response: {
+        200: PaginatedProductsByTagResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Tags"],
         summary: "Get products by tag",
@@ -94,6 +114,11 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
     },
     {
       body: CreateProductTagSchema as any,
+      response: {
+        200: CreateProductTagsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Tags"],
         summary: "Create a new product tag",
@@ -114,6 +139,11 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateProductTagBodySchema as any,
+      response: {
+        200: UpdateProductTagsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Tags"],
         summary: "Update a product tag",

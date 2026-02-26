@@ -62,6 +62,7 @@
 		"vitest-browser-svelte": "^2.0.2"
 	},
 	"dependencies": {
-		"@tanstack/svelte-table": "^8.21.3"
+		"@tanstack/svelte-table": "^8.21.3",
+		"@danimai/backend": "../backend"
 	}
 }

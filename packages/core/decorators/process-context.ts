@@ -1,6 +1,7 @@
 import "reflect-metadata";
-import type { TSchema } from "typebox";
-import Value from "typebox/value";
+import type { TSchema } from "@sinclair/typebox";
+import { Check } from "@sinclair/typebox/value";
+import { Errors, ValueErrorType as SchemaValueErrorType } from "@sinclair/typebox/errors";
 import type { ProcessContextType } from "../type";
 import { ValidationError } from "../errors/validation.error";
 import type { ValueErrorType } from "../errors/value-error-type";
@@ -77,34 +78,19 @@ export function wrapMethodsWithProcessContext(target: any) {
                 const contextArg = args[meta.parameterIndex] as ProcessContextType<typeof meta.schema> | undefined;
 
                 if (contextArg && contextArg.input !== undefined) {
-                    const isValid = Value.Check(meta.schema, contextArg.input);
+                    const isValid = Check(meta.schema, contextArg.input);
 
                     if (!isValid) {
-                        const errors = Array.from(Value.Errors(meta.schema, contextArg.input));
-
-                        // Flatten errors - split grouped errors (like multiple required properties) into individual errors
+                        const errorsIterator = Errors(meta.schema, contextArg.input);
                         const flattenedErrors: Array<{ type: ValueErrorType; message: string; path: string }> = [];
 
-                        for (const error of errors) {
-                            // If it's a "required" error with multiple properties, split them
-                            if (error.keyword === "required" && error.params?.requiredProperties) {
-                                const requiredProperties = error.params.requiredProperties as string[];
-                                for (const property of requiredProperties) {
-                                    flattenedErrors.push({
-                                        type: "required" as ValueErrorType,
-                                        message: `is required field`,
-                                        path: error.instancePath ? `${error.instancePath}/${property}` : property,
-                                    });
-                                }
-                            } else {
-                                // For other error types, use the error as-is but fix the path
-                                const path = error.instancePath.replace(/^\//, "") || error.schemaPath || "";
-                                flattenedErrors.push({
-                                    type: (error.keyword as string) as ValueErrorType,
-                                    message: error.message || "Validation failed",
-                                    path: path,
-                                });
-                            }
+                        for (const error of errorsIterator) {
+                            const typeKey = SchemaValueErrorType[error.type] as string;
+                            flattenedErrors.push({
+                                type: (typeKey ?? "invalid") as ValueErrorType,
+                                message: error.message || "Validation failed",
+                                path: error.path.replace(/^\//, "") || "",
+                            });
                         }
 
                         throw new ValidationError(

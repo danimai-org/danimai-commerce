@@ -20,10 +20,15 @@ import {
   type PaginatedCollectionsProcessInput,
   type PaginatedProductsByCollectionProcessInput,
   PaginatedCollectionsSchema,
+  PaginatedCollectionsResponseSchema,
+  PaginatedProductsByCollectionResponseSchema,
   RETRIEVE_COLLECTION_PROCESS,
   RetrieveCollectionProcess,
   RetrieveCollectionSchema,
+  RetrieveCollectionResponseSchema,
   CreateCollectionSchema,
+  CreateCollectionsResponseSchema,
+  UpdateCollectionsResponseSchema,
   DeleteCollectionsSchema,
 } from "@danimai/product";
 import {
@@ -62,6 +67,11 @@ export const collectionRoutes = new Elysia({ prefix: "/collections" })
     },
     {
       query: PaginatedCollectionsSchema as any,
+      response: {
+        200: PaginatedCollectionsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Collections"],
         summary: "Get paginated collections",
@@ -93,6 +103,11 @@ export const collectionRoutes = new Elysia({ prefix: "/collections" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       query: PaginationSchema as any,
+      response: {
+        200: PaginatedProductsByCollectionResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Collections"],
         summary: "Get products in collection",
@@ -109,6 +124,11 @@ export const collectionRoutes = new Elysia({ prefix: "/collections" })
     },
     {
       params: RetrieveCollectionSchema as any,
+      response: {
+        200: RetrieveCollectionResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Collections"],
         summary: "Get a collection by ID",
@@ -125,6 +145,11 @@ export const collectionRoutes = new Elysia({ prefix: "/collections" })
     },
     {
       body: CreateCollectionSchema as any,
+      response: {
+        200: CreateCollectionsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Collections"],
         summary: "Create a new collection",
@@ -149,6 +174,11 @@ export const collectionRoutes = new Elysia({ prefix: "/collections" })
         handle: Type.Optional(Type.String()),
         metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
       }) as any,
+      response: {
+        200: UpdateCollectionsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Collections"],
         summary: "Update a collection",

@@ -1,7 +1,12 @@
 import { Elysia } from "elysia";
+import { Type } from "@sinclair/typebox";
 import { join } from "path";
 import { mkdir, writeFile, readFile } from "fs/promises";
 import { existsSync } from "fs";
+import {
+  InternalErrorResponseSchema,
+  ValidationErrorResponseSchema,
+} from "../../utils/response-schemas";
 
 const UPLOAD_DIR = join(import.meta.dir, "..", "..", "uploads");
 const API_BASE = process.env.API_BASE_URL || "http://localhost:8000";
@@ -64,6 +69,11 @@ export const uploadRoutes = new Elysia()
       return { url };
     },
     {
+      response: {
+        200: Type.Object({ url: Type.String() }),
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Upload"],
         summary: "Upload image",

@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { CurrencyResponseSchema } from "../retrieve-currency/retrieve-currency.schema";
 
 export const UpdateCurrencySchema = Type.Object({
   id: Type.String(),
@@ -6,3 +7,7 @@ export const UpdateCurrencySchema = Type.Object({
 });
 
 export type UpdateCurrencyProcessInput = Static<typeof UpdateCurrencySchema>;
+
+export const UpdateCurrencyResponseSchema = Type.Union([CurrencyResponseSchema, Type.Undefined()]);
+
+export type UpdateCurrencyProcessOutput = Static<typeof UpdateCurrencyResponseSchema>;

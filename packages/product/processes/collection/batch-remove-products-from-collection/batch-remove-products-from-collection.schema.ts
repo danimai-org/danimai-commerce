@@ -1,4 +1,4 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
 
 export const BatchRemoveProductsFromCollectionSchema = Type.Object({
   product_ids: Type.Array(Type.String()),
@@ -9,3 +9,6 @@ export const BatchRemoveProductsFromCollectionSchema = Type.Object({
 export type BatchRemoveProductsFromCollectionProcessInput = Static<
   typeof BatchRemoveProductsFromCollectionSchema
 >;
+
+export const BatchRemoveProductsFromCollectionResponseSchema = Type.Undefined();
+export type BatchRemoveProductsFromCollectionProcessOutput = void;

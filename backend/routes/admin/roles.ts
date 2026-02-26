@@ -14,8 +14,12 @@ import {
   UpdateRoleProcess,
   DeleteRolesProcess,
   PaginatedRolesSchema,
+  PaginatedRolesResponseSchema,
+  RetrieveRoleResponseSchema,
   CreateRoleSchema,
+  CreateRoleResponseSchema,
   UpdateRoleSchema,
+  UpdateRoleResponseSchema,
   DeleteRolesSchema,
 } from "@danimai/user";
 import { handleProcessError } from "../../utils/error-handler";
@@ -36,6 +40,11 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
     },
     {
       query: PaginatedRolesSchema as any,
+      response: {
+        200: PaginatedRolesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Roles"],
         summary: "Get paginated roles",
@@ -51,6 +60,11 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: RetrieveRoleResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Roles"],
         summary: "Get role by ID",
@@ -66,6 +80,11 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
     },
     {
       body: CreateRoleSchema as any,
+      response: {
+        200: CreateRoleResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Roles"],
         summary: "Create role",
@@ -83,6 +102,11 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: Type.Omit(UpdateRoleSchema, ["id"]) as any,
+      response: {
+        200: UpdateRoleResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Roles"],
         summary: "Update role",

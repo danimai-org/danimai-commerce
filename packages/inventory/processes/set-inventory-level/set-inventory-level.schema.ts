@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { InventoryLevelResponseSchema } from "../get-inventory-item/get-inventory-item.schema";
 
 export const SetInventoryLevelSchema = Type.Object({
   inventory_item_id: Type.String(),
@@ -10,4 +11,12 @@ export const SetInventoryLevelSchema = Type.Object({
 
 export type SetInventoryLevelProcessInput = Static<
   typeof SetInventoryLevelSchema
+>;
+
+export const SetInventoryLevelResponseSchema = Type.Union([
+  InventoryLevelResponseSchema,
+  Type.Null(),
+]);
+export type SetInventoryLevelProcessOutput = Static<
+  typeof SetInventoryLevelResponseSchema
 >;

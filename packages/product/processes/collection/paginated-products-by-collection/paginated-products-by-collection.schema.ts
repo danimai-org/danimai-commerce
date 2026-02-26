@@ -1,4 +1,4 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
 import { PaginationSchema } from "@danimai/core";
 
 export const PaginatedProductsByCollectionSchema = Type.Intersect([
@@ -8,4 +8,12 @@ export const PaginatedProductsByCollectionSchema = Type.Intersect([
 
 export type PaginatedProductsByCollectionProcessInput = Static<
   typeof PaginatedProductsByCollectionSchema
+>;
+
+export const PaginatedProductsByCollectionResponseSchema = Type.Object({
+  products: Type.Array(Type.Any()),
+  count: Type.Number(),
+});
+export type PaginatedProductsByCollectionProcessOutput = Static<
+  typeof PaginatedProductsByCollectionResponseSchema
 >;

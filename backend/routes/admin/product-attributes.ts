@@ -16,8 +16,13 @@ import {
   RetrieveProductAttributeProcess,
   PaginatedProductsByAttributeProcess,
   PaginatedProductAttributesSchema,
+  PaginatedProductAttributesResponseSchema,
+  RetrieveProductAttributeResponseSchema,
+  PaginatedProductsByAttributeResponseSchema,
   CreateProductAttributeSchema,
+  CreateProductAttributesResponseSchema,
   UpdateProductAttributeSchema,
+  UpdateProductAttributesResponseSchema,
   DeleteProductAttributesSchema,
 } from "@danimai/product";
 import { handleProcessError } from "../../utils/error-handler";
@@ -43,6 +48,11 @@ export const productAttributeRoutes = new Elysia({ prefix: "/product-attributes"
     },
     {
       query: PaginatedProductAttributesSchema as any,
+      response: {
+        200: PaginatedProductAttributesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Attributes"],
         summary: "Get paginated product attributes",
@@ -59,6 +69,11 @@ export const productAttributeRoutes = new Elysia({ prefix: "/product-attributes"
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: RetrieveProductAttributeResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Attributes"],
         summary: "Get a product attribute by ID",
@@ -77,6 +92,11 @@ export const productAttributeRoutes = new Elysia({ prefix: "/product-attributes"
     {
       params: Type.Object({ id: Type.String() }) as any,
       query: PaginationSchema as any,
+      response: {
+        200: PaginatedProductsByAttributeResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Attributes"],
         summary: "Get products by attribute",
@@ -93,6 +113,11 @@ export const productAttributeRoutes = new Elysia({ prefix: "/product-attributes"
     },
     {
       body: CreateProductAttributeSchema as any,
+      response: {
+        200: CreateProductAttributesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Attributes"],
         summary: "Create a new product attribute",
@@ -113,6 +138,11 @@ export const productAttributeRoutes = new Elysia({ prefix: "/product-attributes"
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateProductAttributeBodySchema as any,
+      response: {
+        200: UpdateProductAttributesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Attributes"],
         summary: "Update a product attribute",

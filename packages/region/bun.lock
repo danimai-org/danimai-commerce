@@ -10,8 +10,8 @@
         "@danimai/product": "../product",
         "@medusajs/js-sdk": "^2.12.3",
         "@medusajs/types": "^2.12.3",
+        "@sinclair/typebox": "^0.34.48",
         "kysely": "^0.28.9",
-        "typebox": "^1.0.79",
       },
       "devDependencies": {
         "@types/bun": "^1.3.4",
@@ -45,6 +45,8 @@
     "@medusajs/js-sdk": ["@medusajs/js-sdk@2.13.0", "", { "dependencies": { "fetch-event-stream": "^0.1.5", "qs": "^6.12.1" } }, "sha512-Eu5EPzOvbsCykbQCTh4c3zD/i0zKaM7rOOJbKvF7F9vgIEXB4T5sC9o/fpByI6T5Sav3YfXv6fZaQDQV21QX2g=="],
 
     "@medusajs/types": ["@medusajs/types@2.13.0", "", { "dependencies": { "bignumber.js": "^9.1.2" }, "peerDependencies": { "ioredis": "^5.4.1", "vite": "^5.4.21" }, "optionalPeers": ["ioredis", "vite"] }, "sha512-uGjriYN9nFb1GCrLEYFbuxAnLmRFstu8kyZHi4GKH9h2ddGQZP2e1e91kolrSHVtbiI5tJ2tJZ6zwhgm4dO/IA=="],
+
+    "@sinclair/typebox": ["@sinclair/typebox@0.34.48", "", {}, "sha512-kKJTNuK3AQOrgjjotVxMrCn1sUJwM76wMszfq1kdU4uYVJjvEWuFQ6HgvLt4Xz3fSmZlTOxJ/Ie13KnIcWQXFA=="],
 
     "@types/bun": ["@types/bun@1.3.6", "", { "dependencies": { "bun-types": "1.3.6" } }, "sha512-uWCv6FO/8LcpREhenN1d1b6fcspAB+cefwD7uti8C8VffIv0Um08TKMn98FynpTiU38+y2dUO55T11NgDt8VAA=="],
 
@@ -108,8 +110,8 @@
 
     "undici-types": ["undici-types@7.16.0", "", {}, "sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw=="],
 
-    "@danimai/fulfillment/@danimai/core": ["@danimai/core@file:../core", {}],
+    "@danimai/fulfillment/@danimai/core": ["@danimai/core@file:../core", { "dependencies": { "@logtape/logtape": "^1.3.5", "inversify": "^7.11.0", "kysely": "^0.28.9", "kysely-bun-sql": "^0.2.0", "reflect-metadata": "^0.2.2", "typebox": "^1.0.79" } }],
 
-    "@danimai/product/@danimai/core": ["@danimai/core@file:../core", {}],
+    "@danimai/product/@danimai/core": ["@danimai/core@file:../core", { "dependencies": { "@logtape/logtape": "^1.3.5", "inversify": "^7.11.0", "kysely": "^0.28.9", "kysely-bun-sql": "^0.2.0", "reflect-metadata": "^0.2.2", "typebox": "^1.0.79" } }],
   }
 }

@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { StockLocationResponseSchema } from "../retrieve-stock-location/retrieve-stock-location.schema";
 
 const UpdateStockLocationAddressSchema = Type.Object({
   address_1: Type.Optional(Type.Union([Type.String(), Type.Null()])),
@@ -27,3 +28,7 @@ export const UpdateStockLocationSchema = Type.Object({
 export type UpdateStockLocationProcessInput = Static<
   typeof UpdateStockLocationSchema
 >;
+
+export const UpdateStockLocationsResponseSchema = Type.Union([StockLocationResponseSchema, Type.Undefined()]);
+
+export type UpdateStockLocationsProcessOutput = Static<typeof UpdateStockLocationsResponseSchema>;

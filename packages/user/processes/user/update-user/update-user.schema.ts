@@ -1,4 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
+import { MeResponseSchema } from "../retrieve-user/retrieve-user.schema";
 
 export const UpdateUserSchema = Type.Object({
   id: Type.String({
@@ -36,3 +37,9 @@ export const UpdateUserSchema = Type.Object({
 });
 
 export type UpdateUserProcessInput = Static<typeof UpdateUserSchema>;
+
+export const UpdateUserResponseSchema = Type.Union([
+  MeResponseSchema,
+  Type.Undefined(),
+]);
+export type UpdateUserProcessOutput = Static<typeof UpdateUserResponseSchema>;

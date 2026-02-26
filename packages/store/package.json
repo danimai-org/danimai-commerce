@@ -16,6 +16,6 @@
   "dependencies": {
     "@danimai/core": "../core",
     "kysely": "^0.28.9",
-    "typebox": "^1.0.79"
+    "@sinclair/typebox": "^0.34.48"
   }
 }

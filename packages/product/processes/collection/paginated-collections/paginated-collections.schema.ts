@@ -1,6 +1,7 @@
-import { Type, type Static } from "typebox";
-import { createFilterableColumnsSchema, FilterOperator, PaginationSchema } from "@danimai/core";
+import { Type, type Static } from "@sinclair/typebox";
+import { createFilterableColumnsSchema, createPaginatedResponseSchema, FilterOperator, PaginationSchema } from "@danimai/core";
 import type { ProductCollection } from "../../../db/type";
+import { ProductCollectionResponseSchema } from "../retrieve-collection/retrieve-collection.schema";
 
 export const PaginatedCollectionsSchema = Type.Intersect([PaginationSchema, Type.Object({
   search: Type.Optional(Type.String()),
@@ -14,4 +15,10 @@ export const PaginatedCollectionsSchema = Type.Intersect([PaginationSchema, Type
 
 export type PaginatedCollectionsProcessInput = Static<
   typeof PaginatedCollectionsSchema
+>;
+
+export const PaginatedCollectionsResponseSchema =
+  createPaginatedResponseSchema(ProductCollectionResponseSchema);
+export type PaginatedCollectionsProcessOutput = Static<
+  typeof PaginatedCollectionsResponseSchema
 >;

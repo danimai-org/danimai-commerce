@@ -8,3 +8,6 @@ export const DeleteRolesSchema = Type.Object({
 });
 
 export type DeleteRolesProcessInput = Static<typeof DeleteRolesSchema>;
+
+export const DeleteRolesResponseSchema = Type.Undefined();
+export type DeleteRolesProcessOutput = void;

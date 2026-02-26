@@ -12,10 +12,14 @@ import {
   DeleteProductOptionsProcess,
   PaginatedProductOptionsProcess,
   PaginatedProductOptionsSchema,
+  PaginatedProductOptionsResponseSchema,
   RETRIEVE_PRODUCT_OPTION_PROCESS,
   RetrieveProductOptionProcess,
+  RetrieveProductOptionResponseSchema,
   CreateProductOptionSchema,
+  CreateProductOptionsResponseSchema,
   UpdateProductOptionSchema,
+  UpdateProductOptionsResponseSchema,
   DeleteProductOptionsSchema,
 } from "@danimai/product";
 import { handleProcessError } from "../../utils/error-handler";
@@ -42,6 +46,11 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
     },
     {
       query: PaginatedProductOptionsSchema as any,
+      response: {
+        200: PaginatedProductOptionsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Options"],
         summary: "Get paginated product options",
@@ -58,6 +67,11 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: RetrieveProductOptionResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Options"],
         summary: "Get a product option by ID",
@@ -74,6 +88,11 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
     },
     {
       body: CreateProductOptionSchema as any,
+      response: {
+        200: CreateProductOptionsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Options"],
         summary: "Create a new product option",
@@ -94,6 +113,11 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateProductOptionBodySchema as any,
+      response: {
+        200: UpdateProductOptionsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Options"],
         summary: "Update a product option",

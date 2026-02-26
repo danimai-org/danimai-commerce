@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { CustomerAddressResponseSchema } from "../create-customer-address/create-customer-address.schema";
 
 export const UpdateCustomerAddressSchema = Type.Object({
   id: Type.String(),
@@ -17,4 +18,12 @@ export const UpdateCustomerAddressSchema = Type.Object({
 
 export type UpdateCustomerAddressProcessInput = Static<
   typeof UpdateCustomerAddressSchema
+>;
+
+export const UpdateCustomerAddressResponseSchema = Type.Union([
+  CustomerAddressResponseSchema,
+  Type.Undefined(),
+]);
+export type UpdateCustomerAddressProcessOutput = Static<
+  typeof UpdateCustomerAddressResponseSchema
 >;

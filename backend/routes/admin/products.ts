@@ -15,11 +15,17 @@ import {
   DeleteProductsProcess,
   PaginatedProductsProcess,
   PaginatedProductsSchema,
+  PaginatedProductsResponseSchema,
   CreateProductSchema,
   CreateProductsSchema,
+  CreateProductResponseSchema,
+  CreateProductsResponseSchema,
   RETRIEVE_PRODUCT_PROCESS,
   RetrieveProductProcess,
+  RetrieveProductResponseSchema,
   UpdateProductSchema,
+  UpdateProductsResponseSchema,
+  UpdateProductResponseSchema,
   DeleteProductsSchema,
 } from "@danimai/product";
 import {
@@ -63,7 +69,12 @@ export const productRoutes = new Elysia({ prefix: "/products" })
       return { products, count: result.count, offset: result.offset, limit: result.limit };
     },
     {
-      query: PaginatedProductsSchema as any,
+      query: PaginatedProductsSchema,
+      response: {
+        200: PaginatedProductsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Products"],
         summary: "Get paginated products",
@@ -80,6 +91,11 @@ export const productRoutes = new Elysia({ prefix: "/products" })
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: RetrieveProductResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Products"],
         summary: "Get a product by ID",
@@ -96,6 +112,11 @@ export const productRoutes = new Elysia({ prefix: "/products" })
     },
     {
       body: CreateProductSchema as any,
+      response: {
+        200: CreateProductResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Products"],
         summary: "Create a new product",
@@ -112,6 +133,11 @@ export const productRoutes = new Elysia({ prefix: "/products" })
     },
     {
       body: Type.Any() as any,
+      response: {
+        200: CreateProductsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Products"],
         summary: "Create multiple products",
@@ -132,6 +158,11 @@ export const productRoutes = new Elysia({ prefix: "/products" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateProductSchema as any,
+      response: {
+        200: UpdateProductResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Products"],
         summary: "Update a product",
@@ -148,6 +179,11 @@ export const productRoutes = new Elysia({ prefix: "/products" })
     },
     {
       body: Type.Any() as any,
+      response: {
+        200: UpdateProductsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Products"],
         summary: "Update multiple products",

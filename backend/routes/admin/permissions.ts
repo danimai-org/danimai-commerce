@@ -10,9 +10,16 @@ import {
   RetrievePermissionProcess,
   UpdatePermissionProcess,
   PaginatedPermissionsSchema,
+  PaginatedPermissionsResponseSchema,
+  RetrievePermissionResponseSchema,
   UpdatePermissionSchema,
+  UpdatePermissionResponseSchema,
 } from "@danimai/user";
 import { handleProcessError } from "../../utils/error-handler";
+import {
+  InternalErrorResponseSchema,
+  ValidationErrorResponseSchema,
+} from "../../utils/response-schemas";
 
 export const permissionRoutes = new Elysia({ prefix: "/permissions" })
   .onError(({ error, set }) => handleProcessError(error, set))
@@ -25,6 +32,11 @@ export const permissionRoutes = new Elysia({ prefix: "/permissions" })
     },
     {
       query: PaginatedPermissionsSchema as any,
+      response: {
+        200: PaginatedPermissionsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Permissions"],
         summary: "Get paginated permissions",
@@ -40,6 +52,11 @@ export const permissionRoutes = new Elysia({ prefix: "/permissions" })
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: RetrievePermissionResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Permissions"],
         summary: "Get permission by ID",
@@ -57,6 +74,11 @@ export const permissionRoutes = new Elysia({ prefix: "/permissions" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: Type.Omit(UpdatePermissionSchema, ["id"]) as any,
+      response: {
+        200: UpdatePermissionResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Permissions"],
         summary: "Update permission",

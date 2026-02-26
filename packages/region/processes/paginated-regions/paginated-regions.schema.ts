@@ -1,10 +1,12 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
 import {
   createFilterableColumnsSchema,
+  createPaginatedResponseSchema,
   FilterOperator,
   PaginationSchema,
 } from "@danimai/core";
 import type { Region } from "@danimai/region/db";
+import { RegionResponseSchema } from "../update-regions/update-regions.schema";
 
 export const PaginatedRegionsSchema = Type.Intersect([
   PaginationSchema,
@@ -23,3 +25,7 @@ export const PaginatedRegionsSchema = Type.Intersect([
 export type PaginatedRegionsProcessInput = Static<
   typeof PaginatedRegionsSchema
 >;
+
+export const PaginatedRegionsResponseSchema = createPaginatedResponseSchema(RegionResponseSchema);
+
+export type PaginatedRegionsProcessOutput = Static<typeof PaginatedRegionsResponseSchema>;

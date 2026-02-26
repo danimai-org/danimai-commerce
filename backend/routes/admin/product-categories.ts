@@ -14,10 +14,14 @@ import {
   PAGINATED_PRODUCT_CATEGORIES_PROCESS,
   PaginatedProductCategoriesProcess,
   PaginatedProductCategoriesSchema,
+  PaginatedProductCategoriesResponseSchema,
   RETRIEVE_PRODUCT_CATEGORY_PROCESS,
   RetrieveProductCategoryProcess,
+  RetrieveProductCategoryResponseSchema,
   CreateProductCategorySchema,
+  CreateProductCategoriesResponseSchema,
   UpdateProductCategorySchema,
+  UpdateProductCategoriesResponseSchema,
   DeleteProductCategoriesSchema,
   BatchLinkProductsToCategorySchema,
 } from "@danimai/product";
@@ -51,6 +55,11 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
     },
     {
       query: PaginatedProductCategoriesSchema as any,
+      response: {
+        200: PaginatedProductCategoriesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Categories"],
         summary: "Get paginated product categories",
@@ -67,6 +76,11 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: RetrieveProductCategoryResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Categories"],
         summary: "Get a product category by ID",
@@ -83,6 +97,11 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
     },
     {
       body: CreateProductCategorySchema as any,
+      response: {
+        200: CreateProductCategoriesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Categories"],
         summary: "Create a new product category",
@@ -103,6 +122,11 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateProductCategoryBodySchema as any,
+      response: {
+        200: UpdateProductCategoriesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Product Categories"],
         summary: "Update a product category",

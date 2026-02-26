@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { RegionResponseSchema } from "../update-regions/update-regions.schema";
 
 export const CreateRegionSchema = Type.Object({
   name: Type.String(),
@@ -12,3 +13,7 @@ export const CreateRegionsSchema = Type.Object({
 
 export type CreateRegionProcessInput = Static<typeof CreateRegionSchema>;
 export type CreateRegionsProcessInput = Static<typeof CreateRegionsSchema>;
+
+export const CreateRegionsResponseSchema = Type.Array(RegionResponseSchema);
+
+export type CreateRegionsProcessOutput = Static<typeof CreateRegionsResponseSchema>;

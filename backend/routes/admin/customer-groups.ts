@@ -16,11 +16,20 @@ import {
   DeleteCustomerGroupsProcess,
   ListCustomersInGroupProcess,
   PaginatedCustomerGroupsSchema,
+  PaginatedCustomerGroupsResponseSchema,
+  ListCustomersInGroupResponseSchema,
+  RetrieveCustomerGroupResponseSchema,
   CreateCustomerGroupsSchema,
+  CreateCustomerGroupsResponseSchema,
   RetrieveCustomerGroupSchema,
+  UpdateCustomerGroupResponseSchema,
   DeleteCustomerGroupsSchema,
 } from "@danimai/customer";
 import { handleProcessError } from "../../utils/error-handler";
+import {
+  InternalErrorResponseSchema,
+  ValidationErrorResponseSchema,
+} from "../../utils/response-schemas";
 
 const UpdateCustomerGroupBodySchema = Type.Object({
   name: Type.Optional(Type.String()),
@@ -44,6 +53,11 @@ export const customerGroupRoutes = new Elysia({ prefix: "/customer-groups" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       query: PaginationSchema as any,
+      response: {
+        200: ListCustomersInGroupResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Customer Groups"],
         summary: "List customers in a group",
@@ -62,6 +76,11 @@ export const customerGroupRoutes = new Elysia({ prefix: "/customer-groups" })
     },
     {
       params: RetrieveCustomerGroupSchema as any,
+      response: {
+        200: RetrieveCustomerGroupResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Customer Groups"],
         summary: "Get a customer group",
@@ -80,6 +99,11 @@ export const customerGroupRoutes = new Elysia({ prefix: "/customer-groups" })
     },
     {
       query: PaginatedCustomerGroupsSchema as any,
+      response: {
+        200: PaginatedCustomerGroupsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Customer Groups"],
         summary: "Get paginated customer groups",
@@ -96,6 +120,11 @@ export const customerGroupRoutes = new Elysia({ prefix: "/customer-groups" })
     },
     {
       body: CreateCustomerGroupsSchema as any,
+      response: {
+        200: CreateCustomerGroupsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Customer Groups"],
         summary: "Create customer group(s)",
@@ -116,6 +145,11 @@ export const customerGroupRoutes = new Elysia({ prefix: "/customer-groups" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateCustomerGroupBodySchema as any,
+      response: {
+        200: UpdateCustomerGroupResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Customer Groups"],
         summary: "Update a customer group",
@@ -135,6 +169,11 @@ export const customerGroupRoutes = new Elysia({ prefix: "/customer-groups" })
     },
     {
       body: DeleteCustomerGroupsSchema as any,
+      response: {
+        200: Type.Object({ success: Type.Literal(true) }),
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Customer Groups"],
         summary: "Delete customer group(s)",

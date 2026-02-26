@@ -1,4 +1,4 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
 
 export const UpdateTaxRateRuleSchema = Type.Object({
   id: Type.String(),
@@ -14,3 +14,22 @@ export const UpdateTaxRateRuleSchema = Type.Object({
 });
 
 export type UpdateTaxRateRuleProcessInput = Static<typeof UpdateTaxRateRuleSchema>;
+
+export const TaxRateRuleResponseSchema = Type.Object({
+  id: Type.String(),
+  tax_rate_id: Type.String(),
+  rule_type: Type.String(),
+  value: Type.String(),
+  metadata: Type.Union([Type.Unknown(), Type.Null()]),
+  created_at: Type.String(),
+  updated_at: Type.String(),
+  deleted_at: Type.Union([Type.String(), Type.Null()]),
+});
+
+export const UpdateTaxRateRulesResponseSchema = Type.Union([
+  TaxRateRuleResponseSchema,
+  Type.Undefined(),
+]);
+export type UpdateTaxRateRulesProcessOutput = Static<
+  typeof UpdateTaxRateRulesResponseSchema
+>;

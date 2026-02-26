@@ -4,7 +4,7 @@ import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
 import { initialize } from "@danimai/core";
 import { getLogger } from "./logger";
-import { routes } from "./routes";
+import { routes as adminRoutes } from "./routes/admin";
 
 const logger = getLogger();
 
@@ -90,7 +90,7 @@ const app = new Elysia()
       },
     })
   )
-  .use(routes)
+  .use(adminRoutes)
   .listen(8000, () => {
     logger.info("Server started on http://localhost:8000");
     logger.info("Swagger documentation available at http://localhost:8000/swagger");
@@ -106,3 +106,5 @@ function shutdown() {
 }
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
+
+export type App = typeof app 

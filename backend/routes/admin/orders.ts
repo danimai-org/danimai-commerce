@@ -7,14 +7,22 @@ import {
   PAGINATED_ORDERS_PROCESS,
   PaginatedOrdersProcess,
   PaginatedOrdersSchema,
+  PaginatedOrdersResponseSchema,
   CREATE_ORDERS_PROCESS,
   CreateOrdersProcess,
   CreateOrdersSchema,
+  CreateOrdersResponseSchema,
   UPDATE_ORDERS_PROCESS,
   UpdateOrdersProcess,
+  UpdateOrderResponseSchema,
+  OrderResponseSchema,
   type Database,
 } from "@danimai/order";
 import { handleProcessError } from "../../utils/error-handler";
+import {
+  InternalErrorResponseSchema,
+  ValidationErrorResponseSchema,
+} from "../../utils/response-schemas";
 
 const OrderStatus = Type.Union([
   Type.Literal("pending"),
@@ -68,6 +76,11 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
     },
     {
       query: PaginatedOrdersSchema as any,
+      response: {
+        200: PaginatedOrdersResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Orders"],
         summary: "Get paginated orders",
@@ -85,6 +98,11 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
     },
     {
       body: CreateOrdersSchema as any,
+      response: {
+        200: Type.Object({ data: CreateOrdersResponseSchema }),
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Orders"],
         summary: "Create orders",
@@ -112,6 +130,12 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: OrderResponseSchema,
+        404: Type.Object({ message: Type.String() }),
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Orders"],
         summary: "Get an order by ID",
@@ -135,6 +159,12 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateOrderBodySchema as any,
+      response: {
+        200: UpdateOrderResponseSchema,
+        404: Type.Object({ message: Type.String() }),
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Orders"],
         summary: "Update an order",

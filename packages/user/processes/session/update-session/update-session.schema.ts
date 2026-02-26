@@ -1,4 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
+import { SessionResponseSchema } from "../create-session/create-session.schema";
 
 export const UpdateSessionSchema = Type.Object({
   id: Type.String({
@@ -21,3 +22,11 @@ export const UpdateSessionSchema = Type.Object({
 });
 
 export type UpdateSessionProcessInput = Static<typeof UpdateSessionSchema>;
+
+export const UpdateSessionResponseSchema = Type.Union([
+  SessionResponseSchema,
+  Type.Undefined(),
+]);
+export type UpdateSessionProcessOutput = Static<
+  typeof UpdateSessionResponseSchema
+>;

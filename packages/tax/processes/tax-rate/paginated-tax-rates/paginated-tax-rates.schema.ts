@@ -1,10 +1,12 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
 import {
   createFilterableColumnsSchema,
+  createPaginatedResponseSchema,
   FilterOperator,
   PaginationSchema,
 } from "@danimai/core";
 import type { TaxRate } from "@danimai/tax/db";
+import { TaxRateResponseSchema } from "../update-tax-rates/update-tax-rates.schema";
 
 export const PaginatedTaxRatesSchema = Type.Intersect([
   PaginationSchema,
@@ -22,4 +24,10 @@ export const PaginatedTaxRatesSchema = Type.Intersect([
 
 export type PaginatedTaxRatesProcessInput = Static<
   typeof PaginatedTaxRatesSchema
+>;
+
+export const PaginatedTaxRatesResponseSchema =
+  createPaginatedResponseSchema(TaxRateResponseSchema);
+export type PaginatedTaxRatesProcessOutput = Static<
+  typeof PaginatedTaxRatesResponseSchema
 >;

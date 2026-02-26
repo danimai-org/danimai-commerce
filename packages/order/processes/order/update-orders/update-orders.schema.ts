@@ -1,4 +1,4 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
 
 const OrderStatus = Type.Union([
   Type.Literal("pending"),
@@ -45,3 +45,28 @@ export const UpdateOrderSchema = Type.Object({
 });
 
 export type UpdateOrderProcessInput = Static<typeof UpdateOrderSchema>;
+
+export const OrderResponseSchema = Type.Object({
+  id: Type.String(),
+  status: OrderStatus,
+  fulfillment_status: FulfillmentStatus,
+  payment_status: PaymentStatus,
+  display_id: Type.Number(),
+  currency_code: Type.String(),
+  email: Type.Union([Type.String(), Type.Null()]),
+  customer_id: Type.Union([Type.String(), Type.Null()]),
+  sales_channel_id: Type.Union([Type.String(), Type.Null()]),
+  region_id: Type.Union([Type.String(), Type.Null()]),
+  billing_address_id: Type.Union([Type.String(), Type.Null()]),
+  shipping_address_id: Type.Union([Type.String(), Type.Null()]),
+  metadata: Type.Union([Type.Unknown(), Type.Null()]),
+  created_at: Type.String(),
+  updated_at: Type.String(),
+  deleted_at: Type.Union([Type.String(), Type.Null()]),
+});
+
+export const UpdateOrderResponseSchema = Type.Union([
+  OrderResponseSchema,
+  Type.Undefined(),
+]);
+export type UpdateOrderProcessOutput = Static<typeof UpdateOrderResponseSchema>;

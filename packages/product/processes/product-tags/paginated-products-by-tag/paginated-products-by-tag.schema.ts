@@ -1,5 +1,5 @@
-import { Type, type Static } from "typebox";
-import { PaginationSchema } from "@danimai/core";
+import { Type, type Static } from "@sinclair/typebox";
+import { createPaginatedResponseSchema, PaginationSchema } from "@danimai/core";
 
 export const PaginatedProductsByTagSchema = Type.Intersect([
   Type.Object({ tag_id: Type.String() }),
@@ -8,4 +8,10 @@ export const PaginatedProductsByTagSchema = Type.Intersect([
 
 export type PaginatedProductsByTagProcessInput = Static<
   typeof PaginatedProductsByTagSchema
+>;
+
+export const PaginatedProductsByTagResponseSchema =
+  createPaginatedResponseSchema(Type.Any());
+export type PaginatedProductsByTagProcessOutput = Static<
+  typeof PaginatedProductsByTagResponseSchema
 >;

@@ -1,4 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
+import { InviteResponseSchema } from "../create-invite/create-invite.schema";
 
 export const ResendInviteSchema = Type.Object({
   id: Type.String({
@@ -9,3 +10,11 @@ export const ResendInviteSchema = Type.Object({
 });
 
 export type ResendInviteProcessInput = Static<typeof ResendInviteSchema>;
+
+export const ResendInviteResponseSchema = Type.Union([
+  InviteResponseSchema,
+  Type.Undefined(),
+]);
+export type ResendInviteProcessOutput = Static<
+  typeof ResendInviteResponseSchema
+>;

@@ -9,3 +9,8 @@ export const VerifyAccessTokenSchema = Type.Object({
 });
 
 export type VerifyAccessTokenProcessInput = Static<typeof VerifyAccessTokenSchema>;
+
+export const VerifyAccessTokenResponseSchema = Type.Any();
+export type VerifyAccessTokenProcessOutput = Static<
+  typeof VerifyAccessTokenResponseSchema
+>;

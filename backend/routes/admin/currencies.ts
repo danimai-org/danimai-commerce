@@ -20,12 +20,19 @@ import {
   UpdateCurrencyProcess,
   DeleteCurrenciesProcess,
   PaginatedCurrenciesSchema,
+  PaginatedCurrenciesResponseSchema,
   ListCurrenciesSchema,
+  ListCurrenciesResponseSchema,
   ListAndCountCurrenciesSchema,
+  ListAndCountCurrenciesResponseSchema,
   RetrieveCurrencySchema,
+  CurrencyResponseSchema,
   ListAvailableCurrenciesSchema,
+  ListAvailableCurrenciesResponseSchema,
   CreateCurrenciesSchema,
+  CreateCurrenciesResponseSchema,
   UpdateCurrencySchema,
+  UpdateCurrencyResponseSchema,
   DeleteCurrenciesSchema,
 } from "@danimai/currency";
 import { handleProcessError } from "../../utils/error-handler";
@@ -52,6 +59,11 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     },
     {
       query: PaginatedCurrenciesSchema as any,
+      response: {
+        200: PaginatedCurrenciesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Currencies"],
         summary: "Get paginated active currencies",
@@ -69,6 +81,11 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     },
     {
       query: ListAvailableCurrenciesSchema as any,
+      response: {
+        200: ListAvailableCurrenciesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Currencies"],
         summary: "List available currencies (123 fixed list)",
@@ -85,6 +102,11 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     },
     {
       query: ListCurrenciesSchema as any,
+      response: {
+        200: ListCurrenciesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Currencies"],
         summary: "List currencies (listCurrencies)",
@@ -104,6 +126,11 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     },
     {
       query: ListAndCountCurrenciesSchema as any,
+      response: {
+        200: ListAndCountCurrenciesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Currencies"],
         summary: "List and count currencies (listAndCountCurrencies)",
@@ -120,6 +147,11 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     },
     {
       params: RetrieveCurrencySchema as any,
+      response: {
+        200: CurrencyResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Currencies"],
         summary: "Retrieve currency (retrieveCurrency)",
@@ -136,6 +168,11 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     },
     {
       body: CreateCurrenciesSchema as any,
+      response: {
+        200: CreateCurrenciesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Currencies"],
         summary: "Add currencies to active list",
@@ -156,6 +193,11 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateCurrencyBodySchema as any,
+      response: {
+        200: UpdateCurrencyResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Currencies"],
         summary: "Update a currency",

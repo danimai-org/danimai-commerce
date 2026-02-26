@@ -50,7 +50,6 @@ const loginRoute = new Elysia()
       },
     }
   );
-
 export const authRoutes = new Elysia({ prefix: "/auth" })
   .use(bearer())
   .onError(({ error, set }) => handleProcessError(error, set))

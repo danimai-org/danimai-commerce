@@ -17,12 +17,17 @@ import {
   SetInventoryLevelProcess,
   DeleteInventoryLevelProcess,
   PaginatedInventoryItemsSchema,
+  PaginatedInventoryItemsResponseSchema,
   CreateInventoryItemsSchema,
-  PaginatedInventoryLevelsSchema,
-  GetInventoryItemSchema,
-  SetInventoryLevelSchema,
-  DeleteInventoryLevelSchema,
+  CreateInventoryItemsResponseSchema,
+  GetInventoryItemResponseSchema,
   UpdateInventoryItemSchema,
+  UpdateInventoryItemResponseSchema,
+  PaginatedInventoryLevelsSchema,
+  PaginatedInventoryLevelsResponseSchema,
+  SetInventoryLevelSchema,
+  SetInventoryLevelResponseSchema,
+  DeleteInventoryLevelSchema,
 } from "@danimai/inventory";
 import {
   LIST_STOCK_LOCATIONS_BY_IDS_PROCESS,
@@ -34,6 +39,10 @@ import {
   ListProductVariantsBySkuProcess,
 } from "@danimai/product";
 import { handleProcessError } from "../../utils/error-handler";
+import {
+  InternalErrorResponseSchema,
+  ValidationErrorResponseSchema,
+} from "../../utils/response-schemas";
 import { Type } from "@sinclair/typebox";
 
 export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
@@ -49,6 +58,11 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
     },
     {
       body: CreateInventoryItemsSchema as any,
+      response: {
+        200: CreateInventoryItemsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Inventory"],
         summary: "Create inventory item(s)",
@@ -113,6 +127,11 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: GetInventoryItemResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Inventory"],
         summary: "Get inventory item by ID",
@@ -133,6 +152,11 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateInventoryItemSchema as any,
+      response: {
+        200: UpdateInventoryItemResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Inventory"],
         summary: "Update inventory item",
@@ -151,6 +175,11 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
     },
     {
       query: PaginatedInventoryItemsSchema as any,
+      response: {
+        200: PaginatedInventoryItemsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Inventory"],
         summary: "Get paginated inventory items",
@@ -169,6 +198,11 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
     },
     {
       body: SetInventoryLevelSchema as any,
+      response: {
+        200: SetInventoryLevelResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Inventory"],
         summary: "Set inventory level",
@@ -189,6 +223,11 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: Type.Object({ success: Type.Literal(true) }),
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Inventory"],
         summary: "Delete inventory level",
@@ -207,6 +246,11 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
     },
     {
       query: PaginatedInventoryLevelsSchema as any,
+      response: {
+        200: PaginatedInventoryLevelsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Inventory"],
         summary: "Get paginated inventory levels",

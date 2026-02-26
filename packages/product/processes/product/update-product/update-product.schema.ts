@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
+import { ProductResponseSchema } from "../retrieve-product/retrieve-product.schema";
 
 const UpdateProductAttributeGroupRelationSchema = Type.Object({
   attribute_group_id: Type.String(),
@@ -34,4 +35,12 @@ export const UpdateProductSchema = Type.Object({
 
 export type UpdateProductProcessInput = Static<
   typeof UpdateProductSchema
+>;
+
+export const UpdateProductResponseSchema = Type.Union([
+  ProductResponseSchema,
+  Type.Undefined(),
+]);
+export type UpdateProductProcessOutput = Static<
+  typeof UpdateProductResponseSchema
 >;

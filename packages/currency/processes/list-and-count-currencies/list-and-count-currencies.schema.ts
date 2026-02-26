@@ -1,5 +1,6 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
 import { PaginationSchema } from "@danimai/core";
+import { CurrencyResponseSchema } from "../retrieve-currency/retrieve-currency.schema";
 
 /**
  * Danimai-style listAndCountCurrencies: list currencies with pagination and return count.
@@ -15,3 +16,10 @@ export const ListAndCountCurrenciesSchema = Type.Intersect([
 export type ListAndCountCurrenciesProcessInput = Static<
   typeof ListAndCountCurrenciesSchema
 >;
+
+export const ListAndCountCurrenciesResponseSchema = Type.Object({
+  data: Type.Array(CurrencyResponseSchema),
+  count: Type.Number(),
+});
+
+export type ListAndCountCurrenciesProcessOutput = Static<typeof ListAndCountCurrenciesResponseSchema>;

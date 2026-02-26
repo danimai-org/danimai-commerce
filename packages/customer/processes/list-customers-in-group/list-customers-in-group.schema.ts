@@ -1,5 +1,6 @@
-import { Type, type Static } from "typebox";
-import { PaginationSchema } from "@danimai/core";
+import { Type, type Static } from "@sinclair/typebox";
+import { PaginationSchema, createPaginatedResponseSchema } from "@danimai/core";
+import { CustomerResponseSchema } from "../retrieve-customer/retrieve-customer.schema";
 
 export const ListCustomersInGroupSchema = Type.Intersect([
   PaginationSchema,
@@ -10,4 +11,10 @@ export const ListCustomersInGroupSchema = Type.Intersect([
 
 export type ListCustomersInGroupProcessInput = Static<
   typeof ListCustomersInGroupSchema
+>;
+
+export const ListCustomersInGroupResponseSchema =
+  createPaginatedResponseSchema(CustomerResponseSchema);
+export type ListCustomersInGroupProcessOutput = Static<
+  typeof ListCustomersInGroupResponseSchema
 >;

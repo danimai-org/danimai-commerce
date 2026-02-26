@@ -18,11 +18,17 @@ import {
   UpdateStoresProcess,
   DeleteStoresProcess,
   PaginatedStoresSchema,
+  PaginatedStoresResponseSchema,
   ListStoresSchema,
+  ListStoresResponseSchema,
   ListAndCountStoresSchema,
+  ListAndCountStoresResponseSchema,
   CreateStoresSchema,
+  CreateStoresResponseSchema,
   UpdateStoreSchema,
+  UpdateStoreResponseSchema,
   DeleteStoresSchema,
+  StoreResponseSchema,
 } from "@danimai/store";
 import { handleProcessError } from "../../utils/error-handler";
 import {
@@ -50,6 +56,11 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
     },
     {
       query: PaginatedStoresSchema as any,
+      response: {
+        200: PaginatedStoresResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Stores"],
         summary: "Get paginated stores",
@@ -66,6 +77,11 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
     },
     {
       query: ListStoresSchema as any,
+      response: {
+        200: ListStoresResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Stores"],
         summary: "List stores",
@@ -85,6 +101,11 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
     },
     {
       query: ListAndCountStoresSchema as any,
+      response: {
+        200: ListAndCountStoresResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Stores"],
         summary: "List and count stores",
@@ -101,6 +122,11 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
+      response: {
+        200: StoreResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Stores"],
         summary: "Retrieve store",
@@ -117,6 +143,11 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
     },
     {
       body: CreateStoresSchema as any,
+      response: {
+        200: CreateStoresResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Stores"],
         summary: "Create store(s)",
@@ -137,6 +168,11 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
     {
       params: Type.Object({ id: Type.String() }) as any,
       body: UpdateStoreBodySchema as any,
+      response: {
+        200: UpdateStoreResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
       detail: {
         tags: ["Stores"],
         summary: "Update a store",

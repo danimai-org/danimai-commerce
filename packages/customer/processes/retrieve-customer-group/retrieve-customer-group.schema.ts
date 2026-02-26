@@ -1,4 +1,4 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
 
 export const RetrieveCustomerGroupSchema = Type.Object({
   id: Type.String(),
@@ -7,3 +7,30 @@ export const RetrieveCustomerGroupSchema = Type.Object({
 export type RetrieveCustomerGroupProcessInput = Static<
   typeof RetrieveCustomerGroupSchema
 >;
+
+export const CustomerGroupResponseSchema = Type.Object({
+  id: Type.String(),
+  name: Type.String(),
+  metadata: Type.Union([Type.Unknown(), Type.Null()]),
+  created_at: Type.String(),
+  updated_at: Type.String(),
+  deleted_at: Type.Union([Type.String(), Type.Null()]),
+  customer_count: Type.Number(),
+});
+
+export const RetrieveCustomerGroupResponseSchema = Type.Union([
+  CustomerGroupResponseSchema,
+  Type.Undefined(),
+]);
+export type RetrieveCustomerGroupProcessOutput = Static<
+  typeof RetrieveCustomerGroupResponseSchema
+>;
+
+export const CustomerGroupEntitySchema = Type.Object({
+  id: Type.String(),
+  name: Type.String(),
+  metadata: Type.Union([Type.Unknown(), Type.Null()]),
+  created_at: Type.String(),
+  updated_at: Type.String(),
+  deleted_at: Type.Union([Type.String(), Type.Null()]),
+});

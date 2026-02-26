@@ -1,4 +1,4 @@
-import { Type, type Static } from "typebox";
+import { Type, type Static } from "@sinclair/typebox";
 
 export const CreateShippingOptionSchema = Type.Object({
   name: Type.String(),
@@ -27,3 +27,7 @@ export type CreateShippingOptionProcessInput = Static<
 export type CreateShippingOptionsProcessInput = Static<
   typeof CreateShippingOptionsSchema
 >;
+
+export const CreateShippingOptionsResponseSchema = Type.Array(Type.Any());
+
+export type CreateShippingOptionsProcessOutput = Static<typeof CreateShippingOptionsResponseSchema>;

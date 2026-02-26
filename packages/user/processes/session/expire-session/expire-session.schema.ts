@@ -1,4 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
+import { SessionResponseSchema } from "../create-session/create-session.schema";
 
 export const ExpireSessionSchema = Type.Object({
   id: Type.String({
@@ -9,3 +10,11 @@ export const ExpireSessionSchema = Type.Object({
 });
 
 export type ExpireSessionProcessInput = Static<typeof ExpireSessionSchema>;
+
+export const ExpireSessionResponseSchema = Type.Union([
+  SessionResponseSchema,
+  Type.Undefined(),
+]);
+export type ExpireSessionProcessOutput = Static<
+  typeof ExpireSessionResponseSchema
+>;
