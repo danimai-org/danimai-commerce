@@ -26,10 +26,7 @@ export const ProductVariantResponseSchema = Type.Object({
   deleted_at: Type.Union([Type.String(), Type.Null()]),
 });
 
-export const RetrieveProductVariantResponseSchema = Type.Union([
-  Type.Any(),
-  Type.Undefined(),
-]);
+export const RetrieveProductVariantResponseSchema = ProductVariantResponseSchema;
 export type RetrieveProductVariantProcessOutput = Static<
   typeof RetrieveProductVariantResponseSchema
 >;

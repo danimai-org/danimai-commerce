@@ -203,7 +203,7 @@ export const productRoutes = new Elysia({ prefix: "/products" })
     {
       body: DeleteProductsSchema as any,
       response: {
-        204: NoContentResponseSchema,
+        204: NoContentResponseSchema,        
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
