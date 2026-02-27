@@ -8,16 +8,19 @@ import {
 import type { TaxRegion } from "@danimai/tax/db";
 import { TaxRegionResponseSchema } from "../update-tax-regions/update-tax-regions.schema";
 
-export const PaginatedTaxRegionsSchema = Type.Intersect([
-  PaginationSchema,
-  Type.Object({
-    filters: Type.Optional(
-      createFilterableColumnsSchema<keyof Pick<TaxRegion, "name">>({
-        name: true,
-      })
-    ),
-  }),
-]);
+const paginationProperties = (PaginationSchema as unknown as {
+  properties?: Record<string, ReturnType<typeof Type.Any>>;
+}).properties ?? {};
+
+const taxRegionsFiltersSchema = createFilterableColumnsSchema<
+  keyof Pick<TaxRegion, "name">
+>({ name: true });
+
+/** Flat schema for Elysia query (avoids Type.Intersect compile failure). */
+export const PaginatedTaxRegionsSchema = Type.Object({
+  ...paginationProperties,
+  filters: Type.Optional(taxRegionsFiltersSchema),
+});
 
 export type PaginatedTaxRegionsProcessInput = Static<
   typeof PaginatedTaxRegionsSchema

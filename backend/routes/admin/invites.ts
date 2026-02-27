@@ -25,6 +25,19 @@ import {
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
+const toDateString = (v: string | Date | null): string | null =>
+  v == null ? null : v instanceof Date ? v.toISOString() : v;
+
+function serializeInviteDates<T extends Record<string, unknown>>(invite: T): T {
+  return {
+    ...invite,
+    created_at: toDateString(invite.created_at as string | Date | null) ?? invite.created_at,
+    updated_at: toDateString(invite.updated_at as string | Date | null) ?? invite.updated_at,
+    deleted_at: toDateString(invite.deleted_at as string | Date | null),
+    expires_at: toDateString(invite.expires_at as string | Date | null) ?? invite.expires_at,
+  } as T;
+}
+
 export const inviteRoutes = new Elysia({ prefix: "/invites" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
@@ -33,7 +46,9 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
       const process = getService<PaginatedInvitesProcess>(PAGINATED_INVITES_PROCESS);
       const logger = getService<Logger>(DANIMAI_LOGGER);
       const result = await process.runOperations({ input, logger } as any);
-      const data = result.data.map(({ token: _t, ...invite }) => invite);
+      const data = result.data.map(({ token: _t, ...invite }) =>
+        serializeInviteDates(invite as Record<string, unknown>)
+      );
       return { ...result, data };
     },
     {
@@ -55,7 +70,9 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
     async ({ body: input }) => {
       const process = getService<CreateInviteProcess>(CREATE_INVITE_PROCESS);
       const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      const result = await process.runOperations({ input, logger } as any);
+      if (result === undefined) throw new Error("Failed to create invite");
+      return result as any;
     },
     {
       body: CreateInviteSchema as any,
@@ -102,9 +119,9 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
       const logger = getService<Logger>(DANIMAI_LOGGER);
       const input = { id: params.id };
       const result = await process.runOperations({ input, logger } as any);
-      if (!result) return result;
+      if (!result) throw new Error("Invite not found or resend failed");
       const { token: _t, ...invite } = result;
-      return invite;
+      return invite as any;
     },
     {
       params: Type.Object({ id: Type.String() }) as any,

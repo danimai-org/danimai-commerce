@@ -98,6 +98,12 @@
 		fetchStore();
 	});
 
+	// Load store options (regions, channels, locations) so we can show names in store details
+	$effect(() => {
+		if (storeData && !storeOptionsLoading && storeRegions.length === 0 && storeSalesChannels.length === 0)
+			fetchStoreOptions();
+	});
+
 	// Edit store sheet
 	let editStoreOpen = $state(false);
 	let editStoreName = $state('');
@@ -220,9 +226,19 @@
 		defaultCurrency: storeData?.default_currency_code
 			? storeData.default_currency_code.toUpperCase()
 			: '—',
-		defaultRegion: '—',
-		defaultSalesChannel: '—',
-		defaultLocation: '—'
+		defaultRegion:
+			storeData?.default_region_id != null
+				? storeRegions.find((r) => r.id === storeData!.default_region_id)?.name ?? '—'
+				: '—',
+		defaultSalesChannel:
+			storeData?.default_sales_channel_id != null
+				? storeSalesChannels.find((sc) => sc.id === storeData!.default_sales_channel_id)?.name ?? '—'
+				: '—',
+		defaultLocation:
+			storeData?.default_location_id != null
+				? storeStockLocations.find((l) => l.id === storeData!.default_location_id)?.name ??
+					'Unnamed location'
+				: '—'
 	});
 
 	// Active currencies

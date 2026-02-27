@@ -32,7 +32,7 @@ async function runMigration() {
   try {
     const logger = getLogger();
 
-    // Initialize the core system
+    // Initialize the core system (placeholders for optional services so migrate works without full .env)
     initialize({
       db: {
         url: process.env.DATABASE_URL || "",
@@ -42,12 +42,12 @@ async function runMigration() {
         stripeKey: process.env.STRIPE_KEY || "",
         defaultCurrency: process.env.DEFAULT_CURRENCY || "USD",
         email: {
-          resendApiKey: process.env.RESEND_API_KEY || "",
-          from: process.env.EMAIL_FROM || "",
+          resendApiKey: process.env.RESEND_API_KEY || "re_placeholder",
+          from: process.env.EMAIL_FROM || "noreply@localhost",
           templateFolder: process.env.EMAIL_TEMPLATE_FOLDER || "",
         },
         jwt: {
-          secret: process.env.JWT_SECRET || "",
+          secret: process.env.JWT_SECRET || "migrate-placeholder",
         },
       },
     });

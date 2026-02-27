@@ -1,23 +1,20 @@
 import { Kysely, sql } from "kysely";
 
 export async function up(db: Kysely<any>) {
-  await db.schema
-    .createTable("stores")
-    .addColumn("id", "uuid", (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
-    .addColumn("name", "text", (col) => col.notNull())
-    .addColumn("default_currency_code", "text")
-    .addColumn("default_sales_channel_id", "uuid")
-    .addColumn("default_region_id", "uuid")
-    .addColumn("default_location_id", "uuid")
-    .addColumn("metadata", "jsonb")
-    .addColumn("created_at", "timestamptz", (col) =>
-      col.notNull().defaultTo(sql`now()`)
+  await sql`
+    CREATE TABLE IF NOT EXISTS stores (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      name text NOT NULL,
+      default_currency_code text,
+      default_sales_channel_id uuid,
+      default_region_id uuid,
+      default_location_id uuid,
+      metadata jsonb,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      deleted_at timestamptz
     )
-    .addColumn("updated_at", "timestamptz", (col) =>
-      col.notNull().defaultTo(sql`now()`)
-    )
-    .addColumn("deleted_at", "timestamptz")
-    .execute();
+  `.execute(db);
 }
 
 export async function down(db: Kysely<any>) {

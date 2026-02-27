@@ -4,6 +4,7 @@ import {
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
+  SortOrder,
   paginationResponse,
 } from "@danimai/core";
 import { Kysely } from "kysely";
@@ -12,7 +13,7 @@ import type {
   AvailableCurrencyItem,
 } from "./list-available-currencies.schema";
 import { ListAvailableCurrenciesSchema } from "./list-available-currencies.schema";
-import type { Database } from "@danimai/currency/db";
+import type { Database } from "../../db/type";
 import { CURRENCIES_LIST } from "../../data/currencies-list";
 
 export const LIST_AVAILABLE_CURRENCIES_PROCESS = Symbol(
@@ -29,8 +30,10 @@ export class ListAvailableCurrenciesProcess
     context: ProcessContextType<typeof ListAvailableCurrenciesSchema>
   ) {
     const { input } = context;
-    const { page = 1, limit = 50, search = "" } =
-      input as ListAvailableCurrenciesProcessInput;
+    const raw = input as ListAvailableCurrenciesProcessInput;
+    const page = Math.max(1, Number(raw.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(raw.limit) || 50));
+    const search = typeof raw.search === "string" ? raw.search : "";
 
     const activeRows = await this.db
       .selectFrom("currencies")
@@ -75,7 +78,7 @@ export class ListAvailableCurrenciesProcess
       page,
       limit,
       sorting_field: "code",
-      sorting_direction: "asc" as const,
+      sorting_direction: SortOrder.ASC,
     });
   }
 }

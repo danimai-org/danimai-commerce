@@ -99,7 +99,7 @@ const PaginatedProductItemSchema = Type.Object({
       metadata: Type.Union([Type.Unknown(), Type.Null()]),
       created_at: Type.Date(),
       updated_at: Type.Date(),
-      deleted_at: Type.Optional(Type.Date()),
+      deleted_at: Type.Union([Type.Date(), Type.Null()]),
     })
   ),
 });

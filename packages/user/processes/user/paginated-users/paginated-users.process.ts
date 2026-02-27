@@ -47,12 +47,31 @@ export class PaginatedUsersProcess
     const safeSortField = allowedSortFields.includes(sorting_field) ? sorting_field : "created_at";
     query = query.orderBy(sql.ref(`users.${safeSortField}`), sortOrder);
 
-    const offset = (page - 1) * limit;
-    const data = await query
+    const offset = (Number(page) - 1) * Number(limit);
+    const rows = await query
       .selectAll()
-      .limit(limit)
-      .offset(offset)
+      .limit(Number(limit))
+      .offset(Number(offset))
       .execute();
+
+    const toDateString = (v: string | Date): string =>
+      v instanceof Date ? v.toISOString() : v;
+    const toDateStringOrNull = (v: string | Date | null): string | null =>
+      v == null ? null : v instanceof Date ? v.toISOString() : v;
+
+    const data = rows.map((row) => {
+      const r = row as User & {
+        created_at: string | Date;
+        updated_at: string | Date;
+        deleted_at: string | Date | null;
+      };
+      return {
+        ...row,
+        created_at: toDateString(r.created_at),
+        updated_at: toDateString(r.updated_at),
+        deleted_at: toDateStringOrNull(r.deleted_at),
+      };
+    });
 
     return paginationResponse<User>(data, total, input);
   }

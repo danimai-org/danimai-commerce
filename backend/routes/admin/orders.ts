@@ -6,7 +6,7 @@ import type { Kysely } from "kysely";
 import {
   PAGINATED_ORDERS_PROCESS,
   PaginatedOrdersProcess,
-  PaginatedOrdersQuerySchema,
+  PaginatedOrdersSchema,
   PaginatedOrdersResponseSchema,
   CREATE_ORDERS_PROCESS,
   CreateOrdersProcess,
@@ -84,7 +84,7 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
       return process.runOperations({ input, logger } as any);
     },
     {
-      query: PaginatedOrdersQuerySchema,
+      query: PaginatedOrdersSchema as any,
       response: {
         200: PaginatedOrdersResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -103,7 +103,7 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
       const process = getService<CreateOrdersProcess>(CREATE_ORDERS_PROCESS);
       const logger = getService<Logger>(DANIMAI_LOGGER);
       const result = await process.runOperations({ input, logger } as any);
-      return { data: result };
+      return { data: result } as any;
     },
     {
       body: CreateOrdersSchema as any,
@@ -132,10 +132,10 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
 
       if (!order) {
         set.status = 404;
-        return { message: "Order not found" };
+        return { message: "Order not found" } as any;
       }
 
-      return order;
+      return order as any;
     },
     {
       params: Type.Object({ id: Type.String() }) as any,
@@ -161,9 +161,9 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
       const result = await process.runOperations({ input, logger } as any);
       if (!result) {
         set.status = 404;
-        return { message: "Order not found" };
+        return { message: "Order not found" } as any;
       }
-      return result;
+      return result as any;
     },
     {
       params: Type.Object({ id: Type.String() }) as any,

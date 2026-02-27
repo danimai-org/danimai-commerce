@@ -23,6 +23,18 @@ const UpdateUserBodySchema = Type.Object({
   last_name: Type.Optional(Type.String()),
 });
 
+const toDateString = (v: string | Date | null): string | null =>
+  v == null ? null : v instanceof Date ? v.toISOString() : v;
+
+function serializeUserDates<T extends Record<string, unknown>>(user: T): T {
+  return {
+    ...user,
+    created_at: toDateString(user.created_at as string | Date | null) ?? user.created_at,
+    updated_at: toDateString(user.updated_at as string | Date | null) ?? user.updated_at,
+    deleted_at: toDateString(user.deleted_at as string | Date | null),
+  } as T;
+}
+
 export const userRoutes = new Elysia({ prefix: "/users" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
@@ -55,9 +67,9 @@ export const userRoutes = new Elysia({ prefix: "/users" })
       const result = await process.runOperations({ input, logger } as any);
       if (result && "password_hash" in result) {
         const { password_hash: _p, ...user } = result;
-        return user;
+        return serializeUserDates(user);
       }
-      return result;
+      return result ? serializeUserDates(result) : result;
     },
     {
       params: Type.Object({ id: Type.String() }) as any,

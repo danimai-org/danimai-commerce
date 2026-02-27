@@ -11,6 +11,7 @@ export const CreateInviteSchema = Type.Object({
       format: "uuid",
       description: "The role ID to assign",
       examples: ["550e8400-e29b-41d4-a716-446655440000"],
+      
     })
   ),
 });
@@ -26,7 +27,21 @@ export const InviteResponseSchema = Type.Object({
   expires_at: Type.String(),
   metadata: Type.Union([Type.Unknown(), Type.Null()]),
   created_at: Type.Date(),
-  updated_at: Type.Date(),   deleted_at: Type.Union([Type.Date(), Type.Null()]),
+  updated_at: Type.Date(),
+  deleted_at: Type.Union([Type.Date(), Type.Null()]),
+});
+
+/** Invite without token (for list); date fields as string for JSON response */
+export const InviteListItemSchema = Type.Object({
+  id: Type.String(),
+  email: Type.String(),
+  role: Type.Union([Type.String(), Type.Null()]),
+  accepted: Type.Boolean(),
+  expires_at: Type.String(),
+  metadata: Type.Union([Type.Unknown(), Type.Null()]),
+  created_at: Type.String(),
+  updated_at: Type.String(),
+  deleted_at: Type.Union([Type.String(), Type.Null()]),
 });
 
 export const CreateInviteResponseSchema = Type.Union([

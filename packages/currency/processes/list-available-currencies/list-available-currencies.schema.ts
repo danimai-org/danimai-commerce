@@ -1,8 +1,8 @@
 import { Type, type Static } from "@sinclair/typebox";
 
 export const ListAvailableCurrenciesSchema = Type.Object({
-  page: Type.Optional(Type.Integer({ minimum: 1, default: 1 })),
-  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100, default: 50 })),
+  page: Type.Optional(Type.Union([Type.String(), Type.Integer()])),
+  limit: Type.Optional(Type.Union([Type.String(), Type.Integer()])),
   search: Type.Optional(Type.String({ default: "" })),
 });
 
