@@ -10,6 +10,8 @@ function ensureCorsHeaders(set: Context["set"]) {
 export function handleProcessError(err: unknown, set: Context["set"]) {
   ensureCorsHeaders(set);
   if (err instanceof ValidationError) {
+
+    console.log(err.errors);
     set.status = 400;
     return {
       error: "ValidationError",

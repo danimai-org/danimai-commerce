@@ -17,12 +17,12 @@
 	import X from '@lucide/svelte/icons/x';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import ImageIcon from '@lucide/svelte/icons/image';
-	import CreditCard from '@lucide/svelte/icons/credit-card';
-	import Lock from '@lucide/svelte/icons/lock';
-	import User from '@lucide/svelte/icons/user';
-	import Calendar from '@lucide/svelte/icons/calendar';
-	import DollarSign from '@lucide/svelte/icons/dollar-sign';
-	import { DropdownMenu } from 'bits-ui';
+import CreditCard from '@lucide/svelte/icons/credit-card';
+import Lock from '@lucide/svelte/icons/lock';
+import User from '@lucide/svelte/icons/user';
+import Calendar from '@lucide/svelte/icons/calendar';
+import DollarSign from '@lucide/svelte/icons/dollar-sign';
+import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 	import { cn } from '$lib/utils.js';
 	import { goto } from '$app/navigation';
 

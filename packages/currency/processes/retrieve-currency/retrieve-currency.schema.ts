@@ -19,9 +19,8 @@ export const CurrencyResponseSchema = Type.Object({
   name: Type.String(),
   tax_inclusive_pricing: Type.Boolean(),
   metadata: Type.Union([Type.Unknown(), Type.Null()]),
-  created_at: Type.String(),
-  updated_at: Type.String(),
-  deleted_at: Type.Union([Type.String(), Type.Null()]),
+  created_at: Type.Date(),
+  updated_at: Type.Date(),   deleted_at: Type.Union([Type.Date(), Type.Null()]),
 });
 
 export type CurrencyProcessOutput = Static<typeof CurrencyResponseSchema>;

@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import type { TSchema } from "@sinclair/typebox";
+import type { TIntersect, TObject, TSchema } from "@sinclair/typebox";
 import { FormatRegistry } from "@sinclair/typebox";
 import { Check } from "@sinclair/typebox/value";
 import { Errors, ValueErrorType as SchemaValueErrorType } from "@sinclair/typebox/errors";
@@ -16,14 +16,14 @@ const WRAPPED_FLAG = Symbol("process_context_wrapped");
 
 interface ParameterMetadata {
     parameterIndex: number;
-    schema: TSchema;
+    schema: TObject | TIntersect;
 }
 
-export interface ProcessContextDecoratorOptions<TInput extends TSchema> {
+export interface ProcessContextDecoratorOptions<TInput extends TObject | TIntersect> {
     schema: TInput;
 }
 
-export function ProcessContext<TInput extends TSchema>(
+export function ProcessContext<TInput extends TObject | TIntersect>(
     options: ProcessContextDecoratorOptions<TInput>
 ): ParameterDecorator {
     return (target: any, propertyKey: string | symbol | undefined, parameterIndex: number) => {

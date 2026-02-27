@@ -1,4 +1,4 @@
-import Root from "./tooltip.svelte";
+	import Root from "./tooltip.svelte";
 import Trigger from "./tooltip-trigger.svelte";
 import Content from "./tooltip-content.svelte";
 import Provider from "./tooltip-provider.svelte";

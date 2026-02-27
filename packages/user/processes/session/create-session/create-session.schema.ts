@@ -25,8 +25,8 @@ export const SessionResponseSchema = Type.Object({
   expires_at: Type.String(),
   logged_out_at: Type.Union([Type.String(), Type.Null()]),
   metadata: Type.Union([Type.Unknown(), Type.Null()]),
-  created_at: Type.String(),
-  updated_at: Type.String(),
+  created_at: Type.Date(),
+  updated_at: Type.Date(),
 });
 
 export const CreateSessionResponseSchema = Type.Union([

@@ -4,7 +4,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
+import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
 	import Package from '@lucide/svelte/icons/package';
 	import Bell from '@lucide/svelte/icons/bell';
 	import Search from '@lucide/svelte/icons/search';
@@ -21,8 +21,8 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Plus from '@lucide/svelte/icons/plus';
-	import ChevronDown from '@lucide/svelte/icons/chevron-down';
-	import { DropdownMenu } from 'bits-ui';
+import ChevronDown from '@lucide/svelte/icons/chevron-down';
+import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 	import { cn } from '$lib/utils.js';
 
 	const API_BASE = 'http://localhost:8000/admin';

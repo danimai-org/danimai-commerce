@@ -2,6 +2,7 @@ import { Type, type Static } from "@sinclair/typebox";
 import {
   createFilterableColumnsSchema,
   FilterOperator,
+  PaginationQuerySchema,
   PaginationSchema,
 } from "@danimai/core";
 import type { Product } from "../../../db/type";
@@ -39,6 +40,38 @@ export type PaginatedProductsProcessInput = Static<
   typeof PaginatedProductsSchema
 >;
 
+const paginationQueryProperties = (PaginationQuerySchema as unknown as {
+  properties?: Record<string, ReturnType<typeof Type.Any>>;
+}).properties ?? {};
+
+/** Query-only schema for Elysia route (single Type.Object, no Intersect). */
+export const PaginatedProductsQuerySchema = Type.Object({
+  ...paginationQueryProperties,
+  category_id: Type.Optional(Type.String()),
+  category_ids: Type.Optional(Type.Array(Type.String())),
+  search: Type.Optional(Type.String()),
+  filters: Type.Optional(
+    createFilterableColumnsSchema<
+      keyof Pick<Product, "title" | "handle" | "status" | "category_id">
+    >({
+      title: true,
+      handle: true,
+      status: [
+        FilterOperator.EQUAL,
+        FilterOperator.NOT_EQUAL,
+        FilterOperator.IN,
+        FilterOperator.NOT_IN,
+      ],
+      category_id: [
+        FilterOperator.EQUAL,
+        FilterOperator.NOT_EQUAL,
+        FilterOperator.IS_NULL,
+        FilterOperator.IS_NOT_NULL,
+      ],
+    }),
+  ),
+});
+
 const PaginatedProductItemSchema = Type.Object({
   id: Type.String(),
   title: Type.String(),
@@ -64,9 +97,9 @@ const PaginatedProductItemSchema = Type.Object({
       description: Type.Union([Type.String(), Type.Null()]),
       is_default: Type.Boolean(),
       metadata: Type.Union([Type.Unknown(), Type.Null()]),
-      created_at: Type.String(),
-      updated_at: Type.String(),
-      deleted_at: Type.Union([Type.String(), Type.Null()]),
+      created_at: Type.Date(),
+      updated_at: Type.Date(),
+      deleted_at: Type.Optional(Type.Date()),
     })
   ),
 });

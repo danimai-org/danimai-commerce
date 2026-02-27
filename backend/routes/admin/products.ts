@@ -15,6 +15,7 @@ import {
   DeleteProductsProcess,
   PaginatedProductsProcess,
   PaginatedProductsSchema,
+  PaginatedProductsQuerySchema,
   PaginatedProductsResponseSchema,
   CreateProductSchema,
   CreateProductsSchema,
@@ -77,7 +78,7 @@ export const productRoutes = new Elysia({ prefix: "/products" })
       return { products, count: result.count, offset: result.offset, limit: result.limit };
     },
     {
-      query: PaginatedProductsSchema,
+      query: PaginatedProductsQuerySchema as any,
       response: {
         200: PaginatedProductsResponseSchema,
         400: ValidationErrorResponseSchema,

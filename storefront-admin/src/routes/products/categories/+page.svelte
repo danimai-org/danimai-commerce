@@ -3,8 +3,8 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
-	import { DropdownMenu } from 'bits-ui';
+import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
+import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 	import Search from '@lucide/svelte/icons/search';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
@@ -70,7 +70,9 @@
 				const text = await res.text();
 				throw new Error(text || `HTTP ${res.status}`);
 			}
+			loading = false;
 			data = (await res.json()) as CategoriesResponse;
+
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			data = null;

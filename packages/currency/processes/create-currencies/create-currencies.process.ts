@@ -13,7 +13,7 @@ import {
   type CreateCurrencyItemInput,
   CreateCurrenciesSchema,
 } from "./create-currencies.schema";
-import type { Database, Currency } from "@danimai/currency/db";
+import type { Database, Currency } from "../../db/type";
 import { CURRENCIES_LIST } from "../../data/currencies-list";
 
 export const CREATE_CURRENCIES_PROCESS = Symbol("CreateCurrencies");
