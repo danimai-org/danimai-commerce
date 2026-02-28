@@ -28,5 +28,5 @@ export interface ProcessContextType<TInput extends TObject<any> | TIntersect<any
 };
 
 export interface ProcessContract<TProcessReturn = void> {
-  runOperations<T extends TObject<any> | TIntersect<any>>(context: ProcessContextType<T>): Promise<TProcessReturn>;
+  runOperations(context: ProcessContextType<TObject<any> | TIntersect<any>>): Promise<TProcessReturn>;
 }
