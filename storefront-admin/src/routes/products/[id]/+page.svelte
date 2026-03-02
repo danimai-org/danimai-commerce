@@ -8,7 +8,12 @@
 	import {
 		DeleteConfirmationModal,
 		Combobox,
-		MultiSelectCombobox
+		MultiSelectCombobox,
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		type TableColumn
 	} from '$lib/components/organs/index.js';
 	import Package from '@lucide/svelte/icons/package';
 	import Bell from '@lucide/svelte/icons/bell';
@@ -31,8 +36,22 @@
 	import { DropdownMenu } from 'bits-ui';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { cn } from '$lib/utils.js';
+	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
 
 	const API_BASE = 'http://localhost:8000/admin';
+
+	const variantQuery = $derived(createPaginationQuery($page.url.searchParams));
+	function updateVariantUrl(updates: { page?: number; search?: string }) {
+		const params = new URLSearchParams($page.url.searchParams);
+		if (updates.page != null) params.set('page', String(updates.page));
+		if (updates.search !== undefined) {
+			const s = updates.search.trim();
+			if (s) params.set('search', s);
+			else params.delete('search');
+			params.set('page', '1');
+		}
+		goto(`${$page.url.pathname}?${params.toString()}`, { replaceState: true });
+	}
 
 	type ProductAttribute = {
 		id: string;
@@ -432,15 +451,101 @@
 		}
 	};
 
-	let variantPage = $state(1);
-	const variantLimit = 10;
-	const variantTotal = $derived(variants.length);
+	const variantPage = $derived(Math.max(1, Number(variantQuery.page) || 1));
+	const variantLimit = $derived(Math.max(1, Math.min(100, Number(variantQuery.limit) || 10)));
+	let variantSearchQuery = $state('');
+	$effect(() => {
+		variantSearchQuery = variantQuery.search ?? '';
+	});
+	$effect(() => {
+		const currentSearch = ($page.url.searchParams.get('search') ?? '').trim();
+		if (variantSearchQuery.trim() !== currentSearch) {
+			updateVariantUrl({ search: variantSearchQuery });
+		}
+	});
+	const filteredVariants = $derived(
+		variantSearchQuery.trim()
+			? variants.filter(
+					(v) =>
+						v.title.toLowerCase().includes(variantSearchQuery.toLowerCase()) ||
+						(v.sku ?? '').toLowerCase().includes(variantSearchQuery.toLowerCase())
+				)
+			: variants
+	);
+	const variantTotal = $derived(filteredVariants.length);
 	const variantTotalPages = $derived(Math.max(1, Math.ceil(variantTotal / variantLimit)));
 	const paginatedVariants = $derived(
-		variants.slice((variantPage - 1) * variantLimit, variantPage * variantLimit)
+		filteredVariants.slice((variantPage - 1) * variantLimit, variantPage * variantLimit)
 	);
-	const variantStart = $derived((variantPage - 1) * variantLimit + 1);
+	const variantStart = $derived(variantTotal > 0 ? (variantPage - 1) * variantLimit + 1 : 0);
 	const variantEnd = $derived(Math.min(variantPage * variantLimit, variantTotal));
+	const variantPagination = $derived({
+		total: variantTotal,
+		page: variantPage,
+		limit: variantLimit,
+		total_pages: variantTotalPages,
+		has_next_page: variantPage < variantTotalPages,
+		has_previous_page: variantPage > 1
+	});
+	const variantTableRows = $derived(
+		paginatedVariants.map((v) => {
+			const priceInCents = variantPricesMap.get(v.id);
+			return {
+				...v,
+				price_display: priceInCents
+					? `€${(parseFloat(priceInCents) / 100).toFixed(2)}`
+					: '—'
+			};
+		}) as Record<string, unknown>[]
+	);
+	const variantTableColumns: TableColumn[] = [
+		{
+			label: 'Variant',
+			key: 'title',
+			type: 'link',
+			cellHref: () => '#',
+			thumbnailKey: 'thumbnail',
+			textKey: 'title'
+		},
+		{ label: 'SKU', key: 'sku', type: 'text' },
+		{ label: 'Inventory', key: 'manage_inventory', type: 'boolean' },
+		{ label: 'Price', key: 'price_display', type: 'text' },
+		{ label: 'Created', key: 'created_at', type: 'date' },
+		{ label: 'Updated', key: 'updated_at', type: 'date' },
+		{
+			label: 'Actions',
+			key: 'actions',
+			type: 'actions',
+			actions: [
+				{
+					label: 'Edit',
+					key: 'edit',
+					type: 'button',
+					onClick: (row) => {
+						const v = variants.find((x) => x.id === row.id);
+						if (v) openEditVariantSheet(v);
+					}
+				},
+				{
+					label: 'Delete',
+					key: 'delete',
+					type: 'button',
+					onClick: (row) => {
+						const v = variants.find((x) => x.id === row.id);
+						if (v) openDeleteVariantConfirm(v);
+					}
+				}
+			]
+		}
+	];
+	function goToVariantPage(pageNum: number) {
+		updateVariantUrl({ page: Math.max(1, Math.min(variantTotalPages, pageNum)) });
+	}
+	$effect(() => {
+		if (variantTotalPages >= 1 && variantPage > variantTotalPages) {
+			updateVariantUrl({ page: variantTotalPages });
+		}
+	});
 
 	let editSheetOpen = $state(false);
 	let editTitle = $state('');
@@ -1403,8 +1508,6 @@
 				}
 			}
 			
-			// Sync Size field with attributes if there's a single option
-			// This ensures Size is independent from Title - Size updates the attribute, Title updates the variant title
 			if (options.length === 1) {
 				const optionTitle = options[0].title;
 				const existingAttrIndex = editVariantAttributes.findIndex((a) => 
@@ -1892,132 +1995,31 @@
 							{/if}
 
 							<!-- Variants section -->
-							<div class="mt-4 overflow-x-auto rounded-md border">
-								<table class="w-full text-sm">
-									<thead class="border-b bg-muted/50">
-										<tr>
-											<th class="w-14 px-4 py-3 text-left font-medium">Image</th>
-											<th class="px-4 py-3 text-left font-medium">Title</th>
-											<th class="px-4 py-3 text-left font-medium">SKU</th>
-											<th class="px-4 py-3 text-left font-medium">Inventory</th>
-											<th class="px-4 py-3 text-left font-medium">Price</th>
-											<th class="px-4 py-3 text-left font-medium">Created</th>
-											<th class="px-4 py-3 text-left font-medium">Updated</th>
-											<th class="w-10 px-4 py-3"></th>
-										</tr>
-									</thead>
-									<tbody>
-										{#if paginatedVariants.length === 0}
-											<tr>
-												<td
-													colspan="8"
-													class="px-4 py-8 text-center text-muted-foreground"
-												>
-													No variants.
-												</td>
-											</tr>
-										{:else}
-											{#each paginatedVariants as v (v.id)}
-												{@const priceInCents = variantPricesMap.get(v.id)}
-												<tr class="border-b last:border-0">
-													<td class="px-4 py-3">
-														<div
-															class="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground"
-														>
-															{#if v.thumbnail}
-																<img
-																	src={v.thumbnail}
-																	alt=""
-																	class="size-10 rounded-md object-cover"
-																/>
-															{:else}
-																<ImageIcon class="size-5" />
-															{/if}
-														</div>
-													</td>
-													<td class="px-4 py-3 font-medium">{v.title}</td>
-													<td class="px-4 py-3 text-muted-foreground">{v.sku || '—'}</td>
-													<td class="px-4 py-3 text-muted-foreground">
-														{v.manage_inventory ? 'Managed' : 'Not managed'}
-													</td>
-													<td class="px-4 py-3">
-														{#if priceInCents}
-															<span class="font-medium">€{(parseFloat(priceInCents) / 100).toFixed(2)}</span>
-														{:else}
-															<span class="text-muted-foreground">—</span>
-														{/if}
-													</td>
-													<td class="px-4 py-3 text-muted-foreground">{formatDate(v.created_at)}</td
-													>
-													<td class="px-4 py-3 text-muted-foreground">{formatDate(v.updated_at)}</td
-													>
-													<td class="px-4 py-3">
-														<DropdownMenu.Root>
-															<DropdownMenu.Trigger
-																class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
-															>
-																<MoreHorizontal class="size-4" />
-																<span class="sr-only">Actions</span>
-															</DropdownMenu.Trigger>
-															<DropdownMenu.Portal>
-																<DropdownMenu.Content
-																	class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-																	sideOffset={4}
-																>
-																	<DropdownMenu.Item
-																		textValue="Edit"
-																		class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-																		onSelect={() => openEditVariantSheet(v)}
-																	>
-																		<Pencil class="size-4" />
-																		Edit
-																	</DropdownMenu.Item>
-																	<DropdownMenu.Item
-																		textValue="Delete"
-																		class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-																		onSelect={() => openDeleteVariantConfirm(v)}
-																	>
-																		<Trash2 class="size-4" />
-																		Delete
-																	</DropdownMenu.Item>
-																</DropdownMenu.Content>
-															</DropdownMenu.Portal>
-														</DropdownMenu.Root>
-													</td>
-												</tr>
-											{/each}
-										{/if}
-									</tbody>
-								</table>
-							</div>
-							{#if variantTotal > 0}
-								<div class="mt-4 flex items-center justify-between border-t pt-4">
-									<p class="text-sm text-muted-foreground">
-										{variantStart} – {variantEnd} of {variantTotal} results
-									</p>
-									<div class="flex items-center gap-2">
-										<Button
-											variant="outline"
-											size="sm"
-											disabled={variantPage <= 1}
-											onclick={() => (variantPage = Math.max(1, variantPage - 1))}
-										>
-											Prev
-										</Button>
-										<span class="text-sm text-muted-foreground">
-											{variantPage} of {variantTotalPages} pages
-										</span>
-										<Button
-											variant="outline"
-											size="sm"
-											disabled={variantPage >= variantTotalPages}
-											onclick={() => (variantPage = Math.min(variantTotalPages, variantPage + 1))}
-										>
-											Next
-										</Button>
+							<div class="mt-4">
+								<PaginationTable
+									bind:searchQuery={variantSearchQuery}
+									searchPlaceholder="Search variants…"
+									showFilter={false}
+									showSort={false}
+								>
+									<div class="overflow-x-auto rounded-lg border bg-card">
+										<table class="w-full text-sm">
+											<TableHead columns={variantTableColumns} />
+											<TableBody
+												rows={variantTableRows}
+												columns={variantTableColumns}
+												emptyMessage="No variants."
+											/>
+										</table>
 									</div>
-								</div>
-							{/if}
+									<TablePagination
+										pagination={variantPagination}
+										start={variantStart}
+										end={variantEnd}
+										onPageChange={goToVariantPage}
+									/>
+								</PaginationTable>
+							</div>
 						</div>
 
 						<!-- Metadata / JSON placeholders -->

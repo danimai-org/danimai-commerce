@@ -10,7 +10,7 @@ import {
   UpdateProductOptionsProcess,
   DeleteProductOptionsProcess,
   PaginatedProductOptionsProcess,
-  PaginatedProductOptionsSchema,
+  PaginatedProductOptionsQuerySchema,
   PaginatedProductOptionsResponseSchema,
   RETRIEVE_PRODUCT_OPTION_PROCESS,
   RetrieveProductOptionProcess,
@@ -43,7 +43,7 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
       return process.runOperations({ input });
     },
     {
-      query: PaginatedProductOptionsSchema,
+      query: PaginatedProductOptionsQuerySchema,
       response: {
         200: PaginatedProductOptionsResponseSchema,
         400: ValidationErrorResponseSchema,

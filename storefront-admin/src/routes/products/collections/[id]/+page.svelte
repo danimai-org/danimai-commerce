@@ -4,23 +4,24 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import Search from '@lucide/svelte/icons/search';
-	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import ImageIcon from '@lucide/svelte/icons/image';
-	import Bell from '@lucide/svelte/icons/bell';
-	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
-	import { DropdownMenu } from 'bits-ui';
+	import {
+		DeleteConfirmationModal,
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import X from '@lucide/svelte/icons/x';
 	import Info from '@lucide/svelte/icons/info';
-	import Plus from '@lucide/svelte/icons/plus';
 	import { cn } from '$lib/utils.js';
 
 	const API_BASE = 'http://localhost:8000/admin';
@@ -255,6 +256,60 @@
 	const start = $derived(offset + 1);
 	const end = $derived(Math.min(offset + products.length, count));
 
+	const productPagination = $derived(
+		productsData
+			? {
+					total: count,
+					page: productPage,
+					limit,
+					total_pages: totalPages,
+					has_next_page: productPage < totalPages,
+					has_previous_page: productPage > 1
+				}
+			: null
+	);
+
+	const productRows = $derived(
+		products.map((p) => ({
+			...p,
+			collection_display: p.collection?.title ?? '—',
+			sales_channels_display: p.sales_channels?.map((sc) => sc.name).join(', ') ?? '—',
+			variants_count: p.variants?.length ?? 0
+		})) as Record<string, unknown>[]
+	);
+
+	const productTableColumns: TableColumn[] = [
+		{
+			label: 'Product',
+			key: 'title',
+			type: 'link',
+			cellHref: (row) => `/products/${row.id}`,
+			thumbnailKey: 'thumbnail',
+			textKey: 'title'
+		},
+		{ label: 'Collection', key: 'collection_display', type: 'text' },
+		{ label: 'Sales Channels', key: 'sales_channels_display', type: 'text' },
+		{ label: 'Variants', key: 'variants_count', type: 'text' },
+		{ label: 'Status', key: 'status', type: 'text' },
+		{
+			label: 'Actions',
+			key: 'actions',
+			type: 'actions',
+			actions: [
+				{
+					label: 'Remove from collection',
+					key: 'remove',
+					type: 'button',
+					onClick: (item) => openRemoveProductConfirm(item as unknown as Product)
+				}
+			]
+		}
+	];
+
+	function goToProductPage(pageNum: number) {
+		productPage = Math.max(1, Math.min(totalPages, pageNum));
+	}
+
 	function getHandle(c: ProductCollection | null): string {
 		if (!c) return '';
 		return c.handle.startsWith('/') ? c.handle : `/${c.handle}`;
@@ -442,6 +497,7 @@
 			error = e instanceof Error ? e.message : String(e);
 		}
 	}
+
 </script>
 
 <svelte:head>
@@ -514,173 +570,37 @@
 
 				<!-- Products section -->
 				<section class="rounded-lg border bg-card shadow-sm overflow-hidden">
-						<div class="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4 rounded-t-lg">
-							<div class="flex items-center gap-2">
-								<h2 class="text-base font-semibold">Products</h2>
-							</div>
-							<div class="flex items-center gap-2">
-								<div class="relative w-48">
-									<Search
-										class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+					<div class="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4 rounded-t-lg">
+						<h2 class="text-base font-semibold">Products</h2>
+						<Button type="button" size="sm" class="rounded-md" onclick={openAddProductsSheet}>
+							Add product
+						</Button>
+					</div>
+					<div class="px-6 pb-6">
+						<PaginationTable
+							bind:searchQuery={productSearch}
+							searchPlaceholder="Search"
+							showFilter={false}
+						>
+							<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+								<table class="w-full text-sm">
+									<TableHead columns={productTableColumns} />
+									<TableBody
+										rows={productRows}
+										columns={productTableColumns}
+										emptyMessage="No products in this collection."
 									/>
-									<Input
-										type="search"
-										placeholder="Search"
-										bind:value={productSearch}
-										class="h-9 rounded-md pl-9"
-									/>
-								</div>
-								<button
-									type="button"
-									class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-								>
-									<ArrowUpDown class="size-4" />
-									<span class="sr-only">Sort</span>
-								</button>
-								<Button type="button" size="sm" class="rounded-md" onclick={openAddProductsSheet}>
-									Add product
-								</Button>
+								</table>
 							</div>
-						</div>
-						<div class="overflow-x-auto">
-						<table class="w-full text-sm">
-							<thead class="sticky top-0 z-10 border-b bg-muted/50">
-								<tr>
-									<th class="w-10 px-4 py-3 text-left font-medium">
-										<input
-											type="checkbox"
-											class="rounded border-muted-foreground/50"
-											aria-label="Select all"
-										/>
-									</th>
-									<th class="px-4 py-3 text-left font-medium">Product</th>
-									<th class="px-4 py-3 text-left font-medium">Collection</th>
-									<th class="px-4 py-3 text-left font-medium">Sales Channels</th>
-									<th class="px-4 py-3 text-left font-medium">Variants</th>
-									<th class="px-4 py-3 text-left font-medium">Status</th>
-									<th class="px-4 py-3 text-left font-medium">Actions</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#if products.length === 0}
-									<tr>
-										<td colspan="7" class="px-4 py-8 text-center text-muted-foreground">
-											No products in this collection.
-										</td>
-									</tr>
-								{:else}
-									{#each products as product (product.id)}
-										<tr class="border-b last:border-0">
-											<td class="px-4 py-3">
-												<input
-													type="checkbox"
-													class="rounded border-muted-foreground/50"
-													aria-label="Select row"
-												/>
-											</td>
-											<td class="px-4 py-3">
-												<a
-													href="/products/{product.id}"
-													class="flex items-center gap-3 hover:opacity-80"
-												>
-													{#if product.thumbnail}
-														<img
-															src={product.thumbnail}
-															alt=""
-															class="size-10 shrink-0 rounded-md object-cover"
-														/>
-													{:else}
-														<div
-															class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
-														>
-															<ImageIcon class="size-5" />
-														</div>
-													{/if}
-													<span class="font-medium">{product.title}</span>
-												</a>
-											</td>
-											<td class="px-4 py-3 text-muted-foreground">
-												{product.collection?.title ?? '—'}
-											</td>
-											<td class="px-4 py-3 text-muted-foreground">
-												{product.sales_channels?.length
-													? product.sales_channels.map((sc) => sc.name).join(', ')
-													: '—'}
-											</td>
-											<td class="px-4 py-3 text-muted-foreground">
-												{product.variants?.length ?? 0} variant{product.variants?.length === 1
-													? ''
-													: 's'}
-											</td>
-											<td class="px-4 py-3">
-												<span
-													class={cn(
-														'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-														product.status === 'published' &&
-															'bg-green-500/10 text-green-700 dark:text-green-400',
-														product.status === 'draft' && 'bg-muted text-muted-foreground',
-														product.status === 'proposed' &&
-															'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-														product.status === 'rejected' && 'bg-destructive/10 text-destructive'
-													)}
-												>
-													<span
-														class={cn(
-															'size-1.5 rounded-full',
-															product.status === 'published' && 'bg-green-600',
-															product.status === 'draft' && 'bg-muted-foreground/60',
-															product.status === 'proposed' && 'bg-amber-600',
-															product.status === 'rejected' && 'bg-destructive'
-														)}
-													></span>
-													{product.status}
-												</span>
-											</td>
-											<td class="px-4 py-3">
-												<button
-													type="button"
-													class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
-													onclick={() => removeProductDirectly(product)}
-													aria-label="Remove product"
-												>
-													<X class="size-4" />
-												</button>
-											</td>
-										</tr>
-									{/each}
-								{/if}
-							</tbody>
-						</table>
-						</div>
-						{#if count > 0}
-						<div class="flex items-center justify-between gap-4 border-t px-6 py-4">
-							<p class="text-sm text-muted-foreground">
-								{start} – {end} of {count} results
-							</p>
-							<div class="flex items-center gap-2">
-								<Button
-									variant="outline"
-									size="sm"
-									disabled={productPage <= 1}
-									onclick={() => (productPage = Math.max(1, productPage - 1))}
-								>
-									Prev
-								</Button>
-								<span class="text-sm text-muted-foreground">
-									{productPage} of {totalPages} pages
-								</span>
-								<Button
-									variant="outline"
-									size="sm"
-									disabled={productPage >= totalPages}
-									onclick={() => (productPage = Math.min(totalPages, productPage + 1))}
-								>
-									Next
-								</Button>
-							</div>
-						</div>
-						{/if}
-					</section>
+							<TablePagination
+								pagination={productPagination}
+								{start}
+								{end}
+								onPageChange={goToProductPage}
+							/>
+						</PaginationTable>
+					</div>
+				</section>
 
 				<!-- Metadata & JSON -->
 				<div class="grid gap-4 sm:grid-cols-2">

@@ -4,9 +4,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import Search from '@lucide/svelte/icons/search';
-	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import ImageIcon from '@lucide/svelte/icons/image';
-	import Bell from '@lucide/svelte/icons/bell';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
@@ -14,44 +12,20 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { cn } from '$lib/utils.js';
+	import type { ProductTag } from '$lib/product-tags/types.js';
+	import type { Product } from '$lib/products/types.js';
+	import type { PaginationMeta } from '$lib/product-tags/types.js';
 
 	const API_BASE = 'http://localhost:8000/admin';
+	
 
-	type ProductTag = {
-		id: string;
-		value: string;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	type Product = {
-		id: string;
-		title: string;
-		handle: string;
-		status: string;
-		thumbnail: string | null;
-		category_id: string | null;
-		created_at: string;
-		updated_at: string;
-		collection: { id: string; title: string; handle: string } | null;
-		variants: Array<{ id: string }>;
-	};
-
-	type Pagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
+	type TagProduct = Product & { collection?: { id: string; title: string; handle: string } | null };
+	type Pagination = PaginationMeta;
 
 	const tagId = $derived($page.params.id);
 
 	let tag = $state<ProductTag | null>(null);
-	let productsData = $state<{ data: Product[]; pagination: Pagination } | null>(null);
+	let productsData = $state<{ data: TagProduct[]; pagination: Pagination } | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let productPage = $state(1);
@@ -93,7 +67,7 @@
 				cache: 'no-store'
 			});
 			if (!res.ok) throw new Error(await res.text());
-			productsData = (await res.json()) as { data: Product[]; pagination: Pagination };
+			productsData = (await res.json()) as { data: TagProduct[]; pagination: Pagination };
 		} catch (e) {
 			productsData = null;
 		}

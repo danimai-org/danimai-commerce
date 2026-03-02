@@ -9,6 +9,16 @@ export const PaginatedProductOptionsSchema = Type.Intersect([PaginationSchema, T
   }))
 })]);
 
+const paginationQueryProperties = (PaginationSchema as unknown as { properties?: Record<string, unknown> }).properties ?? {};
+
+/** Query-only schema for Elysia route (single Type.Object; Intersect is not supported by Elysia query validation). */
+export const PaginatedProductOptionsQuerySchema = Type.Object({
+  ...paginationQueryProperties,
+  filters: Type.Optional(createFilterableColumnsSchema<keyof Pick<ProductOption, "title">>({
+    title: true,
+  })),
+});
+
 export type PaginatedProductOptionsProcessInput = Static<
   typeof PaginatedProductOptionsSchema
 >;

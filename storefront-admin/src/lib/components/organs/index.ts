@@ -1,5 +1,6 @@
 export { DeleteConfirmationModal } from './modal/index.js';
 export { default as SalesChannelFormSheet } from './sales-channel-form-sheet/sales-channel-form-sheet.svelte';
+export { default as PriceListFormSheet } from './price-list-form-sheet/price-list-form-sheet.svelte';
 export { default as PaginationTable } from './pagination-table/pagination-table.svelte';
 export { Combobox } from './combobox/index.js';
 export type { ComboboxOption } from './combobox/index.js';

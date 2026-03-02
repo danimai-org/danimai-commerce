@@ -1,50 +1,28 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
-	import { DropdownMenu } from 'bits-ui';
-	import Search from '@lucide/svelte/icons/search';
-	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
-	import Pencil from '@lucide/svelte/icons/pencil';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+	import {
+		DeleteConfirmationModal,
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Info from '@lucide/svelte/icons/info';
-	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
-	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import X from '@lucide/svelte/icons/x';
-	import Check from '@lucide/svelte/icons/check';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { cn } from '$lib/utils.js';
+	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import { listCollections, deleteCollections } from '$lib/product-collection/api.js';
+	import type { ProductCollection } from '$lib/product-collection/types.js';
+	import type { CollectionsListResponse } from '$lib/product-collection/types.js';
 
-	const API_BASE = 'http://localhost:8000/admin';
-
-	type ProductCollection = {
-		id: string;
-		title: string;
-		handle: string;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-		product_count?: number;
-	};
-
-	type Pagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
-
-	type CollectionsResponse = {
-		data: ProductCollection[];
-		pagination: Pagination;
-	};
+	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
 	type FilterKind = 'sales_channel' | 'type';
 	const FILTER_OPTIONS: { id: FilterKind; label: string }[] = [
@@ -55,18 +33,51 @@
 	const COLLECTION_TYPE_OPTIONS = ['manual', 'automated'] as const;
 
 	let searchQuery = $state('');
-	let page = $state(1);
-	let limit = $state(10);
-	let sortingField = $state('created_at');
-	let sortingDirection = $state<'asc' | 'desc'>('desc');
 	let activeFilterTypes = $state<Set<FilterKind>>(new Set());
 	let selectedSalesChannelIds = $state<Set<string>>(new Set());
 	let selectedCollectionTypes = $state<Set<string>>(new Set());
 	let salesChannelsList = $state<Array<{ id: string; name: string }>>([]);
 
-	let data = $state<CollectionsResponse | null>(null);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+
+	const paginateState = createPagination<CollectionsListResponse>(
+		async (): Promise<CollectionsListResponse> => {
+			const q = paginationQuery as Record<string, unknown>;
+			const params = {
+				page: q?.page != null ? Number(q.page) : 1,
+				limit: q?.limit != null ? Number(q.limit) : 10,
+				sorting_field: (q?.sorting_field as string) ?? 'created_at',
+				sorting_direction: (q?.sorting_direction as 'asc' | 'desc') ?? 'desc',
+				search: searchQuery.trim() || undefined,
+				sales_channel_ids:
+					selectedSalesChannelIds.size > 0 ? [...selectedSalesChannelIds] : undefined,
+				collection_type:
+					selectedCollectionTypes.size > 0 ? [...selectedCollectionTypes] : undefined
+			};
+			return listCollections(params);
+		},
+		['collections']
+	);
+
+	$effect(() => {
+		page.url.searchParams.toString();
+		searchQuery;
+		[...selectedSalesChannelIds].sort().join(',');
+		[...selectedCollectionTypes].sort().join(',');
+		paginateState.refetch();
+	});
+
+	function goToPage(pageNum: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('page', String(Math.max(1, pageNum)));
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+	}
+
+	function syncPageOne() {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('page', '1');
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+	}
 
 	function toggleFilterType(id: FilterKind) {
 		activeFilterTypes = new Set(activeFilterTypes);
@@ -78,24 +89,24 @@
 		selectedSalesChannelIds = new Set(selectedSalesChannelIds);
 		if (selectedSalesChannelIds.has(id)) selectedSalesChannelIds.delete(id);
 		else selectedSalesChannelIds.add(id);
-		page = 1;
+		syncPageOne();
 	}
 
 	function clearSalesChannelFilter() {
 		selectedSalesChannelIds = new Set();
-		page = 1;
+		syncPageOne();
 	}
 
 	function toggleCollectionType(t: string) {
 		selectedCollectionTypes = new Set(selectedCollectionTypes);
 		if (selectedCollectionTypes.has(t)) selectedCollectionTypes.delete(t);
 		else selectedCollectionTypes.add(t);
-		page = 1;
+		syncPageOne();
 	}
 
 	function clearCollectionTypeFilter() {
 		selectedCollectionTypes = new Set();
-		page = 1;
+		syncPageOne();
 	}
 
 	function clearFilters() {
@@ -103,12 +114,12 @@
 		searchQuery = '';
 		selectedSalesChannelIds = new Set();
 		selectedCollectionTypes = new Set();
-		page = 1;
+		syncPageOne();
 	}
 
 	function removeFilterChip() {
 		searchQuery = '';
-		page = 1;
+		syncPageOne();
 	}
 
 	const hasActiveFilters = $derived(
@@ -118,44 +129,11 @@
 			selectedCollectionTypes.size > 0
 	);
 
-	async function fetchCollections() {
-		loading = true;
-		error = null;
-		try {
-			const params = new URLSearchParams({
-				page: String(page),
-				limit: String(limit),
-				sorting_field: sortingField,
-				sorting_direction: sortingDirection
-			});
-			if (searchQuery.trim()) {
-				params.append('search', searchQuery.trim());
-			}
-			if (selectedSalesChannelIds.size > 0) {
-				params.append('sales_channel_ids', [...selectedSalesChannelIds].join(','));
-			}
-			if (selectedCollectionTypes.size > 0) {
-				params.append('collection_type', [...selectedCollectionTypes].join(','));
-			}
-			const res = await fetch(`${API_BASE}/collections?${params}`);
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			data = (await res.json()) as CollectionsResponse;
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			data = null;
-		} finally {
-			loading = false;
-		}
-	}
-
 	let prevSearch = $state('');
 	$effect(() => {
 		if (searchQuery !== prevSearch) {
 			prevSearch = searchQuery;
-			page = 1;
+			syncPageOne();
 		}
 	});
 
@@ -174,63 +152,54 @@
 			});
 	});
 
-	$effect(() => {
-		page;
-		limit;
-		sortingField;
-		sortingDirection;
-		searchQuery;
-		selectedSalesChannelIds;
-		selectedCollectionTypes;
-		fetchCollections();
-	});
-
-	const collections = $derived(data?.data ?? []);
-	const pagination = $derived(data?.pagination ?? null);
-	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
-	);
-
+	const queryData = $derived(paginateState.query.data as CollectionsListResponse | undefined);
+	const rawRows = $derived(queryData?.data?.rows ?? []);
 	function getHandle(collection: ProductCollection): string {
 		return collection.handle.startsWith('/') ? collection.handle : `/${collection.handle}`;
 	}
+	const rows = $derived(rawRows.map((c) => ({ ...c, handle_display: getHandle(c) })));
+	const pagination = $derived(queryData?.data?.pagination ?? null);
+	const start = $derived(paginateState.start);
+	const end = $derived(paginateState.end);
 
-	let deleteConfirmOpen = $state(false);
-	let collectionToDelete = $state<ProductCollection | null>(null);
-	let deleteSubmitting = $state(false);
+	const openEditSheet = (collection: ProductCollection) => openEdit(collection);
+	const openDeleteConfirm = paginateState.openDeleteConfirm;
+	const closeDeleteConfirm = paginateState.closeDeleteConfirm;
+	const confirmDelete = paginateState.confirmDelete;
+	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
+	const deleteItem = $derived(paginateState.deleteItem);
+	const deleteError = $derived(paginateState.deleteError);
 
-	function openDeleteConfirm(collection: ProductCollection) {
-		collectionToDelete = collection;
-		deleteConfirmOpen = true;
-	}
-
-	function closeDeleteConfirm() {
-		if (!deleteSubmitting) {
-			deleteConfirmOpen = false;
-			collectionToDelete = null;
+	const tableColumns: TableColumn[] = [
+		{
+			label: 'Title',
+			key: 'title',
+			type: 'link',
+			cellHref: (row) => `/products/collections/${row.id}`,
+			textKey: 'title'
+		},
+		{ label: 'Handle', key: 'handle_display', type: 'text' },
+		{ label: 'Products', key: 'product_count', type: 'text' },
+		{
+			label: 'Actions',
+			key: 'actions',
+			type: 'actions',
+			actions: [
+				{
+					label: 'Edit',
+					key: 'edit',
+					type: 'button',
+					onClick: (item) => openEditSheet(item as ProductCollection)
+				},
+				{
+					label: 'Delete',
+					key: 'delete',
+					type: 'button',
+					onClick: (item) => openDeleteConfirm(item as unknown as CollectionsListResponse)
+				}
+			]
 		}
-	}
-
-	async function confirmDeleteCollection() {
-		if (!collectionToDelete) return;
-		deleteSubmitting = true;
-		try {
-			const res = await fetch(`${API_BASE}/collections`, {
-				method: 'DELETE',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ collection_ids: [collectionToDelete.id] })
-			});
-			if (!res.ok) throw new Error(await res.text());
-			deleteConfirmOpen = false;
-			collectionToDelete = null;
-			fetchCollections();
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-		} finally {
-			deleteSubmitting = false;
-		}
-	}
+	];
 
 	// Create modal
 	let createOpen = $state(false);
@@ -274,7 +243,7 @@
 				throw new Error(text || `HTTP ${res.status}`);
 			}
 			closeCreate();
-			fetchCollections();
+			paginateState.refetch();
 		} catch (e) {
 			createError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -328,7 +297,7 @@
 				throw new Error(text || `HTTP ${res.status}`);
 			}
 			closeEdit();
-			fetchCollections();
+			paginateState.refetch();
 		} catch (e) {
 			editError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -346,335 +315,37 @@
 			</div>
 			<Button size="sm" onclick={openCreate}>Create</Button>
 		</div>
-		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex flex-wrap items-center justify-between gap-2">
-				<div class="flex flex-wrap items-center gap-2">
-					<DropdownMenu.Root>
-						<DropdownMenu.Trigger
-							class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4"
-						>
-							<SlidersHorizontal class="mr-1.5 size-4" />
-							Add filter
-							<ChevronDown class="size-4" />
-						</DropdownMenu.Trigger>
-						<DropdownMenu.Portal>
-							<DropdownMenu.Content
-								class="z-50 min-w-48 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-								sideOffset={4}
-							>
-								<div class="max-h-48 overflow-auto py-1">
-									{#each FILTER_OPTIONS as opt (opt.id)}
-										<button
-											type="button"
-											class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-											onclick={() => toggleFilterType(opt.id)}
-										>
-											<span
-												class={cn(
-													'flex size-4 items-center justify-center rounded border border-input bg-background',
-													activeFilterTypes.has(opt.id) && 'ring-2 ring-ring'
-												)}
-											>
-												{#if activeFilterTypes.has(opt.id)}
-													<Check class="size-2.5" />
-												{/if}
-											</span>
-											{opt.label}
-										</button>
-									{/each}
-									<button
-										type="button"
-										class="mt-1 w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-										onclick={clearFilters}
-									>
-										Clear
-									</button>
-								</div>
-							</DropdownMenu.Content>
-						</DropdownMenu.Portal>
-					</DropdownMenu.Root>
-					{#if activeFilterTypes.has('sales_channel')}
-						<DropdownMenu.Root>
-							<DropdownMenu.Trigger
-								class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none [&_svg]:size-4"
-							>
-								Sales channel
-								<ChevronDown class="size-4" />
-							</DropdownMenu.Trigger>
-							<DropdownMenu.Portal>
-								<DropdownMenu.Content
-									class="z-50 min-w-48 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-									sideOffset={4}
-								>
-									<div class="max-h-48 overflow-auto py-1">
-										{#each salesChannelsList as ch (ch.id)}
-											<button
-												type="button"
-												class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-												onclick={() => toggleSalesChannel(ch.id)}
-											>
-												<span
-													class={cn(
-														'flex size-4 shrink-0 items-center justify-center rounded border border-input bg-background',
-														selectedSalesChannelIds.has(ch.id) && 'ring-2 ring-ring'
-													)}
-												>
-													{#if selectedSalesChannelIds.has(ch.id)}
-														<Check class="size-2.5" />
-													{/if}
-												</span>
-												{ch.name}
-											</button>
-										{/each}
-										<button
-											type="button"
-											class="mt-1 w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-											onclick={clearSalesChannelFilter}
-										>
-											Clear
-										</button>
-									</div>
-								</DropdownMenu.Content>
-							</DropdownMenu.Portal>
-						</DropdownMenu.Root>
-					{/if}
-					{#if activeFilterTypes.has('type')}
-						<DropdownMenu.Root>
-							<DropdownMenu.Trigger
-								class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none [&_svg]:size-4"
-							>
-								Type
-								<ChevronDown class="size-4" />
-							</DropdownMenu.Trigger>
-							<DropdownMenu.Portal>
-								<DropdownMenu.Content
-									class="z-50 min-w-48 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-									sideOffset={4}
-								>
-									<div class="max-h-48 overflow-auto py-1">
-										{#each COLLECTION_TYPE_OPTIONS as t (t)}
-											<button
-												type="button"
-												class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent capitalize"
-												onclick={() => toggleCollectionType(t)}
-											>
-												<span
-													class={cn(
-														'flex size-4 shrink-0 items-center justify-center rounded border border-input bg-background',
-														selectedCollectionTypes.has(t) && 'ring-2 ring-ring'
-													)}
-												>
-													{#if selectedCollectionTypes.has(t)}
-														<Check class="size-2.5" />
-													{/if}
-												</span>
-												{t}
-											</button>
-										{/each}
-										<button
-											type="button"
-											class="mt-1 w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-											onclick={clearCollectionTypeFilter}
-										>
-											Clear
-										</button>
-									</div>
-								</DropdownMenu.Content>
-							</DropdownMenu.Portal>
-						</DropdownMenu.Root>
-					{/if}
-					{#if hasActiveFilters}
-						<div class="flex flex-wrap items-center gap-1.5">
-							{#if searchQuery.trim()}
-								<span
-									class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-xs font-medium"
-								>
-									Search: {searchQuery.trim()}
-									<button
-										type="button"
-										class="rounded p-0.5 hover:bg-muted"
-										onclick={removeFilterChip}
-										aria-label="Remove filter"
-									>
-										<X class="size-3" />
-									</button>
-								</span>
-							{/if}
-							{#each [...selectedSalesChannelIds] as scId (scId)}
-								{@const sc = salesChannelsList.find((c) => c.id === scId)}
-								<span
-									class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-xs font-medium"
-								>
-									Sales channel: {sc?.name ?? scId}
-									<button
-										type="button"
-										class="rounded p-0.5 hover:bg-muted"
-										onclick={() => toggleSalesChannel(scId)}
-										aria-label="Remove sales channel filter"
-									>
-										<X class="size-3" />
-									</button>
-								</span>
-							{/each}
-							{#each [...selectedCollectionTypes] as ct (ct)}
-								<span
-									class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-xs font-medium capitalize"
-								>
-									Type: {ct}
-									<button
-										type="button"
-										class="rounded p-0.5 hover:bg-muted"
-										onclick={() => toggleCollectionType(ct)}
-										aria-label="Remove type filter"
-									>
-										<X class="size-3" />
-									</button>
-								</span>
-							{/each}
-							<button
-								type="button"
-								class="text-xs text-muted-foreground underline hover:text-foreground"
-								onclick={clearFilters}
-							>
-								Clear all
-							</button>
-						</div>
-					{/if}
+		<PaginationTable>
+			{#if paginateState.error}
+				<div
+					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+				>
+					{paginateState.error}
 				</div>
-				<div class="flex items-center gap-2">
-					<div class="relative w-64">
-						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							type="search"
-							placeholder="Search collections..."
-							bind:value={searchQuery}
-							class="h-9 rounded-md pl-9"
+			{:else if paginateState.loading}
+				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
+					<p class="text-muted-foreground">Loading…</p>
+				</div>
+			{:else}
+				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+					<table class="w-full text-sm">
+						<TableHead columns={tableColumns} />
+						<TableBody
+							rows={rows}
+							columns={tableColumns}
+							emptyMessage="No collections found."
 						/>
-					</div>
-					<button
-						type="button"
-						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-						aria-label="Sort"
-					>
-						<ArrowUpDown class="size-4" />
-					</button>
+					</table>
 				</div>
-			</div>
-		</div>
 
-		{#if error}
-			<div
-				class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-			>
-				{error}
-			</div>
-		{:else if loading}
-			<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
-				<p class="text-muted-foreground">Loading…</p>
-			</div>
-		{:else}
-			<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-				<table class="w-full text-sm">
-					<thead class="sticky top-0 border-b bg-muted/50">
-						<tr>
-							<th class="px-4 py-3 text-left font-medium">Title</th>
-							<th class="px-4 py-3 text-left font-medium">Handle</th>
-							<th class="px-4 py-3 text-left font-medium">Products</th>
-							<th class="w-10 px-4 py-3"></th>
-						</tr>
-					</thead>
-					<tbody>
-						{#if collections.length === 0}
-							<tr>
-								<td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
-									No collections found.
-								</td>
-							</tr>
-						{:else}
-							{#each collections as collection (collection.id)}
-								<tr
-									class="border-b transition-colors hover:bg-muted/30 cursor-pointer"
-									role="button"
-									tabindex="0"
-									onclick={() => goto(`/products/collections/${collection.id}`)}
-									onkeydown={(e) => e.key === 'Enter' && goto(`/products/collections/${collection.id}`)}
-								>
-									<td class="px-4 py-3 font-medium">{collection.title}</td>
-									<td class="px-4 py-3 text-muted-foreground">{getHandle(collection)}</td>
-									<td class="px-4 py-3 text-muted-foreground">
-										{collection.product_count ?? 0}
-									</td>
-									<td class="px-4 py-3" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
-										<DropdownMenu.Root>
-											<DropdownMenu.Trigger
-												class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
-											>
-												<MoreHorizontal class="size-4" />
-												<span class="sr-only">Actions</span>
-											</DropdownMenu.Trigger>
-											<DropdownMenu.Portal>
-												<DropdownMenu.Content
-													class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-													sideOffset={4}
-												>
-													<DropdownMenu.Item
-														textValue="Edit"
-														class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => openEdit(collection)}
-													>
-														<Pencil class="size-4" />
-														Edit
-													</DropdownMenu.Item>
-													<DropdownMenu.Item
-														textValue="Delete"
-														class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => openDeleteConfirm(collection)}
-													>
-														<Trash2 class="size-4" />
-														Delete
-													</DropdownMenu.Item>
-												</DropdownMenu.Content>
-											</DropdownMenu.Portal>
-										</DropdownMenu.Root>
-									</td>
-								</tr>
-							{/each}
-						{/if}
-					</tbody>
-				</table>
-			</div>
-
-			<div class="mt-4 flex items-center justify-between gap-4 border-t py-4">
-				<p class="text-sm text-muted-foreground">
-					{#if pagination && pagination.total > 0}
-						{start} - {end} of {pagination.total} results
-					{:else}
-						0 results
-					{/if}
-				</p>
-				<div class="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={!pagination?.has_previous_page}
-						onclick={() => (page = page - 1)}
-					>
-						Prev
-					</Button>
-					<span class="text-sm text-muted-foreground">
-						{pagination?.page ?? 1} of {pagination?.total_pages ?? 1} pages
-					</span>
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={!pagination?.has_next_page}
-						onclick={() => (page = page + 1)}
-					>
-						Next
-					</Button>
-				</div>
-			</div>
-		{/if}
+				<TablePagination
+					{pagination}
+					{start}
+					{end}
+					onPageChange={goToPage}
+				/>
+			{/if}
+		</PaginationTable>
 	</div>
 </div>
 
@@ -820,10 +491,17 @@
 
 <!-- Delete collection confirmation -->
 <DeleteConfirmationModal
-	bind:open={deleteConfirmOpen}
+	bind:open={paginateState.deleteConfirmOpen}
 	entityName="collection"
-	entityTitle={collectionToDelete?.title || collectionToDelete?.handle || collectionToDelete?.id || ''}
-	onConfirm={confirmDeleteCollection}
+	entityTitle={(deleteItem as unknown as ProductCollection)?.title ?? (deleteItem as unknown as ProductCollection)?.handle ?? (deleteItem as unknown as ProductCollection)?.id ?? ''}
+	onConfirm={() => confirmDelete((item) => deleteCollections([(item as unknown as ProductCollection).id]))}
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}
 />
+{#if deleteError}
+	<div
+		class="mt-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+	>
+		{deleteError}
+	</div>
+{/if}

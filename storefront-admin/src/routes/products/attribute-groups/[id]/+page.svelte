@@ -1,10 +1,16 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
+	import {
+		DeleteConfirmationModal,
+		PaginationTable,
+		TableHead,
+		TableBody,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
 	import { MultiSelectCombobox } from '$lib/components/organs/multi-select-combobox/index.js';
 	import ListFilter from '@lucide/svelte/icons/list-filter';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -18,38 +24,14 @@
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import { DropdownMenu } from 'bits-ui';
 	import { cn } from '$lib/utils.js';
+	import { getAttributeGroup, updateAttributeGroup, deleteAttributeGroups } from '$lib/product-attribute-groups/api.js';
+	import type { ProductAttributeGroupDetail } from '$lib/product-attribute-groups/types.js';
+	import { listAttributes } from '$lib/product-attributes/api.js';
+	import type { ProductAttribute } from '$lib/product-attributes/types.js';
 
-	const API_BASE = 'http://localhost:8000/admin';
-	type ProductAttributeGroupAttribute = {
-		id: string;
-		title: string;
-		type: string;
-	};
+	const groupId = $derived(page.params.id);
 
-	type ProductAttribute = {
-		id: string;
-		title: string;
-		type: string;
-	};
-
-	type PaginatedAttributesResponse = {
-		data: ProductAttribute[];
-		pagination: { total: number; page: number; limit: number };
-	};
-
-	type ProductAttributeGroup = {
-		id: string;
-		title: string;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-		attributes: ProductAttributeGroupAttribute[];
-	};
-
-	const groupId = $derived($page.params.id);
-
-	let group = $state<ProductAttributeGroup | null>(null);
+	let group = $state<ProductAttributeGroupDetail | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
@@ -69,18 +51,13 @@
 		loading = true;
 		error = null;
 		try {
-			const res = await fetch(`${API_BASE}/product-attribute-groups/${groupId}`, {
-				cache: 'no-store'
-			});
-			if (!res.ok) {
-				if (res.status === 404) {
-					error = 'Attribute group not found';
-					group = null;
-					return;
-				}
-				throw new Error(await res.text());
+			const data = await getAttributeGroup(groupId);
+			if (data === null) {
+				error = 'Attribute group not found';
+				group = null;
+			} else {
+				group = data;
 			}
-			group = (await res.json()) as ProductAttributeGroup;
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			group = null;
@@ -97,10 +74,13 @@
 	async function loadAllAttributes() {
 		allAttributesLoading = true;
 		try {
-			const res = await fetch(`${API_BASE}/product-attributes?limit=100`, { cache: 'no-store' });
-			if (!res.ok) throw new Error(await res.text());
-			const json = (await res.json()) as PaginatedAttributesResponse;
-			allAttributes = json.data ?? [];
+			const res = await listAttributes({
+				page: 1,
+				limit: 100,
+				sorting_field: 'title',
+				sorting_direction: 'asc'
+			});
+			allAttributes = res.data?.rows ?? [];
 		} catch {
 			allAttributes = [];
 		} finally {
@@ -131,17 +111,11 @@
 		}
 		editSubmitting = true;
 		try {
-			const res = await fetch(`${API_BASE}/product-attribute-groups/${group.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ title: editTitle.trim(), attribute_ids: editSelectedAttributeIds })
+			group = await updateAttributeGroup(group.id, {
+				title: editTitle.trim(),
+				attribute_ids: editSelectedAttributeIds
 			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
 			closeEdit();
-			loadGroup();
 		} catch (e) {
 			editError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -161,12 +135,7 @@
 		if (!group) return;
 		deleteSubmitting = true;
 		try {
-			const res = await fetch(`${API_BASE}/product-attribute-groups`, {
-				method: 'DELETE',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ attribute_group_ids: [group.id] })
-			});
-			if (!res.ok) throw new Error(await res.text());
+			await deleteAttributeGroups([group.id]);
 			goto('/products/attribute-groups');
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -189,6 +158,26 @@
 
 	const groupJson = $derived(group ? JSON.stringify(group, null, 2) : '');
 	const jsonKeys = $derived(group ? Object.keys(group).length : 0);
+
+	let attributesSearchQuery = $state('');
+	const attributeTableColumns: TableColumn[] = [
+		{ label: 'Title', key: 'title', type: 'text' },
+		{ label: 'Type', key: 'type', type: 'text' }
+	];
+	const attributeRows = $derived(
+		(group?.attributes ?? [])
+			.filter((attr) => {
+				const q = attributesSearchQuery.trim().toLowerCase();
+				if (!q) return true;
+				return (
+					attr.title.toLowerCase().includes(q) || attr.type.toLowerCase().includes(q)
+				);
+			})
+			.map((attr) => ({ id: attr.id, title: attr.title, type: attr.type })) as Record<
+			string,
+			unknown
+		>[]
+	);
 
 	let metadataSheetOpen = $state(false);
 	let jsonSheetOpen = $state(false);
@@ -350,31 +339,24 @@
 							Edit
 						</Button>
 					</div>
-					<div class="overflow-x-auto">
-						<table class="w-full text-sm">
-							<thead class="border-b bg-muted/50">
-								<tr>
-									<th class="px-4 py-3 text-left font-medium">Title</th>
-									<th class="px-4 py-3 text-left font-medium">Type</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#if (group.attributes ?? []).length === 0}
-									<tr>
-										<td colspan="2" class="px-4 py-8 text-center text-muted-foreground">
-											No attributes in this group.
-										</td>
-									</tr>
-								{:else}
-									{#each (group.attributes ?? []) as attr (attr.id)}
-										<tr class="border-b last:border-0">
-											<td class="px-4 py-3 font-medium">{attr.title}</td>
-											<td class="px-4 py-3 text-muted-foreground capitalize">{attr.type}</td>
-										</tr>
-									{/each}
-								{/if}
-							</tbody>
-						</table>
+					<div class="overflow-x-auto p-4">
+						<PaginationTable
+							bind:searchQuery={attributesSearchQuery}
+							searchPlaceholder="Search attributes"
+							showFilter={false}
+							showSort={false}
+						>
+							<div class="min-h-0 overflow-auto rounded-lg border bg-card">
+								<table class="w-full text-sm">
+									<TableHead columns={attributeTableColumns} />
+									<TableBody
+										rows={attributeRows}
+										columns={attributeTableColumns}
+										emptyMessage="No attributes in this group."
+									/>
+								</table>
+							</div>
+						</PaginationTable>
 					</div>
 				</section>
 			</div>

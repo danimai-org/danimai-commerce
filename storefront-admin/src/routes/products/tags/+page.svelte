@@ -1,131 +1,93 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
-	import { DropdownMenu } from 'bits-ui';
-	import Search from '@lucide/svelte/icons/search';
-	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
-	import Pencil from '@lucide/svelte/icons/pencil';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import Eye from '@lucide/svelte/icons/eye';
-	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+	import {
+		DeleteConfirmationModal,
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
 	import Tag from '@lucide/svelte/icons/tag';
-	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import { cn } from '$lib/utils.js';
+	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
+	import { listTags, deleteTags, createTag, updateTag } from '$lib/product-tags/api.js';
+	import type { TagsResponse, ProductTag } from '$lib/product-tags/types.js';
 
-	const API_BASE = 'http://localhost:8000/admin';
-
-	type ProductTag = {
-		id: string;
-		value: string;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	type Pagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
-
-	type TagsResponse = {
-		data: ProductTag[];
-		pagination: Pagination;
-	};
-
-	let searchQuery = $state('');
-	let page = $state(1);
-	let limit = $state(10);
-	let sortingField = $state('created_at');
-	let sortingDirection = $state<'asc' | 'desc'>('desc');
-
-	let data = $state<TagsResponse | null>(null);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
-
-	async function fetchTags() {
-		loading = true;
-		error = null;
-		try {
-			const params = new URLSearchParams({
-				page: String(page),
-				limit: String(limit),
-				sorting_field: sortingField,
-				sorting_direction: sortingDirection
-			});
-			const res = await fetch(`${API_BASE}/product-tags?${params}`, { cache: 'no-store' });
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			data = (await res.json()) as TagsResponse;
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			data = null;
-		} finally {
-			loading = false;
-		}
-	}
-
-	$effect(() => {
-		page;
-		limit;
-		sortingField;
-		sortingDirection;
-		fetchTags();
-	});
-
-	const tags = $derived(data?.data ?? []);
-	const pagination = $derived(data?.pagination ?? null);
-	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+	const paginateState = createPagination<TagsResponse>(
+		async (): Promise<TagsResponse> => {
+			const q = paginationQuery as Record<string, unknown>;
+			const params = {
+				page: q?.page != null ? Number(q.page) : 1,
+				limit: q?.limit != null ? Number(q.limit) : 10,
+				sorting_field: (q?.sorting_field as string) ?? 'created_at',
+				sorting_direction: (q?.sorting_direction as 'asc' | 'desc') ?? 'desc'
+			};
+			return listTags(params);
+		},
+		['product-tags']
 	);
 
-	let deleteConfirmOpen = $state(false);
-	let tagToDelete = $state<ProductTag | null>(null);
-	let deleteSubmitting = $state(false);
+	$effect(() => {
+		page.url.searchParams.toString();
+		paginateState.refetch();
+	});
 
-	function openDeleteConfirm(tag: ProductTag) {
-		tagToDelete = tag;
-		deleteConfirmOpen = true;
+	function goToPage(pageNum: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('page', String(Math.max(1, pageNum)));
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	function closeDeleteConfirm() {
-		if (!deleteSubmitting) {
-			deleteConfirmOpen = false;
-			tagToDelete = null;
+	const queryData = $derived(paginateState.query.data as TagsResponse | undefined);
+	const rows = $derived((queryData?.data?.rows ?? []) as Record<string, unknown>[]);
+	const pagination = $derived((queryData?.data?.pagination ?? null) as PaginationMeta | null);
+	const start = $derived(paginateState.start);
+	const end = $derived(paginateState.end);
+
+	function confirmDeleteTag() {
+		paginateState.confirmDelete((item) =>
+			deleteTags([(item as unknown as ProductTag).id])
+		);
+	}
+
+	const tableColumns: TableColumn[] = [
+		{
+			label: 'Value',
+			key: 'value',
+			type: 'link',
+			cellHref: (row) => `/products/tags/${row.id}`
+		},
+		{ label: 'Created', key: 'created_at', type: 'date' },
+		{ label: 'Updated', key: 'updated_at', type: 'date' },
+		{
+			label: 'Actions',
+			key: 'actions',
+			type: 'actions',
+			actions: [
+				{
+					label: 'Edit',
+					key: 'edit',
+					type: 'button',
+					onClick: (item) => openEdit(item as unknown as ProductTag)
+				},
+				{
+					label: 'Delete',
+					key: 'delete',
+					type: 'button',
+					onClick: (item) => paginateState.openDeleteConfirm(item as unknown as TagsResponse)
+				}
+			]
 		}
-	}
+	];
 
-	async function confirmDeleteTag() {
-		if (!tagToDelete) return;
-		deleteSubmitting = true;
-		try {
-			const res = await fetch(`${API_BASE}/product-tags`, {
-				method: 'DELETE',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ tag_ids: [tagToDelete.id] })
-			});
-			if (!res.ok) throw new Error(await res.text());
-			deleteConfirmOpen = false;
-			tagToDelete = null;
-			fetchTags();
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-		} finally {
-			deleteSubmitting = false;
-		}
-	}
-
-	// Create sheet
+	// Create sheet (local state)
 	let createOpen = $state(false);
 	let createValue = $state('');
 	let createError = $state<string | null>(null);
@@ -149,17 +111,9 @@
 		}
 		createSubmitting = true;
 		try {
-			const res = await fetch(`${API_BASE}/product-tags`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ value: createValue.trim() })
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
+			await createTag({ value: createValue.trim() });
 			closeCreate();
-			fetchTags();
+			paginateState.refetch();
 		} catch (e) {
 			createError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -167,7 +121,7 @@
 		}
 	}
 
-	// Edit sheet
+	// Edit sheet (local state)
 	let editOpen = $state(false);
 	let editTag = $state<ProductTag | null>(null);
 	let editValue = $state('');
@@ -195,17 +149,9 @@
 		}
 		editSubmitting = true;
 		try {
-			const res = await fetch(`${API_BASE}/product-tags/${editTag.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ value: editValue.trim() })
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
+			await updateTag(editTag.id, { value: editValue.trim() });
 			closeEdit();
-			fetchTags();
+			paginateState.refetch();
 		} catch (e) {
 			editError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -223,157 +169,38 @@
 			</div>
 			<Button size="sm" onclick={openCreate}>Create</Button>
 		</div>
-		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex flex-wrap items-center justify-between gap-2">
-				<Button variant="outline" size="sm" class="rounded-md">
-					<SlidersHorizontal class="mr-1.5 size-4" />
-					Add filter
-				</Button>
-				<div class="flex items-center gap-2">
-					<div class="relative w-64">
-						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							type="search"
-							placeholder="Search"
-							bind:value={searchQuery}
-							class="h-9 rounded-md pl-9"
+
+		<PaginationTable>
+			{#if paginateState.error}
+				<div
+					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+				>
+					{paginateState.error}
+				</div>
+			{:else if paginateState.loading}
+				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
+					<p class="text-muted-foreground">Loading…</p>
+				</div>
+			{:else}
+				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+					<table class="w-full text-sm">
+						<TableHead columns={tableColumns} />
+						<TableBody
+							rows={rows}
+							columns={tableColumns}
+							emptyMessage="No tags found."
 						/>
-					</div>
-					<button
-						type="button"
-						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-					>
-						<ArrowUpDown class="size-4" />
-						<span class="sr-only">Sort</span>
-					</button>
+					</table>
 				</div>
-			</div>
-		</div>
 
-		{#if error}
-			<div
-				class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-			>
-				{error}
-			</div>
-		{:else if loading}
-			<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
-				<p class="text-muted-foreground">Loading…</p>
-			</div>
-		{:else}
-			<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-				<table class="w-full text-sm">
-					<thead class="sticky top-0 border-b bg-muted/50">
-						<tr>
-							<th class="px-4 py-3 text-left font-medium">Value</th>
-							<th class="px-4 py-3 text-left font-medium">Created</th>
-							<th class="px-4 py-3 text-left font-medium">Updated</th>
-							<th class="w-10 px-4 py-3"></th>
-						</tr>
-					</thead>
-					<tbody>
-						{#if tags.length === 0}
-							<tr>
-								<td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
-									No tags found.
-								</td>
-							</tr>
-						{:else}
-							{#each tags as tag (tag.id)}
-								<tr class="border-b transition-colors hover:bg-muted/30">
-									<td class="px-4 py-3 font-medium">
-										<a
-											href="/products/tags/{tag.id}"
-											class="hover:underline"
-										>
-											{tag.value}
-										</a>
-									</td>
-									<td class="px-4 py-3 text-muted-foreground">
-										{new Date(tag.created_at).toLocaleDateString('en-US', {
-											month: 'short',
-											day: 'numeric',
-											year: 'numeric'
-										})}
-									</td>
-									<td class="px-4 py-3 text-muted-foreground">
-										{new Date(tag.updated_at).toLocaleDateString('en-US', {
-											month: 'short',
-											day: 'numeric',
-											year: 'numeric'
-										})}
-									</td>
-									<td class="px-4 py-3">
-										<DropdownMenu.Root>
-											<DropdownMenu.Trigger
-												class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
-											>
-												<MoreHorizontal class="size-4" />
-												<span class="sr-only">Actions</span>
-											</DropdownMenu.Trigger>
-											<DropdownMenu.Portal>
-												<DropdownMenu.Content
-													class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-													sideOffset={4}
-												>
-													<DropdownMenu.Item
-														textValue="Edit"
-														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => openEdit(tag)}
-													>
-														<Pencil class="size-4" />
-														Edit
-													</DropdownMenu.Item>
-													<DropdownMenu.Item
-														textValue="Delete"
-														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => openDeleteConfirm(tag)}
-													>
-														<Trash2 class="size-4" />
-														Delete
-													</DropdownMenu.Item>
-												</DropdownMenu.Content>
-											</DropdownMenu.Portal>
-										</DropdownMenu.Root>
-									</td>
-								</tr>
-							{/each}
-						{/if}
-					</tbody>
-				</table>
-			</div>
-
-			<div class="mt-4 flex items-center justify-between gap-4 border-t py-4">
-				<p class="text-sm text-muted-foreground">
-					{#if pagination && pagination.total > 0}
-						{start} – {end} of {pagination.total} results
-					{:else}
-						0 results
-					{/if}
-				</p>
-				<div class="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={!pagination?.has_previous_page}
-						onclick={() => (page = page - 1)}
-					>
-						Prev
-					</Button>
-					<span class="text-sm text-muted-foreground">
-						{pagination?.page ?? 1} of {pagination?.total_pages ?? 1} pages
-					</span>
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={!pagination?.has_next_page}
-						onclick={() => (page = page + 1)}
-					>
-						Next
-					</Button>
-				</div>
-			</div>
-		{/if}
+				<TablePagination
+					{pagination}
+					{start}
+					{end}
+					onPageChange={goToPage}
+				/>
+			{/if}
+		</PaginationTable>
 	</div>
 </div>
 
@@ -453,12 +280,18 @@
 	</Sheet.Content>
 </Sheet.Root>
 
-<!-- Delete tag confirmation -->
 <DeleteConfirmationModal
-	bind:open={deleteConfirmOpen}
+	bind:open={paginateState.deleteConfirmOpen}
 	entityName="tag"
-	entityTitle={tagToDelete?.value || tagToDelete?.id || ''}
+	entityTitle={(paginateState.deleteItem as unknown as ProductTag)?.value || (paginateState.deleteItem as unknown as ProductTag)?.id || ''}
 	onConfirm={confirmDeleteTag}
-	onCancel={closeDeleteConfirm}
-	submitting={deleteSubmitting}
+	onCancel={paginateState.closeDeleteConfirm}
+	submitting={paginateState.deleteSubmitting}
 />
+{#if paginateState.deleteError}
+	<div
+		class="mt-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+	>
+		{paginateState.deleteError}
+	</div>
+{/if}

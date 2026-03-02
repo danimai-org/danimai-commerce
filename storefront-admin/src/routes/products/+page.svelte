@@ -1,61 +1,42 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
+	import {
+		DeleteConfirmationModal,
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
 	import Package from '@lucide/svelte/icons/package';
-	import Bell from '@lucide/svelte/icons/bell';
-	import Search from '@lucide/svelte/icons/search';
-	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
-	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
-	import ImageIcon from '@lucide/svelte/icons/image';
-	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Info from '@lucide/svelte/icons/info';
 	import Check from '@lucide/svelte/icons/check';
 	import Upload from '@lucide/svelte/icons/upload-cloud';
-	import GripVertical from '@lucide/svelte/icons/grip-vertical';
-	import XCircle from '@lucide/svelte/icons/x-circle';
 	import X from '@lucide/svelte/icons/x';
-	import Pencil from '@lucide/svelte/icons/pencil';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import Plus from '@lucide/svelte/icons/plus';
-import ChevronDown from '@lucide/svelte/icons/chevron-down';
-import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 	import { cn } from '$lib/utils.js';
+	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import { listProducts } from '$lib/products/api';
+	import type { Product, ProductsListResponse, ListProductsParams } from '$lib/products/types.js';
+	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 
-	const API_BASE = 'http://localhost:8000/admin';
+	async function deleteProducts(ids: string[]): Promise<void> {
+		const res = await fetch(`${API_BASE}/products`, {
+			method: 'DELETE',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ product_ids: ids })
+		});
+		if (!res.ok) {
+			const text = await res.text();
+			throw new Error(text || `HTTP ${res.status}`);
+		}
+	}
 
-	type Product = {
-		id: string;
-		title: string;
-		handle: string;
-		subtitle?: string | null;
-		description?: string | null;
-		status: string;
-		thumbnail: string | null;
-		category_id?: string | null;
-		category?: { id: string; value: string; handle: string } | null;
-		created_at?: string;
-		updated_at?: string;
-		sales_channels?: Array<{ id: string; name: string }>;
-		variants?: Array<{ id: string }>;
-	};
-
-	type Pagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
-
-	type ProductsResponse = {
-		data: Product[];
-		pagination: Pagination;
-	};
+	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
 	type ProductOption = { title: string; values: string[] };
 	type ProductVariantForm = {
@@ -98,259 +79,104 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 		});
 	}
 
-	let searchQuery = $state('');
-	let page = $state(1);
-	let limit = $state(10);
-	let sortingField = $state('created_at');
-	let sortingDirection = $state<'asc' | 'desc'>('desc');
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
-	let data = $state<ProductsResponse | null>(null);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
-
-	let deleteConfirmOpen = $state(false);
-	let productToDelete = $state<Product | null>(null);
-	let deleteSubmitting = $state(false);
-
-	function openDeleteConfirm(product: Product) {
-		productToDelete = product;
-		deleteConfirmOpen = true;
-	}
-
-	let selectedProducts = $state<Set<string>>(new Set());
-
-	type FilterType =
-		| 'categories'
-		| 'sales_channel'
-		| 'vendors'
-		| 'tag'
-		| 'statuses'
-		| 'region_catalog'
-		| 'b2b_catalog'
-		| 'company_location_catalog'
-		| 'retail_catalog'
-		| 'unassigned_catalog'
-		| 'types'
-		| 'collection'
-		| 'publishing_error'
-		| 'gift_card'
-		| 'combined_listings';
-	let activeFilterTypes = $state<Set<FilterType>>(
-		new Set(['vendors', 'tag', 'statuses'])
-	);
-	const FILTER_OPTIONS: { id: FilterType; label: string }[] = [
-		{ id: 'categories', label: 'Categories' },
-		{ id: 'sales_channel', label: 'Sales channel' },
-		{ id: 'region_catalog', label: 'Region catalog' },
-		{ id: 'b2b_catalog', label: 'B2B catalog' },
-		{ id: 'company_location_catalog', label: 'Company location catalog' },
-		{ id: 'retail_catalog', label: 'Retail catalog' },
-		{ id: 'unassigned_catalog', label: 'Unassigned catalog' },
-		{ id: 'vendors', label: 'Vendors' },
-		{ id: 'tag', label: 'Tag' },
-		{ id: 'types', label: 'Types' },
-		{ id: 'collection', label: 'Collection' },
-		{ id: 'statuses', label: 'Statuses' },
-		{ id: 'publishing_error', label: 'Publishing error' },
-		{ id: 'gift_card', label: 'Gift card' },
-		{ id: 'combined_listings', label: 'Combined listings' }
-	];
-	function toggleFilterType(id: FilterType) {
-		activeFilterTypes = new Set(activeFilterTypes);
-		if (activeFilterTypes.has(id)) activeFilterTypes.delete(id);
-		else activeFilterTypes.add(id);
-	}
-	function clearFilters() {
-		activeFilterTypes = new Set();
-	}
-
-	const VENDORS_LIST = [
-		'ddanimai',
-		'Hydrogen Vendor',
-		'Multi-managed Vendor',
-		'Snowboard Vendor'
-	] as const;
-	const STATUS_OPTIONS = ['published', 'draft', 'proposed', 'rejected'] as const;
-	let selectedVendors = $state<Set<string>>(new Set());
-	let selectedTagIds = $state<Set<string>>(new Set());
-	let selectedStatuses = $state<Set<string>>(new Set());
-	let selectedCategoryIds = $state<Set<string>>(new Set());
-	let selectedSalesChannelIds = $state<Set<string>>(new Set());
-
-	function toggleCategory(id: string) {
-		selectedCategoryIds = new Set(selectedCategoryIds);
-		if (selectedCategoryIds.has(id)) selectedCategoryIds.delete(id);
-		else selectedCategoryIds.add(id);
-	}
-	function clearCategoryFilter() {
-		selectedCategoryIds = new Set();
-	}
-	function toggleSalesChannel(id: string) {
-		selectedSalesChannelIds = new Set(selectedSalesChannelIds);
-		if (selectedSalesChannelIds.has(id)) selectedSalesChannelIds.delete(id);
-		else selectedSalesChannelIds.add(id);
-	}
-	function clearSalesChannelFilter() {
-		selectedSalesChannelIds = new Set();
-	}
-	function toggleVendor(v: string) {
-		selectedVendors = new Set(selectedVendors);
-		if (selectedVendors.has(v)) selectedVendors.delete(v);
-		else selectedVendors.add(v);
-	}
-	function clearVendorFilter() {
-		selectedVendors = new Set();
-	}
-	function toggleTag(id: string) {
-		selectedTagIds = new Set(selectedTagIds);
-		if (selectedTagIds.has(id)) selectedTagIds.delete(id);
-		else selectedTagIds.add(id);
-	}
-	function clearTagFilter() {
-		selectedTagIds = new Set();
-	}
-	function toggleStatus(s: string) {
-		selectedStatuses = new Set(selectedStatuses);
-		if (selectedStatuses.has(s)) selectedStatuses.delete(s);
-		else selectedStatuses.add(s);
-	}
-	function clearStatusFilter() {
-		selectedStatuses = new Set();
-	}
-
-	async function fetchProducts() {
-		loading = true;
-		error = null;
-		data = null;
-		try {
-			const params = new URLSearchParams({
-				page: String(page),
-				limit: String(limit),
-				sorting_field: sortingField,
-				sorting_direction: sortingDirection
-			});
-			if (searchQuery.trim()) {
-				params.append('search', searchQuery.trim());
-			}
-			if (selectedCategoryIds.size > 0) {
-				params.append('category_ids', [...selectedCategoryIds].join(','));
-			}
-			const res = await fetch(`${API_BASE}/products?${params}`, { cache: 'no-store' });
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			const raw = (await res.json()) as {
-				products?: Product[];
-				count?: number;
-				offset?: number;
-				limit?: number;
+	const paginateState =
+		createPagination<ProductsListResponse>(async (): Promise<ProductsListResponse> => {
+			const q = createPaginationQuery(page.url.searchParams) as Record<string, unknown>;
+			const categoryIds = q?.category_ids;
+			const categoryIdsArr =
+				typeof categoryIds === 'string'
+					? categoryIds
+							.split(',')
+							.map((s: string) => s.trim())
+							.filter(Boolean)
+					: Array.isArray(categoryIds)
+						? categoryIds
+						: undefined;
+			const params = {
+				page: q?.page != null ? Number(q.page) : 1,
+				limit: q?.limit != null ? Number(q.limit) : 10,
+				sorting_field: (q?.sorting_field as string) ?? 'created_at',
+				sorting_direction: (q?.sorting_direction as 'asc' | 'desc') ?? 'desc',
+				search: (q?.search as string) || undefined,
+				category_ids: categoryIdsArr?.length ? (categoryIdsArr as string[]) : undefined
 			};
-			const limitNum = raw.limit ?? 10;
-			const total = raw.count ?? 0;
-			const offsetVal = raw.offset ?? 0;
-			const pageNum = limitNum > 0 ? Math.floor(offsetVal / limitNum) + 1 : 1;
-			const totalPages = limitNum > 0 ? Math.ceil(total / limitNum) : 1;
-			data = {
-				data: raw.products ?? [],
-				pagination: {
-					total,
-					page: pageNum,
-					limit: limitNum,
-					total_pages: totalPages,
-					has_next_page: pageNum < totalPages,
-					has_previous_page: pageNum > 1
-				}
-			} as ProductsResponse;
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			data = null;
-		} finally {
-			loading = false;
-		}
+			return listProducts(params as any) as unknown as ProductsListResponse;
+		}, ['products']);
+
+	$effect(() => {
+		page.url.searchParams.toString();
+		paginateState.refetch();
+	});
+
+	function goToPage(pageNum: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('page', String(Math.max(1, pageNum)));
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	let previousSearchQuery = $state('');
-	let previousCategoryFilterSize = $state(0);
-	$effect(() => {
-		if (searchQuery !== previousSearchQuery) {
-			previousSearchQuery = searchQuery;
-			page = 1;
+	const queryData = $derived(paginateState.query.data as ProductsListResponse | undefined);
+	const rawRows = $derived(queryData?.data?.rows ?? []);
+	const rows = $derived(
+		rawRows.map((p: Product) => ({
+			...p,
+			category_display: p.category?.value ?? '—',
+			sales_channels_display: p.sales_channels?.map((sc) => sc.name).join(', ') ?? '—',
+			variants_count: p.variants?.length ?? 0
+		}))
+	) as Record<string, unknown>[];
+	const pagination = $derived((queryData?.data?.pagination ?? null) as PaginationMeta | null);
+	const start = $derived(paginateState.start);
+	const end = $derived(paginateState.end);
+	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
+	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
+	const confirmDelete = $derived(paginateState.confirmDelete);
+	const deleteItem = $derived(paginateState.deleteItem);
+	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
+	const deleteError = $derived(paginateState.deleteError);
+	const refetch = $derived(paginateState.refetch);
+
+	const tableColumns: TableColumn[] = [
+		{
+			label: 'Product',
+			key: 'title',
+			type: 'link',
+			cellHref: (row) => `/products/${row.id}`,
+			thumbnailKey: 'thumbnail',
+			textKey: 'title'
+		},
+		{ label: 'Category', key: 'category_display', type: 'text' },
+		{
+			label: 'Inventory',
+			key: 'id',
+			type: 'link',
+			cellHref: (row) => `/products/${row.id}`,
+			linkLabel: 'View'
+		},
+		{ label: 'Sales Channels', key: 'sales_channels_display', type: 'text' },
+		{ label: 'Variants', key: 'variants_count', type: 'text' },
+		{ label: 'Status', key: 'status', type: 'text' },
+		{
+			label: 'Actions',
+			key: 'actions',
+			type: 'actions',
+			actions: [
+				{
+					label: 'Edit',
+					key: 'edit',
+					type: 'button',
+					onClick: (item) => goto(`/products/${item.id}`)
+				},
+				{
+					label: 'Delete',
+					key: 'delete',
+					type: 'button',
+					onClick: (item) => openDeleteConfirm(item as unknown as ProductsListResponse)
+				}
+			]
 		}
-	});
-	$effect(() => {
-		const size = selectedCategoryIds.size;
-		if (size !== previousCategoryFilterSize) {
-			previousCategoryFilterSize = size;
-			page = 1;
-		}
-	});
-
-	$effect(() => {
-		page;
-		limit;
-		sortingField;
-		sortingDirection;
-		searchQuery;
-		selectedCategoryIds;
-		fetchProducts();
-	});
-
-	$effect(() => {
-		const handler = () => {
-			if (document.visibilityState === 'visible') fetchProducts();
-		};
-		document.addEventListener('visibilitychange', handler);
-		return () => document.removeEventListener('visibilitychange', handler);
-	});
-
-	let tagsLoadedForFilter = $state(false);
-	$effect(() => {
-		if (tagsLoadedForFilter) return;
-		tagsLoadedForFilter = true;
-		fetch(`${API_BASE}/product-tags?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
-			.then((j) => {
-				tagsList = j.data ?? [];
-			})
-			.catch(() => {
-				tagsList = [];
-			});
-	});
-	let filterCategoriesLoaded = $state(false);
-	let filterSalesChannelsLoaded = $state(false);
-	$effect(() => {
-		if (filterCategoriesLoaded) return;
-		filterCategoriesLoaded = true;
-		fetch(`${API_BASE}/product-categories?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
-			.then((j) => {
-				categoriesList = j.data ?? [];
-			})
-			.catch(() => {
-				categoriesList = [];
-			});
-	});
-	$effect(() => {
-		if (filterSalesChannelsLoaded) return;
-		filterSalesChannelsLoaded = true;
-		fetch(`${API_BASE}/sales-channels?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
-			.then((j) => {
-				const ch = j.data ?? [];
-				salesChannelsList = ch.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }));
-			})
-			.catch(() => {
-				salesChannelsList = [];
-			});
-	});
-
-	const products = $derived(data?.data ?? []);
-	const pagination = $derived(data?.pagination ?? null);
-	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
-	);
+	];
 
 	// --- Create product flow ---
 	let createOpen = $state(false);
@@ -415,7 +241,10 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 	let createAttributeEntries = $state<CreateAttributeEntry[]>([]);
 
 	function addAttributeEntry() {
-		createAttributeEntries = [...createAttributeEntries, { attributeId: '', attributeTitle: '', value: '' }];
+		createAttributeEntries = [
+			...createAttributeEntries,
+			{ attributeId: '', attributeTitle: '', value: '' }
+		];
 	}
 
 	function removeAttributeEntry(index: number) {
@@ -506,7 +335,9 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 					id: ch.id,
 					name: ch.name
 				}));
-				const defaultChannels = salesChannels.filter((ch: { is_default: boolean }) => ch.is_default);
+				const defaultChannels = salesChannels.filter(
+					(ch: { is_default: boolean }) => ch.is_default
+				);
 				if (defaultChannels.length > 0) {
 					createSalesChannels = defaultChannels.map((ch: { id: string; name: string }) => ({
 						id: ch.id,
@@ -521,45 +352,6 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 
 	function closeCreate() {
 		createOpen = false;
-	}
-
-	async function confirmDeleteProduct() {
-		if (!productToDelete) return;
-		deleteSubmitting = true;
-		error = null;
-		try {
-			const res = await fetch(`${API_BASE}/products`, {
-				method: 'DELETE',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ product_ids: [productToDelete.id] })
-			});
-			if (res.ok) {
-				deleteConfirmOpen = false;
-				productToDelete = null;
-				fetchProducts();
-			} else {
-				const text = await res.text();
-				error = text || 'Failed to delete product';
-			}
-		} catch {
-			error = 'Failed to delete product';
-		} finally {
-			deleteSubmitting = false;
-		}
-	}
-
-	function handleDeleteCancel() {
-		if (!deleteSubmitting) {
-			deleteConfirmOpen = false;
-			productToDelete = null;
-		}
-	}
-
-	function closeDeleteConfirm() {
-		if (!deleteSubmitting) {
-			deleteConfirmOpen = false;
-			productToDelete = null;
-		}
 	}
 
 	function isDetailsStepValid() {
@@ -668,7 +460,10 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 			const availableCountStr = String(v.availableCount || '').trim();
 			const availableCountNum = availableCountStr ? parseInt(availableCountStr, 10) : null;
 			const optionsTrimmed = Object.fromEntries(
-				Object.entries(v.options).map(([k, val]) => [k.trim(), typeof val === 'string' ? val.trim() : val])
+				Object.entries(v.options).map(([k, val]) => [
+					k.trim(),
+					typeof val === 'string' ? val.trim() : val
+				])
 			);
 			return {
 				title: v.title,
@@ -710,7 +505,10 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 			tag_ids: createTagIds.length > 0 ? createTagIds : undefined,
 			options: createHasVariants ? optionsForApi : undefined,
 			variants: createHasVariants && variantsForApi.length > 0 ? variantsForApi : undefined,
-			sales_channels: createSalesChannels.length > 0 ? createSalesChannels.map((ch) => ({ id: ch.id })) : undefined,
+			sales_channels:
+				createSalesChannels.length > 0
+					? createSalesChannels.map((ch) => ({ id: ch.id }))
+					: undefined,
 			attribute_groups: attributeGroupsForApi,
 			attributes: attributesForApi
 		};
@@ -722,9 +520,7 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 			createError = 'Title is required';
 			return;
 		}
-		const hasAttributeEntries = createAttributeEntries.some(
-			(e) => e.attributeId && e.value.trim()
-		);
+		const hasAttributeEntries = createAttributeEntries.some((e) => e.attributeId && e.value.trim());
 		if (hasAttributeEntries && !createAttributeGroupId) {
 			createError = 'Select an attribute group when setting attributes.';
 			return;
@@ -745,6 +541,7 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 					}
 				}
 			}
+			console.log('createVariants', createVariants);
 			// Validate that at least one variant has a price > 0 (only for published products)
 			if (status === 'published') {
 				const hasValidPrice = createVariants.some((variant) => {
@@ -780,7 +577,7 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 				});
 			}
 			closeCreate();
-			fetchProducts();
+			refetch();
 		} catch (e) {
 			createError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -790,459 +587,36 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 </script>
 
 <div class="flex h-full flex-col">
-	<!-- Top bar: Products icon, actions, bell -->
-	<div class="flex h-14 shrink-0 items-center justify-between gap-4 border-b px-6">
-		<div class="flex items-center gap-2">
-			<div
-				class="flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground"
-			>
-				<Package class="size-4" />
-			</div>
-			<span class="font-semibold">Products</span>
-		</div>
-		<div class="flex items-center gap-2">
-			<Button variant="outline" size="sm">Export</Button>
-			<Button variant="outline" size="sm">Import</Button>
-			<Button size="sm" onclick={openCreate}>Create</Button>
-			<Button variant="ghost" size="icon" class="size-9">
-				<Bell class="size-4" />
-				<span class="sr-only">Notifications</span>
-			</Button>
-		</div>
-	</div>
-
-	<!-- Content -->
 	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div class="mb-4 flex flex-col gap-4">
-			<div class="flex flex-wrap items-center justify-between gap-2">
-				<div class="flex flex-wrap items-center gap-2">
-					{#each FILTER_OPTIONS as opt (opt.id)}
-						{#if activeFilterTypes.has(opt.id)}
-							<DropdownMenu.Root>
-								<DropdownMenu.Trigger
-									class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-								>
-									{opt.label}
-									<ChevronDown class="size-4" />
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Portal>
-									<DropdownMenu.Content
-										class="z-50 min-w-48 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-										sideOffset={4}
-									>
-										{#if opt.id === 'categories'}
-											<div class="max-h-48 overflow-auto py-1">
-												{#each categoriesList as cat (cat.id)}
-													<button
-														type="button"
-														class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-														onclick={() => toggleCategory(cat.id)}
-													>
-														<span
-															class={cn(
-																'flex size-4 shrink-0 items-center justify-center rounded border border-input bg-background',
-																selectedCategoryIds.has(cat.id) && 'ring-2 ring-ring'
-															)}
-														>
-															{#if selectedCategoryIds.has(cat.id)}
-																<Check class="size-2.5" />
-															{/if}
-														</span>
-														{cat.value}
-													</button>
-												{/each}
-												<button
-													type="button"
-													class="w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-													onclick={clearCategoryFilter}
-												>
-													Clear
-												</button>
-											</div>
-										{:else if opt.id === 'sales_channel'}
-											<div class="max-h-48 overflow-auto py-1">
-												{#each salesChannelsList as ch (ch.id)}
-													<button
-														type="button"
-														class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-														onclick={() => toggleSalesChannel(ch.id)}
-													>
-														<span
-															class={cn(
-																'flex size-4 shrink-0 items-center justify-center rounded border border-input bg-background',
-																selectedSalesChannelIds.has(ch.id) && 'ring-2 ring-ring'
-															)}
-														>
-															{#if selectedSalesChannelIds.has(ch.id)}
-																<Check class="size-2.5" />
-															{/if}
-														</span>
-														{ch.name}
-													</button>
-												{/each}
-												<button
-													type="button"
-													class="w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-													onclick={clearSalesChannelFilter}
-												>
-													Clear
-												</button>
-											</div>
-										{:else if opt.id === 'vendors'}
-											<div class="max-h-48 overflow-auto py-1">
-												{#each VENDORS_LIST as vendor (vendor)}
-													<button
-														type="button"
-														class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-														onclick={() => toggleVendor(vendor)}
-													>
-														<span
-															class={cn(
-																'flex size-4 shrink-0 items-center justify-center rounded border border-input bg-background',
-																selectedVendors.has(vendor) && 'ring-2 ring-ring'
-															)}
-														>
-															{#if selectedVendors.has(vendor)}
-																<Check class="size-2.5" />
-															{/if}
-														</span>
-														{vendor}
-													</button>
-												{/each}
-												<button
-													type="button"
-													class="w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-													onclick={clearVendorFilter}
-												>
-													Clear
-												</button>
-											</div>
-										{:else if opt.id === 'tag'}
-											<div class="max-h-48 overflow-auto py-1">
-												{#each tagsList as tag (tag.id)}
-													<button
-														type="button"
-														class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-														onclick={() => toggleTag(tag.id)}
-													>
-														<span
-															class={cn(
-																'flex size-4 shrink-0 items-center justify-center rounded border border-input bg-background',
-																selectedTagIds.has(tag.id) && 'ring-2 ring-ring'
-															)}
-														>
-															{#if selectedTagIds.has(tag.id)}
-																<Check class="size-2.5" />
-															{/if}
-														</span>
-														{tag.value}
-													</button>
-												{/each}
-												<button
-													type="button"
-													class="w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-													onclick={clearTagFilter}
-												>
-													Clear
-												</button>
-											</div>
-										{:else if opt.id === 'statuses'}
-											<div class="max-h-48 overflow-auto py-1">
-												{#each STATUS_OPTIONS as status (status)}
-													<button
-														type="button"
-														class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-														onclick={() => toggleStatus(status)}
-													>
-														<span
-															class={cn(
-																'flex size-4 shrink-0 items-center justify-center rounded border border-input bg-background',
-																selectedStatuses.has(status) && 'ring-2 ring-ring'
-															)}
-														>
-															{#if selectedStatuses.has(status)}
-																<Check class="size-2.5" />
-															{/if}
-														</span>
-														{status}
-													</button>
-												{/each}
-												<button
-													type="button"
-													class="w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-													onclick={clearStatusFilter}
-												>
-													Clear
-												</button>
-											</div>
-										{:else}
-											<div class="max-h-48 overflow-auto py-1">
-												<p class="px-2 py-1.5 text-sm text-muted-foreground">No options</p>
-											</div>
-										{/if}
-									</DropdownMenu.Content>
-								</DropdownMenu.Portal>
-							</DropdownMenu.Root>
-						{/if}
-					{/each}
-					<DropdownMenu.Root>
-						<DropdownMenu.Trigger
-							class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-						>
-							<SlidersHorizontal class="mr-1.5 size-4" />
-							Add filter
-							<ChevronDown class="size-4" />
-						</DropdownMenu.Trigger>
-						<DropdownMenu.Portal>
-							<DropdownMenu.Content
-								class="z-50 min-w-48 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-								sideOffset={4}
-							>
-								<div class="max-h-48 overflow-auto py-1">
-									{#each FILTER_OPTIONS as opt (opt.id)}
-										<button
-											type="button"
-											class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-											onclick={() => toggleFilterType(opt.id)}
-										>
-											<span
-												class={cn(
-													'flex size-4 items-center justify-center rounded border border-input bg-background',
-													activeFilterTypes.has(opt.id) && 'ring-2 ring-ring'
-												)}
-											>
-												{#if activeFilterTypes.has(opt.id)}
-													<Check class="size-2.5" />
-												{/if}
-											</span>
-											{opt.label}
-										</button>
-									{/each}
-									<button
-										type="button"
-										class="mt-1 w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-										onclick={clearFilters}
-									>
-										Clear
-									</button>
-								</div>
-							</DropdownMenu.Content>
-						</DropdownMenu.Portal>
-					</DropdownMenu.Root>
-				</div>
-				<div class="flex items-center gap-2">
-					<div class="relative max-w-md min-w-[200px] flex-1">
-						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							type="search"
-							placeholder="Search products..."
-							bind:value={searchQuery}
-							class="h-9 rounded-md pl-9"
-						/>
-					</div>
-					<button
-						type="button"
-						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-					>
-						<ArrowUpDown class="size-4" />
-						<span class="sr-only">Sort</span>
-					</button>
-				</div>
+		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
+			<div class="flex items-center gap-2">
+				<Package class="size-4" />
+				<span class="font-semibold">Products</span>
 			</div>
+			<Button size="sm" onclick={openCreate}>Create</Button>
 		</div>
-
-		{#if error}
-			<div
-				class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-			>
-				{error}
-			</div>
-		{:else if loading}
-			<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
-				<p class="text-muted-foreground">Loading…</p>
-			</div>
-		{:else}
-			<!-- Table -->
-			<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-				<table class="w-full text-sm">
-					<thead class="sticky top-0 border-b bg-muted/50">
-						<tr>
-							<th class="w-10 px-4 py-3"></th>
-							<th class="px-4 py-3 text-left font-medium">Product</th>
-							<th class="px-4 py-3 text-left font-medium">Category</th>
-							<th class="px-4 py-3 text-left font-medium">Inventory</th>
-							<th class="px-4 py-3 text-left font-medium">Sales Channels</th>
-							<th class="px-4 py-3 text-left font-medium">Variants</th>
-							<th class="px-4 py-3 text-left font-medium">Status</th>
-							<th class="px-4 py-3 text-left font-medium">Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#if products.length === 0}
-							<tr>
-								<td colspan="8" class="px-4 py-8 text-center text-muted-foreground">
-									No products found.
-								</td>
-							</tr>
-						{:else}
-							{#each products as product (product.id)}
-								{@const isSelected = selectedProducts.has(product.id)}
-								<tr class="border-b transition-colors hover:bg-muted/30">
-									<td class="px-4 py-3">
-										<input
-											type="checkbox"
-											checked={isSelected}
-											onchange={(e) => {
-												const checked = (e.currentTarget as HTMLInputElement).checked;
-												if (checked) {
-													selectedProducts = new Set([...selectedProducts, product.id]);
-												} else {
-													const newSet = new Set(selectedProducts);
-													newSet.delete(product.id);
-													selectedProducts = newSet;
-												}
-											}}
-											class="size-4 rounded border-input"
-										/>
-									</td>
-									<td class="px-4 py-3">
-										<a
-											href="/products/{product.id}"
-											class="flex items-center gap-3 hover:opacity-80"
-										>
-											{#if product.thumbnail}
-												<img
-													src={product.thumbnail}
-													alt=""
-													class="size-10 shrink-0 rounded-md object-cover"
-												/>
-											{:else}
-												<div
-													class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
-												>
-													<ImageIcon class="size-5" />
-												</div>
-											{/if}
-											<span class="font-medium"
-												>{product.title || product.handle || product.id || '—'}</span
-											>
-										</a>
-									</td>
-									<td class="px-4 py-3 text-muted-foreground">
-										{product.category?.value ?? '—'}
-									</td>
-									<td class="px-4 py-3 text-muted-foreground">
-										<a
-											href="/products/{product.id}"
-											class="text-primary hover:underline"
-										>
-											View
-										</a>
-									</td>
-									<td class="px-4 py-3 text-muted-foreground">
-										{product.sales_channels?.length
-											? product.sales_channels.map((sc) => sc.name).join(', ')
-											: '—'}
-									</td>
-									<td class="px-4 py-3 text-muted-foreground">
-										{product.variants?.length != null ? product.variants.length : '—'}
-									</td>
-									<td class="px-4 py-3">
-										<span
-											class={cn(
-												'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-												product.status === 'published' &&
-													'bg-green-500/10 text-green-700 dark:text-green-400',
-												product.status === 'draft' && 'bg-muted text-muted-foreground',
-												product.status === 'proposed' &&
-													'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-												product.status === 'rejected' && 'bg-destructive/10 text-destructive'
-											)}
-										>
-											<span
-												class={cn(
-													'size-1.5 rounded-full',
-													product.status === 'published' && 'bg-green-600',
-													product.status === 'draft' && 'bg-muted-foreground/60',
-													product.status === 'proposed' && 'bg-amber-600',
-													product.status === 'rejected' && 'bg-destructive'
-												)}
-											></span>
-											{product.status}
-										</span>
-									</td>
-									<td class="px-4 py-3" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
-										<DropdownMenu.Root>
-											<DropdownMenu.Trigger
-												class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
-											>
-												<MoreHorizontal class="size-4" />
-												<span class="sr-only">Actions</span>
-											</DropdownMenu.Trigger>
-											<DropdownMenu.Portal>
-												<DropdownMenu.Content
-													class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-													sideOffset={4}
-												>
-													<DropdownMenu.Item
-														textValue="Edit"
-														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => goto(`/products/${product.id}`)}
-													>
-														<Pencil class="size-4" />
-														Edit
-													</DropdownMenu.Item>
-													<DropdownMenu.Item
-														textValue="Delete"
-														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => openDeleteConfirm(product)}
-													>
-														<Trash2 class="size-4" />
-														Delete
-													</DropdownMenu.Item>
-												</DropdownMenu.Content>
-											</DropdownMenu.Portal>
-										</DropdownMenu.Root>
-									</td>
-								</tr>
-							{/each}
-						{/if}
-					</tbody>
-				</table>
-			</div>
-
-			<!-- Pagination -->
-			<div class="mt-4 flex items-center justify-between gap-4 border-t py-4">
-				<p class="text-sm text-muted-foreground">
-					{#if pagination && pagination.total > 0}
-						{start} - {end} of {pagination.total} results
-					{:else}
-						0 results
-					{/if}
-				</p>
-				<div class="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={!pagination?.has_previous_page}
-						onclick={() => (page = page - 1)}
-					>
-						Prev
-					</Button>
-					<span class="text-sm text-muted-foreground">
-						{pagination?.page ?? 1} of {pagination?.total_pages ?? 1} pages
-					</span>
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={!pagination?.has_next_page}
-						onclick={() => (page = page + 1)}
-					>
-						Next
-					</Button>
+		<PaginationTable>
+			{#if paginateState.error}
+				<div
+					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+				>
+					{paginateState.error}
 				</div>
-			</div>
-		{/if}
+			{:else if paginateState.loading}
+				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
+					<p class="text-muted-foreground">Loading…</p>
+				</div>
+			{:else}
+				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+					<table class="w-full text-sm">
+						<TableHead columns={tableColumns} />
+						<TableBody {rows} columns={tableColumns} emptyMessage="No products found." />
+					</table>
+				</div>
+
+				<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
+			{/if}
+		</PaginationTable>
 	</div>
 </div>
 
@@ -1404,14 +778,16 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 								<p>Drag and drop images here or click to upload.</p>
 								{#if createMediaUrl || createMediaFile}
 									<p class="text-xs text-muted-foreground">
-										{createMediaUrl ? 'Image URL set' : createMediaFile?.name ?? '1 image selected'}
+										{createMediaUrl
+											? 'Image URL set'
+											: (createMediaFile?.name ?? '1 image selected')}
 									</p>
 								{/if}
 							</div>
 							<!-- Image URL / Choose file modal (centered, not full-screen sheet) -->
 							<Dialog.Root bind:open={createMediaModalOpen}>
 								<Dialog.Content
-									class="my-auto mx-auto h-max w-full max-w-md max-h-[90dvh] overflow-auto rounded-lg border shadow-lg"
+									class="mx-auto my-auto h-max max-h-[90dvh] w-full max-w-md overflow-auto rounded-lg border shadow-lg"
 								>
 									<Dialog.Header>
 										<Dialog.Title>Provide an image</Dialog.Title>
@@ -1522,11 +898,14 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 				<div class="flex-1 overflow-auto p-6 pt-4">
 					<h2 class="text-lg font-semibold">Attributes</h2>
 					<p class="mt-1 text-sm text-muted-foreground">
-						Assign product attributes and their values. You can manage attributes from the product detail page after creation.
+						Assign product attributes and their values. You can manage attributes from the product
+						detail page after creation.
 					</p>
 					<div class="mt-6 flex flex-col gap-4">
 						<div class="flex flex-col gap-2">
-							<label for="create-attr-group-select" class="text-sm font-medium">Attribute group</label>
+							<label for="create-attr-group-select" class="text-sm font-medium"
+								>Attribute group</label
+							>
 							<Select.Root
 								type="single"
 								value={createAttributeGroupId}
@@ -1534,7 +913,8 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 								allowDeselect
 							>
 								<Select.Trigger id="create-attr-group-select" class="w-full max-w-xs">
-									{attributeGroupsList.find((g) => g.id === createAttributeGroupId)?.title ?? 'Select attribute group'}
+									{attributeGroupsList.find((g) => g.id === createAttributeGroupId)?.title ??
+										'Select attribute group'}
 								</Select.Trigger>
 								<Select.Content>
 									<Select.Group>
@@ -1550,14 +930,18 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 									</Select.Group>
 								</Select.Content>
 							</Select.Root>
-							<p class="text-xs text-muted-foreground">Required when adding attributes. Attributes must belong to the selected group.</p>
+							<p class="text-xs text-muted-foreground">
+								Required when adding attributes. Attributes must belong to the selected group.
+							</p>
 						</div>
 						{#each createAttributeEntries as entry, entryIndex (entryIndex)}
 							<div class="rounded-lg border p-4">
 								<div class="flex items-start justify-between gap-2">
 									<div class="min-w-0 flex-1 space-y-3">
 										<div class="flex flex-col gap-2">
-											<label for="create-attr-select-{entryIndex}" class="text-sm font-medium">Attribute</label>
+											<label for="create-attr-select-{entryIndex}" class="text-sm font-medium"
+												>Attribute</label
+											>
 											<Select.Root
 												type="single"
 												value={entry.attributeId}
@@ -1583,13 +967,19 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 											</Select.Root>
 										</div>
 										<div class="flex flex-col gap-2">
-											<label for="create-attr-value-{entryIndex}" class="text-sm font-medium">Value</label>
+											<label for="create-attr-value-{entryIndex}" class="text-sm font-medium"
+												>Value</label
+											>
 											<Input
 												id="create-attr-value-{entryIndex}"
 												class="h-9"
 												placeholder="Value"
 												value={entry.value}
-												oninput={(e) => setAttributeEntryValue(entryIndex, (e.currentTarget as HTMLInputElement).value)}
+												oninput={(e) =>
+													setAttributeEntryValue(
+														entryIndex,
+														(e.currentTarget as HTMLInputElement).value
+													)}
 											/>
 										</div>
 									</div>
@@ -1896,13 +1286,15 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 														placeholder="0"
 														min="0"
 														class={cn(
-															"h-8 w-20",
-															String(v.availableCount || '').trim() && !v.sku.trim() && "border-destructive"
+															'h-8 w-20',
+															String(v.availableCount || '').trim() &&
+																!v.sku.trim() &&
+																'border-destructive'
 														)}
 														disabled={!v.sku.trim()}
 													/>
 													{#if String(v.availableCount || '').trim() && !v.sku.trim()}
-														<p class="text-xs text-destructive mt-0.5">SKU required</p>
+														<p class="mt-0.5 text-xs text-destructive">SKU required</p>
 													{/if}
 												</td>
 												<td class="px-3 py-2">
@@ -1969,12 +1361,21 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 	</Dialog.Content>
 </Dialog.Root>
 
-<!-- Delete product confirmation -->
 <DeleteConfirmationModal
-	bind:open={deleteConfirmOpen}
+	bind:open={paginateState.deleteConfirmOpen}
 	entityName="product"
-	entityTitle={productToDelete?.title || productToDelete?.handle || productToDelete?.id || ''}
-	onConfirm={confirmDeleteProduct}
-	onCancel={handleDeleteCancel}
+	entityTitle={(deleteItem as unknown as Product | null)?.title ??
+		(deleteItem as unknown as Product | null)?.handle ??
+		(deleteItem as unknown as Product | null)?.id ??
+		''}
+	onConfirm={() => confirmDelete((p) => deleteProducts([(p as unknown as Product).id]))}
+	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}
 />
+{#if deleteError}
+	<div
+		class="mt-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+	>
+		{deleteError}
+	</div>
+{/if}

@@ -3,6 +3,7 @@
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import ImageIcon from '@lucide/svelte/icons/image';
 	import type { TableColumn, TableColumnAction } from './type.js';
 
 	let {
@@ -27,16 +28,48 @@
 		return column.key === 'actions' && (openEdit != null || openDeleteConfirm != null);
 	}
 
+	function isLinkColumn(column: TableColumn): boolean {
+		return column.type === 'link' && (typeof column.cellHref === 'function' || typeof column.cellHref === 'string');
+	}
+
+	function linkHref(column: TableColumn, row: Record<string, unknown>): string {
+		const cellHref = column.cellHref;
+		if (typeof cellHref === 'function') return cellHref(row);
+		if (typeof cellHref === 'string' && cellHref.includes('{{')) {
+			return cellHref.replace(/\{\{(\w+)\}\}/g, (_, k) => String(row[k] ?? ''));
+		}
+		return typeof cellHref === 'string' ? cellHref + String(row[column.key] ?? '') : '#';
+	}
+
+	function linkText(column: TableColumn, row: Record<string, unknown>): string {
+		const linkLabel = (column as { linkLabel?: string }).linkLabel;
+		if (linkLabel) return linkLabel;
+		const textKey = (column as { textKey?: string }).textKey ?? column.key;
+		const v = row[textKey];
+		if (v != null && v !== '') return String(v);
+		const id = row.id;
+		return id != null ? String(id) : '—';
+	}
+
+	function getThumbUrl(column: TableColumn, row: Record<string, unknown>): string | null {
+		const k = (column as { thumbnailKey?: string }).thumbnailKey;
+		if (!k) return null;
+		const v = row[k];
+		return typeof v === 'string' ? v : null;
+	}
+
 	function formatDate(value: unknown): string {
-		if (value == null) return '—';
+		if (value == null || value === '') return '—';
 		try {
-			return new Date(value as string | Date).toLocaleDateString('en-US', {
+			const date = new Date(value as string | Date);
+			if (Number.isNaN(date.getTime())) return '—';
+			return date.toLocaleDateString('en-US', {
 				month: 'short',
 				day: 'numeric',
 				year: 'numeric',
 			});
 		} catch {
-			return String(value);
+			return '—';
 		}
 	}
 
@@ -80,7 +113,29 @@
 		{#each rows as row, i (row.id ?? i)}
 			<tr class="border-b transition-colors hover:bg-muted/30">
 				{#each columns as column, colIndex}
-					{#if isActionsColumn(column)}
+					{#if isLinkColumn(column)}
+						<td class="px-4 py-3">
+							<a
+								href={linkHref(column, row)}
+								class="flex items-center gap-3 hover:opacity-80 font-medium"
+							>
+								{#if getThumbUrl(column, row)}
+									<img
+										src={getThumbUrl(column, row)!}
+										alt=""
+										class="size-10 shrink-0 rounded-md object-cover"
+									/>
+								{:else if (column as { thumbnailKey?: string }).thumbnailKey}
+									<div
+										class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
+									>
+										<ImageIcon class="size-5" />
+									</div>
+								{/if}
+								<span>{linkText(column, row)}</span>
+							</a>
+						</td>
+					{:else if isActionsColumn(column)}
 						<td class="px-4 py-3">
 							<DropdownMenu.Root>
 								<DropdownMenu.Trigger

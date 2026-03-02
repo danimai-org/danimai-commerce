@@ -1,100 +1,67 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import * as Dialog from '$lib/components/ui/dialog/index.js';
-import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
-import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
-	import Search from '@lucide/svelte/icons/search';
-	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
-	import Pencil from '@lucide/svelte/icons/pencil';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import {
+		DeleteConfirmationModal,
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
 	import Info from '@lucide/svelte/icons/info';
 	import GripVertical from '@lucide/svelte/icons/grip-vertical';
 	import FolderTree from '@lucide/svelte/icons/folder-tree';
-	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
-	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import { cn } from '$lib/utils.js';
+	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import { listCategories, deleteCategories } from '$lib/product-categories/api.js';
+	import type { ProductCategory } from '$lib/product-categories/types.js';
+	import type { CategoriesListResponse } from '$lib/product-categories/types.js';
 
-	const API_BASE = 'http://localhost:8000/admin';
+	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
-	type ProductCategory = {
-		id: string;
-		value: string;
-		handle: string;
-		metadata: unknown | null;
-		parent_id: string | null;
-		status: string;
-		visibility: string;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
-	type Pagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
-
-	type CategoriesResponse = {
-		data: ProductCategory[];
-		pagination: Pagination;
-	};
-
-	let searchQuery = $state('');
-	let page = $state(1);
-	let limit = $state(10);
-	let sortingField = $state('created_at');
-	let sortingDirection = $state<'asc' | 'desc'>('desc');
-
-	let data = $state<CategoriesResponse | null>(null);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
-
-	async function fetchCategories() {
-		loading = true;
-		error = null;
-		try {
-			const params = new URLSearchParams({
-				page: String(page),
-				limit: String(limit),
-				sorting_field: sortingField,
-				sorting_direction: sortingDirection
-			});
-			const res = await fetch(`${API_BASE}/product-categories?${params}`);
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			loading = false;
-			data = (await res.json()) as CategoriesResponse;
-
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			data = null;
-		} finally {
-			loading = false;
-		}
-	}
+	const paginateState = createPagination<CategoriesListResponse>(
+		async (): Promise<CategoriesListResponse> => {
+			const q = paginationQuery as Record<string, unknown>;
+			const params = {
+				page: q?.page != null ? Number(q.page) : 1,
+				limit: q?.limit != null ? Number(q.limit) : 10,
+				sorting_field: (q?.sorting_field as string) ?? 'created_at',
+				sorting_direction: (q?.sorting_direction as 'asc' | 'desc') ?? 'desc'
+			};
+			return listCategories(params);
+		},
+		['product-categories']
+	);
 
 	$effect(() => {
-		page;
-		limit;
-		sortingField;
-		sortingDirection;
-		fetchCategories();
+		page.url.searchParams.toString();
+		paginateState.refetch();
 	});
 
-	const categories = $derived(data?.data ?? []);
-	const pagination = $derived(data?.pagination ?? null);
-	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
-	);
+	function goToPage(pageNum: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('page', String(Math.max(1, pageNum)));
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+	}
+
+	const queryData = $derived(paginateState.query.data as CategoriesListResponse | undefined);
+	const rawRows = $derived(queryData?.data?.rows ?? []);
+	function getHandle(category: ProductCategory): string {
+		const h = category.handle;
+		if (h) return h.startsWith('/') ? h : `/${h}`;
+		return `/${category.value.toLowerCase().replace(/\s+/g, '-')}`;
+	}
+	const rows = $derived(rawRows.map((c) => ({ ...c, handle_display: getHandle(c) })));
+	const pagination = $derived(queryData?.data?.pagination ?? null);
+	const start = $derived(paginateState.start);
+	const end = $derived(paginateState.end);
+	const categories = $derived(rows);
 
 	// Create modal
 	let createOpen = $state(false);
@@ -131,14 +98,13 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 
 	async function openRanking() {
 		rankingOpen = true;
-		// Fetch all categories for ranking (use high limit)
 		try {
 			const res = await fetch(
 				`${API_BASE}/product-categories?page=1&limit=100&sorting_field=created_at&sorting_direction=asc`
 			);
 			if (res.ok) {
-				const json = (await res.json()) as CategoriesResponse;
-				rankedCategories = [...(json.data ?? [])];
+				const json = (await res.json()) as { rows?: ProductCategory[] };
+				rankedCategories = [...(json.rows ?? [])];
 			} else {
 				rankedCategories = [...categories];
 			}
@@ -207,9 +173,10 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 				});
 			}
 			closeRanking();
-			fetchCategories();
+			paginateState.refetch();
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			// use a local ranking error if we add state for it; for now keep refetch
+			paginateState.refetch();
 		} finally {
 			rankingSaving = false;
 		}
@@ -283,7 +250,7 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 				throw new Error(text || `HTTP ${res.status}`);
 			}
 			closeEdit();
-			fetchCategories();
+			paginateState.refetch();
 		} catch (e) {
 			editError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -322,7 +289,7 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 				throw new Error(text || `HTTP ${res.status}`);
 			}
 			closeCreate();
-			fetchCategories();
+			paginateState.refetch();
 		} catch (e) {
 			createError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -330,42 +297,36 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 		}
 	}
 
-	function getHandle(category: ProductCategory): string {
-		const h = category.handle;
-		if (h) return h.startsWith('/') ? h : `/${h}`;
-		return `/${category.value.toLowerCase().replace(/\s+/g, '-')}`;
-	}
+	const openEditSheet = (category: ProductCategory) => openEdit(category);
+	const openDeleteConfirm = paginateState.openDeleteConfirm;
+	const closeDeleteConfirm = paginateState.closeDeleteConfirm;
+	const confirmDelete = paginateState.confirmDelete;
+	const deleteConfirmOpen = $derived(paginateState.deleteConfirmOpen);
+	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
+	const deleteItem = $derived(paginateState.deleteItem);
+	const deleteError = $derived(paginateState.deleteError);
 
-	// Delete confirmation
-	let categoryToDelete = $state<ProductCategory | null>(null);
-	let deleteConfirmOpen = $state(false);
-
-	function openDeleteConfirm(category: ProductCategory) {
-		categoryToDelete = category;
-		deleteConfirmOpen = true;
-	}
-
-	function closeDeleteConfirm() {
-		deleteConfirmOpen = false;
-		categoryToDelete = null;
-	}
-
-	async function confirmDeleteCategory() {
-		if (!categoryToDelete) return;
-		try {
-			const res = await fetch(`${API_BASE}/product-categories`, {
-				method: 'DELETE',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ category_ids: [categoryToDelete.id] })
-			});
-			if (!res.ok) throw new Error(await res.text());
-			fetchCategories();
-			closeDeleteConfirm();
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			closeDeleteConfirm();
+	const tableColumns: TableColumn[] = [
+		{
+			label: 'Name',
+			key: 'value',
+			type: 'link',
+			cellHref: (row) => `/products/categories/${row.id}`,
+			textKey: 'value'
+		},
+		{ label: 'Handle', key: 'handle_display', type: 'text' },
+		{ label: 'Status', key: 'status', type: 'text' },
+		{ label: 'Visibility', key: 'visibility', type: 'text' },
+		{
+			label: 'Actions',
+			key: 'actions',
+			type: 'actions',
+			actions: [
+				{ label: 'Edit', key: 'edit', type: 'button', onClick: (item) => openEditSheet(item as ProductCategory) },
+				{ label: 'Delete', key: 'delete', type: 'button', onClick: (item) => openDeleteConfirm(item as unknown as CategoriesListResponse) }
+			]
 		}
-	}
+	];
 </script>
 
 <div class="flex h-full flex-col">
@@ -384,183 +345,37 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 				<Button size="sm" onclick={openCreate}>Create</Button>
 			</div>
 		</div>
-		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex flex-wrap items-center justify-between gap-2">
-				<Button variant="outline" size="sm" class="rounded-md">
-					<SlidersHorizontal class="mr-1.5 size-4" />
-					Add filter
-				</Button>
-				<div class="flex items-center gap-2">
-					<div class="relative w-64">
-						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							type="search"
-							placeholder="Search"
-							bind:value={searchQuery}
-							class="h-9 rounded-md pl-9"
+		<PaginationTable>
+			{#if paginateState.error}
+				<div
+					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+				>
+					{paginateState.error}
+				</div>
+			{:else if paginateState.loading}
+				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
+					<p class="text-muted-foreground">Loading…</p>
+				</div>
+			{:else}
+				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+					<table class="w-full text-sm">
+						<TableHead columns={tableColumns} />
+						<TableBody
+							rows={rows}
+							columns={tableColumns}
+							emptyMessage="No categories found."
 						/>
-					</div>
-					<button
-						type="button"
-						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-					>
-						<ArrowUpDown class="size-4" />
-						<span class="sr-only">Sort</span>
-					</button>
+					</table>
 				</div>
-			</div>
-		</div>
 
-		{#if error}
-			<div
-				class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-			>
-				{error}
-			</div>
-		{:else if loading}
-			<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
-				<p class="text-muted-foreground">Loading…</p>
-			</div>
-		{:else}
-			<!-- Table -->
-			<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-				<table class="w-full text-sm">
-					<thead class="sticky top-0 border-b bg-muted/50">
-						<tr>
-							<th class="px-4 py-3 text-left font-medium">Name</th>
-							<th class="px-4 py-3 text-left font-medium">Handle</th>
-							<th class="px-4 py-3 text-left font-medium">Status</th>
-							<th class="px-4 py-3 text-left font-medium">Visibility</th>
-							<th class="px-4 py-3 text-left font-medium">Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#if categories.length === 0}
-							<tr>
-								<td colspan="5" class="px-4 py-8 text-center text-muted-foreground">
-									No categories found.
-								</td>
-							</tr>
-						{:else}
-							{#each categories as category (category.id)}
-								<tr class="border-b transition-colors hover:bg-muted/30">
-									<td class="px-4 py-3 font-medium">
-										<a
-											href="/products/categories/{category.id}"
-											class="hover:underline focus:underline focus:outline-none"
-										>
-											{category.value}
-										</a>
-									</td>
-									<td class="px-4 py-3 text-muted-foreground">{getHandle(category)}</td>
-									<td class="px-4 py-3">
-										<span
-											class={cn(
-												'inline-flex items-center gap-1.5 text-sm capitalize',
-												category.status === 'active' && 'text-green-700 dark:text-green-400',
-												category.status === 'inactive' && 'text-muted-foreground'
-											)}
-										>
-											<span
-												class={cn(
-													'size-1.5 rounded-full',
-													category.status === 'active' && 'bg-green-600',
-													category.status === 'inactive' && 'bg-muted-foreground'
-												)}
-											></span>
-											{category.status ?? 'Active'}
-										</span>
-									</td>
-									<td class="px-4 py-3">
-										<span
-											class={cn(
-												'inline-flex items-center gap-1.5 text-sm capitalize',
-												category.visibility === 'public' && 'text-green-700 dark:text-green-400',
-												category.visibility === 'private' && 'text-muted-foreground'
-											)}
-										>
-											<span
-												class={cn(
-													'size-1.5 rounded-full',
-													category.visibility === 'public' && 'bg-green-600',
-													category.visibility === 'private' && 'bg-muted-foreground'
-												)}
-											></span>
-											{category.visibility ?? 'Public'}
-										</span>
-									</td>
-									<td class="px-4 py-3" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
-										<DropdownMenu.Root>
-											<DropdownMenu.Trigger
-												class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
-											>
-												<MoreHorizontal class="size-4" />
-												<span class="sr-only">Actions</span>
-											</DropdownMenu.Trigger>
-											<DropdownMenu.Portal>
-												<DropdownMenu.Content
-													class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-													sideOffset={4}
-												>
-													<DropdownMenu.Item
-														textValue="Edit"
-														class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => openEdit(category)}
-													>
-														<Pencil class="size-4" />
-														Edit
-													</DropdownMenu.Item>
-													<DropdownMenu.Item
-														textValue="Delete"
-														class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => openDeleteConfirm(category)}
-													>
-														<Trash2 class="size-4" />
-														Delete
-													</DropdownMenu.Item>
-												</DropdownMenu.Content>
-											</DropdownMenu.Portal>
-										</DropdownMenu.Root>
-									</td>
-								</tr>
-							{/each}
-						{/if}
-					</tbody>
-				</table>
-			</div>
-
-			<!-- Pagination -->
-			<div class="mt-4 flex items-center justify-between gap-4 border-t py-4">
-				<p class="text-sm text-muted-foreground">
-					{#if pagination && pagination.total > 0}
-						{start} - {end} of {pagination.total} results
-					{:else}
-						0 results
-					{/if}
-				</p>
-				<div class="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={!pagination?.has_previous_page}
-						onclick={() => (page = page - 1)}
-					>
-						Prev
-					</Button>
-					<span class="text-sm text-muted-foreground">
-						{pagination?.page ?? 1} of {pagination?.total_pages ?? 1} pages
-					</span>
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={!pagination?.has_next_page}
-						onclick={() => (page = page + 1)}
-					>
-						Next
-					</Button>
-				</div>
-			</div>
-		{/if}
+				<TablePagination
+					{pagination}
+					{start}
+					{end}
+					onPageChange={goToPage}
+				/>
+			{/if}
+		</PaginationTable>
 	</div>
 </div>
 
@@ -852,10 +667,18 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 
 <!-- Delete Confirmation Modal -->
 <DeleteConfirmationModal
-	bind:open={deleteConfirmOpen}
+	bind:open={paginateState.deleteConfirmOpen}
 	entityName="category"
-	entityTitle={categoryToDelete?.value ?? categoryToDelete?.id ?? ''}
+	entityTitle={(deleteItem as unknown as ProductCategory)?.value ?? (deleteItem as unknown as ProductCategory)?.id ?? ''}
 	customMessage="Delete this category? This action cannot be undone."
-	onConfirm={confirmDeleteCategory}
+	onConfirm={() => confirmDelete((item) => deleteCategories([(item as unknown as ProductCategory).id]))}
 	onCancel={closeDeleteConfirm}
+	submitting={deleteSubmitting}
 />
+{#if deleteError}
+	<div
+		class="mt-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+	>
+		{deleteError}
+	</div>
+{/if}

@@ -41,13 +41,13 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query: input })  => {
       const process = getService<PaginatedInvitesProcess>(PAGINATED_INVITES_PROCESS);
       const result = await process.runOperations({ input });
       const data = result.data.map(({ token: _t, ...invite }) =>
         serializeInviteDates(invite as Record<string, unknown>)
       );
-      return { ...result, data };
+      return { ...result, rows };
     },
     {
       query: PaginatedInvitesSchema,
