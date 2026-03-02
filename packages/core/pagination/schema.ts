@@ -1,4 +1,4 @@
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static, type TSchema } from "@sinclair/typebox";
 
 export enum SortOrder {
     ASC = "asc",
@@ -30,18 +30,29 @@ export const PaginationSchema = Type.Object({
             .Decode(coerceLimit)
             .Encode((v: number) => v)
     ),
-    sorting_direction: Type.Optional(Type.Enum(SortOrder, {
-        default: SortOrder.DESC,
-    })),
-    sorting_field: Type.Optional(Type.String({
-        default: "created_at",
-    })),
+   
     search: Type.Optional(Type.String({
         default: "",
     })),
-    search_fields: Type.Optional(Type.Array(Type.String({
-        default: [],
-    })))
 });
+
+export const createPaginationSchema = ({
+    filter_schema,
+    sorting_fields,
+}: {
+    filter_schema: TSchema,
+    sorting_fields: Record<string, string>
+}) => Type.Intersect([
+    PaginationSchema,
+    Type.Object({
+        sorting_direction: Type.Optional(Type.Enum(SortOrder, {
+            default: SortOrder.DESC,
+        })),
+        sorting_field: Type.Optional(Type.Enum(sorting_fields, {
+            default: Object.keys(sorting_fields)[0],
+        })),
+    }),
+    filter_schema,
+]);
 
 export type PaginationType = Static<typeof PaginationSchema>;
