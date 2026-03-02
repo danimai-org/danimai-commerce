@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { getService } from "@danimai/core";
 import {
   PAGINATED_USERS_PROCESS,
   PaginatedUsersProcess,
@@ -41,11 +40,10 @@ export const userRoutes = new Elysia({ prefix: "/users" })
     "/",
     async ({ query: input }) => {
       const process = getService<PaginatedUsersProcess>(PAGINATED_USERS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: PaginatedUsersSchema as any,
+      query: PaginatedUsersSchema,
       response: {
         200: PaginatedUsersResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -62,9 +60,8 @@ export const userRoutes = new Elysia({ prefix: "/users" })
     "/:id",
     async ({ params, body }) => {
       const process = getService<UpdateUserProcess>(UPDATE_USER_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const input = { ...(body as Record<string, unknown>), id: params.id };
-      const result = await process.runOperations({ input, logger } as any);
+      const result = await process.runOperations({ input });
       if (result && "password_hash" in result) {
         const { password_hash: _p, ...user } = result;
         return serializeUserDates(user);
@@ -72,8 +69,8 @@ export const userRoutes = new Elysia({ prefix: "/users" })
       return result ? serializeUserDates(result) : result;
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: UpdateUserBodySchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateUserBodySchema,
       response: {
         200: UpdateUserResponseSchema,
         400: ValidationErrorResponseSchema,

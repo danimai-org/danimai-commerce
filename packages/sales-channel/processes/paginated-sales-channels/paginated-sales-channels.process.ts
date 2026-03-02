@@ -68,8 +68,8 @@ export class PaginatedSalesChannelsProcess
       sortOrder
     );
 
-    const offset = (page - 1) * limit;
-    const data = await query.selectAll().limit(limit).offset(offset).execute();
+    const offset = (Number(page) - 1) * Number(limit);
+    const data = await query.selectAll().limit(Number(limit)).offset(Number(offset)).execute();
     return paginationResponse<SalesChannel>(data, total, input);
   }
 }

@@ -62,7 +62,7 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
       return process.runOperations({ input });
     },
     {
-      body: RefreshTokenSchema as any,
+      body: RefreshTokenSchema,
       response: {
         200: AuthTokensResponseSchema,
         400: ValidationErrorResponseSchema,

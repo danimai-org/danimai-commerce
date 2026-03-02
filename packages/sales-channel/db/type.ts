@@ -12,9 +12,9 @@ export interface SalesChannelTable {
   description: string | null;
   is_default: boolean;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type SalesChannel = Selectable<SalesChannelTable>;
 export type NewSalesChannel = Insertable<SalesChannelTable>;
@@ -25,7 +25,7 @@ export interface ProductSalesChannelTable {
   id: Generated<string>;
   product_id: string;
   sales_channel_id: string;
-  created_at: Generated<string>;
+  created_at: Generated<Date>;
 }
 export type ProductSalesChannel = Selectable<ProductSalesChannelTable>;
 export type NewProductSalesChannel = Insertable<ProductSalesChannelTable>;

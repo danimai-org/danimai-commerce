@@ -12,9 +12,9 @@ export interface StoreTable {
   default_region_id: string | null;
   default_location_id: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 
 export type Store = Selectable<StoreTable>;

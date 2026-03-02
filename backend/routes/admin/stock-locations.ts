@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { Type } from "@sinclair/typebox";
+import { getService } from "@danimai/core";
 import {
   PAGINATED_STOCK_LOCATIONS_PROCESS,
   RETRIEVE_STOCK_LOCATION_PROCESS,
@@ -30,7 +30,6 @@ import {
   NoContentResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
-import { Type } from "@sinclair/typebox";
 
 const UpdateStockLocationBodySchema = Type.Object({
   name: Type.Optional(Type.Union([Type.String(), Type.Null()])),
@@ -46,11 +45,10 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
       const process = getService<PaginatedStockLocationsProcess>(
         PAGINATED_STOCK_LOCATIONS_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: PaginatedStockLocationsSchema as any,
+      query: PaginatedStockLocationsSchema,
       response: {
         200: PaginatedStockLocationsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -67,11 +65,10 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
     "/:id",
     async ({ params }) => {
       const process = getService<RetrieveStockLocationProcess>(RETRIEVE_STOCK_LOCATION_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input: { id: params.id }, logger } as any);
+      return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
+      params: Type.Object({ id: Type.String() }),
       response: {
         200: StockLocationResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -88,11 +85,10 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
     "/",
     async ({ body: input }) => {
       const process = getService<CreateStockLocationsProcess>(CREATE_STOCK_LOCATIONS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: CreateStockLocationsSchema as any,
+      body: CreateStockLocationsSchema,
       response: {
         200: CreateStockLocationsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -123,15 +119,13 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
     "/:id",
     async ({ params, body }) => {
       const process = getService<UpdateStockLocationsProcess>(UPDATE_STOCK_LOCATIONS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       return process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
-        logger,
-      } as any);
+      });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: UpdateStockLocationBodySchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateStockLocationBodySchema,
       response: {
         200: UpdateStockLocationsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -147,20 +141,18 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
   .delete(
     "/",
     async ({ body: input, set }) => {
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const checkProcess = getService<CheckLocationsInUseProcess>(CHECK_LOCATIONS_IN_USE_PROCESS);
       const { stock_location_ids } = input as { stock_location_ids: string[] };
       await checkProcess.runOperations({
         input: { location_ids: stock_location_ids },
-        logger,
-      } as any);
+      });
       const process = getService<DeleteStockLocationsProcess>(DELETE_STOCK_LOCATIONS_PROCESS);
-      await process.runOperations({ input, logger } as any);
+      await process.runOperations({ input });
       set.status = 204;
       return undefined;
     },
     {
-      body: DeleteStockLocationsSchema as any,
+      body: DeleteStockLocationsSchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,

@@ -73,9 +73,9 @@ export interface RoleTable {
   id: Generated<string>;
   name: string;
   description: string;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 
 export type Role = Selectable<RoleTable>;
@@ -86,9 +86,9 @@ export interface PermissionTable {
   id: Generated<string>;
   name: (typeof PERMISSIONS)[keyof typeof PERMISSIONS][keyof (typeof PERMISSIONS)[keyof typeof PERMISSIONS]];
   description: string;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 
 export type Permission = Selectable<PermissionTable>;
@@ -99,9 +99,9 @@ export interface RolePermissionTable {
   id: Generated<string>;
   role_id: string;
   permission_id: string;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 
 // table users
@@ -113,9 +113,9 @@ export interface UserTable {
   last_name: string | null;
   avatar_url: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
   role_id: string | null;
 }
 
@@ -132,9 +132,9 @@ export interface InviteTable {
   token: string;
   expires_at: string; // ISO timestamp
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type Invite = Selectable<InviteTable>;
 export type NewInvite = Insertable<InviteTable>;

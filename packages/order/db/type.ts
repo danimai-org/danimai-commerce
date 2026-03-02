@@ -61,9 +61,9 @@ export interface OrderTable {
   billing_address_id: string | null;
   shipping_address_id: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type Order = Selectable<OrderTable>;
 export type NewOrder = Insertable<OrderTable>;
@@ -83,9 +83,9 @@ export interface OrderAddressTable {
   province: string | null;
   postal_code: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type OrderAddress = Selectable<OrderAddressTable>;
 export type NewOrderAddress = Insertable<OrderAddressTable>;
@@ -117,9 +117,9 @@ export interface OrderItemTable {
   unit_price: string; // Decimal as string
   quantity: number;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type OrderItem = Selectable<OrderItemTable>;
 export type NewOrderItem = Insertable<OrderItemTable>;
@@ -152,9 +152,9 @@ export interface OrderLineItemTable {
   unit_price: string; // Decimal as string
   quantity: number;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type OrderLineItem = Selectable<OrderLineItemTable>;
 export type NewOrderLineItem = Insertable<OrderLineItemTable>;
@@ -170,9 +170,9 @@ export interface OrderLineItemAdjustmentTable {
   promotion_id: string | null;
   provider_id: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type OrderLineItemAdjustment = Selectable<OrderLineItemAdjustmentTable>;
 export type NewOrderLineItemAdjustment = Insertable<OrderLineItemAdjustmentTable>;
@@ -188,9 +188,9 @@ export interface OrderLineItemTaxLineTable {
   rate: string; // Decimal as string (e.g., "10.5" for 10.5%)
   provider_id: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type OrderLineItemTaxLine = Selectable<OrderLineItemTaxLineTable>;
 export type NewOrderLineItemTaxLine = Insertable<OrderLineItemTaxLineTable>;
@@ -204,9 +204,9 @@ export interface OrderShippingTable {
   amount: string; // Decimal as string
   data: unknown | null; // JSON for shipping provider data
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type OrderShipping = Selectable<OrderShippingTable>;
 export type NewOrderShipping = Insertable<OrderShippingTable>;
@@ -222,9 +222,9 @@ export interface OrderShippingMethodTable {
   data: unknown | null; // JSON for shipping provider data
   tax_lines: unknown | null; // JSON array of tax lines
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type OrderShippingMethod = Selectable<OrderShippingMethodTable>;
 export type NewOrderShippingMethod = Insertable<OrderShippingMethodTable>;
@@ -240,9 +240,9 @@ export interface OrderShippingMethodAdjustmentTable {
   promotion_id: string | null;
   provider_id: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type OrderShippingMethodAdjustment = Selectable<OrderShippingMethodAdjustmentTable>;
 export type NewOrderShippingMethodAdjustment = Insertable<OrderShippingMethodAdjustmentTable>;
@@ -258,9 +258,9 @@ export interface OrderShippingMethodTaxLineTable {
   rate: string; // Decimal as string (e.g., "10.5" for 10.5%)
   provider_id: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type OrderShippingMethodTaxLine = Selectable<OrderShippingMethodTaxLineTable>;
 export type NewOrderShippingMethodTaxLine = Insertable<OrderShippingMethodTaxLineTable>;
@@ -275,9 +275,9 @@ export interface OrderTransactionTable {
   reference: string | null;
   reference_id: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type OrderTransaction = Selectable<OrderTransactionTable>;
 export type NewOrderTransaction = Insertable<OrderTransactionTable>;
@@ -292,9 +292,9 @@ export interface ReturnTable {
   refund_amount: string | null; // Decimal as string
   location_id: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type Return = Selectable<ReturnTable>;
 export type NewReturn = Insertable<ReturnTable>;
@@ -309,9 +309,9 @@ export interface ReturnItemTable {
   reason_id: string | null;
   note: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ReturnItem = Selectable<ReturnItemTable>;
 export type NewReturnItem = Insertable<ReturnItemTable>;
@@ -323,9 +323,9 @@ export interface ReturnReasonTable {
   label: string;
   description: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ReturnReason = Selectable<ReturnReasonTable>;
 export type NewReturnReason = Insertable<ReturnReasonTable>;

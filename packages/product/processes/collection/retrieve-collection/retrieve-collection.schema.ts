@@ -14,7 +14,8 @@ export const ProductCollectionResponseSchema = Type.Object({
   handle: Type.String(),
   metadata: Type.Union([Type.Unknown(), Type.Null()]),
   created_at: Type.Date(),
-  updated_at: Type.Date(),   deleted_at: Type.Union([Type.Date(), Type.Null()]),
+  updated_at: Type.Date(),
+  deleted_at: Type.Union([Type.Date(), Type.Null()]),
 });
 
 export const RetrieveCollectionResponseSchema = Type.Union([

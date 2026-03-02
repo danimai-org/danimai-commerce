@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { getService } from "@danimai/core";
 import {
   ACCEPT_INVITE_PROCESS,
   AcceptInviteProcess,
@@ -44,15 +43,14 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
     "/",
     async ({ query: input }) => {
       const process = getService<PaginatedInvitesProcess>(PAGINATED_INVITES_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      const result = await process.runOperations({ input, logger } as any);
+      const result = await process.runOperations({ input });
       const data = result.data.map(({ token: _t, ...invite }) =>
         serializeInviteDates(invite as Record<string, unknown>)
       );
       return { ...result, data };
     },
     {
-      query: PaginatedInvitesSchema as any,
+      query: PaginatedInvitesSchema,
       response: {
         200: PaginatedInvitesResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -69,13 +67,12 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
     "/",
     async ({ body: input }) => {
       const process = getService<CreateInviteProcess>(CREATE_INVITE_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      const result = await process.runOperations({ input, logger } as any);
+      const result = await process.runOperations({ input });
       if (result === undefined) throw new Error("Failed to create invite");
-      return result as any;
+      return result;
     },
     {
-      body: CreateInviteSchema as any,
+      body: CreateInviteSchema,
       response: {
         200: CreateInviteResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -92,14 +89,13 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
     "/accept",
     async ({ body: input }) => {
       const process = getService<AcceptInviteProcess>(ACCEPT_INVITE_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      const result = await process.runOperations({ input, logger } as any);
+      const result = await process.runOperations({ input });
       if (!result) return result;
       const { password_hash: _p, ...user } = result;
       return user;
     },
     {
-      body: AcceptInviteSchema as any,
+      body: AcceptInviteSchema,
       response: {
         200: AcceptInviteResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -116,15 +112,14 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
     "/:id/resend",
     async ({ params }) => {
       const process = getService<ResendInviteProcess>(RESEND_INVITE_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const input = { id: params.id };
-      const result = await process.runOperations({ input, logger } as any);
+      const result = await process.runOperations({ input });
       if (!result) throw new Error("Invite not found or resend failed");
       const { token: _t, ...invite } = result;
-      return invite as any;
+      return invite;
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
+      params: Type.Object({ id: Type.String() }),
       response: {
         200: ResendInviteResponseSchema,
         400: ValidationErrorResponseSchema,

@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { getService } from "@danimai/core";
 import {
   CREATE_SALES_CHANNELS_PROCESS,
   UPDATE_SALES_CHANNELS_PROCESS,
@@ -19,11 +18,8 @@ import {
   PaginatedSalesChannelsResponseSchema,
   CreateSalesChannelsSchema,
   CreateSalesChannelsResponseSchema,
-  UpdateSalesChannelSchema,
   UpdateSalesChannelsResponseSchema,
   DeleteSalesChannelsSchema,
-  SyncProductSalesChannelsSchema,
-  GetProductSalesChannelsSchema,
   GetProductSalesChannelsResponseSchema,
 } from "@danimai/sales-channel";
 import { handleProcessError } from "../../utils/error-handler";
@@ -46,15 +42,14 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedSalesChannelsProcess>(
         PAGINATED_SALES_CHANNELS_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input: query });
     },
     {
-      query: PaginatedSalesChannelsSchema as any,
+      query: PaginatedSalesChannelsSchema,
       response: {
         200: PaginatedSalesChannelsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -69,13 +64,12 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
   )
   .post(
     "/",
-    async ({ body: input }) => {
+    async ({ body }) => {
       const process = getService<CreateSalesChannelsProcess>(CREATE_SALES_CHANNELS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input: body });
     },
     {
-      body: CreateSalesChannelsSchema as any,
+      body: CreateSalesChannelsSchema,
       response: {
         200: CreateSalesChannelsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -92,15 +86,16 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
     "/:id",
     async ({ params, body }) => {
       const process = getService<UpdateSalesChannelsProcess>(UPDATE_SALES_CHANNELS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       return process.runOperations({
-        input: { ...(body as Record<string, unknown>), id: params.id },
-        logger,
-      } as any);
+        input: {
+          ...body,
+          id: params.id,
+        },
+      });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: UpdateSalesChannelBodySchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateSalesChannelBodySchema,
       response: {
         200: UpdateSalesChannelsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -117,13 +112,12 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
     "/",
     async ({ body: input, set }) => {
       const process = getService<DeleteSalesChannelsProcess>(DELETE_SALES_CHANNELS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      await process.runOperations({ input, logger } as any);
+      await process.runOperations({ input });
       set.status = 204;
       return undefined;
     },
     {
-      body: DeleteSalesChannelsSchema as any,
+      body: DeleteSalesChannelsSchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -142,15 +136,18 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
       const process = getService<SyncProductSalesChannelsProcess>(
         SYNC_PRODUCT_SALES_CHANNELS_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      const input = { ...(body as Record<string, unknown>), product_id: params.productId };
-      await process.runOperations({ input, logger } as any);
+      await process.runOperations({
+        input: {
+          ...body,
+          product_id: params.productId,
+        }
+      });
       set.status = 204;
       return undefined;
     },
     {
-      params: Type.Object({ productId: Type.String() }) as any,
-      body: SyncProductSalesChannelsBodySchema as any,
+      params: Type.Object({ productId: Type.String() }),
+      body: SyncProductSalesChannelsBodySchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -169,12 +166,11 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
       const process = getService<GetProductSalesChannelsProcess>(
         GET_PRODUCT_SALES_CHANNELS_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const input = { product_id: params.productId };
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      params: Type.Object({ productId: Type.String() }) as any,
+      params: Type.Object({ productId: Type.String() }),
       response: {
         200: GetProductSalesChannelsResponseSchema,
         400: ValidationErrorResponseSchema,

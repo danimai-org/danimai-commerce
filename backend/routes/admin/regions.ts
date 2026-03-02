@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { getService } from "@danimai/core";
 import {
   PAGINATED_REGIONS_PROCESS,
   CREATE_REGIONS_PROCESS,
@@ -38,11 +37,10 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
     "/",
     async ({ query: input }) => {
       const process = getService<PaginatedRegionsProcess>(PAGINATED_REGIONS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: PaginatedRegionsSchema as any,
+      query: PaginatedRegionsSchema,
       response: {
         200: PaginatedRegionsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -59,11 +57,10 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
     "/",
     async ({ body: input }) => {
       const process = getService<CreateRegionsProcess>(CREATE_REGIONS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: CreateRegionsSchema as any,
+      body: CreateRegionsSchema,
       response: {
         200: CreateRegionsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -80,15 +77,13 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
     "/:id",
     async ({ params, body }) => {
       const process = getService<UpdateRegionsProcess>(UPDATE_REGIONS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       return process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
-        logger,
-      } as any);
+      });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: UpdateRegionBodySchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateRegionBodySchema,
       response: {
         200: UpdateRegionResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -105,13 +100,12 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
     "/",
     async ({ body: input, set }) => {
       const process = getService<DeleteRegionsProcess>(DELETE_REGIONS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      await process.runOperations({ input, logger } as any);
+      await process.runOperations({ input });
       set.status = 204;
       return undefined;
     },
     {
-      body: DeleteRegionsSchema as any,
+      body: DeleteRegionsSchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,

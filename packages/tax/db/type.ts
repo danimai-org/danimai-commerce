@@ -13,9 +13,9 @@ export interface TaxProviderTable {
   name: string;
   is_installed: boolean;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type TaxProvider = Selectable<TaxProviderTable>;
 export type NewTaxProvider = Insertable<TaxProviderTable>;
@@ -28,9 +28,9 @@ export interface TaxRegionTable {
   tax_provider_id: string | null;
   parent_id: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type TaxRegion = Selectable<TaxRegionTable>;
 export type NewTaxRegion = Insertable<TaxRegionTable>;
@@ -45,9 +45,9 @@ export interface TaxRateTable {
   rate: string; // Decimal as string for precision (e.g., "10.5" for 10.5%)
   is_combinable: boolean;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type TaxRate = Selectable<TaxRateTable>;
 export type NewTaxRate = Insertable<TaxRateTable>;
@@ -60,9 +60,9 @@ export interface TaxRateRuleTable {
   rule_type: string; // e.g., "product_type", "product_id", "product_tag", "shipping_option"
   value: string; // The value for the rule (e.g., product type ID, product ID, tag ID)
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type TaxRateRule = Selectable<TaxRateRuleTable>;
 export type NewTaxRateRule = Insertable<TaxRateRuleTable>;

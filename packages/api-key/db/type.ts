@@ -20,9 +20,9 @@ export interface ApiKeyTable {
   revoked_by: string | null; // user id who revoked
   created_by: string | null; // user id who created
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ApiKey = Selectable<ApiKeyTable>;
 export type NewApiKey = Insertable<ApiKeyTable>;

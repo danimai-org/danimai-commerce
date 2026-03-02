@@ -13,9 +13,9 @@ export interface CurrencyTable {
   name: string; // Currency name (e.g., "US Dollar", "Euro")
   tax_inclusive_pricing: boolean;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type Currency = Selectable<CurrencyTable>;
 export type NewCurrency = Insertable<CurrencyTable>;

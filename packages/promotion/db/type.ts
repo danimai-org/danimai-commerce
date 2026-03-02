@@ -29,9 +29,9 @@ export interface PromotionTable {
   campaign_id: string | null;
   application_method_id: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type Promotion = Selectable<PromotionTable>;
 export type NewPromotion = Insertable<PromotionTable>;
@@ -47,9 +47,9 @@ export interface ApplicationMethodTable {
   max_quantity: number | null;
   currency_code: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ApplicationMethod = Selectable<ApplicationMethodTable>;
 export type NewApplicationMethod = Insertable<ApplicationMethodTable>;
@@ -64,9 +64,9 @@ export interface CampaignTable {
   starts_at: string | null;
   ends_at: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type Campaign = Selectable<CampaignTable>;
 export type NewCampaign = Insertable<CampaignTable>;
@@ -81,9 +81,9 @@ export interface CampaignBudgetTable {
   used: string | null; // amount spent or usage count
   attribute: string | null; // e.g. "customer_id", "customer_email" for use_by_attribute
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type CampaignBudget = Selectable<CampaignBudgetTable>;
 export type NewCampaignBudget = Insertable<CampaignBudgetTable>;
@@ -96,9 +96,9 @@ export interface CampaignBudgetUsageTable {
   attribute_value: string | null; // e.g. customer_id or email
   used: string | null; // usage count for this attribute value
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type CampaignBudgetUsage = Selectable<CampaignBudgetUsageTable>;
 export type NewCampaignBudgetUsage = Insertable<CampaignBudgetUsageTable>;
@@ -111,9 +111,9 @@ export interface PromotionRuleTable {
   application_method_id: string | null;
   rule_type: string; // e.g. "customer_group", "items", "sku"
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type PromotionRule = Selectable<PromotionRuleTable>;
 export type NewPromotionRule = Insertable<PromotionRuleTable>;
@@ -125,9 +125,9 @@ export interface PromotionRuleValueTable {
   promotion_rule_id: string | null;
   value: string; // e.g. customer group id, sku, product ids
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type PromotionRuleValue = Selectable<PromotionRuleValueTable>;
 export type NewPromotionRuleValue = Insertable<PromotionRuleValueTable>;

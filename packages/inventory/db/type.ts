@@ -12,9 +12,9 @@ export interface InventoryItemTable {
   sku: string | null; // SKU of the item (can be null for non-shippable items)
   requires_shipping: boolean; // Whether the item requires shipping
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type InventoryItem = Selectable<InventoryItemTable>;
 export type NewInventoryItem = Insertable<InventoryItemTable>;
@@ -29,9 +29,9 @@ export interface InventoryLevelTable {
   reserved_quantity: number; // Quantity reserved/allocated
   available_quantity: number; // Available quantity (stocked - reserved)
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type InventoryLevel = Selectable<InventoryLevelTable>;
 export type NewInventoryLevel = Insertable<InventoryLevelTable>;
@@ -46,9 +46,9 @@ export interface ReservationItemTable {
   line_item_id: string | null; // Associated line item (e.g., from cart/order)
   description: string | null; // Description of the reservation
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ReservationItem = Selectable<ReservationItemTable>;
 export type NewReservationItem = Insertable<ReservationItemTable>;

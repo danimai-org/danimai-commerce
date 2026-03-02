@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { DANIMAI_LOGGER, DANIMAI_DB, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { DANIMAI_DB, getService } from "@danimai/core";
 import type { Kysely } from "kysely";
 import {
   PAGINATED_ORDERS_PROCESS,
@@ -71,7 +70,6 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
     "/",
     async ({ query }) => {
       const process = getService<PaginatedOrdersProcess>(PAGINATED_ORDERS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const input: Record<string, unknown> = { ...query };
       if (query.page !== undefined) {
         const p = typeof query.page === "string" ? parseInt(query.page, 10) : query.page;
@@ -81,10 +79,10 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
         const l = typeof query.limit === "string" ? parseInt(query.limit, 10) : query.limit;
         input.limit = Number.isNaN(l) ? 10 : Math.max(1, Math.min(100, l));
       }
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: PaginatedOrdersSchema as any,
+      query: PaginatedOrdersSchema,
       response: {
         200: PaginatedOrdersResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -101,12 +99,11 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
     "/",
     async ({ body: input }) => {
       const process = getService<CreateOrdersProcess>(CREATE_ORDERS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      const result = await process.runOperations({ input, logger } as any);
-      return { data: result } as any;
+      const result = await process.runOperations({ input });
+      return { data: result };
     },
     {
-      body: CreateOrdersSchema as any,
+      body: CreateOrdersSchema,
       response: {
         200: Type.Object({ data: CreateOrdersResponseSchema }),
         400: ValidationErrorResponseSchema,
@@ -132,13 +129,13 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
 
       if (!order) {
         set.status = 404;
-        return { message: "Order not found" } as any;
+        return { message: "Order not found" };
       }
 
-      return order as any;
+      return order;
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
+      params: Type.Object({ id: Type.String() }),
       response: {
         200: OrderResponseSchema,
         404: Type.Object({ message: Type.String() }),
@@ -156,18 +153,17 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
     "/:id",
     async ({ params, body, set }) => {
       const process = getService<UpdateOrdersProcess>(UPDATE_ORDERS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const input = { ...(body as Record<string, unknown>), id: params.id };
-      const result = await process.runOperations({ input, logger } as any);
+      const result = await process.runOperations({ input });
       if (!result) {
         set.status = 404;
-        return { message: "Order not found" } as any;
+        return { message: "Order not found" };
       }
-      return result as any;
+      return result;
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: UpdateOrderBodySchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateOrderBodySchema,
       response: {
         200: UpdateOrderResponseSchema,
         404: Type.Object({ message: Type.String() }),

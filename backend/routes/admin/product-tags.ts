@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { DANIMAI_LOGGER, getService, PaginationSchema } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { getService, PaginationSchema } from "@danimai/core";
 import {
   CREATE_PRODUCT_TAGS_PROCESS,
   UPDATE_PRODUCT_TAGS_PROCESS,
@@ -44,11 +43,10 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
     "/",
     async ({ query: input }) => {
       const process = getService<PaginatedProductTagsProcess>(PAGINATED_PRODUCT_TAGS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: PaginatedProductTagsSchema as any,
+      query: PaginatedProductTagsSchema,
       response: {
         200: PaginatedProductTagsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -65,11 +63,10 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
     "/:id",
     async ({ params }) => {
       const process = getService<RetrieveProductTagProcess>(RETRIEVE_PRODUCT_TAG_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input: { id: params.id }, logger } as any);
+      return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
+      params: Type.Object({ id: Type.String() }),
       response: {
         200: RetrieveProductTagResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -86,13 +83,12 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
     "/:id/products",
     async ({ params, query }) => {
       const process = getService<PaginatedProductsByTagProcess>(PAGINATED_PRODUCTS_BY_TAG_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const input = { tag_id: params.id, ...query };
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      query: PaginationSchema as any,
+      params: Type.Object({ id: Type.String() }),
+      query: PaginationSchema,
       response: {
         200: PaginatedProductsByTagResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -109,11 +105,10 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
     "/",
     async ({ body: input }) => {
       const process = getService<CreateProductTagsProcess>(CREATE_PRODUCT_TAGS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: CreateProductTagSchema as any,
+      body: CreateProductTagSchema,
       response: {
         200: CreateProductTagsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -130,15 +125,13 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
     "/:id",
     async ({ params, body }) => {
       const process = getService<UpdateProductTagsProcess>(UPDATE_PRODUCT_TAGS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       return process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
-        logger,
-      } as any);
+      });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: UpdateProductTagBodySchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateProductTagBodySchema,
       response: {
         200: UpdateProductTagsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -155,13 +148,12 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
     "/",
     async ({ body: input, set }) => {
       const process = getService<DeleteProductTagsProcess>(DELETE_PRODUCT_TAGS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      await process.runOperations({ input, logger } as any);
+      await process.runOperations({ input });
       set.status = 204;
       return undefined;
     },
     {
-      body: DeleteProductTagsSchema as any,
+      body: DeleteProductTagsSchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,

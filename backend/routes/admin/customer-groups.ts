@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { DANIMAI_LOGGER, getService, PaginationSchema } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { getService, PaginationSchema } from "@danimai/core";
 import {
   PAGINATED_CUSTOMER_GROUPS_PROCESS,
   CREATE_CUSTOMER_GROUPS_PROCESS,
@@ -21,7 +20,6 @@ import {
   RetrieveCustomerGroupResponseSchema,
   CreateCustomerGroupsSchema,
   CreateCustomerGroupsResponseSchema,
-  RetrieveCustomerGroupSchema,
   UpdateCustomerGroupResponseSchema,
   DeleteCustomerGroupsSchema,
 } from "@danimai/customer";
@@ -46,13 +44,12 @@ export const customerGroupRoutes = new Elysia({ prefix: "/customer-groups" })
       const process = getService<ListCustomersInGroupProcess>(
         LIST_CUSTOMERS_IN_GROUP_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const input = { ...query, customer_group_id: params.id };
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      query: PaginationSchema as any,
+      params: Type.Object({ id: Type.String() }),
+      query: PaginationSchema,
       response: {
         200: ListCustomersInGroupResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -71,11 +68,10 @@ export const customerGroupRoutes = new Elysia({ prefix: "/customer-groups" })
       const process = getService<RetrieveCustomerGroupProcess>(
         RETRIEVE_CUSTOMER_GROUP_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input: { id: params.id }, logger } as any);
+      return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: RetrieveCustomerGroupSchema as any,
+      params: Type.Object({ id: Type.String() }),
       response: {
         200: RetrieveCustomerGroupResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -94,11 +90,10 @@ export const customerGroupRoutes = new Elysia({ prefix: "/customer-groups" })
       const process = getService<PaginatedCustomerGroupsProcess>(
         PAGINATED_CUSTOMER_GROUPS_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: PaginatedCustomerGroupsSchema as any,
+      query: PaginatedCustomerGroupsSchema,
       response: {
         200: PaginatedCustomerGroupsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -115,11 +110,10 @@ export const customerGroupRoutes = new Elysia({ prefix: "/customer-groups" })
     "/",
     async ({ body: input }) => {
       const process = getService<CreateCustomerGroupsProcess>(CREATE_CUSTOMER_GROUPS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: CreateCustomerGroupsSchema as any,
+      body: CreateCustomerGroupsSchema,
       response: {
         200: CreateCustomerGroupsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -138,13 +132,12 @@ export const customerGroupRoutes = new Elysia({ prefix: "/customer-groups" })
       const process = getService<UpdateCustomerGroupProcess>(
         UPDATE_CUSTOMER_GROUP_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const input = { ...(body as Record<string, unknown>), id: params.id };
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: UpdateCustomerGroupBodySchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateCustomerGroupBodySchema,
       response: {
         200: UpdateCustomerGroupResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -163,12 +156,11 @@ export const customerGroupRoutes = new Elysia({ prefix: "/customer-groups" })
       const process = getService<DeleteCustomerGroupsProcess>(
         DELETE_CUSTOMER_GROUPS_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      await process.runOperations({ input, logger } as any);
+      await process.runOperations({ input });
       return { success: true };
     },
     {
-      body: DeleteCustomerGroupsSchema as any,
+      body: DeleteCustomerGroupsSchema,
       response: {
         200: Type.Object({ success: Type.Literal(true) }),
         400: ValidationErrorResponseSchema,

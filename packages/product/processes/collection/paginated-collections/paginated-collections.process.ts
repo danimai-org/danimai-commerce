@@ -50,7 +50,7 @@ export class PaginatedCollectionsProcess
     if (sales_channel_ids && sales_channel_ids.length > 0) {
       const collectionIdsInChannel = this.db
         .selectFrom("product_collection_relations")
-        .innerJoin("product_sales_channels", "product_sales_channels.product_id", "product_collection_relations.product_id")
+        .innerJoin("product_sales_channels" as any, "product_sales_channels.product_id", "product_collection_relations.product_id")
         .where("product_sales_channels.sales_channel_id", "in", sales_channel_ids)
         .select("product_collection_relations.product_collection_id")
         .distinct();
@@ -71,7 +71,7 @@ export class PaginatedCollectionsProcess
     const safeSortField = allowedSortFields.includes(sorting_field) ? sorting_field : "created_at";
 
     // Apply pagination and include product count
-    const offset = (page - 1) * limit;
+    const offset = (Number(page) - 1) * Number(limit);
     const dataWithCount = await baseQuery
       .leftJoin(
         "product_collection_relations",
@@ -90,7 +90,7 @@ export class PaginatedCollectionsProcess
       ])
       .groupBy("product_collections.id")
       .orderBy(sql.ref(`product_collections.${safeSortField}`), sortOrder)
-      .limit(limit)
+      .limit(Number(limit))
       .offset(offset)
       .execute();
 

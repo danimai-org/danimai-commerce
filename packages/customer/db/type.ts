@@ -16,9 +16,9 @@ export interface CustomerTable {
   phone: string | null;
   has_account: boolean;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type Customer = Selectable<CustomerTable>;
 export type NewCustomer = Insertable<CustomerTable>;
@@ -39,9 +39,9 @@ export interface CustomerAddressTable {
   province: string | null;
   postal_code: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type CustomerAddress = Selectable<CustomerAddressTable>;
 export type NewCustomerAddress = Insertable<CustomerAddressTable>;
@@ -52,9 +52,9 @@ export interface CustomerGroupTable {
   id: Generated<string>;
   name: string;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type CustomerGroup = Selectable<CustomerGroupTable>;
 export type NewCustomerGroup = Insertable<CustomerGroupTable>;

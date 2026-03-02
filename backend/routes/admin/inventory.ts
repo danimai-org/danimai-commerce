@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { Type } from "@sinclair/typebox";
+import { getService } from "@danimai/core";
 import {
   PAGINATED_INVENTORY_ITEMS_PROCESS,
   PAGINATED_INVENTORY_LEVELS_PROCESS,
@@ -43,7 +43,6 @@ import {
   InternalErrorResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
-import { Type } from "@sinclair/typebox";
 
 export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
   .onError(({ error, set }) => handleProcessError(error, set))
@@ -53,11 +52,10 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
       const process = getService<CreateInventoryItemsProcess>(
         CREATE_INVENTORY_ITEMS_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: CreateInventoryItemsSchema as any,
+      body: CreateInventoryItemsSchema,
       response: {
         200: CreateInventoryItemsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -76,9 +74,8 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
       const process = getService<GetInventoryItemProcess>(
         GET_INVENTORY_ITEM_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const input = { id: params.id };
-      const result = await process.runOperations({ input, logger } as any);
+      const result = await process.runOperations({ input });
       if (!result) return result;
       const locationIds = [
         ...new Set(result.levels.map((l) => l.location_id)),
@@ -90,8 +87,7 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
         );
         const locations = await listLocations.runOperations({
           input: { ids: locationIds },
-          logger,
-        } as any);
+        });
         locationMap = Object.fromEntries(
           locations.map((loc) => [loc.id, loc])
         );
@@ -109,8 +105,7 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
           );
           const variantResult = await listVariants.runOperations({
             input: { sku: result.item.sku },
-            logger,
-          } as any);
+          });
           associated_variants = variantResult.variants;
           product_summaries = variantResult.product_summaries;
         } catch {
@@ -126,7 +121,7 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
       };
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
+      params: Type.Object({ id: Type.String() }),
       response: {
         200: GetInventoryItemResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -145,13 +140,12 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
       const process = getService<UpdateInventoryItemProcess>(
         UPDATE_INVENTORY_ITEM_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const input = { id: params.id, ...(body as Record<string, unknown>) };
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: UpdateInventoryItemSchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateInventoryItemSchema,
       response: {
         200: UpdateInventoryItemResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -170,11 +164,10 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
       const process = getService<PaginatedInventoryItemsProcess>(
         PAGINATED_INVENTORY_ITEMS_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: PaginatedInventoryItemsSchema as any,
+      query: PaginatedInventoryItemsSchema,
       response: {
         200: PaginatedInventoryItemsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -193,11 +186,10 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
       const process = getService<SetInventoryLevelProcess>(
         SET_INVENTORY_LEVEL_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: SetInventoryLevelSchema as any,
+      body: SetInventoryLevelSchema,
       response: {
         200: SetInventoryLevelResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -216,13 +208,12 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
       const process = getService<DeleteInventoryLevelProcess>(
         DELETE_INVENTORY_LEVEL_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const input = { id: params.id };
-      await process.runOperations({ input, logger } as any);
+      await process.runOperations({ input });
       return { success: true };
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
+      params: Type.Object({ id: Type.String() }),
       response: {
         200: Type.Object({ success: Type.Literal(true) }),
         400: ValidationErrorResponseSchema,
@@ -241,11 +232,10 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
       const process = getService<PaginatedInventoryLevelsProcess>(
         PAGINATED_INVENTORY_LEVELS_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: PaginatedInventoryLevelsSchema as any,
+      query: PaginatedInventoryLevelsSchema,
       response: {
         200: PaginatedInventoryLevelsResponseSchema,
         400: ValidationErrorResponseSchema,

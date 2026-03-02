@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { getService } from "@danimai/core";
 import {
   PAGINATED_ROLES_PROCESS,
   RETRIEVE_ROLE_PROCESS,
@@ -35,11 +34,10 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
     "/",
     async ({ query: input }) => {
       const process = getService<PaginatedRolesProcess>(PAGINATED_ROLES_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: PaginatedRolesSchema as any,
+      query: PaginatedRolesSchema,
       response: {
         200: PaginatedRolesResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -48,6 +46,7 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
       detail: {
         tags: ["Roles"],
         summary: "Get paginated roles",
+        description: "Gets a paginated list of roles",
       },
     }
   )
@@ -55,11 +54,10 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
     "/:id",
     async ({ params }) => {
       const process = getService<RetrieveRoleProcess>(RETRIEVE_ROLE_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input: { id: params.id }, logger } as any);
+      return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
+      params: Type.Object({ id: Type.String() }),
       response: {
         200: RetrieveRoleResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -68,6 +66,7 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
       detail: {
         tags: ["Roles"],
         summary: "Get role by ID",
+        description: "Retrieves a single role by its ID",
       },
     }
   )
@@ -75,11 +74,10 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
     "/",
     async ({ body: input }) => {
       const process = getService<CreateRoleProcess>(CREATE_ROLE_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: CreateRoleSchema as any,
+      body: CreateRoleSchema,
       response: {
         200: CreateRoleResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -88,6 +86,7 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
       detail: {
         tags: ["Roles"],
         summary: "Create role",
+        description: "Creates a new role",
       },
     }
   )
@@ -95,13 +94,12 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
     "/:id",
     async ({ params, body }) => {
       const process = getService<UpdateRoleProcess>(UPDATE_ROLE_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const input = { ...(body as Record<string, unknown>), id: params.id };
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: Type.Omit(UpdateRoleSchema, ["id"]) as any,
+      params: Type.Object({ id: Type.String() }),
+      body: Type.Omit(UpdateRoleSchema, ["id"]),
       response: {
         200: UpdateRoleResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -110,6 +108,7 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
       detail: {
         tags: ["Roles"],
         summary: "Update role",
+        description: "Updates an existing role by ID",
       },
     }
   )
@@ -117,13 +116,12 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
     "/",
     async ({ body: input, set }) => {
       const process = getService<DeleteRolesProcess>(DELETE_ROLES_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      await process.runOperations({ input, logger } as any);
+      await process.runOperations({ input });
       set.status = 204;
       return undefined;
     },
     {
-      body: DeleteRolesSchema as any,
+      body: DeleteRolesSchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -132,6 +130,7 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
       detail: {
         tags: ["Roles"],
         summary: "Delete roles",
+        description: "Deletes multiple roles by their IDs",
       },
     }
   );

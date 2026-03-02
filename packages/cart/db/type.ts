@@ -28,9 +28,9 @@ export interface CartTable {
   payment_authorized_at: string | null; // ISO timestamp
   shipping_address_id: string | null; // Foreign key to cart_addresses
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type Cart = Selectable<CartTable>;
 export type NewCart = Insertable<CartTable>;
@@ -49,9 +49,9 @@ export interface CartAddressTable {
   country_code: string | null;
   phone: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type CartAddress = Selectable<CartAddressTable>;
 export type NewCartAddress = Insertable<CartAddressTable>;
@@ -69,9 +69,9 @@ export interface CartLineItemTable {
   quantity: number | null;
   unit_price: string | null; // Decimal as string
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type CartLineItem = Selectable<CartLineItemTable>;
 export type NewCartLineItem = Insertable<CartLineItemTable>;
@@ -85,9 +85,9 @@ export interface CartLineItemAdjustmentTable {
   amount: string | null; // Decimal as string
   description: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type CartLineItemAdjustment = Selectable<CartLineItemAdjustmentTable>;
 export type NewCartLineItemAdjustment = Insertable<CartLineItemAdjustmentTable>;
@@ -102,9 +102,9 @@ export interface CartLineItemTaxLineTable {
   rate: string | null; // Tax rate as decimal string
   provider_id: string | null; // Tax provider ID
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type CartLineItemTaxLine = Selectable<CartLineItemTaxLineTable>;
 export type NewCartLineItemTaxLine = Insertable<CartLineItemTaxLineTable>;
@@ -118,9 +118,9 @@ export interface CartCreditLineTable {
   amount: string | null; // Decimal as string
   description: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type CartCreditLine = Selectable<CartCreditLineTable>;
 export type NewCartCreditLine = Insertable<CartCreditLineTable>;
@@ -135,9 +135,9 @@ export interface CartShippingMethodTable {
   amount: string | null; // Decimal as string
   data: unknown | null; // Custom shipping method data
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type CartShippingMethod = Selectable<CartShippingMethodTable>;
 export type NewCartShippingMethod = Insertable<CartShippingMethodTable>;
@@ -152,9 +152,9 @@ export interface CartShippingMethodTaxLineTable {
   rate: string | null; // Tax rate as decimal string
   provider_id: string | null; // Tax provider ID
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type CartShippingMethodTaxLine = Selectable<CartShippingMethodTaxLineTable>;
 export type NewCartShippingMethodTaxLine = Insertable<CartShippingMethodTaxLineTable>;
@@ -168,9 +168,9 @@ export interface CartShippingMethodAdjustmentTable {
   amount: string | null; // Decimal as string
   description: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type CartShippingMethodAdjustment = Selectable<CartShippingMethodAdjustmentTable>;
 export type NewCartShippingMethodAdjustment = Insertable<CartShippingMethodAdjustmentTable>;

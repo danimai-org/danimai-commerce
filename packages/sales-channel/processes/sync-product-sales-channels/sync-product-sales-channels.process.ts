@@ -45,7 +45,7 @@ export class SyncProductSalesChannelsProcess
 
   async validateProduct(productId: string) {
     const product = await this.db
-      .selectFrom("products")
+      .selectFrom("products" as any)
       .where("id", "=", productId)
       .where("deleted_at", "is", null)
       .select("id")

@@ -40,9 +40,9 @@ export interface ProductTable {
   external_id: string | null;
   metadata: unknown | null;
   category_id: string | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
   attribute_group_id: string | null;
 }
 export type Product = Selectable<ProductTable>;
@@ -54,9 +54,9 @@ export interface ProductAttributeGroupTable {
   id: Generated<string>;
   title: string;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 
 export type ProductAttributeGroup = Selectable<ProductAttributeGroupTable>;
@@ -69,9 +69,9 @@ export interface ProductAttributeTable {
   title: string;
   type: string;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ProductAttribute = Selectable<ProductAttributeTable>;
 export type NewProductAttribute = Insertable<ProductAttributeTable>;
@@ -87,9 +87,9 @@ export interface ProductAttributeValueTable {
   attribute_id: string | null;
   product_id: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ProductAttributeValue = Selectable<ProductAttributeValueTable>;
 export type NewProductAttributeValue = Insertable<ProductAttributeValueTable>;
@@ -138,9 +138,9 @@ export interface ProductVariantTable {
   variant_rank: number | null;
   thumbnail: string | null;
   product_id: string | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ProductVariant = Selectable<ProductVariantTable>;
 export type NewProductVariant = Insertable<ProductVariantTable>;
@@ -151,9 +151,9 @@ export interface ProductOptionTable {
   id: Generated<string>;
   title: string;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 
 export type ProductOption = Selectable<ProductOptionTable>;
@@ -167,9 +167,9 @@ export interface ProductOptionValueTable {
   metadata: unknown | null;
   option_id: string | null;
   product_id: string | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ProductOptionValue = Selectable<ProductOptionValueTable>;
 export type NewProductOptionValue = Insertable<ProductOptionValueTable>;
@@ -181,9 +181,9 @@ export interface ProductCollectionTable {
   title: string;
   handle: string;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ProductCollection = Selectable<ProductCollectionTable>;
 export type NewProductCollection = Insertable<ProductCollectionTable>;
@@ -201,9 +201,9 @@ export interface ProductCategoryTable {
   parent_id: string | null;
   status: ProductCategoryStatus;
   visibility: ProductCategoryVisibility;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ProductCategory = Selectable<ProductCategoryTable>;
 export type NewProductCategory = Insertable<ProductCategoryTable>;
@@ -214,9 +214,9 @@ export interface ProductTagTable {
   id: Generated<string>;
   value: string;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ProductTag = Selectable<ProductTagTable>;
 export type NewProductTag = Insertable<ProductTagTable>;
@@ -230,9 +230,9 @@ export interface ProductImageTable {
   rank: number;
   product_id: string | null;
   variant_id: string | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ProductImage = Selectable<ProductImageTable>;
 export type NewProductImage = Insertable<ProductImageTable>;

@@ -22,9 +22,9 @@ export interface AccountHolderTable {
   type: string | null; // e.g. "customer"
   account_id: string | null; // e.g. customer id
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type AccountHolder = Selectable<AccountHolderTable>;
 export type NewAccountHolder = Insertable<AccountHolderTable>;
@@ -35,9 +35,9 @@ export interface PaymentProviderTable {
   id: Generated<string>;
   name: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type PaymentProvider = Selectable<PaymentProviderTable>;
 export type NewPaymentProvider = Insertable<PaymentProviderTable>;
@@ -49,9 +49,9 @@ export interface RefundReasonTable {
   label: string | null;
   value: string | null; // code
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type RefundReason = Selectable<RefundReasonTable>;
 export type NewRefundReason = Insertable<RefundReasonTable>;
@@ -63,9 +63,9 @@ export interface PaymentCollectionTable {
   amount: string | null; // total as decimal string
   currency_code: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type PaymentCollection = Selectable<PaymentCollectionTable>;
 export type NewPaymentCollection = Insertable<PaymentCollectionTable>;
@@ -90,9 +90,9 @@ export interface PaymentSessionTable {
   currency_code: string | null;
   data: unknown | null; // provider-specific payload
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type PaymentSession = Selectable<PaymentSessionTable>;
 export type NewPaymentSession = Insertable<PaymentSessionTable>;
@@ -108,9 +108,9 @@ export interface PaymentTable {
   currency_code: string | null;
   data: unknown | null; // from session, for provider processing
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type Payment = Selectable<PaymentTable>;
 export type NewPayment = Insertable<PaymentTable>;
@@ -123,9 +123,9 @@ export interface CaptureTable {
   amount: string | null; // decimal as string
   created_by: string | null; // e.g. user id
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type Capture = Selectable<CaptureTable>;
 export type NewCapture = Insertable<CaptureTable>;
@@ -139,9 +139,9 @@ export interface RefundTable {
   refund_reason_id: string | null;
   created_by: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type Refund = Selectable<RefundTable>;
 export type NewRefund = Insertable<RefundTable>;

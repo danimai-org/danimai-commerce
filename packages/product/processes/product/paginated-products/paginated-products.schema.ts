@@ -2,7 +2,6 @@ import { Type, type Static } from "@sinclair/typebox";
 import {
   createFilterableColumnsSchema,
   FilterOperator,
-  PaginationQuerySchema,
   PaginationSchema,
 } from "@danimai/core";
 import type { Product } from "../../../db/type";
@@ -40,7 +39,7 @@ export type PaginatedProductsProcessInput = Static<
   typeof PaginatedProductsSchema
 >;
 
-const paginationQueryProperties = (PaginationQuerySchema as unknown as {
+const paginationQueryProperties = (PaginationSchema as unknown as {
   properties?: Record<string, ReturnType<typeof Type.Any>>;
 }).properties ?? {};
 

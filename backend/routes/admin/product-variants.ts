@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { getService } from "@danimai/core";
 import {
   CREATE_PRODUCT_VARIANTS_PROCESS,
   UPDATE_PRODUCT_VARIANTS_PROCESS,
@@ -46,11 +45,10 @@ export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
     "/",
     async ({ query: input }) => {
       const process = getService<PaginatedProductVariantsProcess>(PAGINATED_PRODUCT_VARIANTS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: PaginatedProductVariantsSchema as any,
+      query: PaginatedProductVariantsSchema,
       response: {
         200: PaginatedProductVariantsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -67,11 +65,10 @@ export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
     "/:id",
     async ({ params }) => {
       const process = getService<RetrieveProductVariantProcess>(RETRIEVE_PRODUCT_VARIANT_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input: { id: params.id }, logger } as any);
+      return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
+      params: Type.Object({ id: Type.String() }),
       response: {
         200: RetrieveProductVariantResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -87,12 +84,11 @@ export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
   .post(
     "/",
     async ({ body: input }) => {
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const process = getService<CreateProductVariantsProcess>(CREATE_PRODUCT_VARIANTS_PROCESS);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: CreateProductVariantSchema as any,
+      body: CreateProductVariantSchema,
       response: {
         200: CreateProductVariantsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -108,16 +104,14 @@ export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
   .put(
     "/:id",
     async ({ params, body }) => {
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const process = getService<UpdateProductVariantsProcess>(UPDATE_PRODUCT_VARIANTS_PROCESS);
       return process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
-        logger,
-      } as any);
+      });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: UpdateProductVariantBodySchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateProductVariantBodySchema,
       response: {
         200: UpdateProductVariantsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -133,14 +127,13 @@ export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
   .delete(
     "/",
     async ({ body: input, set }) => {
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const process = getService<DeleteProductVariantsProcess>(DELETE_PRODUCT_VARIANTS_PROCESS);
-      await process.runOperations({ input, logger } as any);
+      await process.runOperations({ input });
       set.status = 204;
       return undefined;
     },
     {
-      body: DeleteProductVariantsSchema as any,
+      body: DeleteProductVariantsSchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,

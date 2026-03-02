@@ -3,6 +3,7 @@ import { Type } from "@sinclair/typebox";
 import { join } from "path";
 import { mkdir, writeFile, readFile } from "fs/promises";
 import { existsSync } from "fs";
+import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
   ValidationErrorResponseSchema,
@@ -37,13 +38,8 @@ const uploadsStatic = new Elysia()
     { detail: { tags: ["Upload"] } }
   );
 
-export const uploadRoutes = new Elysia()
-  .use(uploadsStatic)
-  .use(new Elysia({ prefix: "/upload" })
-  .onError(({ error, set }) => {
-    set.status = 500;
-    return { error: error instanceof Error ? error.message : "Upload failed" };
-  })
+const uploadApiRoutes = new Elysia({ prefix: "/upload" })
+  .onError(({ error, set }) => handleProcessError(error, set))
   .post(
     "/",
     async ({ request, set }) => {
@@ -80,4 +76,8 @@ export const uploadRoutes = new Elysia()
         description: "Upload an image file; returns a public URL for the stored file.",
       },
     }
-  ));
+  );
+
+export const uploadRoutes = new Elysia()
+  .use(uploadsStatic)
+  .use(uploadApiRoutes);

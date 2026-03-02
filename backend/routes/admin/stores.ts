@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { getService } from "@danimai/core";
 import {
   PAGINATED_STORES_PROCESS,
   LIST_STORES_PROCESS,
@@ -51,11 +50,10 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
     "/",
     async ({ query: input }) => {
       const process = getService<PaginatedStoresProcess>(PAGINATED_STORES_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: PaginatedStoresSchema as any,
+      query: PaginatedStoresSchema,
       response: {
         200: PaginatedStoresResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -72,11 +70,10 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
     "/list",
     async ({ query: input }) => {
       const process = getService<ListStoresProcess>(LIST_STORES_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: ListStoresSchema as any,
+      query: ListStoresSchema,
       response: {
         200: ListStoresResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -95,12 +92,11 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
       const process = getService<ListAndCountStoresProcess>(
         LIST_AND_COUNT_STORES_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      const [data, count] = await process.runOperations({ input, logger } as any);
+      const [data, count] = await process.runOperations({ input });
       return { data, count };
     },
     {
-      query: ListAndCountStoresSchema as any,
+      query: ListAndCountStoresSchema,
       response: {
         200: ListAndCountStoresResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -117,11 +113,10 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
     "/:id",
     async ({ params }) => {
       const process = getService<RetrieveStoreProcess>(RETRIEVE_STORE_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input: { id: params.id }, logger } as any);
+      return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
+      params: Type.Object({ id: Type.String() }),
       response: {
         200: StoreResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -138,11 +133,10 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
     "/",
     async ({ body: input }) => {
       const process = getService<CreateStoresProcess>(CREATE_STORES_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: CreateStoresSchema as any,
+      body: CreateStoresSchema,
       response: {
         200: CreateStoresResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -159,15 +153,13 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
     "/:id",
     async ({ params, body }) => {
       const process = getService<UpdateStoresProcess>(UPDATE_STORES_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       return process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
-        logger,
-      } as any);
+      });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: UpdateStoreBodySchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateStoreBodySchema,
       response: {
         200: UpdateStoreResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -184,13 +176,12 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
     "/",
     async ({ body: input, set }) => {
       const process = getService<DeleteStoresProcess>(DELETE_STORES_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      await process.runOperations({ input, logger } as any);
+      await process.runOperations({ input });
       set.status = 204;
       return undefined;
     },
     {
-      body: DeleteStoresSchema as any,
+      body: DeleteStoresSchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,

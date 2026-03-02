@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { getService } from "@danimai/core";
 import {
   PAGINATED_CURRENCIES_PROCESS,
   LIST_CURRENCIES_PROCESS,
@@ -25,7 +24,6 @@ import {
   ListCurrenciesResponseSchema,
   ListAndCountCurrenciesSchema,
   ListAndCountCurrenciesResponseSchema,
-  RetrieveCurrencySchema,
   CurrencyResponseSchema,
   ListAvailableCurrenciesSchema,
   ListAvailableCurrenciesResponseSchema,
@@ -54,11 +52,10 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
       const process = getService<PaginatedCurrenciesProcess>(
         PAGINATED_CURRENCIES_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: PaginatedCurrenciesSchema as any,
+      query: PaginatedCurrenciesSchema,
       response: {
         200: PaginatedCurrenciesResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -80,7 +77,7 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
       return process.runOperations({ input });
     },
     {
-      query: ListAvailableCurrenciesSchema as any,
+      query: ListAvailableCurrenciesSchema,
       response: {
         200: ListAvailableCurrenciesResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -97,11 +94,10 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     "/list",
     async ({ query: input }) => {
       const process = getService<ListCurrenciesProcess>(LIST_CURRENCIES_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: ListCurrenciesSchema as any,
+      query: ListCurrenciesSchema,
       response: {
         200: ListCurrenciesResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -120,12 +116,11 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
       const process = getService<ListAndCountCurrenciesProcess>(
         LIST_AND_COUNT_CURRENCIES_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      const [data, count] = await process.runOperations({ input, logger } as any);
+      const [data, count] = await process.runOperations({ input });
       return { data, count };
     },
     {
-      query: ListAndCountCurrenciesSchema as any,
+      query: ListAndCountCurrenciesSchema,
       response: {
         200: ListAndCountCurrenciesResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -142,11 +137,10 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     "/:id",
     async ({ params }) => {
       const process = getService<RetrieveCurrencyProcess>(RETRIEVE_CURRENCY_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input: { id: params.id }, logger } as any);
+      return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: RetrieveCurrencySchema as any,
+      params: Type.Object({ id: Type.String() }),
       response: {
         200: CurrencyResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -163,11 +157,10 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     "/",
     async ({ body: input }) => {
       const process = getService<CreateCurrenciesProcess>(CREATE_CURRENCIES_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: CreateCurrenciesSchema as any,
+      body: CreateCurrenciesSchema,
       response: {
         200: CreateCurrenciesResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -184,15 +177,13 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     "/:id",
     async ({ params, body }) => {
       const process = getService<UpdateCurrencyProcess>(UPDATE_CURRENCY_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       return process.runOperations({
         input: { ...(body as { tax_inclusive_pricing?: boolean }), id: params.id },
-        logger,
-      } as any);
+      });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: UpdateCurrencyBodySchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateCurrencyBodySchema,
       response: {
         200: UpdateCurrencyResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -209,13 +200,12 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     "/",
     async ({ body: input, set }) => {
       const process = getService<DeleteCurrenciesProcess>(DELETE_CURRENCIES_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      await process.runOperations({ input, logger } as any);
+      await process.runOperations({ input });
       set.status = 204;
       return undefined;
     },
     {
-      body: DeleteCurrenciesSchema as any,
+      body: DeleteCurrenciesSchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,

@@ -3,7 +3,6 @@ import {
   createFilterableColumnsSchema,
   createPaginatedResponseSchema,
   FilterOperator,
-  PaginationQuerySchema,
   PaginationSchema,
 } from "@danimai/core";
 import type { Order } from "@danimai/order/db";
@@ -31,9 +30,9 @@ export const PaginatedOrdersSchema = Type.Object({
   filters: Type.Optional(ordersFiltersSchema),
 });
 
-/** Query-only schema for Elysia route (no Type.Transform). */
+/** Query-only schema for Elysia route. */
 export const PaginatedOrdersQuerySchema = Type.Intersect([
-  PaginationQuerySchema,
+  PaginationSchema,
   Type.Object({
     filters: Type.Optional(ordersFiltersSchema),
   }),

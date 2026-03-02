@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { Type } from "@sinclair/typebox";
+import { getService } from "@danimai/core";
 import {
   CREATE_PRODUCT_PROCESS,
   CREATE_PRODUCTS_PROCESS,
@@ -14,7 +14,6 @@ import {
   UpdateProductsProcess,
   DeleteProductsProcess,
   PaginatedProductsProcess,
-  PaginatedProductsSchema,
   PaginatedProductsQuerySchema,
   PaginatedProductsResponseSchema,
   CreateProductSchema,
@@ -25,6 +24,7 @@ import {
   RetrieveProductProcess,
   RetrieveProductResponseSchema,
   UpdateProductSchema,
+  UpdateProductsSchema,
   UpdateProductsResponseSchema,
   UpdateProductResponseSchema,
   DeleteProductsSchema,
@@ -39,7 +39,6 @@ import {
   NoContentResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
-import { Type } from "@sinclair/typebox";
 
 export const productRoutes = new Elysia({ prefix: "/products" })
   .onError(({ error, set }) => handleProcessError(error, set))
@@ -47,7 +46,6 @@ export const productRoutes = new Elysia({ prefix: "/products" })
     "/",
     async ({ query }) => {
       const process = getService<PaginatedProductsProcess>(PAGINATED_PRODUCTS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const cleanedQuery: Record<string, unknown> = Object.fromEntries(
         Object.entries(query).filter(([_, value]) => value !== null && value !== undefined && value !== "")
       );
@@ -62,12 +60,12 @@ export const productRoutes = new Elysia({ prefix: "/products" })
         const l = typeof cleanedQuery.limit === "string" ? parseInt(cleanedQuery.limit, 10) : cleanedQuery.limit;
         cleanedQuery.limit = Number.isNaN(l) ? 10 : Math.max(1, Math.min(100, l));
       }
-      const result = await process.runOperations({ input: cleanedQuery as any, logger } as any);
+      const result = await process.runOperations({ input: cleanedQuery });
       const allScIds = [...new Set(result.products.flatMap((p) => p.sales_channel_ids))];
       let scMap: Record<string, { id: string; name: string; description: string | null; is_default: boolean; metadata: unknown; created_at: string; updated_at: string; deleted_at: string | null }> = {};
       if (allScIds.length > 0) {
         const listProcess = getService<ListSalesChannelsByIdsProcess>(LIST_SALES_CHANNELS_BY_IDS_PROCESS);
-        const channels = await listProcess.runOperations({ input: { ids: allScIds }, logger } as any);
+        const channels = await listProcess.runOperations({ input: { ids: allScIds } });
         scMap = Object.fromEntries(channels.map((c) => [c.id, c]));
       }
       const products = result.products.map((p) => {
@@ -78,7 +76,7 @@ export const productRoutes = new Elysia({ prefix: "/products" })
       return { products, count: result.count, offset: result.offset, limit: result.limit };
     },
     {
-      query: PaginatedProductsQuerySchema as any,
+      query: PaginatedProductsQuerySchema,
       response: {
         200: PaginatedProductsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -95,11 +93,10 @@ export const productRoutes = new Elysia({ prefix: "/products" })
     "/:id",
     async ({ params }) => {
       const process = getService<RetrieveProductProcess>(RETRIEVE_PRODUCT_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input: { id: params.id }, logger } as any);
+      return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
+      params: Type.Object({ id: Type.String() }),
       response: {
         200: RetrieveProductResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -115,12 +112,11 @@ export const productRoutes = new Elysia({ prefix: "/products" })
   .post(
     "/",
     async ({ body: input }) => {
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const process = getService<CreateProductProcess>(CREATE_PRODUCT_PROCESS);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: CreateProductSchema as any,
+      body: CreateProductSchema,
       response: {
         200: CreateProductResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -136,12 +132,11 @@ export const productRoutes = new Elysia({ prefix: "/products" })
   .post(
     "/batch",
     async ({ body: input }) => {
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const process = getService<CreateProductsProcess>(CREATE_PRODUCTS_PROCESS);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: Type.Any() as any,
+      body: CreateProductsSchema,
       response: {
         200: CreateProductsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -157,16 +152,14 @@ export const productRoutes = new Elysia({ prefix: "/products" })
   .put(
     "/:id",
     async ({ params, body }) => {
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const process = getService<UpdateProductProcess>(UPDATE_PRODUCT_PROCESS);
       return process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
-        logger,
-      } as any);
+      });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: UpdateProductSchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateProductSchema,
       response: {
         200: UpdateProductResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -182,12 +175,11 @@ export const productRoutes = new Elysia({ prefix: "/products" })
   .put(
     "/batch",
     async ({ body: input }) => {
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const process = getService<UpdateProductsProcess>(UPDATE_PRODUCTS_PROCESS);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: Type.Any() as any,
+      body: UpdateProductsSchema,
       response: {
         200: UpdateProductsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -203,14 +195,13 @@ export const productRoutes = new Elysia({ prefix: "/products" })
   .delete(
     "/",
     async ({ body: input, set }) => {
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const process = getService<DeleteProductsProcess>(DELETE_PRODUCTS_PROCESS);
-      await process.runOperations({ input, logger } as any);
+      await process.runOperations({ input });
       set.status = 204;
       return undefined;
     },
     {
-      body: DeleteProductsSchema as any,
+      body: DeleteProductsSchema,
       response: {
         204: NoContentResponseSchema,        
         400: ValidationErrorResponseSchema,

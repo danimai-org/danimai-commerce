@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { getService } from "@danimai/core";
 import {
   CREATE_PRODUCT_ATTRIBUTE_GROUPS_PROCESS,
   UPDATE_PRODUCT_ATTRIBUTE_GROUPS_PROCESS,
@@ -40,11 +39,10 @@ export const productAttributeGroupRoutes = new Elysia({ prefix: "/product-attrib
     "/",
     async ({ query: input }) => {
       const process = getService<PaginatedProductAttributeGroupsProcess>(PAGINATED_PRODUCT_ATTRIBUTE_GROUPS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: PaginatedProductAttributeGroupsSchema as any,
+      query: PaginatedProductAttributeGroupsSchema,
       response: {
         200: PaginatedProductAttributeGroupsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -61,11 +59,10 @@ export const productAttributeGroupRoutes = new Elysia({ prefix: "/product-attrib
     "/:id",
     async ({ params }) => {
       const process = getService<RetrieveProductAttributeGroupProcess>(RETRIEVE_PRODUCT_ATTRIBUTE_GROUP_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input: { id: params.id }, logger } as any);
+      return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
+      params: Type.Object({ id: Type.String() }),
       response: {
         200: RetrieveProductAttributeGroupResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -82,11 +79,10 @@ export const productAttributeGroupRoutes = new Elysia({ prefix: "/product-attrib
     "/",
     async ({ body: input }) => {
       const process = getService<CreateProductAttributeGroupsProcess>(CREATE_PRODUCT_ATTRIBUTE_GROUPS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: CreateProductAttributeGroupSchema as any,
+      body: CreateProductAttributeGroupSchema,
       response: {
         200: CreateProductAttributeGroupsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -103,15 +99,13 @@ export const productAttributeGroupRoutes = new Elysia({ prefix: "/product-attrib
     "/:id",
     async ({ params, body }) => {
       const process = getService<UpdateProductAttributeGroupsProcess>(UPDATE_PRODUCT_ATTRIBUTE_GROUPS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       return process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
-        logger,
-      } as any);
+      });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: UpdateProductAttributeGroupBodySchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateProductAttributeGroupBodySchema,
       response: {
         200: UpdateProductAttributeGroupsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -128,13 +122,12 @@ export const productAttributeGroupRoutes = new Elysia({ prefix: "/product-attrib
     "/",
     async ({ body: input, set }) => {
       const process = getService<DeleteProductAttributeGroupsProcess>(DELETE_PRODUCT_ATTRIBUTE_GROUPS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      await process.runOperations({ input, logger } as any);
+      await process.runOperations({ input });
       set.status = 204;
       return undefined;
     },
     {
-      body: DeleteProductAttributeGroupsSchema as any,
+      body: DeleteProductAttributeGroupsSchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,

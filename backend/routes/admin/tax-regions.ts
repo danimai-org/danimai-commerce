@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { getService } from "@danimai/core";
 import {
   PAGINATED_TAX_REGIONS_PROCESS,
   CREATE_TAX_REGIONS_PROCESS,
@@ -39,11 +38,10 @@ export const taxRegionRoutes = new Elysia({ prefix: "/tax-regions" })
       const process = getService<PaginatedTaxRegionsProcess>(
         PAGINATED_TAX_REGIONS_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: PaginatedTaxRegionsSchema as any,
+      query: PaginatedTaxRegionsSchema,
       response: {
         200: PaginatedTaxRegionsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -60,11 +58,10 @@ export const taxRegionRoutes = new Elysia({ prefix: "/tax-regions" })
     "/",
     async ({ body: input }) => {
       const process = getService<CreateTaxRegionsProcess>(CREATE_TAX_REGIONS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: CreateTaxRegionsSchema as any,
+      body: CreateTaxRegionsSchema,
       response: {
         200: CreateTaxRegionsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -81,15 +78,13 @@ export const taxRegionRoutes = new Elysia({ prefix: "/tax-regions" })
     "/:id",
     async ({ params, body }) => {
       const process = getService<UpdateTaxRegionsProcess>(UPDATE_TAX_REGIONS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       return process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
-        logger,
-      } as any);
+      });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: UpdateTaxRegionBodySchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateTaxRegionBodySchema,
       response: {
         200: UpdateTaxRegionsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -106,13 +101,12 @@ export const taxRegionRoutes = new Elysia({ prefix: "/tax-regions" })
     "/",
     async ({ body: input, set }) => {
       const process = getService<DeleteTaxRegionsProcess>(DELETE_TAX_REGIONS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      await process.runOperations({ input, logger } as any);
+      await process.runOperations({ input });
       set.status = 204;
       return undefined;
     },
     {
-      body: DeleteTaxRegionsSchema as any,
+      body: DeleteTaxRegionsSchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,

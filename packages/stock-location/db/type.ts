@@ -15,9 +15,9 @@ export interface StockLocationTable {
   name: string | null;
   address_id: string | null; // Foreign key to stock_location_addresses
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type StockLocation = Selectable<StockLocationTable>;
 export type NewStockLocation = Insertable<StockLocationTable>;
@@ -36,9 +36,9 @@ export interface StockLocationAddressTable {
   country_code: string | null;
   phone: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type StockLocationAddress = Selectable<StockLocationAddressTable>;
 export type NewStockLocationAddress = Insertable<StockLocationAddressTable>;

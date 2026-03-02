@@ -13,9 +13,9 @@ export interface Database {
 export interface PriceSetTable {
   id: Generated<string>;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type PriceSet = Selectable<PriceSetTable>;
 export type NewPriceSet = Insertable<PriceSetTable>;
@@ -31,9 +31,9 @@ export interface PriceTable {
   max_quantity: number | null;
   price_list_id: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type Price = Selectable<PriceTable>;
 export type NewPrice = Insertable<PriceTable>;
@@ -49,9 +49,9 @@ export interface PriceListTable {
   starts_at: string | null; // ISO timestamp
   ends_at: string | null; // ISO timestamp
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type PriceList = Selectable<PriceListTable>;
 export type NewPriceList = Insertable<PriceListTable>;
@@ -64,9 +64,9 @@ export interface PriceRuleTable {
   rule_type: string; // e.g., "customer_group", "region", "currency"
   value: string; // The value for the rule (e.g., customer group ID, region ID, currency code)
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type PriceRule = Selectable<PriceRuleTable>;
 export type NewPriceRule = Insertable<PriceRuleTable>;
@@ -79,9 +79,9 @@ export interface PriceListRuleTable {
   rule_type: string; // e.g., "customer_group", "region", "currency"
   value: string; // The value for the rule (e.g., customer group ID, region ID, currency code)
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type PriceListRule = Selectable<PriceListRuleTable>;
 export type NewPriceListRule = Insertable<PriceListRuleTable>;
@@ -95,9 +95,9 @@ export interface PricePreferenceTable {
   region_id: string | null;
   customer_id: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type PricePreference = Selectable<PricePreferenceTable>;
 export type NewPricePreference = Insertable<PricePreferenceTable>;

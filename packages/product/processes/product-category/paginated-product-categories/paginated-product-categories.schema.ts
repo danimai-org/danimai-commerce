@@ -3,13 +3,12 @@ import {
   createFilterableColumnsSchema,
   createPaginatedResponseSchema,
   FilterOperator,
-  PaginationQuerySchema,
   PaginationSchema,
 } from "@danimai/core";
 import type { ProductCategory } from "../../../db/type";
 import { ProductCategoryResponseSchema } from "../retrieve-product-category/retrieve-product-category.schema";
 
-const paginationQueryProperties = (PaginationQuerySchema as unknown as {
+const paginationQueryProperties = (PaginationSchema as unknown as {
   properties?: Record<string, ReturnType<typeof Type.Any>>;
 }).properties ?? {};
 

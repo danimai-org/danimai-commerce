@@ -25,9 +25,9 @@ export interface FulfillmentSetTable {
   name: string | null;
   type: string | null; // "shipping" | "pick-up" | etc.
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type FulfillmentSet = Selectable<FulfillmentSetTable>;
 export type NewFulfillmentSet = Insertable<FulfillmentSetTable>;
@@ -39,9 +39,9 @@ export interface ServiceZoneTable {
   fulfillment_set_id: string | null;
   name: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ServiceZone = Selectable<ServiceZoneTable>;
 export type NewServiceZone = Insertable<ServiceZoneTable>;
@@ -57,9 +57,9 @@ export interface GeoZoneTable {
   city: string | null;
   postal_expression: unknown | null; // JSON e.g. pattern
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type GeoZone = Selectable<GeoZoneTable>;
 export type NewGeoZone = Insertable<GeoZoneTable>;
@@ -71,9 +71,9 @@ export interface ShippingProfileTable {
   name: string | null;
   type: string | null; // "default" | "gift_card" | "custom"
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ShippingProfile = Selectable<ShippingProfileTable>;
 export type NewShippingProfile = Insertable<ShippingProfileTable>;
@@ -86,9 +86,9 @@ export interface ShippingOptionTypeTable {
   code: string | null;
   description: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ShippingOptionType = Selectable<ShippingOptionTypeTable>;
 export type NewShippingOptionType = Insertable<ShippingOptionTypeTable>;
@@ -106,9 +106,9 @@ export interface ShippingOptionTable {
   amount: string | null; // decimal as string
   data: unknown | null; // custom provider data
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ShippingOption = Selectable<ShippingOptionTable>;
 export type NewShippingOption = Insertable<ShippingOptionTable>;
@@ -122,9 +122,9 @@ export interface ShippingOptionRuleTable {
   operator: string | null; // "in" | "nin" | etc.
   value: unknown | null; // JSON - single or array of values
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type ShippingOptionRule = Selectable<ShippingOptionRuleTable>;
 export type NewShippingOptionRule = Insertable<ShippingOptionRuleTable>;
@@ -135,9 +135,9 @@ export interface FulfillmentProviderTable {
   id: Generated<string>;
   name: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type FulfillmentProvider = Selectable<FulfillmentProviderTable>;
 export type NewFulfillmentProvider = Insertable<FulfillmentProviderTable>;
@@ -155,9 +155,9 @@ export interface FulfillmentAddressTable {
   country_code: string | null;
   phone: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type FulfillmentAddress = Selectable<FulfillmentAddressTable>;
 export type NewFulfillmentAddress = Insertable<FulfillmentAddressTable>;
@@ -171,9 +171,9 @@ export interface FulfillmentTable {
   provider_id: string | null;
   delivery_address_id: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type Fulfillment = Selectable<FulfillmentTable>;
 export type NewFulfillment = Insertable<FulfillmentTable>;
@@ -186,9 +186,9 @@ export interface FulfillmentItemTable {
   item_id: string | null; // line item reference
   quantity: number | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type FulfillmentItem = Selectable<FulfillmentItemTable>;
 export type NewFulfillmentItem = Insertable<FulfillmentItemTable>;
@@ -202,9 +202,9 @@ export interface FulfillmentLabelTable {
   tracking_url: string | null;
   label_url: string | null;
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type FulfillmentLabel = Selectable<FulfillmentLabelTable>;
 export type NewFulfillmentLabel = Insertable<FulfillmentLabelTable>;

@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { getService } from "@danimai/core";
 import {
   CREATE_PRODUCT_CATEGORIES_PROCESS,
   UPDATE_PRODUCT_CATEGORIES_PROCESS,
@@ -50,7 +49,6 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
     "/",
     async ({ query }) => {
       const process = getService<PaginatedProductCategoriesProcess>(PAGINATED_PRODUCT_CATEGORIES_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const input: Record<string, unknown> = { ...query };
       if (query.page !== undefined) {
         const p = typeof query.page === "string" ? parseInt(query.page, 10) : query.page;
@@ -60,7 +58,7 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
         const l = typeof query.limit === "string" ? parseInt(query.limit, 10) : query.limit;
         input.limit = Number.isNaN(l) ? 10 : Math.max(1, Math.min(100, l));
       }
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
       query: PaginatedProductCategoriesQuerySchema,
@@ -80,11 +78,10 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
     "/:id",
     async ({ params }) => {
       const process = getService<RetrieveProductCategoryProcess>(RETRIEVE_PRODUCT_CATEGORY_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input: { id: params.id }, logger } as any);
+      return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
+      params: Type.Object({ id: Type.String() }),
       response: {
         200: RetrieveProductCategoryResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -101,11 +98,10 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
     "/",
     async ({ body: input }) => {
       const process = getService<CreateProductCategoriesProcess>(CREATE_PRODUCT_CATEGORIES_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      body: CreateProductCategorySchema as any,
+      body: CreateProductCategorySchema,
       response: {
         200: CreateProductCategoriesResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -122,15 +118,13 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
     "/:id",
     async ({ params, body }) => {
       const process = getService<UpdateProductCategoriesProcess>(UPDATE_PRODUCT_CATEGORIES_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       return process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
-        logger,
-      } as any);
+      });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: UpdateProductCategoryBodySchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateProductCategoryBodySchema,
       response: {
         200: UpdateProductCategoriesResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -147,13 +141,12 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
     "/",
     async ({ body: input, set }) => {
       const process = getService<DeleteProductCategoriesProcess>(DELETE_PRODUCT_CATEGORIES_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      await process.runOperations({ input, logger } as any);
+      await process.runOperations({ input });
       set.status = 204;
       return undefined;
     },
     {
-      body: DeleteProductCategoriesSchema as any,
+      body: DeleteProductCategoriesSchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -172,17 +165,15 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
       const process = getService<BatchLinkProductsToCategoryProcess>(
         BATCH_LINK_PRODUCTS_TO_CATEGORY_PROCESS
       );
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       await process.runOperations({
         input: { ...(body as Record<string, unknown>), category_id: params.id },
-        logger,
-      } as any);
+      });
       set.status = 204;
       return undefined;
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: BatchLinkProductsBodySchema as any,
+      params: Type.Object({ id: Type.String() }),
+      body: BatchLinkProductsBodySchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,

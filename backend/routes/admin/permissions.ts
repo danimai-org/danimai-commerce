@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { DANIMAI_LOGGER, getService } from "@danimai/core";
-import type { Logger } from "@logtape/logtape";
+import { getService } from "@danimai/core";
 import {
   PAGINATED_PERMISSIONS_PROCESS,
   RETRIEVE_PERMISSION_PROCESS,
@@ -27,11 +26,10 @@ export const permissionRoutes = new Elysia({ prefix: "/permissions" })
     "/",
     async ({ query: input }) => {
       const process = getService<PaginatedPermissionsProcess>(PAGINATED_PERMISSIONS_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      query: PaginatedPermissionsSchema as any,
+      query: PaginatedPermissionsSchema,
       response: {
         200: PaginatedPermissionsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -40,6 +38,7 @@ export const permissionRoutes = new Elysia({ prefix: "/permissions" })
       detail: {
         tags: ["Permissions"],
         summary: "Get paginated permissions",
+        description: "Gets a paginated list of permissions",
       },
     }
   )
@@ -47,11 +46,10 @@ export const permissionRoutes = new Elysia({ prefix: "/permissions" })
     "/:id",
     async ({ params }) => {
       const process = getService<RetrievePermissionProcess>(RETRIEVE_PERMISSION_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
-      return process.runOperations({ input: { id: params.id }, logger } as any);
+      return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
+      params: Type.Object({ id: Type.String() }),
       response: {
         200: RetrievePermissionResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -60,6 +58,7 @@ export const permissionRoutes = new Elysia({ prefix: "/permissions" })
       detail: {
         tags: ["Permissions"],
         summary: "Get permission by ID",
+        description: "Retrieves a single permission by its ID",
       },
     }
   )
@@ -67,13 +66,12 @@ export const permissionRoutes = new Elysia({ prefix: "/permissions" })
     "/:id",
     async ({ params, body }) => {
       const process = getService<UpdatePermissionProcess>(UPDATE_PERMISSION_PROCESS);
-      const logger = getService<Logger>(DANIMAI_LOGGER);
       const input = { ...(body as Record<string, unknown>), id: params.id };
-      return process.runOperations({ input, logger } as any);
+      return process.runOperations({ input });
     },
     {
-      params: Type.Object({ id: Type.String() }) as any,
-      body: Type.Omit(UpdatePermissionSchema, ["id"]) as any,
+      params: Type.Object({ id: Type.String() }),
+      body: Type.Omit(UpdatePermissionSchema, ["id"]),
       response: {
         200: UpdatePermissionResponseSchema,
         400: ValidationErrorResponseSchema,

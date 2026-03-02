@@ -11,9 +11,9 @@ export interface RegionTable {
   name: string;
   currency_code: string; // Three-character currency code (e.g., "USD", "EUR")
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type Region = Selectable<RegionTable>;
 export type NewRegion = Insertable<RegionTable>;
@@ -29,9 +29,9 @@ export interface CountryTable {
   display_name: string; // Country name for display
   region_id: string | null; // Foreign key to regions
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
-  deleted_at: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
 }
 export type Country = Selectable<CountryTable>;
 export type NewCountry = Insertable<CountryTable>;
