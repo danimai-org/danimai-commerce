@@ -20,6 +20,7 @@ import {
   UpdateStockLocationsResponseSchema,
   DeleteStockLocationsSchema,
 } from "@danimai/stock-location";
+import type { UpdateStockLocationsProcessOutput } from "@danimai/stock-location";
 import {
   CHECK_LOCATIONS_IN_USE_PROCESS,
   CheckLocationsInUseProcess,
@@ -119,9 +120,10 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
     "/:id",
     async ({ params, body }) => {
       const process = getService<UpdateStockLocationsProcess>(UPDATE_STOCK_LOCATIONS_PROCESS);
-      return process.runOperations({
+      const result = await process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
       });
+      return result as UpdateStockLocationsProcessOutput;
     },
     {
       params: Type.Object({ id: Type.String() }),
@@ -136,7 +138,7 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
         summary: "Update a stock location",
         description: "Updates an existing stock location by id",
       },
-    }
+     }
   )
   .delete(
     "/",

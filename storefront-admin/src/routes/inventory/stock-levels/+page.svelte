@@ -2,11 +2,20 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import Search from '@lucide/svelte/icons/search';
+	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import { client } from '$lib/client.js';
+	import { page } from '$app/state';
 
-	const API_BASE = 'http://localhost:8000/admin';
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+	const paginateState = createPagination(
+		async () => {
+			return client.inventory.levels.get({ query: paginationQuery });
+		},
+		['inventory-levels']
+	);
 
 	type InventoryLevel = {
-		id: string;
+		id: string;	
 		inventory_item_id: string;
 		location_id: string;
 		stocked_quantity: number;
@@ -28,67 +37,22 @@
 	};
 
 	let searchQuery = $state('');
-	let page = $state(1);
-	let limit = $state(10);
-	let levelsData = $state<{ data: InventoryLevel[]; pagination: Pagination } | null>(null);
-	let levelsLoading = $state(true);
-	let levelsError = $state<string | null>(null);
-
-	async function fetchLevels() {
-		levelsLoading = true;
-		levelsError = null;
-		try {
-			const params = new URLSearchParams({
-				page: String(page),
-				limit: String(limit),
-				sorting_field: 'created_at',
-				sorting_direction: 'desc'
-			});
-			if (searchQuery.trim()) {
-				params.append('search', searchQuery.trim());
-			}
-			const res = await fetch(`${API_BASE}/inventory/levels?${params}`, { cache: 'no-store' });
-			if (!res.ok) throw new Error(await res.text());
-			levelsData = (await res.json()) as { data: InventoryLevel[]; pagination: Pagination };
-		} catch (e) {
-			levelsError = e instanceof Error ? e.message : String(e);
-			levelsData = null;
-		} finally {
-			levelsLoading = false;
-		}
-	}
 
 	$effect(() => {
-		page;
-		limit;
-		searchQuery;
-		fetchLevels();
+		paginationQuery;
+		paginateState.refetch();
 	});
-
-	const levels = $derived(levelsData?.data ?? []);
-	const levelsPagination = $derived(levelsData?.pagination ?? null);
-	const levelsStart = $derived(
-		levelsPagination ? (levelsPagination.page - 1) * levelsPagination.limit + 1 : 0
-	);
-	const levelsEnd = $derived(
-		levelsPagination ? Math.min(levelsPagination.page * levelsPagination.limit, levelsPagination.total) : 0
-	);
+	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
+	const rows = $derived((paginateState.query.data?.data?.rows ?? []) as unknown as InventoryLevel[]);
+	const start = $derived(paginateState.start);
+	const end = $derived(paginateState.end);
 
 	function formatDate(iso: string) {
-		try {
-			return new Date(iso).toLocaleDateString('en-US', {
-				year: 'numeric',
-				month: 'short',
-				day: '2-digit'
-			});
-		} catch {
-			return iso;
-		}
-	}
-
-	function handleSearch() {
-		page = 1;
-		fetchLevels();
+		return new Date(iso).toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'short',
+			day: '2-digit'
+		});
 	}
 </script>
 
@@ -116,22 +80,18 @@
 						placeholder="Search by Item ID or Location ID..."
 						bind:value={searchQuery}
 						class="pl-9"
-						onkeydown={(e) => {
-							if (e.key === 'Enter') handleSearch();
-						}}
 					/>
 				</div>
-				<Button variant="outline" onclick={handleSearch}>Search</Button>
 			</div>
 		</div>
 
-		{#if levelsError}
+		{#if paginateState.error}
 			<div
 				class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 			>
-				{levelsError}
+				{paginateState.error}
 			</div>
-		{:else if levelsLoading}
+		{:else if paginateState.loading}
 			<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
 				<p class="text-muted-foreground">Loading…</p>
 			</div>
@@ -149,14 +109,14 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#if levels.length === 0}
+						{#if rows.length === 0}
 							<tr>
 								<td colspan="6" class="px-4 py-8 text-center text-muted-foreground">
 									No inventory levels found.
 								</td>
 							</tr>
 						{:else}
-							{#each levels as level (level.id)}
+							{#each rows as level (level.id)}
 								<tr class="border-b transition-colors hover:bg-muted/30">
 									<td class="px-4 py-3 font-mono text-xs">{level.inventory_item_id}</td>
 									<td class="px-4 py-3 font-mono text-xs">{level.location_id}</td>
@@ -172,8 +132,8 @@
 			</div>
 			<div class="mt-4 flex items-center justify-between gap-4 border-t py-4">
 				<p class="text-sm text-muted-foreground">
-					{#if levelsPagination && levelsPagination.total > 0}
-						{levelsStart} – {levelsEnd} of {levelsPagination.total} results
+					{#if pagination && pagination.total > 0}
+						{start} – {end} of {pagination?.total ?? 0} results
 					{:else}
 						0 results
 					{/if}
@@ -182,20 +142,20 @@
 					<Button
 						variant="outline"
 						size="sm"
-						disabled={!levelsPagination?.has_previous_page}
-						onclick={() => (page = page - 1)}
+						disabled={!pagination?.has_previous_page}
+						onclick={() => paginateState.query.refetch()}
 					>
 						Prev
 					</Button>
 					<span class="text-sm text-muted-foreground">
-						{levelsPagination?.page ?? 1} of {levelsPagination?.total_pages ?? 1} pages
+						{pagination?.page ?? 1} of {pagination?.total_pages ?? 1} pages
 					</span>
 					<Button
 						variant="outline"
 						size="sm"
-						disabled={!levelsPagination?.has_next_page}
-						onclick={() => (page = page + 1)}
-					>
+						disabled={!pagination?.has_next_page}
+						onclick={() => paginateState.query.refetch()}
+					>	
 						Next
 					</Button>
 				</div>
