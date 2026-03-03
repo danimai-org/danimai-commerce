@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
@@ -11,8 +13,18 @@
 	import Store from '@lucide/svelte/icons/store';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import { cn } from '$lib/utils.js';
-	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
+	import {
+		DeleteConfirmationModal,
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
 	import Combobox from '$lib/components/organs/combobox/combobox.svelte';
+	import { client } from '$lib/client.js';
+	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import { deleteCurrencies } from '$lib/currencies/api.js';
 
 	const API_BASE = 'http://localhost:8000/admin';
 
@@ -241,57 +253,50 @@
 				: '—'
 	});
 
-	// Active currencies
-	let searchQuery = $state('');
-	let page = $state(1);
-	let limit = $state(10);
-	let data = $state<{ data: Currency[]; pagination: Pagination } | null>(null);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
-	let selectedIds = $state<Set<string>>(new Set());
-
-	async function fetchCurrencies() {
-		loading = true;
-		error = null;
-		try {
-			const params = new URLSearchParams({
-				page: String(page),
-				limit: String(limit),
-				sorting_field: 'code',
-				sorting_direction: 'asc'
+	// Active currencies: paginationQuery + createPagination (sales-channels structure)
+	const paginationQuery = $derived.by(() =>
+		createPaginationQuery(page.url.searchParams)
+	);
+	const paginateState = createPagination(
+		async () => {
+			const res = await client.currencies.get({
+				query: paginationQuery as { page?: number; limit?: number; sorting_field?: string; sorting_direction?: string }
 			});
-			const res = await fetch(`${API_BASE}/currencies?${params}`, { cache: 'no-store' });
-			if (!res.ok) throw new Error(await res.text());
-			data = (await res.json()) as { data: Currency[]; pagination: Pagination };
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			data = null;
-		} finally {
-			loading = false;
-		}
-	}
+			return res as unknown as { data?: { rows?: Currency[]; pagination?: Pagination }; rows?: Currency[]; pagination?: Pagination };
+		},
+		['currencies']
+	);
 
 	$effect(() => {
-		page;
-		limit;
-		fetchCurrencies();
+		page.url.searchParams.toString();
+		paginateState.refetch();
 	});
 
-	const currencies = $derived(data?.data ?? []);
-	const pagination = $derived(data?.pagination ?? null);
+	function goToPage(pageNum: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('page', String(Math.max(1, pageNum)));
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+	}
+
+	const queryData = $derived(paginateState.query.data as { data?: { rows?: Currency[]; pagination?: Pagination }; rows?: Currency[]; pagination?: Pagination } | undefined);
+	const rows = $derived((queryData?.data?.rows ?? queryData?.rows ?? []) as Record<string, unknown>[]);
+	const pagination = $derived(queryData?.data?.pagination ?? queryData?.pagination ?? null);
 	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
 	const end = $derived(
 		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
 	);
 
-	const filteredCurrencies = $derived(
+	let searchQuery = $state('');
+	let selectedIds = $state<Set<string>>(new Set());
+
+	const filteredRows = $derived(
 		searchQuery.trim()
-			? currencies.filter(
-					(c) =>
-						c.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-						c.name.toLowerCase().includes(searchQuery.toLowerCase())
+			? rows.filter(
+					(r) =>
+						String(r.code ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+						String(r.name ?? '').toLowerCase().includes(searchQuery.toLowerCase())
 				)
-			: currencies
+			: rows
 	);
 
 	function toggleSelect(id: string) {
@@ -301,107 +306,80 @@
 	}
 
 	function toggleSelectAll() {
-		if (selectedIds.size === filteredCurrencies.length) selectedIds = new Set();
-		else selectedIds = new Set(filteredCurrencies.map((c) => c.id));
-	}
-
-	// Delete currency modal
-	let deleteModalOpen = $state(false);
-	let currencyToDelete = $state<Currency | null>(null);
-	let deleteSubmitting = $state(false);
-	let deleteError = $state<string | null>(null);
-
-	function openDeleteModal(currency: Currency) {
-		currencyToDelete = currency;
-		deleteModalOpen = true;
-		deleteError = null;
-	}
-
-	function closeDeleteModal() {
-		if (!deleteSubmitting) {
-			deleteModalOpen = false;
-			currencyToDelete = null;
-			deleteError = null;
-		}
-	}
-
-	async function removeCurrency() {
-		if (!currencyToDelete) return;
-		deleteSubmitting = true;
-		deleteError = null;
-		try {
-			const res = await fetch(`${API_BASE}/currencies`, {
-				method: 'DELETE',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ currency_ids: [currencyToDelete.id] })
-			});
-			if (!res.ok) throw new Error(await res.text());
-			selectedIds = new Set(selectedIds);
-			selectedIds.delete(currencyToDelete.id);
-			fetchCurrencies();
-			deleteModalOpen = false;
-			currencyToDelete = null;
-		} catch (e) {
-			deleteError = e instanceof Error ? e.message : String(e);
-		} finally {
-			deleteSubmitting = false;
-		}
+		if (selectedIds.size === filteredRows.length) selectedIds = new Set();
+		else selectedIds = new Set(filteredRows.map((r) => String(r.id ?? '')));
 	}
 
 	async function removeSelected() {
 		if (selectedIds.size === 0) return;
 		try {
-			const res = await fetch(`${API_BASE}/currencies`, {
-				method: 'DELETE',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ currency_ids: [...selectedIds] })
-			});
-			if (!res.ok) throw new Error(await res.text());
+			await deleteCurrencies([...selectedIds]);
 			selectedIds = new Set();
-			fetchCurrencies();
+			paginateState.refetch();
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			// paginateState.error is for the list query; bulk delete error could be shown via a toast or inline
+			console.error(e);
+			paginateState.refetch();
 		}
 	}
 
-	// Edit currency sheet
-	let editOpen = $state(false);
-	let editCurrency = $state<Currency | null>(null);
+	const openEdit = $derived(paginateState.openEdit);
+	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
+	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
+	const confirmDelete = $derived(paginateState.confirmDelete);
+	const refetch = $derived(paginateState.refetch);
+	const deleteItem = $derived(paginateState.deleteItem);
+	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
+	const deleteError = $derived(paginateState.deleteError);
+
+	// Edit currency sheet (uses createPagination form state + local editTaxInclusive)
 	let editTaxInclusive = $state(false);
 	let editError = $state<string | null>(null);
 	let editSubmitting = $state(false);
+	const formItem = $derived(paginateState.formItem as Currency | null);
+	const closeForm = $derived(paginateState.closeForm);
 
-	function openEdit(currency: Currency) {
-		editCurrency = currency;
-		editOpen = true;
-		editTaxInclusive = currency.tax_inclusive_pricing;
+	function handleOpenEdit(item: Record<string, unknown>) {
+		openEdit(item);
+		editTaxInclusive = Boolean(item?.tax_inclusive_pricing);
 		editError = null;
-	}
-
-	function closeEdit() {
-		editOpen = false;
-		editCurrency = null;
 	}
 
 	async function submitEdit() {
-		if (!editCurrency) return;
+		const item = formItem;
+		if (!item?.id) return;
 		editError = null;
 		editSubmitting = true;
 		try {
-			const res = await fetch(`${API_BASE}/currencies/${editCurrency.id}`, {
+			const res = await fetch(`${API_BASE}/currencies/${item.id}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ tax_inclusive_pricing: editTaxInclusive })
 			});
 			if (!res.ok) throw new Error(await res.text());
-			closeEdit();
-			fetchCurrencies();
+			closeForm();
+			paginateState.refetch();
 		} catch (e) {
 			editError = e instanceof Error ? e.message : String(e);
 		} finally {
 			editSubmitting = false;
 		}
 	}
+
+	const tableColumns: TableColumn[] = [
+		{ label: 'Code', key: 'code', type: 'text' },
+		{ label: 'Name', key: 'name', type: 'text' },
+		{ label: 'Tax inclusive pricing', key: 'tax_inclusive_pricing', type: 'boolean' },
+		{
+			label: 'Actions',
+			key: 'actions',
+			type: 'actions',
+			actions: [
+				{ label: 'Edit', key: 'edit', type: 'button', onClick: (item) => handleOpenEdit(item as Record<string, unknown>) },
+				{ label: 'Remove', key: 'delete', type: 'button', onClick: (item) => openDeleteConfirm(item as Parameters<typeof openDeleteConfirm>[0]) }
+			]
+		}
+	];
 
 	// Add currencies sheet
 	let addOpen = $state(false);
@@ -513,7 +491,7 @@
 			});
 			if (!res.ok) throw new Error(await res.text());
 			closeAdd();
-			fetchCurrencies();
+			paginateState.refetch();
 		} catch (e) {
 			addError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -608,183 +586,59 @@
 					<Button size="sm" onclick={openAdd}>Add currencies</Button>
 				</div>
 			</div>
-			<div class="flex flex-wrap items-center justify-between gap-2">
-				<div class="flex items-center gap-2">
-					{#if selectedIds.size > 0}
-						<Button
-							variant="outline"
-							size="sm"
-							class="rounded-md text-destructive hover:bg-destructive/10 hover:text-destructive"
-							onclick={removeSelected}
-						>
-							<Trash2 class="mr-1.5 size-4" />
-							Remove selected ({selectedIds.size})
-						</Button>
-					{:else}
-						<Button variant="outline" size="sm" class="rounded-md">
-							<SlidersHorizontal class="mr-1.5 size-4" />
-							Add filter
-						</Button>
-					{/if}
-				</div>
-				<div class="flex items-center gap-2">
-					<div class="relative w-64">
-						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							type="search"
-							placeholder="Search"
-							bind:value={searchQuery}
-							class="h-9 rounded-md pl-9"
-						/>
-					</div>
-					<button
-						type="button"
-						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-					>
-						<ArrowUpDown class="size-4" />
-						<span class="sr-only">Sort</span>
-					</button>
-				</div>
-			</div>
 		</div>
 
-		{#if error}
-			<div
-				class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-			>
-				{error}
-			</div>
-		{:else if loading}
-			<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
-				<p class="text-muted-foreground">Loading…</p>
-			</div>
-		{:else}
-			<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-				<table class="w-full text-sm">
-					<thead class="sticky top-0 border-b bg-muted/50">
-						<tr>
-							<th class="w-10 px-4 py-3">
-								<input
-									type="checkbox"
-									class="h-4 w-4 rounded border-input"
-									checked={filteredCurrencies.length > 0 &&
-										selectedIds.size === filteredCurrencies.length}
-									onchange={toggleSelectAll}
-								/>
-							</th>
-							<th class="px-4 py-3 text-left font-medium">Code</th>
-							<th class="px-4 py-3 text-left font-medium">Name</th>
-							<th class="px-4 py-3 text-left font-medium">Tax inclusive pricing</th>
-							<th class="w-10 px-4 py-3"></th>
-						</tr>
-					</thead>
-					<tbody>
-						{#if filteredCurrencies.length === 0}
-							<tr>
-								<td colspan="5" class="px-4 py-8 text-center text-muted-foreground">
-									No currencies found.
-								</td>
-							</tr>
-						{:else}
-							{#each filteredCurrencies as currency (currency.id)}
-								<tr class="border-b transition-colors hover:bg-muted/30">
-									<td class="px-4 py-3">
-										<input
-											type="checkbox"
-											class="h-4 w-4 rounded border-input"
-											checked={selectedIds.has(currency.id)}
-											onchange={() => toggleSelect(currency.id)}
-										/>
-									</td>
-									<td class="px-4 py-3 font-medium">{currency.code}</td>
-									<td class="px-4 py-3 text-muted-foreground">{currency.name}</td>
-									<td class="px-4 py-3">
-										<span class="text-muted-foreground">
-											• {currency.tax_inclusive_pricing ? 'True' : 'False'}
-										</span>
-									</td>
-									<td class="px-4 py-3">
-										<DropdownMenu.Root>
-											<DropdownMenu.Trigger
-												class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
-											>
-												<MoreHorizontal class="size-4" />
-												<span class="sr-only">Actions</span>
-											</DropdownMenu.Trigger>
-											<DropdownMenu.Portal>
-												<DropdownMenu.Content
-													class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-													sideOffset={4}
-												>
-													<DropdownMenu.Item
-														textValue="Edit"
-														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => openEdit(currency)}
-													>
-														<Pencil class="size-4" />
-														Edit
-													</DropdownMenu.Item>
-													<DropdownMenu.Item
-														textValue="Remove"
-														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => openDeleteModal(currency)}
-													>
-														<Trash2 class="size-4" />
-														Remove
-													</DropdownMenu.Item>
-												</DropdownMenu.Content>
-											</DropdownMenu.Portal>
-										</DropdownMenu.Root>
-									</td>
-								</tr>
-							{/each}
-						{/if}
-					</tbody>
-				</table>
-			</div>
-
-			<div class="mt-4 flex items-center justify-between gap-4 border-t py-4">
-				<p class="text-sm text-muted-foreground">
-					{#if pagination && pagination.total > 0}
-						{start} – {end} of {pagination.total} results
-					{:else}
-						0 results
-					{/if}
-				</p>
-				<div class="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={!pagination?.has_previous_page}
-						onclick={() => (page = page - 1)}
-					>
-						Prev
-					</Button>
-					<span class="text-sm text-muted-foreground">
-						{pagination?.page ?? 1} of {pagination?.total_pages ?? 1} pages
-					</span>
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={!pagination?.has_next_page}
-						onclick={() => (page = page + 1)}
-					>
-						Next
-					</Button>
+		<PaginationTable>
+			{#if paginateState.error}
+				<div
+					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+				>
+					{paginateState.error}
 				</div>
-			</div>
-		{/if}
+			{:else if paginateState.loading}
+				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
+					<p class="text-muted-foreground">Loading…</p>
+				</div>
+			{:else}
+				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+					<table class="w-full text-sm">
+						<TableHead
+							columns={tableColumns}
+							showSelectAll={true}
+							selectAllChecked={filteredRows.length > 0 && selectedIds.size === filteredRows.length}
+							selectAllIndeterminate={selectedIds.size > 0 && selectedIds.size < filteredRows.length}
+							onToggleSelectAll={toggleSelectAll}
+						/>
+						<TableBody
+							rows={filteredRows}
+							columns={tableColumns}
+							emptyMessage="No currencies found."
+							selectedIds={selectedIds}
+							onToggleSelect={toggleSelect}
+							rowIdKey="id"
+						/>
+					</table>
+				</div>
+
+				<TablePagination
+					{pagination}
+					{start}
+					{end}
+					onPageChange={goToPage}
+				/>
+			{/if}
+		</PaginationTable>
 	</div>
 </div>
 
 <!-- Edit currency sheet -->
-<Sheet.Root bind:open={editOpen}>
+<Sheet.Root bind:open={paginateState.formSheetOpen}>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
 		<div class="flex h-full flex-col">
 			<div class="flex-1 overflow-auto p-6 pt-12">
 				<h2 class="text-lg font-semibold">Edit currency</h2>
 				<p class="mt-1 text-sm text-muted-foreground">
-					Update tax inclusive pricing for {editCurrency?.code ?? ''}.
+					Update tax inclusive pricing for {formItem?.code ?? ''}.
 				</p>
 				{#if editError && !editSubmitting}
 					<div
@@ -807,7 +661,7 @@
 				</div>
 			</div>
 			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeEdit}>Cancel</Button>
+				<Button variant="outline" onclick={closeForm}>Cancel</Button>
 				<Button onclick={submitEdit} disabled={editSubmitting}>
 					{editSubmitting ? 'Saving…' : 'Save'}
 				</Button>
@@ -949,15 +803,22 @@
 
 <!-- Delete currency confirmation modal -->
 <DeleteConfirmationModal
-	bind:open={deleteModalOpen}
+	bind:open={paginateState.deleteConfirmOpen}
 	entityName="currency"
-	entityTitle={currencyToDelete ? `${currencyToDelete.code} (${currencyToDelete.name})` : ''}
-	onConfirm={removeCurrency}
-	onCancel={closeDeleteModal}
+	entityTitle={(deleteItem as Record<string, unknown>) ? `${(deleteItem as Record<string, unknown>).code ?? ''} (${(deleteItem as Record<string, unknown>).name ?? ''})` : ''}
+	onConfirm={() => confirmDelete((item: unknown) => deleteCurrencies([(item as { id: string }).id]))}
+	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}
 	error={deleteError}
-	customMessage={currencyToDelete ? `Are you sure you want to remove ${currencyToDelete.code} (${currencyToDelete.name})? This action cannot be undone.` : undefined}
+	customMessage={(deleteItem as Record<string, unknown>) ? `Are you sure you want to remove ${(deleteItem as Record<string, unknown>).code ?? ''} (${(deleteItem as Record<string, unknown>).name ?? ''})? This action cannot be undone.` : undefined}
 />
+{#if deleteError}
+	<div
+		class="mt-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+	>
+		{deleteError}
+	</div>
+{/if}
 
 <!-- Edit store sheet -->
 <Sheet.Root bind:open={editStoreOpen}>

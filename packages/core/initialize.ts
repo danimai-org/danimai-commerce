@@ -75,38 +75,38 @@ export const initialize = ({ db, logger, config }: DanimaiInitialize) => {
     container.bind<boolean>(DANIMAI_INITIALIZED).toConstantValue(true);
   }
   if (!container.isBound(DANIMAI_DB)) {
-    container.bind(DANIMAI_DB).toConstantValue(
-      new Kysely({
-        dialect: new BunPostgresDialect(db),
-        log: (event: LogEvent) => {
-          let caller = getQueryCaller();
-          if (!caller && event.query.sql) {
-            const sql = event.query.sql.toLowerCase();
-            const tableMatch = sql.match(/(?:from|into|update|join)\s+["']?(\w+)["']?/);
-            const table = tableMatch ? tableMatch[1] : "";
-            const domain = table ? table.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim() : "DB";
-            caller = { packageTag: `[${domain}]`, processInfo: "process" };
-          }
-          const header = caller
-            ? `${caller.packageTag} --> ${caller.processInfo}`
-            : "Processes called";
-          const timeMs = event.queryDurationMillis.toFixed(2);
-          const queryLine = `${ANSI.blue}[Query Time]${ANSI.reset} ${timeMs}ms ${ANSI.red}|${ANSI.reset} ${ANSI.blue}[Query]${ANSI.reset} ${event.query.sql}`;
+    const connection = new Kysely({
+      dialect: new BunPostgresDialect(db),
+      log: (event: LogEvent) => {
+        let caller = getQueryCaller();
+        if (!caller && event.query.sql) {
+          const sql = event.query.sql.toLowerCase();
+          const tableMatch = sql.match(/(?:from|into|update|join)\s+["']?(\w+)["']?/);
+          const table = tableMatch ? tableMatch[1] : "";
+          const domain = table ? table.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim() : "DB";
+          caller = { packageTag: `[${domain}]`, processInfo: "process" };
+        }
+        const header = caller
+          ? `${caller.packageTag} --> ${caller.processInfo}`
+          : "Processes called";
+        const timeMs = event.queryDurationMillis.toFixed(2);
+        const queryLine = `${ANSI.blue}[Query Time]${ANSI.reset} ${timeMs}ms ${ANSI.red}|${ANSI.reset} ${ANSI.blue}[Query]${ANSI.reset} ${event.query.sql}`;
 
-          if (event.level === "query") {
-            logger.info(`${header}`);
-            logger.info(`  ${queryLine}`);
-          }
+        if (event.level === "query") {
+          logger.info(`${header}`);
+          logger.info(`  ${queryLine}`);
+        }
 
-          if (event.level === "error") {
-            const errLine = `${ANSI.blue}[Query Time]${ANSI.reset} ${timeMs}ms ${ANSI.red}|${ANSI.reset} ${ANSI.blue}[Error]${ANSI.reset} Query failed`;
-            logger.error(`${header}`);
-            logger.error(`  ${errLine}`);
-            logger.error(`  SQL: ${event.query.sql}`);
-            logger.error(`  Error: ${event.error}`);
-          }
-        }, plugins: [new ParseJSONResultsPlugin()] })
-    );
+        if (event.level === "error") {
+          const errLine = `${ANSI.blue}[Query Time]${ANSI.reset} ${timeMs}ms ${ANSI.red}|${ANSI.reset} ${ANSI.blue}[Error]${ANSI.reset} Query failed`;
+          logger.error(`${header}`);
+          logger.error(`  ${errLine}`);
+          logger.error(`  SQL: ${event.query.sql}`);
+          logger.error(`  Error: ${event.error}`);
+        }
+      }, plugins: [new ParseJSONResultsPlugin()] })
+
+    container.bind(DANIMAI_DB).toConstantValue(connection);
   }
 
   if (!container.isBound(DANIMAI_LOGGER)) {

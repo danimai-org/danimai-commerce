@@ -12,13 +12,22 @@
 		emptyMessage = 'No results found.',
 		openEdit,
 		openDeleteConfirm,
+		selectedIds,
+		onToggleSelect,
+		rowIdKey = 'id',
 	}: {
 		rows: Record<string, unknown>[];
 		columns: TableColumn[];
 		emptyMessage?: string;
 		openEdit?: (item: Record<string, unknown>) => void;
 		openDeleteConfirm?: (item: Record<string, unknown>) => void;
+		selectedIds?: Set<string>;
+		onToggleSelect?: (id: string) => void;
+		rowIdKey?: string;
 	} = $props();
+
+	const showSelection = $derived(selectedIds != null && onToggleSelect != null);
+	const totalCols = $derived(columns.length + (showSelection ? 1 : 0));
 
 	function isActionsColumn(column: TableColumn): column is TableColumn & { actions: TableColumnAction[] } {
 		return column.key === 'actions' && Array.isArray((column as { actions?: TableColumnAction[] }).actions);
@@ -105,13 +114,24 @@
 <tbody>
 	{#if rows.length === 0}
 		<tr>
-			<td colspan={columns.length} class="px-4 py-8 text-center text-muted-foreground">
+			<td colspan={totalCols} class="px-4 py-8 text-center text-muted-foreground">
 				{emptyMessage}
 			</td>
 		</tr>
 	{:else}
 		{#each rows as row, i (row.id ?? i)}
 			<tr class="border-b transition-colors hover:bg-muted/30">
+				{#if showSelection}
+					{@const rowId = String(row[rowIdKey] ?? '')}
+					<td class="px-4 py-3">
+						<input
+							type="checkbox"
+							class="h-4 w-4 rounded border-input"
+							checked={selectedIds?.has(rowId) ?? false}
+							onchange={() => onToggleSelect?.(rowId)}
+						/>
+					</td>
+				{/if}
 				{#each columns as column, colIndex}
 					{#if isLinkColumn(column)}
 						<td class="px-4 py-3">
