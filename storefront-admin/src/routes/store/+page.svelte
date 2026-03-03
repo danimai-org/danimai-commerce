@@ -15,50 +15,27 @@
 	import { cn } from '$lib/utils.js';
 	import {
 		DeleteConfirmationModal,
-		PaginationTable,
+		CurrencyFormSheet,
 		TableHead,
 		TableBody,
 		TablePagination,
 		type TableColumn
 	} from '$lib/components/organs/index.js';
 	import Combobox from '$lib/components/organs/combobox/combobox.svelte';
-	import { client } from '$lib/client.js';
+	import {
+		listCurrencies,
+		deleteCurrencies,
+		listAvailableCurrencies,
+		createCurrencies
+	} from '$lib/currencies/api.js';
+	import type {
+		Currency,
+		CurrenciesListResponse,
+		AvailableCurrency
+	} from '$lib/currencies/types.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
-	import { deleteCurrencies } from '$lib/currencies/api.js';
 
 	const API_BASE = 'http://localhost:8000/admin';
-
-	type Currency = {
-		id: string;
-		code: string;
-		name: string;
-		symbol: string;
-		symbol_native: string;
-		tax_inclusive_pricing: boolean;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	type AvailableCurrency = {
-		code: string;
-		name: string;
-		symbol: string;
-		symbol_native: string;
-		active: boolean;
-		id?: string;
-		tax_inclusive_pricing: boolean;
-	};
-
-	type Pagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
 
 	type Store = {
 		id: string;
@@ -90,6 +67,15 @@
 		name: string | null;
 	};
 
+	type StoreListPagination = {
+		total: number;
+		page: number;
+		limit: number;
+		total_pages: number;
+		has_next_page: boolean;
+		has_previous_page: boolean;
+	};
+
 	// Store details from API (first store)
 	let storeData = $state<Store | null>(null);
 	let storeLoading = $state(true);
@@ -98,7 +84,7 @@
 		try {
 			const res = await fetch(`${API_BASE}/stores?limit=1`, { cache: 'no-store' });
 			if (!res.ok) throw new Error(await res.text());
-			const json = (await res.json()) as { data: Store[]; pagination: Pagination };
+			const json = (await res.json()) as { data: Store[]; pagination: StoreListPagination };
 			storeData = json.data[0] ?? null;
 		} catch {
 			storeData = null;
@@ -136,29 +122,26 @@
 	async function fetchStoreOptions() {
 		storeOptionsLoading = true;
 		try {
-			const [regionsRes, channelsRes, locationsRes, currenciesRes] = await Promise.all([
+			const [regionsRes, channelsRes, locationsRes, currenciesData] = await Promise.all([
 				fetch(`${API_BASE}/regions?limit=100`, { cache: 'no-store' }),
 				fetch(`${API_BASE}/sales-channels?limit=100`, { cache: 'no-store' }),
 				fetch(`${API_BASE}/stock-locations?limit=100`, { cache: 'no-store' }),
-				fetch(`${API_BASE}/currencies?limit=100`, { cache: 'no-store' })
+				listCurrencies({ limit: 100 })
 			]);
 
 			if (regionsRes.ok) {
 				const json = (await regionsRes.json()) as { data: Region[] };
-				storeRegions = json.data;
+				storeRegions = json.data ?? [];
 			}
 			if (channelsRes.ok) {
 				const json = (await channelsRes.json()) as { data: SalesChannel[] };
-				storeSalesChannels = json.data;
+				storeSalesChannels = json.data ?? [];
 			}
 			if (locationsRes.ok) {
 				const json = (await locationsRes.json()) as { data: StockLocation[] };
-				storeStockLocations = json.data;
+				storeStockLocations = json.data ?? [];
 			}
-			if (currenciesRes.ok) {
-				const json = (await currenciesRes.json()) as { data: Currency[] };
-				storeCurrencies = json.data;
-			}
+			storeCurrencies = currenciesData.rows;
 		} catch (e) {
 			console.error('Failed to fetch options:', e);
 		} finally {
@@ -253,24 +236,13 @@
 				: '—'
 	});
 
-	// Active currencies: paginationQuery + createPagination (sales-channels structure)
-	const paginationQuery = $derived.by(() =>
-		createPaginationQuery(page.url.searchParams)
-	);
+	// Currencies list: URL pagination + createPagination
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+
 	const paginateState = createPagination(
-		async () => {
-			const res = await client.currencies.get({
-				query: paginationQuery as { page?: number; limit?: number; sorting_field?: string; sorting_direction?: string }
-			});
-			return res as unknown as { data?: { rows?: Currency[]; pagination?: Pagination }; rows?: Currency[]; pagination?: Pagination };
-		},
+		async () => listCurrencies(paginationQuery),
 		['currencies']
 	);
-
-	$effect(() => {
-		page.url.searchParams.toString();
-		paginateState.refetch();
-	});
 
 	function goToPage(pageNum: number) {
 		const params = new URLSearchParams(page.url.searchParams);
@@ -278,26 +250,25 @@
 		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	const queryData = $derived(paginateState.query.data as { data?: { rows?: Currency[]; pagination?: Pagination }; rows?: Currency[]; pagination?: Pagination } | undefined);
-	const rows = $derived((queryData?.data?.rows ?? queryData?.rows ?? []) as Record<string, unknown>[]);
-	const pagination = $derived(queryData?.data?.pagination ?? queryData?.pagination ?? null);
-	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
-	);
+	const queryData = $derived(paginateState.query.data as CurrenciesListResponse | undefined);
+	const rows = $derived(queryData?.rows ?? []);
+	const pagination = $derived(queryData?.pagination ?? null);
+	const start = $derived(paginateState.start);
+	const end = $derived(paginateState.end);
+	const formMode = $derived(paginateState.formMode);
+	const formItem = $derived(paginateState.formItem);
+	const openEdit = $derived(paginateState.openEdit);
+	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
+	const closeForm = $derived(paginateState.closeForm);
+	const deleteConfirmOpen = $derived(paginateState.deleteConfirmOpen);
+	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
+	const deleteItem = $derived(paginateState.deleteItem);
+	const deleteError = $derived(paginateState.deleteError);
+	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
+	const confirmDelete = $derived(paginateState.confirmDelete);
+	const refetch = $derived(paginateState.refetch);
 
-	let searchQuery = $state('');
 	let selectedIds = $state<Set<string>>(new Set());
-
-	const filteredRows = $derived(
-		searchQuery.trim()
-			? rows.filter(
-					(r) =>
-						String(r.code ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-						String(r.name ?? '').toLowerCase().includes(searchQuery.toLowerCase())
-				)
-			: rows
-	);
 
 	function toggleSelect(id: string) {
 		selectedIds = new Set(selectedIds);
@@ -306,8 +277,8 @@
 	}
 
 	function toggleSelectAll() {
-		if (selectedIds.size === filteredRows.length) selectedIds = new Set();
-		else selectedIds = new Set(filteredRows.map((r) => String(r.id ?? '')));
+		if (selectedIds.size === rows.length) selectedIds = new Set();
+		else selectedIds = new Set((rows as Currency[]).map((c) => c.id));
 	}
 
 	async function removeSelected() {
@@ -315,54 +286,10 @@
 		try {
 			await deleteCurrencies([...selectedIds]);
 			selectedIds = new Set();
-			paginateState.refetch();
+			refetch();
 		} catch (e) {
-			// paginateState.error is for the list query; bulk delete error could be shown via a toast or inline
-			console.error(e);
-			paginateState.refetch();
-		}
-	}
-
-	const openEdit = $derived(paginateState.openEdit);
-	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
-	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
-	const confirmDelete = $derived(paginateState.confirmDelete);
-	const refetch = $derived(paginateState.refetch);
-	const deleteItem = $derived(paginateState.deleteItem);
-	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
-	const deleteError = $derived(paginateState.deleteError);
-
-	// Edit currency sheet (uses createPagination form state + local editTaxInclusive)
-	let editTaxInclusive = $state(false);
-	let editError = $state<string | null>(null);
-	let editSubmitting = $state(false);
-	const formItem = $derived(paginateState.formItem as Currency | null);
-	const closeForm = $derived(paginateState.closeForm);
-
-	function handleOpenEdit(item: Record<string, unknown>) {
-		openEdit(item);
-		editTaxInclusive = Boolean(item?.tax_inclusive_pricing);
-		editError = null;
-	}
-
-	async function submitEdit() {
-		const item = formItem;
-		if (!item?.id) return;
-		editError = null;
-		editSubmitting = true;
-		try {
-			const res = await fetch(`${API_BASE}/currencies/${item.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ tax_inclusive_pricing: editTaxInclusive })
-			});
-			if (!res.ok) throw new Error(await res.text());
-			closeForm();
-			paginateState.refetch();
-		} catch (e) {
-			editError = e instanceof Error ? e.message : String(e);
-		} finally {
-			editSubmitting = false;
+			// error surfaces via paginateState or we could set local error
+			refetch();
 		}
 	}
 
@@ -375,15 +302,28 @@
 			key: 'actions',
 			type: 'actions',
 			actions: [
-				{ label: 'Edit', key: 'edit', type: 'button', onClick: (item) => handleOpenEdit(item as Record<string, unknown>) },
-				{ label: 'Remove', key: 'delete', type: 'button', onClick: (item) => openDeleteConfirm(item as Parameters<typeof openDeleteConfirm>[0]) }
+				{
+					label: 'Edit',
+					key: 'edit',
+					type: 'button',
+					onClick: (item) => openEdit(item as Parameters<typeof openEdit>[0])
+				},
+				{
+					label: 'Remove',
+					key: 'delete',
+					type: 'button',
+					onClick: (item) => openDeleteConfirm(item as Parameters<typeof openDeleteConfirm>[0])
+				}
 			]
 		}
 	];
 
+	const selectAllChecked = $derived(rows.length > 0 && selectedIds.size === rows.length);
+	const selectAllIndeterminate = $derived(selectedIds.size > 0 && selectedIds.size < rows.length);
+
 	// Add currencies sheet
 	let addOpen = $state(false);
-	let availableData = $state<{ data: AvailableCurrency[]; pagination: Pagination } | null>(null);
+	let availableData = $state<import('$lib/currencies/types.js').AvailableCurrenciesResponse | null>(null);
 	let availableLoading = $state(false);
 	let availablePage = $state(1);
 	let availableLimit = $state(50);
@@ -409,19 +349,11 @@
 	async function fetchAvailable() {
 		availableLoading = true;
 		try {
-			const params = new URLSearchParams({
-				page: String(availablePage),
-				limit: String(availableLimit),
+			availableData = await listAvailableCurrencies({
+				page: availablePage,
+				limit: availableLimit,
 				search: availableSearchDebounced
 			});
-			const res = await fetch(`${API_BASE}/currencies/available?${params}`, {
-				cache: 'no-store'
-			});
-			if (!res.ok) throw new Error(await res.text());
-			availableData = (await res.json()) as {
-				data: AvailableCurrency[];
-				pagination: Pagination;
-			};
 		} catch (e) {
 			addError = e instanceof Error ? e.message : String(e);
 			availableData = null;
@@ -484,14 +416,9 @@
 		addSubmitting = true;
 		addError = null;
 		try {
-			const res = await fetch(`${API_BASE}/currencies`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ currencies: payload })
-			});
-			if (!res.ok) throw new Error(await res.text());
+			await createCurrencies({ currencies: payload });
 			closeAdd();
-			paginateState.refetch();
+			refetch();
 		} catch (e) {
 			addError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -582,13 +509,41 @@
 					<h2 class="text-lg font-semibold">Currencies</h2>
 					<p class="mt-1 text-sm text-muted-foreground">Manage active currencies for your store.</p>
 				</div>
+				<Button size="sm" onclick={openAdd}>Add currencies</Button>
+			</div>
+			<div class="mb-6 flex flex-wrap items-center justify-between gap-2">
 				<div class="flex items-center gap-2">
-					<Button size="sm" onclick={openAdd}>Add currencies</Button>
+					{#if selectedIds.size > 0}
+						<Button
+							variant="outline"
+							size="sm"
+							class="rounded-md text-destructive hover:bg-destructive/10 hover:text-destructive"
+							onclick={removeSelected}
+						>
+							<Trash2 class="mr-1.5 size-4" />
+							Remove selected ({selectedIds.size})
+						</Button>
+					{:else}
+						<Button variant="outline" size="sm" class="rounded-md">
+							<SlidersHorizontal class="mr-1.5 size-4" />
+							Add filter
+						</Button>
+					{/if}
+				</div>
+				<div class="flex items-center gap-2">
+					<div class="relative w-64">
+						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+						<Input type="search" placeholder="Search" class="h-9 rounded-md pl-9" />
+					</div>
+					<button
+						type="button"
+						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+					>
+						<ArrowUpDown class="size-4" />
+						<span class="sr-only">Sort</span>
+					</button>
 				</div>
 			</div>
-		</div>
-
-		<PaginationTable>
 			{#if paginateState.error}
 				<div
 					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
@@ -605,21 +560,19 @@
 						<TableHead
 							columns={tableColumns}
 							showSelectAll={true}
-							selectAllChecked={filteredRows.length > 0 && selectedIds.size === filteredRows.length}
-							selectAllIndeterminate={selectedIds.size > 0 && selectedIds.size < filteredRows.length}
+							selectAllChecked={selectAllChecked}
+							selectAllIndeterminate={selectAllIndeterminate}
 							onToggleSelectAll={toggleSelectAll}
 						/>
 						<TableBody
-							rows={filteredRows}
+							rows={rows}
 							columns={tableColumns}
 							emptyMessage="No currencies found."
 							selectedIds={selectedIds}
 							onToggleSelect={toggleSelect}
-							rowIdKey="id"
 						/>
 					</table>
 				</div>
-
 				<TablePagination
 					{pagination}
 					{start}
@@ -627,48 +580,37 @@
 					onPageChange={goToPage}
 				/>
 			{/if}
-		</PaginationTable>
+		</div>
 	</div>
 </div>
 
-<!-- Edit currency sheet -->
-<Sheet.Root bind:open={paginateState.formSheetOpen}>
-	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-		<div class="flex h-full flex-col">
-			<div class="flex-1 overflow-auto p-6 pt-12">
-				<h2 class="text-lg font-semibold">Edit currency</h2>
-				<p class="mt-1 text-sm text-muted-foreground">
-					Update tax inclusive pricing for {formItem?.code ?? ''}.
-				</p>
-				{#if editError && !editSubmitting}
-					<div
-						class="mt-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-					>
-						{editError}
-					</div>
-				{/if}
-				<div class="mt-6 flex flex-col gap-4">
-					<div class="flex items-center gap-2">
-						<input
-							type="checkbox"
-							id="edit-tax-inclusive"
-							bind:checked={editTaxInclusive}
-							class="h-4 w-4 rounded border-input"
-						/>
-						<label for="edit-tax-inclusive" class="text-sm font-medium">Tax inclusive pricing</label
-						>
-					</div>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeForm}>Cancel</Button>
-				<Button onclick={submitEdit} disabled={editSubmitting}>
-					{editSubmitting ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
+<CurrencyFormSheet
+	bind:open={paginateState.formSheetOpen}
+	currency={(formItem as unknown) as Currency | null}
+	onSuccess={refetch}
+/>
+
+<DeleteConfirmationModal
+	bind:open={paginateState.deleteConfirmOpen}
+	entityName="currency"
+	entityTitle={((deleteItem as unknown) as Currency | null)
+		? `${((deleteItem as unknown) as Currency).code} (${((deleteItem as unknown) as Currency).name})`
+		: ''}
+	onConfirm={() => confirmDelete((item) => deleteCurrencies([((item as unknown) as Currency).id]))}
+	onCancel={closeDeleteConfirm}
+	submitting={deleteSubmitting}
+	error={deleteError}
+	customMessage={((deleteItem as unknown) as Currency | null)
+		? `Are you sure you want to remove ${((deleteItem as unknown) as Currency).code} (${((deleteItem as unknown) as Currency).name})? This action cannot be undone.`
+		: undefined}
+/>
+{#if deleteError}
+	<div
+		class="mt-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+	>
+		{deleteError}
+	</div>
+{/if}
 
 <!-- Add currencies sheet -->
 <Sheet.Root bind:open={addOpen}>
@@ -800,25 +742,6 @@
 		</div>
 	</Sheet.Content>
 </Sheet.Root>
-
-<!-- Delete currency confirmation modal -->
-<DeleteConfirmationModal
-	bind:open={paginateState.deleteConfirmOpen}
-	entityName="currency"
-	entityTitle={(deleteItem as Record<string, unknown>) ? `${(deleteItem as Record<string, unknown>).code ?? ''} (${(deleteItem as Record<string, unknown>).name ?? ''})` : ''}
-	onConfirm={() => confirmDelete((item: unknown) => deleteCurrencies([(item as { id: string }).id]))}
-	onCancel={closeDeleteConfirm}
-	submitting={deleteSubmitting}
-	error={deleteError}
-	customMessage={(deleteItem as Record<string, unknown>) ? `Are you sure you want to remove ${(deleteItem as Record<string, unknown>).code ?? ''} (${(deleteItem as Record<string, unknown>).name ?? ''})? This action cannot be undone.` : undefined}
-/>
-{#if deleteError}
-	<div
-		class="mt-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-	>
-		{deleteError}
-	</div>
-{/if}
 
 <!-- Edit store sheet -->
 <Sheet.Root bind:open={editStoreOpen}>
