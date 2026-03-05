@@ -41,13 +41,16 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input })  => {
+    async ({ query: input }) => {
       const process = getService<PaginatedInvitesProcess>(PAGINATED_INVITES_PROCESS);
       const result = await process.runOperations({ input });
-      const data = result.data.map(({ token: _t, ...invite }) =>
+      if (!result) {
+        throw new Error("Failed to list invites");
+      }
+      const rows = result.rows.map(({ token: _t, ...invite }: any) =>
         serializeInviteDates(invite as Record<string, unknown>)
       );
-      return { ...result, rows };
+      return { ...result, rows } as any;
     },
     {
       query: PaginatedInvitesSchema,
@@ -90,9 +93,9 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
     async ({ body: input }) => {
       const process = getService<AcceptInviteProcess>(ACCEPT_INVITE_PROCESS);
       const result = await process.runOperations({ input });
-      if (!result) return result;
+      if (!result) return result as any;
       const { password_hash: _p, ...user } = result;
-      return user;
+      return user as any;
     },
     {
       body: AcceptInviteSchema,
@@ -116,7 +119,7 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
       const result = await process.runOperations({ input });
       if (!result) throw new Error("Invite not found or resend failed");
       const { token: _t, ...invite } = result;
-      return invite;
+      return invite as any;
     },
     {
       params: Type.Object({ id: Type.String() }),

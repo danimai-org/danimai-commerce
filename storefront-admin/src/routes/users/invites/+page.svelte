@@ -2,18 +2,37 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import * as Select from '$lib/components/ui/select/index.js';
+	import {
+		MultiSelectCombobox,
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
 	import Mail from '@lucide/svelte/icons/mail';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import Search from '@lucide/svelte/icons/search';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
+	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
+	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 
 	const API_BASE = 'http://localhost:8000/admin';
+
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+
+	function goToPage(pageNum: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('page', String(Math.max(1, pageNum)));
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+	}
 
 	type Role = {
 		id: string;
 		name: string;
 		description: string;
+		
 	};
 
 	type Invite = {
@@ -37,7 +56,7 @@
 
 	let inviteOpen = $state(false);
 	let inviteEmail = $state('');
-	let inviteRoleId = $state<string | null>(null);
+	let inviteRoleIds = $state<string[]>([]);
 	let roles = $state<Role[]>([]);
 	let inviteLoading = $state(false);
 	let inviteSubmitting = $state(false);
@@ -45,26 +64,34 @@
 	let inviteSuccess = $state(false);
 
 	let searchQuery = $state('');
-	let invitesData = $state<{ data: Invite[]; pagination: Pagination } | null>(null);
+	let invitesData = $state<{ rows: Invite[]; pagination: Pagination } | null>(null);
 	let invitesLoading = $state(true);
 	let invitesError = $state<string | null>(null);
-	let page = $state(1);
 	const limit = 10;
 	let resendingId = $state<string | null>(null);
+
+	const tableColumns: TableColumn[] = [
+		{ label: 'Email', key: 'email', type: 'text' },
+		{ label: 'Role', key: 'role', type: 'text' },
+		{ label: 'Status', key: 'status', type: 'text' },
+		{ label: 'Expires', key: 'expires_at', type: 'date' },
+		{ label: 'Created', key: 'created_at', type: 'date' },
+		{ label: 'Actions', key: 'actions', type: 'actions' }
+	];
 
 	async function fetchInvites() {
 		invitesLoading = true;
 		invitesError = null;
 		try {
 			const params = new URLSearchParams({
-				page: String(page),
+				page: String(paginationQuery.page),
 				limit: String(limit),
 				sorting_field: 'created_at',
 				sorting_direction: 'desc'
 			});
 			const res = await fetch(`${API_BASE}/invites?${params}`, { cache: 'no-store' });
 			if (!res.ok) throw new Error(await res.text());
-			invitesData = (await res.json()) as { data: Invite[]; pagination: Pagination };
+			invitesData = (await res.json()) as { rows: Invite[]; pagination: Pagination };
 		} catch (e) {
 			invitesError = e instanceof Error ? e.message : String(e);
 			invitesData = null;
@@ -78,31 +105,39 @@
 		fetchInvites();
 	});
 
-	const invites = $derived(invitesData?.data ?? []);
+	const invites = $derived(invitesData?.rows ?? []);
 	const pagination = $derived(invitesData?.pagination ?? null);
+	const start = $derived(
+		pagination ? (pagination.page - 1) * pagination.limit + 1 : 0
+	);
+	const end = $derived(
+		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	);
 
-	function formatDate(iso: string) {
-		try {
-			return new Date(iso).toLocaleDateString('en-US', {
+	function formatDate(iso: string | Date) {
+		if (iso instanceof Date) {
+			return iso.toLocaleDateString('en-US', {
 				year: 'numeric',
 				month: 'short',
 				day: '2-digit',
 				hour: '2-digit',
 				minute: '2-digit'
 			});
-		} catch {
-			return iso;
 		}
+		return iso;
 	}
 
-	function isExpired(expiresAt: string) {
+	function isExpired(expiresAt: string | Date) {
+		if (expiresAt instanceof Date) {
+			return expiresAt < new Date();
+		}
 		return new Date(expiresAt) < new Date();
 	}
 
 	async function openInviteSheet() {
 		inviteOpen = true;
 		inviteEmail = '';
-		inviteRoleId = null;
+		inviteRoleIds = [];
 		inviteError = null;
 		inviteSuccess = false;
 		inviteLoading = true;
@@ -127,8 +162,8 @@
 		}
 		inviteSubmitting = true;
 		try {
-			const body: { email: string; role_id?: string } = { email };
-			if (inviteRoleId) body.role_id = inviteRoleId;
+			const body: { email: string; role_ids?: string[] } = { email };
+			if (inviteRoleIds.length > 0) body.role_ids = inviteRoleIds;
 			const res = await fetch(`${API_BASE}/invites`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -145,7 +180,7 @@
 			}
 			inviteSuccess = true;
 			inviteEmail = '';
-			inviteRoleId = null;
+			inviteRoleIds = [];
 			fetchInvites();
 		} catch (e) {
 			inviteError = e instanceof Error ? e.message : String(e);
@@ -184,55 +219,27 @@
 			</div>
 			<Button size="sm" onclick={openInviteSheet}>Invite user</Button>
 		</div>
-		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex flex-wrap items-center justify-between gap-2">
-				<Button variant="outline" size="sm" class="rounded-md">
-					<SlidersHorizontal class="mr-1.5 size-4" />
-					Add filter
-				</Button>
-				<div class="flex items-center gap-2">
-					<div class="relative w-64">
-						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							type="search"
-							placeholder="Search"
-							bind:value={searchQuery}
-							class="h-9 rounded-md pl-9"
-						/>
-					</div>
-					<button
-						type="button"
-						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-					>
-						<ArrowUpDown class="size-4" />
-						<span class="sr-only">Sort</span>
-					</button>
+		<PaginationTable>
+			{#if invitesError}
+				<div
+					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+				>
+					{invitesError}
 				</div>
-			</div>
-		</div>
-
-		{#if invitesLoading}
-			<p class="text-sm text-muted-foreground">Loading invites…</p>
-		{:else if invitesError}
-			<p class="text-sm text-destructive">{invitesError}</p>
-		{:else if invites.length === 0}
-			<div class="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-				No invites yet. Click "Invite user" to send your first invite.
-			</div>
-		{:else}
-			<div class="rounded-lg border">
-				<div class="overflow-x-auto">
+			{:else if invitesLoading}
+				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
+					<p class="text-muted-foreground">Loading…</p>
+				</div>
+			{:else if invites.length === 0}
+				<div
+					class="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground bg-card"
+				>
+					No invites yet. Click &quot;Invite user&quot; to send your first invite.
+				</div>
+			{:else}
+				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
 					<table class="w-full text-sm">
-						<thead>
-							<tr class="border-b bg-muted/50">
-								<th class="px-4 py-3 text-left font-medium">Email</th>
-								<th class="px-4 py-3 text-left font-medium">Role</th>
-								<th class="px-4 py-3 text-left font-medium">Status</th>
-								<th class="px-4 py-3 text-left font-medium">Expires</th>
-								<th class="px-4 py-3 text-left font-medium">Created</th>
-								<th class="px-4 py-3 text-right font-medium">Actions</th>
-							</tr>
-						</thead>
+						<TableHead columns={tableColumns} />
 						<tbody>
 							{#each invites as invite (invite.id)}
 								<tr class="border-b last:border-0">
@@ -277,36 +284,12 @@
 						</tbody>
 					</table>
 				</div>
+
 				{#if pagination && pagination.total_pages > 1}
-					<div class="flex items-center justify-between border-t px-4 py-3">
-						<p class="text-sm text-muted-foreground">
-							Showing {(pagination.page - 1) * pagination.limit + 1}–{Math.min(
-								pagination.page * pagination.limit,
-								pagination.total
-							)} of {pagination.total}
-						</p>
-						<div class="flex gap-2">
-							<Button
-								size="sm"
-								variant="outline"
-								disabled={!pagination.has_previous_page}
-								onclick={() => (page = page - 1)}
-							>
-								Previous
-							</Button>
-							<Button
-								size="sm"
-								variant="outline"
-								disabled={!pagination.has_next_page}
-								onclick={() => (page = page + 1)}
-							>
-								Next
-							</Button>
-						</div>
-					</div>
+					<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
 				{/if}
-			</div>
-		{/if}
+			{/if}
+		</PaginationTable>
 	</div>
 </div>
 
@@ -316,7 +299,7 @@
 			<div class="shrink-0 border-b px-6 py-4">
 				<h2 class="text-lg font-semibold">Invite user</h2>
 				<p class="mt-1 text-sm text-muted-foreground">
-					Send an invite by email. Optionally assign a role.
+					Send an invite by email. Optionally assign roles.
 				</p>
 			</div>
 			<form
@@ -341,30 +324,17 @@
 							/>
 						</div>
 						<div class="space-y-2">
-							<label for="invite-role" class="block text-sm font-medium">Role (optional)</label>
+							<label for="invite-role" class="block text-sm font-medium">Roles (optional)</label>
 							{#if inviteLoading}
 								<p class="text-sm text-muted-foreground">Loading roles…</p>
 							{:else}
-								<Select.Root
-									type="single"
-									value={inviteRoleId ?? undefined}
-									onValueChange={(v) => (inviteRoleId = v ?? null)}
-									allowDeselect
+								<MultiSelectCombobox
+									id="invite-role"
+									options={roles.map((r) => ({ id: r.id, value: r.name }))}
+									bind:value={inviteRoleIds}
+									placeholder="Select roles…"
 									disabled={inviteSubmitting}
-								>
-									<Select.Trigger id="invite-role" class="w-full">
-										{#if inviteRoleId && roles.find((r) => r.id === inviteRoleId)}
-											{roles.find((r) => r.id === inviteRoleId)?.name}
-										{:else}
-											Select role
-										{/if}
-									</Select.Trigger>
-									<Select.Content>
-										{#each roles as role (role.id)}
-											<Select.Item value={role.id} label={role.name}>{role.name}</Select.Item>
-										{/each}
-									</Select.Content>
-								</Select.Root>
+								/>
 							{/if}
 						</div>
 						{#if inviteError}

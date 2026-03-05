@@ -83,17 +83,17 @@ export class CreateInviteProcess implements ProcessContract<
       );
     }
 
-    let roleName: string | null = null;
-    if (input.role_id) {
-      const role = await this.db
-        .withSchema("public")
+    let roleNames: string[] = [];
+    if (input.role_ids?.length) {
+      const roles = await this.db
         .selectFrom("roles")
-        .where("id", "=", input.role_id)
+        .where("id", "in", input.role_ids)
         .where("deleted_at", "is", null)
         .select("name")
-        .executeTakeFirst();
-      roleName = role?.name ?? null;
+        .execute();
+      roleNames = roles.map((r) => r.name);
     }
+    const role = roleNames.length > 0 ? roleNames.join(", ") : null;
 
     const token = randomBytes(32).toString("hex");
     const expiresAt = new Date();
@@ -103,7 +103,7 @@ export class CreateInviteProcess implements ProcessContract<
       .insertInto("invites")
       .values({
         email,
-        role: roleName,
+        role,
         accepted: false,
         token,
         expires_at: expiresAt.toISOString(),
@@ -127,7 +127,7 @@ export class CreateInviteProcess implements ProcessContract<
         token,
         inviteLink,
         expiresAt: expiresAt.toISOString(),
-        roleName: roleName ?? undefined,
+        roleName: role ?? undefined,
       },
     });
 

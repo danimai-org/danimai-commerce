@@ -10,16 +10,19 @@
 		searchPlaceholder = 'Search',
 		showFilter = true,
 		showSort = true,
+		showToolbar = true,
 		children,
 	}: {
 		searchQuery?: string;
 		searchPlaceholder?: string;
 		showFilter?: boolean;
 		showSort?: boolean;
+		showToolbar?: boolean;
 		children?: import('svelte').Snippet;
 	} = $props();
 </script>
 
+{#if showToolbar}
 <div class="mb-6 flex flex-col gap-4">
 	<div class="flex flex-wrap items-center justify-between gap-2">
 		{#if showFilter}
@@ -52,6 +55,7 @@
 		</div>
 	</div>
 </div>
+{/if}
 
 {#if children}
 	{@render children()}
