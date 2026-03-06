@@ -1,7 +1,13 @@
 import type { Generated, Selectable, Insertable, Updateable } from "kysely";
+import type { ProductSalesChannelTable } from "@danimai/sales-channel/db";
 
-type ProductStatus = "draft" | "proposed" | "published" | "rejected";
-
+export enum ProductStatusEnum {
+  DRAFT = "draft",
+  PROPOSED = "proposed",
+  PUBLISHED = "published",
+  REJECTED = "rejected",
+}
+  
 export interface Database {
   products: ProductTable;
   product_images: ProductImageTable;
@@ -24,6 +30,8 @@ export interface Database {
 
   product_tags: ProductTagTable;
   product_tag_relations: ProductTagRelationTable;
+
+  product_sales_channels: ProductSalesChannelTable;
 }
 
 // table products
@@ -34,7 +42,7 @@ export interface ProductTable {
   subtitle: string | null;
   description: string | null;
   is_giftcard: boolean;
-  status: ProductStatus;
+  status: ProductStatusEnum;
   thumbnail: string | null;
   discountable: boolean;
   external_id: string | null;
@@ -103,8 +111,8 @@ export interface ProductAttributeGroupRelationTable {
   attribute_group_id: string;
   required: boolean;
   rank: number;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
 }
 export type ProductAttributeGroupRelation = Selectable<ProductAttributeGroupRelationTable>;
 export type NewProductAttributeGroupRelation = Insertable<ProductAttributeGroupRelationTable>;
@@ -117,8 +125,8 @@ export interface ProductAttributeGroupAttributeTable {
   attribute_id: string;
   rank: number;
   required: boolean;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
 }
 
 export type ProductAttributeGroupAttribute = Selectable<ProductAttributeGroupAttributeTable>;
@@ -277,7 +285,6 @@ export type ProductVariantImageRelationUpdate =
 export interface ProductCollectionRelationTable {
   product_id: string;
   product_collection_id: string;
-  created_at: Generated<string>;
 }
 export type ProductCollectionRelation =
   Selectable<ProductCollectionRelationTable>;

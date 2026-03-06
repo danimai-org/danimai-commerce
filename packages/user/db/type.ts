@@ -150,8 +150,8 @@ export interface SessionTable {
   expires_at: string; // ISO timestamp; session is invalid after this
   logged_out_at: string | null; // set when user logs out
   metadata: unknown | null;
-  created_at: Generated<string>;
-  updated_at: Generated<string>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
 }
 
 export type Session = Selectable<SessionTable>;

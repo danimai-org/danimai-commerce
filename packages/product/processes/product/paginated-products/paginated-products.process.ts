@@ -1,52 +1,29 @@
 import {
   InjectDB,
-  InjectLogger,
   Process,
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
   SortOrder,
 } from "@danimai/core";
-import { Kysely, sql } from "kysely";
-import type { Logger } from "@logtape/logtape";
+import { Kysely, sql, type OrderByExpression } from "kysely";
 import {
-  type PaginatedProductsProcessInput,
+  type PaginatedProductsProcessOutput,
   PaginatedProductsSchema,
 } from "./paginated-products.schema";
-import type { Database, Product, ProductCategory } from "../../../db/type";
-
-export type PaginatedProductItem = {
-  id: string;
-  title: string;
-  handle: string;
-  status: string;
-  thumbnail: string | null;
-  variants: Array<{ id: string }>;
-  category_id: string | null;
-  category: {
-    id: string;
-    value: string;
-    handle: string;
-  } | null;
-  sales_channel_ids: string[];
-};
-
-export type PaginatedProductsResponse = {
-  products: PaginatedProductItem[];
-  count: number;
-  offset: number;
-  limit: number;
-};
+import type { Database } from "../../../db/type";
+import { paginationResponse } from "@danimai/core/pagination";
 
 export const PAGINATED_PRODUCTS_PROCESS = Symbol("PaginatedProducts");
 
 @Process(PAGINATED_PRODUCTS_PROCESS)
-export class PaginatedProductsProcess implements ProcessContract<PaginatedProductsResponse> {
+export class PaginatedProductsProcess implements ProcessContract<
+  typeof PaginatedProductsSchema,
+  PaginatedProductsProcessOutput
+> {
   constructor(
     @InjectDB()
-    private readonly db: Kysely<Database>,
-    @InjectLogger()
-    private readonly logger: Logger,
+    private readonly db: Kysely<Database>
   ) {}
 
   async runOperations(
@@ -54,25 +31,54 @@ export class PaginatedProductsProcess implements ProcessContract<PaginatedProduc
       schema: PaginatedProductsSchema,
     })
     context: ProcessContextType<typeof PaginatedProductsSchema>,
-  ) {
+  ): Promise<PaginatedProductsProcessOutput> {
     const { input } = context;
     const {
       page = 1,
       limit = 10,
       sorting_field = "created_at",
       sorting_direction = SortOrder.DESC,
-      category_id,
-      category_ids,
       search,
-      filters
+      filters,
     } = input;
+    const {
+      status,
+      category_ids,
+      tag_ids,
+      sales_channel_ids,
+      collection_ids,
+    } = filters ?? {};
 
     let query = this.db.selectFrom("products").where("deleted_at", "is", null);
 
-    if (category_ids?.length) {
-      query = query.where("category_id", "in", category_ids);
-    } else if (category_id) {
-      query = query.where("category_id", "=", category_id);
+    if (status) {
+      query = query.where("status", "=", status);
+    }
+
+    if (category_ids && category_ids.length > 0) {
+      query = query.where("products.category_id", "in", category_ids);
+    }
+
+    if (tag_ids && tag_ids.length > 0) {
+      query = query.innerJoin(
+        "product_tag_relations",
+        (join) => join
+          .onRef("product_tag_relations.product_id", "=", "products.id")
+          .on("product_tag_relations.product_tag_id", "in", tag_ids),
+      );
+    }
+
+    if (collection_ids && collection_ids.length > 0) {
+      query = query.innerJoin(
+        "product_collection_relations",
+        (join) => join
+          .onRef("product_collection_relations.product_id", "=", "products.id")
+          .on("product_collection_relations.product_collection_id", "in", collection_ids)
+      );
+    }
+
+    if (sales_channel_ids && sales_channel_ids.length > 0) {
+      query = query.innerJoin("product_sales_channels",(join) => join.onRef("product_sales_channels.product_id", "=", "products.id").on("product_sales_channels.sales_channel_id", "in", sales_channel_ids));
     }
 
     if (search && search.trim()) {
@@ -91,90 +97,55 @@ export class PaginatedProductsProcess implements ProcessContract<PaginatedProduc
 
     const total = Number(countResult?.count || 0);
     const sortOrder = sorting_direction === SortOrder.ASC ? "asc" : "desc";
-    const allowedSortFields = [
-      "id",
-      "title",
-      "handle",
-      "status",
-      "category_id",
-      "is_giftcard",
-      "discountable",
-      "created_at",
-      "updated_at",
-      "deleted_at",
-    ];
-    const safeSortField = allowedSortFields.includes(sorting_field)
-      ? sorting_field
-      : "created_at";
-    query = query.orderBy(sql.ref(`products.${safeSortField}`), sortOrder);
 
-    const offset = (page - 1) * limit;
+    query = query.orderBy(sorting_field as OrderByExpression<Database, "products", {}>, sortOrder);
+
+    const offset = (Number(page) - 1) * Number(limit);
     const rows = await query.selectAll().limit(limit).offset(offset).execute();
 
     const productIds = rows.map((p) => p.id);
     if (productIds.length === 0) {
-      return { products: [], count: total, offset, limit };
+      return  paginationResponse([], total, input);
     }
 
-    const variants = await this.db
-      .selectFrom("product_variants")
-      .where("product_id", "in", productIds)
-      .where("deleted_at", "is", null)
-      .select(["id", "product_id"])
+    const products = await this.db
+      .selectFrom("products")
+      .where("products.id", "in", productIds)
+      .leftJoin("product_variants", (join) =>
+        join
+          .onRef("product_variants.product_id", "=", "products.id")
+          .on("product_variants.deleted_at", "is", null),
+      )
+      .leftJoin("product_categories", (join) =>
+        join
+          .onRef("product_categories.id", "=", "products.category_id")
+          .on("product_categories.deleted_at", "is", null),
+      )
+      .leftJoin(
+        "product_sales_channels",
+        "product_sales_channels.product_id",
+        "products.id",
+      )
+      .select([
+        "products.id as id",
+        "products.title as title",
+        "products.status as status",
+        "products.handle as handle",
+        (eb) => sql<number>`count(product_variants.id) as variant_count`.as("variant_count"),
+        (eb) => sql<{
+          id: string;
+          name: string;
+        }[]>`array_agg(jsonb_build_object('id', product_sales_channels.sales_channel_id, 'name', product_sales_channels.name)) as sales_channels`.as("sales_channels"),
+        (eb) => sql<{ id: string; name: string; } | null>`
+          CASE
+            WHEN product_categories.id IS NULL THEN NULL
+            ELSE jsonb_build_object('id', product_categories.id, 'name', product_categories.name)
+          END
+        `.as('category'),
+      ]).groupBy(["products.id", "products.title", "products.status", "products.handle"])
       .execute();
 
-    const categoryIds = [
-      ...new Set(rows.map((p) => p.category_id).filter(Boolean) as string[]),
-    ];
-    let categoryMap: Record<string, ProductCategory> = {};
-    if (categoryIds.length > 0) {
-      const categories = await this.db
-        .selectFrom("product_categories")
-        .where("id", "in", categoryIds)
-        .where("deleted_at", "is", null)
-        .selectAll()
-        .execute();
-      categoryMap = Object.fromEntries(categories.map((c) => [c.id, c]));
-    }
 
-    const salesChannelRelations = await (this.db as any)
-      .selectFrom("product_sales_channels")
-      .where("product_id", "in", productIds)
-      .select(["product_id", "sales_channel_id"])
-      .execute();
-
-    const variantsByProduct = new Map<string, Array<{ id: string }>>();
-    for (const v of variants) {
-      if (!v.product_id) continue;
-      const list = variantsByProduct.get(v.product_id) ?? [];
-      list.push({ id: v.id });
-      variantsByProduct.set(v.product_id, list);
-    }
-
-    const salesChannelsByProduct = new Map<string, string[]>();
-    for (const r of salesChannelRelations) {
-      const list = salesChannelsByProduct.get(r.product_id) ?? [];
-      list.push(r.sales_channel_id);
-      salesChannelsByProduct.set(r.product_id, list);
-    }
-
-    const products: PaginatedProductItem[] = rows.map((p) => {
-      const cat = p.category_id ? categoryMap[p.category_id] : null;
-      return {
-        id: p.id,
-        title: p.title,
-        handle: p.handle,
-        status: p.status,
-        thumbnail: p.thumbnail,
-        variants: variantsByProduct.get(p.id) ?? [],
-        category_id: p.category_id,
-        category: cat
-          ? { id: cat.id, value: cat.value, handle: cat.handle }
-          : null,
-        sales_channel_ids: salesChannelsByProduct.get(p.id) ?? [],
-      };
-    });
-
-    return { products, count: total, offset, limit };
+    return paginationResponse(products, total, input);
   }
 }

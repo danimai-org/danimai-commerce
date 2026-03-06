@@ -18,7 +18,12 @@ export type FilterableColumn<T extends string> = Record<T,
 >;
 
 export const createFilterableColumnsSchema = <T extends string>(columns: FilterableColumn<T>) => Type.Union(Object.keys(columns).map((column) => Type.Object({
-    [column]: Type.Union([Type.String(), Type.Union([Type.Boolean(), Type.Array(Type.Enum(FilterOperator))])]),
+    [column]: Type.Object({
+        operator: Type.Enum(FilterOperator, {
+            default: FilterOperator.EQUAL
+        }),
+        value: Type.Any()
+    }),
 })),
 );
 
