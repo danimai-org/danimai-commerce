@@ -28,9 +28,11 @@ export class PaginatedRolesProcess
 
   async runOperations(@ProcessContext({
     schema: PaginatedRolesSchema,
-  }) context: ProcessContextType<typeof PaginatedRolesSchema>) {
+  }) context: ProcessContextType<typeof PaginatedRolesSchema> & { input: PaginatedRolesProcessInput }) {
     const { input } = context;
     const { page = 1, limit = 10, sorting_field = "created_at", sorting_direction = SortOrder.DESC } = input;
+    const pageNum = Number(page);
+    const limitNum = Number(limit);
 
     let query = this.db
       .selectFrom("roles")
@@ -47,10 +49,10 @@ export class PaginatedRolesProcess
     const safeSortField = allowedSortFields.includes(sorting_field) ? sorting_field : "created_at";
     query = query.orderBy(sql.ref(`roles.${safeSortField}`), sortOrder);
 
-    const offset = (page - 1) * limit;
+    const offset = (pageNum - 1) * limitNum;
     const data = await query
       .selectAll()
-      .limit(limit)
+      .limit(limitNum)
       .offset(offset)
       .execute();
 

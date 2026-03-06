@@ -67,10 +67,7 @@
 		{ label: 'Description', key: 'description', type: 'text' },
 		{ label: 'Created', key: 'created_at', type: 'date' },
 		{ label: 'Updated', key: 'updated_at', type: 'date' },
-		{
-			label: 'Actions',
-			key: 'actions',
-			type: 'actions',
+		{ label: 'Actions',key: 'actions', type: 'actions',
 			actions: [
 				{ label: 'Edit', key: 'edit', type: 'button', onClick: (item) => paginateState.openEdit(item as any) },
 				{ label: 'Delete', key: 'delete', type: 'button', onClick: (item) => paginateState.openDeleteConfirm(item as any) }

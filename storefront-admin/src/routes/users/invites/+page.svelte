@@ -6,19 +6,34 @@
 		MultiSelectCombobox,
 		PaginationTable,
 		TableHead,
-		TableBody,
 		TablePagination,
 		type TableColumn
 	} from '$lib/components/organs/index.js';
 	import Mail from '@lucide/svelte/icons/mail';
-	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
-	import Search from '@lucide/svelte/icons/search';
-	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
-	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
+	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { client } from '$lib/client.js';
+	import { getAccessToken } from '$lib/auth.js';
 
-	const API_BASE = 'http://localhost:8000/admin';
+	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
+
+	function authHeaders(): Record<string, string> {
+		const h: Record<string, string> = { 'Content-Type': 'application/json' };
+		const token = getAccessToken();
+		if (token) h['Authorization'] = `Bearer ${token}`;
+		return h;
+	}
+
+	type Invite = {
+		id: string;
+		email: string;
+		role?: string | null;
+		accepted: boolean;
+		expires_at: string | Date;
+		created_at: string | Date;
+	};
+	type Role = { id: string; name: string };
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
@@ -28,47 +43,33 @@
 		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	type Role = {
-		id: string;
-		name: string;
-		description: string;
-		
-	};
+	const paginateState = createPagination(
+		async () => {
+			return client.invites.get({ query: paginationQuery as any });
+		},
+		['invites']
+	);
 
-	type Invite = {
-		id: string;
-		email: string;
-		role: string | null;
-		accepted: boolean;
-		expires_at: string;
-		created_at: string;
-		updated_at: string;
-	};
-
-	type Pagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
+	const invites = $derived(paginateState.query.data?.data?.rows ?? []);
+	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
+	const start = $derived(
+		pagination ? (pagination.page - 1) * pagination.limit + 1 : 0
+	);
+	const end = $derived(
+		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	);
+	const invitesLoading = $derived(paginateState.loading);
+	const invitesError = $derived(paginateState.error);
 
 	let inviteOpen = $state(false);
 	let inviteEmail = $state('');
 	let inviteRoleIds = $state<string[]>([]);
-	let roles = $state<Role[]>([]);
-	let inviteLoading = $state(false);
-	let inviteSubmitting = $state(false);
 	let inviteError = $state<string | null>(null);
 	let inviteSuccess = $state(false);
-
-	let searchQuery = $state('');
-	let invitesData = $state<{ rows: Invite[]; pagination: Pagination } | null>(null);
-	let invitesLoading = $state(true);
-	let invitesError = $state<string | null>(null);
-	const limit = 10;
+	let inviteLoading = $state(false);
+	let inviteSubmitting = $state(false);
 	let resendingId = $state<string | null>(null);
+	let roles = $state<Role[]>([]);
 
 	const tableColumns: TableColumn[] = [
 		{ label: 'Email', key: 'email', type: 'text' },
@@ -79,40 +80,14 @@
 		{ label: 'Actions', key: 'actions', type: 'actions' }
 	];
 
-	async function fetchInvites() {
-		invitesLoading = true;
-		invitesError = null;
-		try {
-			const params = new URLSearchParams({
-				page: String(paginationQuery.page),
-				limit: String(limit),
-				sorting_field: 'created_at',
-				sorting_direction: 'desc'
-			});
-			const res = await fetch(`${API_BASE}/invites?${params}`, { cache: 'no-store' });
-			if (!res.ok) throw new Error(await res.text());
-			invitesData = (await res.json()) as { rows: Invite[]; pagination: Pagination };
-		} catch (e) {
-			invitesError = e instanceof Error ? e.message : String(e);
-			invitesData = null;
-		} finally {
-			invitesLoading = false;
-		}
-	}
-
+	let prevParams = $state<string | null>(null);
 	$effect(() => {
-		page;
-		fetchInvites();
+		const params = page.url.searchParams.toString();
+		if (prevParams !== null && prevParams !== params) {
+			paginateState.refetch();
+		}
+		prevParams = params;
 	});
-
-	const invites = $derived(invitesData?.rows ?? []);
-	const pagination = $derived(invitesData?.pagination ?? null);
-	const start = $derived(
-		pagination ? (pagination.page - 1) * pagination.limit + 1 : 0
-	);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
-	);
 
 	function formatDate(iso: string | Date) {
 		if (iso instanceof Date) {
@@ -142,10 +117,13 @@
 		inviteSuccess = false;
 		inviteLoading = true;
 		try {
-			const res = await fetch(`${API_BASE}/roles?limit=100`, { cache: 'no-store' });
+			const res = await fetch(`${API_BASE}/roles?limit=100`, {
+				cache: 'no-store',
+				headers: authHeaders()
+			});
 			if (res.ok) {
-				const json = (await res.json()) as { data: Role[] };
-				roles = json.data ?? [];
+				const json = (await res.json()) as { rows: Role[] };
+				roles = json.rows ?? [];
 			}
 		} finally {
 			inviteLoading = false;
@@ -166,7 +144,7 @@
 			if (inviteRoleIds.length > 0) body.role_ids = inviteRoleIds;
 			const res = await fetch(`${API_BASE}/invites`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: authHeaders(),
 				body: JSON.stringify(body)
 			});
 			const text = await res.text();
@@ -181,9 +159,13 @@
 			inviteSuccess = true;
 			inviteEmail = '';
 			inviteRoleIds = [];
-			fetchInvites();
+			paginateState.refetch();
 		} catch (e) {
-			inviteError = e instanceof Error ? e.message : String(e);
+			const msg = e instanceof Error ? e.message : String(e);
+			inviteError =
+				msg === 'Failed to fetch'
+					? 'Could not reach the API. Ensure the backend is running (e.g. bun dev in backend).'
+					: msg;
 		} finally {
 			inviteSubmitting = false;
 		}
@@ -193,7 +175,10 @@
 		if (invite.accepted) return;
 		resendingId = invite.id;
 		try {
-			const res = await fetch(`${API_BASE}/invites/${invite.id}/resend`, { method: 'POST' });
+			const res = await fetch(`${API_BASE}/invites/${invite.id}/resend`, {
+				method: 'POST',
+				headers: authHeaders()
+			});
 			const text = await res.text();
 			if (!res.ok) {
 				let msg = text;
@@ -203,7 +188,7 @@
 				} catch {}
 				throw new Error(msg);
 			}
-			fetchInvites();
+			paginateState.refetch();
 		} finally {
 			resendingId = null;
 		}
@@ -309,20 +294,20 @@
 				}}
 				class="flex min-h-0 flex-1 flex-col"
 			>
-				<div class="min-h-0 flex-1 overflow-auto">
-					<div class="space-y-4 px-6 py-6">
-						<div class="space-y-2">
-							<label for="invite-email" class="block text-sm font-medium">Email</label>
-							<Input
-								id="invite-email"
-								type="email"
-								placeholder="user@example.com"
-								class="w-full"
-								bind:value={inviteEmail}
-								disabled={inviteSubmitting}
-								required
-							/>
-						</div>
+				<div class="min-h-0 flex-1 overflow-auto space-y-4 px-6 py-6">
+					<div class="space-y-2">
+						<label for="invite-email" class="block text-sm font-medium">Email</label>
+						<Input
+							id="invite-email"
+							type="email"
+							placeholder="user@example.com"
+							class="w-full"
+							bind:value={inviteEmail}
+							disabled={inviteSubmitting}
+							required
+						/>
+					</div>
+					{#if roles.length > 0}
 						<div class="space-y-2">
 							<label for="invite-role" class="block text-sm font-medium">Roles (optional)</label>
 							{#if inviteLoading}
@@ -337,13 +322,13 @@
 								/>
 							{/if}
 						</div>
-						{#if inviteError}
-							<p class="text-sm text-destructive">{inviteError}</p>
-						{/if}
-						{#if inviteSuccess}
-							<p class="text-sm text-green-600 dark:text-green-400">Invite sent successfully.</p>
-						{/if}
-					</div>
+					{/if}
+					{#if inviteError}
+						<p class="text-sm text-destructive">{inviteError}</p>
+					{/if}
+					{#if inviteSuccess}
+						<p class="text-sm text-green-600 dark:text-green-400">Invite sent successfully.</p>
+					{/if}
 				</div>
 				<div class="flex shrink-0 justify-end gap-2 border-t p-4">
 					<Button

@@ -75,23 +75,11 @@ const serverLogger = new Elysia({ name: "server-logger" })
 
 const corsOrigin = process.env.CORS_ORIGIN || "*";
 
-const ensureCorsOnResponse = new Elysia({ name: "ensure-cors-on-response" }).onAfterResponse(
-  ({ set }) => {
-    if (!set.headers) set.headers = {};
-    const headers = set.headers as Record<string, string>;
-    headers["Access-Control-Allow-Origin"] = corsOrigin;
-    if (corsOrigin !== "*") {
-      headers["Access-Control-Allow-Credentials"] = "true";
-    }
-  }
-);
-
 const app = new Elysia()
   .use(cors({
     origin: corsOrigin,
-    credentials: true,
+    credentials: corsOrigin !== "*",
   }))
-  .use(ensureCorsOnResponse)
   .use(serverLogger)
   .use(
     swagger({

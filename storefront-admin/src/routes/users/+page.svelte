@@ -4,7 +4,6 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import * as Select from '$lib/components/ui/select/index.js';
 	import {
 		PaginationTable,
 		TableHead,
@@ -15,6 +14,7 @@
 	import { client } from '$lib/client.js';
 	import { createPagination, createPaginationQuery } from '$lib/api/pagination.svelte.js';
 	import Users from '@lucide/svelte/icons/users';
+	import MultiSelectCombobox from '$lib/components/organs/multi-select-combobox/multi-select-combobox.svelte';
 
 	const API_BASE = 'http://localhost:8000/admin';
 	type Role = {
@@ -59,8 +59,8 @@
 		if (roles.length > 0) return;
 		fetch(`${API_BASE}/roles?limit=100`, { cache: 'no-store' })
 			.then((r) => r.json())
-			.then((j: { data: Role[] }) => {
-				if (j.data?.length) roles = j.data;
+			.then((j: { rows: Role[] }) => {
+				if (j.rows?.length) roles = j.rows;
 			});
 	});
 
@@ -131,7 +131,7 @@
 	// Invite user dialog
 	let inviteOpen = $state(false);
 	let inviteEmail = $state('');
-	let inviteRoleId = $state<string | null>(null);
+	let inviteRoleIds = $state<string[]>([]);
 	let roles = $state<Role[]>([]);
 	let inviteLoading = $state(false);
 	let inviteSubmitting = $state(false);
@@ -140,14 +140,14 @@
 	async function openInviteDialog() {
 		inviteOpen = true;
 		inviteEmail = '';
-		inviteRoleId = null;
+		inviteRoleIds = [];
 		inviteError = null;
 		inviteLoading = true;
 		try {
 			const res = await fetch(`${API_BASE}/roles?limit=100`, { cache: 'no-store' });
 			if (res.ok) {
-				const json = (await res.json()) as { data: Role[] };
-				roles = json.data ?? [];
+				const json = (await res.json()) as { rows: Role[] };
+				roles = json.rows ?? [];
 			}
 		} finally {
 			inviteLoading = false;
@@ -164,7 +164,7 @@
 		inviteSubmitting = true;
 		try {
 			const body: { email: string; role_id?: string } = { email };
-			if (inviteRoleId) body.role_id = inviteRoleId;
+			if (inviteRoleIds.length > 0) body.role_id = inviteRoleIds[0];
 			const res = await fetch(`${API_BASE}/invites`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -193,7 +193,7 @@
 	let editUser = $state<User | null>(null);
 	let editFirstName = $state('');
 	let editLastName = $state('');
-	let editRoleId = $state<string | null>(null);
+	let editRoleIds = $state<string[]>([]);
 	let editError = $state<string | null>(null);
 	let editSubmitting = $state(false);
 
@@ -202,7 +202,7 @@
 		editOpen = true;
 		editFirstName = user.first_name ?? '';
 		editLastName = user.last_name ?? '';
-		editRoleId = user.role_id ?? null;
+		editRoleIds = user.role_id ? [user.role_id] : [];
 		editError = null;
 	}
 
@@ -226,8 +226,8 @@
 			if (nextLastName !== (editUser.last_name ?? '')) {
 				body.last_name = nextLastName;
 			}
-			if (editRoleId !== (editUser.role_id ?? null)) {
-				body.role_id = editRoleId;
+			if ((editRoleIds[0] ?? null) !== (editUser.role_id ?? null)) {
+				body.role_id = editRoleIds[0] ?? null;
 			}
 			if (Object.keys(body).length === 0) {
 				closeEdit();
@@ -302,26 +302,13 @@
 								{#if inviteLoading}
 									<p class="text-sm text-muted-foreground">Loading roles…</p>
 								{:else}
-									<Select.Root
-										type="single"
-										value={inviteRoleId ?? undefined}
-										onValueChange={(v) => (inviteRoleId = v ?? null)}
-										allowDeselect
+									<MultiSelectCombobox
+										id="invite-role"
+										options={roles.map((r) => ({ id: r.id, value: r.name }))}
+										bind:value={inviteRoleIds}
+										placeholder="Select role"
 										disabled={inviteSubmitting}
-									>
-										<Select.Trigger id="invite-role" class="w-full">
-											{#if inviteRoleId && roles.find((r) => r.id === inviteRoleId)}
-												{roles.find((r) => r.id === inviteRoleId)?.name}
-											{:else}
-												Select role
-											{/if}
-										</Select.Trigger>
-										<Select.Content>
-											{#each roles as role (role.id)}
-												<Select.Item value={role.id} label={role.name}>{role.name}</Select.Item>
-											{/each}
-										</Select.Content>
-									</Select.Root>
+									/>
 								{/if}
 							</div>
 							{#if inviteError}
@@ -383,26 +370,13 @@
 							</div>
 							<div class="space-y-2">
 								<label for="edit-role" class="block text-sm font-medium">Role</label>
-								<Select.Root
-									type="single"
-									value={editRoleId ?? undefined}
-									onValueChange={(v) => (editRoleId = v ?? null)}
-									allowDeselect
+								<MultiSelectCombobox
+									id="edit-role"
+									options={roles.map((r) => ({ id: r.id, value: r.name }))}
+									bind:value={editRoleIds}
+									placeholder="Select role"
 									disabled={editSubmitting}
-								>
-									<Select.Trigger id="edit-role" class="w-full">
-										{#if editRoleId && roles.find((r) => r.id === editRoleId)}
-											{roles.find((r) => r.id === editRoleId)?.name}
-										{:else}
-											Select role
-										{/if}
-									</Select.Trigger>
-									<Select.Content>
-										{#each roles as role (role.id)}
-											<Select.Item value={role.id} label={role.name}>{role.name}</Select.Item>
-										{/each}
-									</Select.Content>
-								</Select.Root>
+								/>
 							</div>
 							{#if editError}
 								<p class="text-sm text-destructive">{editError}</p>
