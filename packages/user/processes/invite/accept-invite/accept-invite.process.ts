@@ -69,11 +69,13 @@ export class AcceptInviteProcess implements ProcessContract<User | undefined> {
     }
 
     let roleId: string | null = null;
-    if (invite.role) {
+    const firstRoleName = invite.role
+      ? invite.role.split(",").map((s) => s.trim()).filter(Boolean)[0]
+      : null;
+    if (firstRoleName) {
       const role = await this.db
-        .withSchema("public")
         .selectFrom("roles")
-        .where("name", "=", invite.role)
+        .where("name", "=", firstRoleName)
         .where("deleted_at", "is", null)
         .select("id")
         .executeTakeFirst();

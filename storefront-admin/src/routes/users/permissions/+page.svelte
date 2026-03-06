@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
@@ -9,69 +11,43 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import { DropdownMenu } from 'bits-ui';
-
-	const API_BASE = 'http://localhost:8000/admin';
+	import { client } from '$lib/client.js';
+	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 
 	type Permission = {
 		id: string;
 		name: string;
 		description: string;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	type Pagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
+		created_at: string | Date;
+		updated_at: string | Date;
+		deleted_at: string | Date | null;
 	};
 
 	let searchQuery = $state('');
-	let page = $state(1);
-	let limit = $state(10);
-	let data = $state<{ data: Permission[]; pagination: Pagination } | null>(null);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
 
-	async function fetchPermissions() {
-		loading = true;
-		error = null;
-		try {
-			const params = new URLSearchParams({
-				page: String(page),
-				limit: String(limit),
-				sorting_field: 'name',
-				sorting_direction: 'asc'
-			});
-			const res = await fetch(`${API_BASE}/permissions?${params}`, { cache: 'no-store' });
-			if (!res.ok) throw new Error(await res.text());
-			data = (await res.json()) as { data: Permission[]; pagination: Pagination };
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			data = null;
-		} finally {
-			loading = false;
-		}
-	}
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
-	$effect(() => {
-		page;
-		limit;
-		fetchPermissions();
-	});
-
-	const permissions = $derived(data?.data ?? []);
-	const pagination = $derived(data?.pagination ?? null);
-	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	const paginateState = createPagination(
+		async () => {
+			return client['permissions'].get({ query: paginationQuery });
+		},
+		['permissions']
 	);
 
-	function formatDate(iso: string) {
+	const permissions = $derived(paginateState.query.data?.data?.rows ?? []);
+	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
+	const start = $derived(paginateState.start);
+	const end = $derived(paginateState.end);
+	const loading = $derived(paginateState.loading);
+	const error = $derived(paginateState.error);
+
+	function goToPage(pageNum: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('page', String(Math.max(1, pageNum)));
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+	}
+
+	function formatDate(iso: string | Date) {
 		try {
 			return new Date(iso).toLocaleDateString('en-US', {
 				year: 'numeric',
@@ -104,6 +80,8 @@
 		editPermission = null;
 	}
 
+	const refetch = $derived(paginateState.refetch);
+
 	async function submitEdit() {
 		if (!editPermission) return;
 		editError = null;
@@ -111,7 +89,7 @@
 		try {
 			const body: { description?: string } = {};
 			if (editDescription.trim() !== (editPermission.description ?? '')) body.description = editDescription.trim();
-			const res = await fetch(`${API_BASE}/permissions/${editPermission.id}`, {
+			const res = await fetch(`/admin/permissions/${editPermission.id}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(body)
@@ -126,7 +104,7 @@
 				throw new Error(msg);
 			}
 			closeEdit();
-			fetchPermissions();
+			refetch();
 		} catch (e) {
 			editError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -249,7 +227,7 @@
 						variant="outline"
 						size="sm"
 						disabled={!pagination?.has_previous_page}
-						onclick={() => (page = page - 1)}
+						onclick={() => pagination && goToPage(pagination.page - 1)}
 					>
 						Prev
 					</Button>
@@ -260,7 +238,7 @@
 						variant="outline"
 						size="sm"
 						disabled={!pagination?.has_next_page}
-						onclick={() => (page = page + 1)}
+						onclick={() => pagination && goToPage(pagination.page + 1)}
 					>
 						Next
 					</Button>

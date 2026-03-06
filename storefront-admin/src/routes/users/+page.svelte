@@ -1,22 +1,29 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import {
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
+	import { client } from '$lib/client.js';
+	import { createPagination, createPaginationQuery } from '$lib/api/pagination.svelte.js';
 	import Users from '@lucide/svelte/icons/users';
-	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
-	import Search from '@lucide/svelte/icons/search';
-	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
-	import Pencil from '@lucide/svelte/icons/pencil';
-	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
-	import { DropdownMenu } from 'bits-ui';
 
 	const API_BASE = 'http://localhost:8000/admin';
-
 	type Role = {
 		id: string;
 		name: string;
 		description: string;
+		created_at: string | Date;
+		updated_at: string | Date;
+		deleted_at: string | Date | null;
 	};
 
 	type User = {
@@ -26,54 +33,26 @@
 		last_name: string | null;
 		avatar_url: string | null;
 		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
+		created_at: string | Date;
+		updated_at: string | Date;
+		deleted_at: string | Date | null;
 		role_id: string | null;
 	};
 
-	type Pagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
-	let searchQuery = $state('');
-	let page = $state(1);
-	let limit = $state(10);
-	let data = $state<{ data: User[]; pagination: Pagination } | null>(null);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
+	const paginateState = createPagination(
+		async () => {
+			return client.users.get({ query: paginationQuery });
+		},
+		['users']
+	);
 
-	async function fetchUsers() {
-		loading = true;
-		error = null;
-		try {
-			const params = new URLSearchParams({
-				page: String(page),
-				limit: String(limit),
-				sorting_field: 'created_at',
-				sorting_direction: 'desc'
-			});
-			const res = await fetch(`${API_BASE}/users?${params}`, { cache: 'no-store' });
-			if (!res.ok) throw new Error(await res.text());
-			data = (await res.json()) as { data: User[]; pagination: Pagination };
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			data = null;
-		} finally {
-			loading = false;
-		}
+	function goToPage(pageNum: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('page', String(Math.max(1, pageNum)));
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
-
-	$effect(() => {
-		page;
-		limit;
-		fetchUsers();
-	});
 
 	// Load roles once for Role column and Edit sheet
 	$effect(() => {
@@ -90,23 +69,63 @@
 		for (const r of roles) m.set(r.id, r.name);
 		return m;
 	});
-	const users = $derived(data?.data ?? []);
-	const pagination = $derived(data?.pagination ?? null);
-	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
-	);
 
-	function formatDate(iso: string) {
-		try {
-			return new Date(iso).toLocaleDateString('en-US', {
-				year: 'numeric',
-				month: 'short',
-				day: '2-digit'
-			});
-		} catch {
-			return iso;
+	const rows = $derived(paginateState.query.data?.data?.rows ?? []);
+	const rowsWithDisplay = $derived(
+		(rows as User[]).map((user) => ({
+			...user,
+			first_name_display: user.first_name ?? '–',
+			last_name_display: user.last_name ?? '–',
+			role_label: user.role_id ? rolesById.get(user.role_id) ?? '–' : '–',
+			created_at_display: formatDate(user.created_at),
+			updated_at_display: formatDate(user.updated_at),
+			actions: user
+		}))
+	);
+	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
+	const start = $derived(paginateState.start);
+	const end = $derived(paginateState.end);
+	const refetch = $derived(paginateState.refetch);
+
+	const tableColumns: TableColumn[] = [
+		{ label: 'Email', key: 'email', type: 'text' },
+		{ label: 'First Name', key: 'first_name_display', type: 'text' },
+		{ label: 'Last Name', key: 'last_name_display', type: 'text' },
+		{ label: 'Role', key: 'role_label', type: 'text' },
+		{ label: 'Created', key: 'created_at_display', type: 'text' },
+		{ label: 'Updated', key: 'updated_at_display', type: 'text' },
+		{
+			label: 'Actions',
+			key: 'actions',
+			type: 'actions',
+			actions: [
+				{
+					label: 'Edit',
+					key: 'edit',
+					type: 'button',
+					onClick: (item) => openEdit(item as User)
+				}
+			]
 		}
+	];
+
+	function formatDate(iso: string | Date) {	
+			if (iso instanceof Date) {
+				return iso.toLocaleDateString('en-US', {
+					year: 'numeric',
+					month: 'short',
+					day: '2-digit'
+				});
+			}
+			try {
+				return new Date(iso).toLocaleDateString('en-US', {
+					year: 'numeric',
+					month: 'short',
+					day: '2-digit'
+				});
+			} catch {
+				return iso;
+			}
 	}
 
 	// Invite user dialog
@@ -161,7 +180,7 @@
 				throw new Error(msg);
 			}
 			inviteOpen = false;
-			fetchUsers();
+			refetch();
 		} catch (e) {
 			inviteError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -197,10 +216,19 @@
 		editError = null;
 		editSubmitting = true;
 		try {
-			const body: { first_name?: string | null; last_name?: string | null; role_id?: string | null } = {};
-			if (editFirstName.trim() !== (editUser.first_name ?? '')) body.first_name = editFirstName.trim() || null;
-			if (editLastName.trim() !== (editUser.last_name ?? '')) body.last_name = editLastName.trim() || null;
-			if (editRoleId !== (editUser.role_id ?? null)) body.role_id = editRoleId;
+			const body: { first_name?: string; last_name?: string; role_id?: string | null } = {};
+			const nextFirstName = editFirstName.trim();
+			const nextLastName = editLastName.trim();
+
+			if (nextFirstName !== (editUser.first_name ?? '')) {
+				body.first_name = nextFirstName;
+			}
+			if (nextLastName !== (editUser.last_name ?? '')) {
+				body.last_name = nextLastName;
+			}
+			if (editRoleId !== (editUser.role_id ?? null)) {
+				body.role_id = editRoleId;
+			}
 			if (Object.keys(body).length === 0) {
 				closeEdit();
 				return;
@@ -208,11 +236,7 @@
 			const res = await fetch(`${API_BASE}/users/${editUser.id}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					first_name: editFirstName.trim() || null,
-					last_name: editLastName.trim() || null,
-					role_id: editRoleId
-				})
+				body: JSON.stringify(body)
 			});
 			const text = await res.text();
 			if (!res.ok) {
@@ -224,7 +248,7 @@
 				throw new Error(msg);
 			}
 			closeEdit();
-			fetchUsers();
+			refetch();
 		} catch (e) {
 			editError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -242,32 +266,7 @@
 			</div>
 			<Button size="sm" onclick={openInviteDialog}>Invite user</Button>
 		</div>
-		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex flex-wrap items-center justify-between gap-2">
-				<Button variant="outline" size="sm" class="rounded-md">
-					<SlidersHorizontal class="mr-1.5 size-4" />
-					Add filter
-				</Button>
-				<div class="flex items-center gap-2">
-					<div class="relative w-64">
-						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							type="search"
-							placeholder="Search"
-							bind:value={searchQuery}
-							class="h-9 rounded-md pl-9"
-						/>
-					</div>
-					<button
-						type="button"
-						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-					>
-						<ArrowUpDown class="size-4" />
-						<span class="sr-only">Sort</span>
-					</button>
-				</div>
-			</div>
-		</div>
+		<PaginationTable searchPlaceholder="Search users">
 
 		<Sheet.Root bind:open={inviteOpen}>
 			<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
@@ -346,7 +345,7 @@
 		<Sheet.Root bind:open={editOpen}>
 			<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
 				<div class="flex h-full flex-col">
-<div class="border-b px-6 py-4">
+                 <div class="border-b px-6 py-4">
 					<h2 class="text-lg font-semibold">Edit user</h2>
 					<p class="mt-1 text-sm text-muted-foreground">
 						Update first name, last name, and role.
@@ -422,108 +421,35 @@
 			</Sheet.Content>
 		</Sheet.Root>
 
-		{#if error}
+		{#if paginateState.error}
 			<div
 				class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 			>
-				{error}
+				{paginateState.error}
 			</div>
-		{:else if loading}
+		{:else if paginateState.loading}
 			<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
 				<p class="text-muted-foreground">Loading…</p>
 			</div>
 		{:else}
 			<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
 				<table class="w-full text-sm">
-					<thead class="sticky top-0 border-b bg-muted/50">
-						<tr>
-							<th class="px-4 py-3 text-left font-medium">Email</th>
-							<th class="px-4 py-3 text-left font-medium">First Name</th>
-							<th class="px-4 py-3 text-left font-medium">Last Name</th>
-							<th class="px-4 py-3 text-left font-medium">Role</th>
-							<th class="px-4 py-3 text-left font-medium">Created</th>
-							<th class="px-4 py-3 text-left font-medium">Updated</th>
-							<th class="w-10 px-4 py-3"></th>
-						</tr>
-					</thead>
-					<tbody>
-						{#if users.length === 0}
-							<tr>
-								<td colspan="7" class="px-4 py-8 text-center text-muted-foreground">
-									No users found.
-								</td>
-							</tr>
-						{:else}
-							{#each users as user (user.id)}
-								<tr class="border-b transition-colors hover:bg-muted/30">
-									<td class="px-4 py-3 font-medium">{user.email}</td>
-									<td class="px-4 py-3 text-muted-foreground">{user.first_name ?? '–'}</td>
-									<td class="px-4 py-3 text-muted-foreground">{user.last_name ?? '–'}</td>
-									<td class="px-4 py-3 text-muted-foreground">{user.role_id ? (rolesById.get(user.role_id) ?? '–') : '–'}</td>
-									<td class="px-4 py-3 text-muted-foreground">{formatDate(user.created_at)}</td>
-									<td class="px-4 py-3 text-muted-foreground">{formatDate(user.updated_at)}</td>
-									<td class="px-4 py-3">
-										<DropdownMenu.Root>
-											<DropdownMenu.Trigger
-												class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
-											>
-												<MoreHorizontal class="size-4" />
-												<span class="sr-only">Actions</span>
-											</DropdownMenu.Trigger>
-											<DropdownMenu.Portal>
-												<DropdownMenu.Content
-													class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-													sideOffset={4}
-												>
-													<DropdownMenu.Item
-														textValue="Edit"
-														class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-														onSelect={() => openEdit(user)}
-													>
-														<Pencil class="size-4" />
-														Edit
-													</DropdownMenu.Item>
-												</DropdownMenu.Content>
-											</DropdownMenu.Portal>
-										</DropdownMenu.Root>
-									</td>
-								</tr>
-							{/each}
-						{/if}
-					</tbody>
+					<TableHead columns={tableColumns} />
+					<TableBody
+						rows={rowsWithDisplay}
+						columns={tableColumns}
+						emptyMessage="No users found."
+					/>
 				</table>
 			</div>
 
-			<div class="mt-4 flex items-center justify-between gap-4 border-t py-4">
-				<p class="text-sm text-muted-foreground">
-					{#if pagination && pagination.total > 0}
-						{start} – {end} of {pagination.total} results
-					{:else}
-						0 results
-					{/if}
-				</p>
-				<div class="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={!pagination?.has_previous_page}
-						onclick={() => (page = page - 1)}
-					>
-						Prev
-					</Button>
-					<span class="text-sm text-muted-foreground">
-						{pagination?.page ?? 1} of {pagination?.total_pages ?? 1} pages
-					</span>
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={!pagination?.has_next_page}
-						onclick={() => (page = page + 1)}
-					>
-						Next
-					</Button>
-				</div>
-			</div>
+			<TablePagination
+				{pagination}
+				{start}
+				{end}
+				onPageChange={goToPage}
+			/>
 		{/if}
+		</PaginationTable>
 	</div>
 </div>

@@ -1,10 +1,19 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
+	import {
+		DeleteConfirmationModal,
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		CustomerFormSheet,
+		CustomerAddressFormSheet,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
 	import { DropdownMenu } from 'bits-ui';
 	import Users from '@lucide/svelte/icons/users';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -19,59 +28,20 @@
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
+	import {
+		getCustomer,
+		listCustomerAddresses,
+		addCustomerToGroup,
+		removeCustomerFromGroup as removeCustomerFromGroupApi,
+		updateCustomer,
+		deleteCustomer,
+		deleteCustomerAddress,
+		type Customer,
+		type CustomerAddress
+	} from '$lib/customers/api.js';
+	import { listCustomerGroups, type CustomerGroup } from '$lib/customer-groups/api.js';
 
-	const API_BASE = 'http://localhost:8000/admin';
-
-	type Customer = {
-		id: string;
-		email: string;
-		first_name: string | null;
-		last_name: string | null;
-		phone: string | null;
-		has_account: boolean;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	type CustomerAddress = {
-		id: string;
-		customer_id: string;
-		first_name: string | null;
-		last_name: string | null;
-		phone: string | null;
-		company: string | null;
-		address_1: string;
-		address_2: string | null;
-		city: string;
-		country_code: string;
-		province: string | null;
-		postal_code: string | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	type CustomerGroup = {
-		id: string;
-		name: string;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	type Pagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
-
-	const customerId = $derived($page.params.id);
+	const customerId = $derived(page.params?.id ?? '');
 
 	let customer = $state<Customer | null>(null);
 	let addresses = $state<CustomerAddress[]>([]);
@@ -81,9 +51,7 @@
 	async function loadAddresses() {
 		if (!customerId) return;
 		try {
-			const res = await fetch(`${API_BASE}/customers/${customerId}/addresses`, { cache: 'no-store' });
-			if (!res.ok) return;
-			addresses = (await res.json()) as CustomerAddress[];
+			addresses = await listCustomerAddresses(customerId);
 		} catch {
 			addresses = [];
 		}
@@ -94,14 +62,7 @@
 		loading = true;
 		error = null;
 		try {
-			const res = await fetch(`${API_BASE}/customers/${customerId}`, { cache: 'no-store' });
-			if (!res.ok) {
-				const body = await res.json().catch(() => ({}));
-				error = body?.message ?? (res.status === 404 ? 'Customer not found' : await res.text());
-				customer = null;
-				return;
-			}
-			customer = (await res.json()) as Customer;
+			customer = await getCustomer(customerId);
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			customer = null;
@@ -168,7 +129,7 @@
 	let addToGroupModalOpen = $state(false);
 	let groupModalPage = $state(1);
 	let groupModalSearch = $state('');
-	let groupModalData = $state<{ data: CustomerGroup[]; pagination: Pagination } | null>(null);
+	let groupModalData = $state<{ data: { rows: CustomerGroup[]; pagination: { total: number; page: number; limit: number; total_pages: number; has_next_page: boolean; has_previous_page: boolean } }; pagination: { total: number; page: number; limit: number; total_pages: number; has_next_page: boolean; has_previous_page: boolean } } | null>(null);
 	let groupModalLoading = $state(false);
 	let addToGroupSubmitting = $state(false);
 	let addToGroupError = $state<string | null>(null);
@@ -177,15 +138,12 @@
 	async function fetchGroupModalGroups() {
 		groupModalLoading = true;
 		try {
-			const params = new URLSearchParams({
-				page: String(groupModalPage),
-				limit: '10',
+			groupModalData = await listCustomerGroups({
+				page: groupModalPage,
+				limit: 10,
 				sorting_field: 'name',
 				sorting_direction: 'asc'
 			});
-			const res = await fetch(`${API_BASE}/customer-groups?${params}`, { cache: 'no-store' });
-			if (!res.ok) throw new Error(await res.text());
-			groupModalData = (await res.json()) as { data: CustomerGroup[]; pagination: Pagination };
 		} catch {
 			groupModalData = null;
 		} finally {
@@ -235,15 +193,7 @@
 		removeFromGroupSubmitting = true;
 		removeFromGroupError = null;
 		try {
-			const url =
-				removeFromGroupTarget?.id != null
-					? `${API_BASE}/customers/${customerId}/customer-groups?customer_group_id=${encodeURIComponent(removeFromGroupTarget.id)}`
-					: `${API_BASE}/customers/${customerId}/customer-groups`;
-			const res = await fetch(url, { method: 'DELETE' });
-			if (!res.ok) {
-				const err = await res.json().catch(() => ({}));
-				throw new Error((err as { message?: string })?.message ?? 'Failed to remove from group');
-			}
+			await removeCustomerFromGroupApi(customerId, removeFromGroupTarget?.id);
 			await loadCustomer();
 			removeFromGroupModalOpen = false;
 			removeFromGroupTarget = null;
@@ -254,7 +204,7 @@
 		}
 	}
 
-	const groupModalGroups = $derived(groupModalData?.data ?? []);
+	const groupModalGroups = $derived(groupModalData?.data?.rows ?? []);
 	const groupModalPagination = $derived(groupModalData?.pagination ?? null);
 	const groupModalFiltered = $derived(
 		groupModalSearch.trim()
@@ -286,15 +236,7 @@
 		addToGroupSubmitting = true;
 		try {
 			for (const groupId of selectedGroupIds) {
-				const res = await fetch(`${API_BASE}/customers/${customerId}/customer-groups`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ customer_group_id: groupId })
-				});
-				if (!res.ok) {
-					const err = await res.json().catch(() => ({}));
-					throw new Error((err as { message?: string })?.message ?? 'Failed to add customer to group');
-				}
+				await addCustomerToGroup(customerId, groupId);
 			}
 			selectedGroupIds = [];
 			addToGroupModalOpen = false;
@@ -314,27 +256,10 @@
 
 	// Edit customer sheet
 	let editOpen = $state(false);
-	let editFirstName = $state('');
-	let editLastName = $state('');
-	let editEmail = $state('');
-	let editPhone = $state('');
-	let editCompany = $state('');
-	let editError = $state<string | null>(null);
-	let editSubmitting = $state(false);
 
 	function openEdit() {
 		if (!customer) return;
-		editFirstName = customer.first_name || '';
-		editLastName = customer.last_name || '';
-		editEmail = customer.email;
-		editPhone = customer.phone || '';
-		editCompany = (customer.metadata as { company?: string })?.company || '';
-		editError = null;
 		editOpen = true;
-	}
-
-	function closeEdit() {
-		editOpen = false;
 	}
 
 	// Delete confirmation
@@ -353,11 +278,7 @@
 		if (!customer) return;
 		deleteSubmitting = true;
 		try {
-			const res = await fetch(`${API_BASE}/customers/${customer.id}`, { method: 'DELETE' });
-			if (!res.ok) {
-				const err = await res.json().catch(() => ({}));
-				throw new Error((err as { message?: string })?.message ?? 'Failed to delete customer');
-			}
+			await deleteCustomer(customer.id);
 			closeDeleteModal();
 			goto('/customers');
 		} catch (e) {
@@ -367,226 +288,60 @@
 		}
 	}
 
-	async function saveEdit() {
-		if (!customer) return;
-		editError = null;
-		editSubmitting = true;
-
-		if (!editEmail.trim()) {
-			editError = 'Email is required';
-			editSubmitting = false;
-			return;
-		}
-
-		try {
-			const response = await fetch(`${API_BASE}/customers/${customer.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					email: editEmail.trim(),
-					first_name: editFirstName.trim() || null,
-					last_name: editLastName.trim() || null,
-					phone: editPhone.trim() || null,
-					...(editCompany.trim() && { metadata: { company: editCompany.trim() } })
-				})
-			});
-
-			if (!response.ok) {
-				const err = await response.json().catch(() => ({}));
-				throw new Error((err as { message?: string })?.message ?? 'Failed to update customer');
-			}
-			closeEdit();
-			loadCustomer();
-		} catch (e) {
-			editError = e instanceof Error ? e.message : String(e);
-		} finally {
-			editSubmitting = false;
-		}
-	}
-
-	// Add address sheet
+	// Address form sheets
 	let addAddressOpen = $state(false);
-	let addrFirstName = $state('');
-	let addrLastName = $state('');
-	let addrPhone = $state('');
-	let addrCompany = $state('');
-	let addrAddress1 = $state('');
-	let addrAddress2 = $state('');
-	let addrCity = $state('');
-	let addrProvince = $state('');
-	let addrPostalCode = $state('');
-	let addrCountryCode = $state('');
-	let addAddressError = $state<string | null>(null);
-	let addAddressSubmitting = $state(false);
+	let editAddressOpen = $state(false);
+	let editingAddress = $state<CustomerAddress | null>(null);
 
 	function openAddAddress() {
-		addrFirstName = customer?.first_name ?? '';
-		addrLastName = customer?.last_name ?? '';
-		addrPhone = customer?.phone ?? '';
-		addrCompany = (customer?.metadata as { company?: string })?.company ?? '';
-		addrAddress1 = '';
-		addrAddress2 = '';
-		addrCity = '';
-		addrProvince = '';
-		addrPostalCode = '';
-		addrCountryCode = '';
-		addAddressError = null;
+		editingAddress = null;
 		addAddressOpen = true;
 	}
 
-	function closeAddAddress() {
-		addAddressOpen = false;
-	}
-
-	async function submitAddAddress() {
-		if (!customer) return;
-		addAddressError = null;
-		addAddressSubmitting = true;
-		if (!addrAddress1.trim()) {
-			addAddressError = 'Address line 1 is required';
-			addAddressSubmitting = false;
-			return;
-		}
-		if (!addrCity.trim()) {
-			addAddressError = 'City is required';
-			addAddressSubmitting = false;
-			return;
-		}
-		if (!addrCountryCode.trim()) {
-			addAddressError = 'Country code is required';
-			addAddressSubmitting = false;
-			return;
-		}
-		try {
-			const res = await fetch(`${API_BASE}/customers/${customer.id}/addresses`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					first_name: addrFirstName.trim() || null,
-					last_name: addrLastName.trim() || null,
-					phone: addrPhone.trim() || null,
-					company: addrCompany.trim() || null,
-					address_1: addrAddress1.trim(),
-					address_2: addrAddress2.trim() || null,
-					city: addrCity.trim(),
-					province: addrProvince.trim() || null,
-					postal_code: addrPostalCode.trim() || null,
-					country_code: addrCountryCode.trim()
-				})
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				let message: string | null = null;
-				try {
-					const err = JSON.parse(text) as { message?: string };
-					message = err?.message ?? null;
-				} catch {
-					message = text || null;
-				}
-				throw new Error(message ?? `Request failed (${res.status})`);
-			}
-			closeAddAddress();
-			loadCustomer();
-			loadAddresses();
-		} catch (e) {
-			addAddressError = e instanceof Error ? e.message : String(e);
-		} finally {
-			addAddressSubmitting = false;
-		}
-	}
-
-	// Edit address sheet
-	let editAddressOpen = $state(false);
-	let editingAddress = $state<CustomerAddress | null>(null);
-	let editAddrFirstName = $state('');
-	let editAddrLastName = $state('');
-	let editAddrPhone = $state('');
-	let editAddrCompany = $state('');
-	let editAddrAddress1 = $state('');
-	let editAddrAddress2 = $state('');
-	let editAddrCity = $state('');
-	let editAddrProvince = $state('');
-	let editAddrPostalCode = $state('');
-	let editAddrCountryCode = $state('');
-	let editAddressError = $state<string | null>(null);
-	let editAddressSubmitting = $state(false);
-
 	function openEditAddress(addr: CustomerAddress) {
 		editingAddress = addr;
-		editAddrFirstName = addr.first_name ?? '';
-		editAddrLastName = addr.last_name ?? '';
-		editAddrPhone = addr.phone ?? '';
-		editAddrCompany = addr.company ?? '';
-		editAddrAddress1 = addr.address_1 ?? '';
-		editAddrAddress2 = addr.address_2 ?? '';
-		editAddrCity = addr.city ?? '';
-		editAddrProvince = addr.province ?? '';
-		editAddrPostalCode = addr.postal_code ?? '';
-		editAddrCountryCode = addr.country_code ?? '';
-		editAddressError = null;
 		editAddressOpen = true;
 	}
 
-	function closeEditAddress() {
-		editAddressOpen = false;
-		editingAddress = null;
+	function onAddressSuccess() {
+		loadAddresses();
 	}
 
-	async function saveEditAddress() {
-		if (!customer || !editingAddress) return;
-		editAddressError = null;
-		editAddressSubmitting = true;
-		if (!editAddrAddress1.trim()) {
-			editAddressError = 'Address line 1 is required';
-			editAddressSubmitting = false;
-			return;
-		}
-		if (!editAddrCity.trim()) {
-			editAddressError = 'City is required';
-			editAddressSubmitting = false;
-			return;
-		}
-		if (!editAddrCountryCode.trim()) {
-			editAddressError = 'Country code is required';
-			editAddressSubmitting = false;
-			return;
-		}
-		try {
-			const res = await fetch(`${API_BASE}/customers/${customer.id}/addresses/${editingAddress.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					first_name: editAddrFirstName.trim() || null,
-					last_name: editAddrLastName.trim() || null,
-					phone: editAddrPhone.trim() || null,
-					company: editAddrCompany.trim() || null,
-					address_1: editAddrAddress1.trim(),
-					address_2: editAddrAddress2.trim() || null,
-					city: editAddrCity.trim(),
-					province: editAddrProvince.trim() || null,
-					postal_code: editAddrPostalCode.trim() || null,
-					country_code: editAddrCountryCode.trim()
-				})
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				let message: string | null = null;
-				try {
-					const err = JSON.parse(text) as { message?: string };
-					message = err?.message ?? null;
-				} catch {
-					message = text || null;
+	const addressTableColumns: TableColumn[] = [
+		{
+			label: 'Address',
+			key: 'address_line',
+			type: 'text'
+		},
+		{ label: 'City', key: 'city', type: 'text' },
+		{ label: 'Country', key: 'country_code', type: 'text' },
+		{
+			label: 'Actions',
+			key: 'actions',
+			type: 'actions',
+			actions: [
+				{
+					label: 'Edit',
+					key: 'edit',
+					type: 'button',
+					onClick: (item) => openEditAddress(item as CustomerAddress)
+				},
+				{
+					label: 'Delete',
+					key: 'delete',
+					type: 'button',
+					onClick: (item) => openDeleteAddressModal(item as CustomerAddress)
 				}
-				throw new Error(message ?? `Request failed (${res.status})`);
-			}
-			closeEditAddress();
-			loadAddresses();
-		} catch (e) {
-			editAddressError = e instanceof Error ? e.message : String(e);
-		} finally {
-			editAddressSubmitting = false;
+			]
 		}
-	}
+	];
+
+	const addressesWithDisplay = $derived(
+		addresses.map((addr) => ({
+			...addr,
+			address_line: [addr.address_1, addr.address_2].filter(Boolean).join(', ')
+		}))
+	);
 
 	// Delete address modal
 	let deleteAddressModalOpen = $state(false);
@@ -665,21 +420,13 @@
 				const num = Number(row.value);
 				meta[k] = Number.isNaN(num) ? row.value : num;
 			}
-			const res = await fetch(`${API_BASE}/customers/${customer.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					email: customer.email,
-					first_name: customer.first_name ?? null,
-					last_name: customer.last_name ?? null,
-					phone: customer.phone ?? null,
-					metadata: meta
-				})
+			await updateCustomer(customer.id, {
+				email: customer.email,
+				first_name: customer.first_name ?? null,
+				last_name: customer.last_name ?? null,
+				phone: customer.phone ?? null,
+				metadata: meta
 			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
 			closeMetadataSheet();
 			loadCustomer();
 		} catch (e) {
@@ -694,20 +441,7 @@
 		deleteAddressError = null;
 		deleteAddressSubmitting = true;
 		try {
-			const res = await fetch(`${API_BASE}/customers/${customer.id}/addresses/${addressToDelete.id}`, {
-				method: 'DELETE'
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				let message: string | null = null;
-				try {
-					const err = JSON.parse(text) as { message?: string };
-					message = err?.message ?? null;
-				} catch {
-					message = text || null;
-				}
-				throw new Error(message ?? 'Failed to delete address');
-			}
+			await deleteCustomerAddress(customer.id, addressToDelete.id);
 			deleteAddressModalOpen = false;
 			addressToDelete = null;
 			deleteAddressError = null;
@@ -717,6 +451,17 @@
 		} finally {
 			deleteAddressSubmitting = false;
 		}
+	}
+
+	const groupModalTableColumns: TableColumn[] = [
+		{ label: 'Name', key: 'name', type: 'text' },
+		{ label: 'Created', key: 'created_at', type: 'date' }
+	];
+
+	const selectedGroupIdSet = $derived(new Set(selectedGroupIds));
+
+	function goToGroupModalPage(pageNum: number) {
+		groupModalPage = Math.max(1, pageNum);
 	}
 </script>
 
@@ -934,70 +679,18 @@
 						</h2>
 						<Button variant="outline" size="sm" onclick={openAddAddress}>Add address</Button>
 					</div>
-					{#if addresses.length === 0}
-						<div class="px-6 py-8 text-center text-sm text-muted-foreground">
-							No addresses yet.
+					<PaginationTable showToolbar={false}>
+						<div class="min-h-0 flex-1 overflow-auto">
+							<table class="w-full text-sm">
+								<TableHead columns={addressTableColumns} />
+								<TableBody
+									rows={addressesWithDisplay}
+									columns={addressTableColumns}
+									emptyMessage="No addresses yet."
+								/>
+							</table>
 						</div>
-					{:else}
-						<ul class="divide-y">
-							{#each addresses as addr (addr.id)}
-								<li class="flex items-start justify-between gap-4 px-6 py-4">
-									<div class="min-w-0 flex-1">
-										<div class="text-sm font-medium">
-											{#if addr.first_name || addr.last_name}
-												{addr.first_name ?? ''} {addr.last_name ?? ''}
-											{:else}
-												Address
-											{/if}
-										</div>
-										<div class="mt-1 text-sm text-muted-foreground">
-											{addr.address_1}
-											{#if addr.address_2}, {addr.address_2}{/if}
-											<br />
-											{addr.city}
-											{#if addr.province}, {addr.province}{/if}
-											{#if addr.postal_code} {addr.postal_code}{/if}
-											{addr.country_code}
-										</div>
-										{#if addr.phone}
-											<div class="mt-1 text-sm text-muted-foreground">Phone: {addr.phone}</div>
-										{/if}
-									</div>
-									<DropdownMenu.Root>
-										<DropdownMenu.Trigger
-											class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
-										>
-											<MoreHorizontal class="size-4" />
-											<span class="sr-only">Address actions</span>
-										</DropdownMenu.Trigger>
-										<DropdownMenu.Portal>
-											<DropdownMenu.Content
-												class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-												sideOffset={4}
-											>
-												<DropdownMenu.Item
-													textValue="Edit"
-													class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-													onSelect={() => openEditAddress(addr)}
-												>
-													<Pencil class="size-4" />
-													Edit
-												</DropdownMenu.Item>
-												<DropdownMenu.Item
-													textValue="Delete"
-													class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-													onSelect={() => openDeleteAddressModal(addr)}
-												>
-													<Trash2 class="size-4" />
-													Delete
-												</DropdownMenu.Item>
-											</DropdownMenu.Content>
-										</DropdownMenu.Portal>
-									</DropdownMenu.Root>
-								</li>
-							{/each}
-						</ul>
-					{/if}
+					</PaginationTable>
 				</section>
 
 				<!-- Footer: Metadata & JSON -->
@@ -1042,410 +735,22 @@
 	{/if}
 </div>
 
-<!-- Edit Customer Sheet -->
-<Sheet.Root bind:open={editOpen}>
-	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
-		<div class="flex h-full flex-col">
-			<Sheet.Header class="flex flex-col gap-1 border-b px-6 py-4">
-				<Sheet.Title>Edit Customer</Sheet.Title>
-				<Sheet.Description>Update customer details.</Sheet.Description>
-			</Sheet.Header>
+<CustomerFormSheet bind:open={editOpen} customer={customer} onSuccess={loadCustomer} />
 
-			<div class="flex-1 overflow-auto px-6 py-6">
-				{#if editError}
-					<div
-						class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-					>
-						{editError}
-					</div>
-				{/if}
-
-				<div class="flex flex-col gap-4">
-					<div class="grid grid-cols-2 gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="edit-first-name" class="text-sm font-medium">
-								First Name <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="edit-first-name"
-								bind:value={editFirstName}
-								placeholder="First name"
-								class="h-9"
-								disabled={editSubmitting}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="edit-last-name" class="text-sm font-medium">
-								Last Name <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="edit-last-name"
-								bind:value={editLastName}
-								placeholder="Last name"
-								class="h-9"
-								disabled={editSubmitting}
-							/>
-						</div>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="edit-email" class="text-sm font-medium">Email</label>
-						<Input
-							id="edit-email"
-							type="email"
-							bind:value={editEmail}
-							placeholder="Email"
-							class="h-9"
-							disabled={editSubmitting}
-							required
-						/>
-					</div>
-					<div class="grid grid-cols-2 gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="edit-phone" class="text-sm font-medium">
-								Phone <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="edit-phone"
-								type="tel"
-								bind:value={editPhone}
-								placeholder="Phone"
-								class="h-9"
-								disabled={editSubmitting}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="edit-company" class="text-sm font-medium">
-								Company <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="edit-company"
-								bind:value={editCompany}
-								placeholder="Company"
-								class="h-9"
-								disabled={editSubmitting}
-							/>
-						</div>
-					</div>
-				</div>
-			</div>
-
-			<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeEdit} disabled={editSubmitting}>
-					Cancel
-				</Button>
-				<Button onclick={saveEdit} disabled={editSubmitting}>
-					{editSubmitting ? 'Saving...' : 'Save'}
-				</Button>
-			</Sheet.Footer>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
-
-<!-- Add Address Sheet -->
-<Sheet.Root bind:open={addAddressOpen}>
-	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
-		<div class="flex h-full flex-col">
-			<Sheet.Header class="flex flex-col gap-1 border-b px-6 py-4">
-				<Sheet.Title>Add address</Sheet.Title>
-				<Sheet.Description>Add a new address for this customer.</Sheet.Description>
-			</Sheet.Header>
-
-			<div class="flex-1 overflow-auto px-6 py-6">
-				{#if addAddressError}
-					<div
-						class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-					>
-						{addAddressError}
-					</div>
-				{/if}
-
-				<div class="flex flex-col gap-4">
-					<div class="grid grid-cols-2 gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="addr-first-name" class="text-sm font-medium">First name</label>
-							<Input
-								id="addr-first-name"
-								bind:value={addrFirstName}
-								placeholder="First name"
-								class="h-9"
-								disabled={addAddressSubmitting}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="addr-last-name" class="text-sm font-medium">Last name</label>
-							<Input
-								id="addr-last-name"
-								bind:value={addrLastName}
-								placeholder="Last name"
-								class="h-9"
-								disabled={addAddressSubmitting}
-							/>
-						</div>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="addr-address-1" class="text-sm font-medium">Address line 1</label>
-						<Input
-							id="addr-address-1"
-							bind:value={addrAddress1}
-							placeholder="Street address"
-							class="h-9"
-							disabled={addAddressSubmitting}
-						/>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="addr-address-2" class="text-sm font-medium">
-							Address line 2 <span class="font-normal text-muted-foreground">(Optional)</span>
-						</label>
-						<Input
-							id="addr-address-2"
-							bind:value={addrAddress2}
-							placeholder="Apartment, suite, etc."
-							class="h-9"
-							disabled={addAddressSubmitting}
-						/>
-					</div>
-					<div class="grid grid-cols-2 gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="addr-city" class="text-sm font-medium">City</label>
-							<Input
-								id="addr-city"
-								bind:value={addrCity}
-								placeholder="City"
-								class="h-9"
-								disabled={addAddressSubmitting}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="addr-province" class="text-sm font-medium">
-								Province / State <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="addr-province"
-								bind:value={addrProvince}
-								placeholder="Province or state"
-								class="h-9"
-								disabled={addAddressSubmitting}
-							/>
-						</div>
-					</div>
-					<div class="grid grid-cols-2 gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="addr-postal-code" class="text-sm font-medium">
-								Postal code <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="addr-postal-code"
-								bind:value={addrPostalCode}
-								placeholder="Postal code"
-								class="h-9"
-								disabled={addAddressSubmitting}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="addr-country-code" class="text-sm font-medium">Country code</label>
-							<Input
-								id="addr-country-code"
-								bind:value={addrCountryCode}
-								placeholder="e.g. US, GB"
-								class="h-9"
-								disabled={addAddressSubmitting}
-							/>
-						</div>
-					</div>
-					<div class="grid grid-cols-2 gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="addr-phone" class="text-sm font-medium">
-								Phone <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="addr-phone"
-								type="tel"
-								bind:value={addrPhone}
-								placeholder="Phone"
-								class="h-9"
-								disabled={addAddressSubmitting}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="addr-company" class="text-sm font-medium">
-								Company <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="addr-company"
-								bind:value={addrCompany}
-								placeholder="Company"
-								class="h-9"
-								disabled={addAddressSubmitting}
-							/>
-						</div>
-					</div>
-				</div>
-			</div>
-
-			<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeAddAddress} disabled={addAddressSubmitting}>
-					Cancel
-				</Button>
-				<Button onclick={submitAddAddress} disabled={addAddressSubmitting}>
-					{addAddressSubmitting ? 'Saving...' : 'Save address'}
-				</Button>
-			</Sheet.Footer>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
-
-<!-- Edit Address Sheet -->
-<Sheet.Root bind:open={editAddressOpen}>
-	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
-		<div class="flex h-full flex-col">
-			<Sheet.Header class="flex flex-col gap-1 border-b px-6 py-4">
-				<Sheet.Title>Edit address</Sheet.Title>
-				<Sheet.Description>Update this address.</Sheet.Description>
-			</Sheet.Header>
-
-			<div class="flex-1 overflow-auto px-6 py-6">
-				{#if editAddressError}
-					<div
-						class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-					>
-						{editAddressError}
-					</div>
-				{/if}
-
-				<div class="flex flex-col gap-4">
-					<div class="grid grid-cols-2 gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="edit-addr-first-name" class="text-sm font-medium">First name</label>
-							<Input
-								id="edit-addr-first-name"
-								bind:value={editAddrFirstName}
-								placeholder="First name"
-								class="h-9"
-								disabled={editAddressSubmitting}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="edit-addr-last-name" class="text-sm font-medium">Last name</label>
-							<Input
-								id="edit-addr-last-name"
-								bind:value={editAddrLastName}
-								placeholder="Last name"
-								class="h-9"
-								disabled={editAddressSubmitting}
-							/>
-						</div>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="edit-addr-address-1" class="text-sm font-medium">Address line 1</label>
-						<Input
-							id="edit-addr-address-1"
-							bind:value={editAddrAddress1}
-							placeholder="Street address"
-							class="h-9"
-							disabled={editAddressSubmitting}
-						/>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="edit-addr-address-2" class="text-sm font-medium">
-							Address line 2 <span class="font-normal text-muted-foreground">(Optional)</span>
-						</label>
-						<Input
-							id="edit-addr-address-2"
-							bind:value={editAddrAddress2}
-							placeholder="Apartment, suite, etc."
-							class="h-9"
-							disabled={editAddressSubmitting}
-						/>
-					</div>
-					<div class="grid grid-cols-2 gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="edit-addr-city" class="text-sm font-medium">City</label>
-							<Input
-								id="edit-addr-city"
-								bind:value={editAddrCity}
-								placeholder="City"
-								class="h-9"
-								disabled={editAddressSubmitting}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="edit-addr-province" class="text-sm font-medium">
-								Province / State <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="edit-addr-province"
-								bind:value={editAddrProvince}
-								placeholder="Province or state"
-								class="h-9"
-								disabled={editAddressSubmitting}
-							/>
-						</div>
-					</div>
-					<div class="grid grid-cols-2 gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="edit-addr-postal-code" class="text-sm font-medium">
-								Postal code <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="edit-addr-postal-code"
-								bind:value={editAddrPostalCode}
-								placeholder="Postal code"
-								class="h-9"
-								disabled={editAddressSubmitting}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="edit-addr-country-code" class="text-sm font-medium">Country code</label>
-							<Input
-								id="edit-addr-country-code"
-								bind:value={editAddrCountryCode}
-								placeholder="e.g. US, GB"
-								class="h-9"
-								disabled={editAddressSubmitting}
-							/>
-						</div>
-					</div>
-					<div class="grid grid-cols-2 gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="edit-addr-phone" class="text-sm font-medium">
-								Phone <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="edit-addr-phone"
-								type="tel"
-								bind:value={editAddrPhone}
-								placeholder="Phone"
-								class="h-9"
-								disabled={editAddressSubmitting}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="edit-addr-company" class="text-sm font-medium">
-								Company <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="edit-addr-company"
-								bind:value={editAddrCompany}
-								placeholder="Company"
-								class="h-9"
-								disabled={editAddressSubmitting}
-							/>
-						</div>
-					</div>
-				</div>
-			</div>
-
-			<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeEditAddress} disabled={editAddressSubmitting}>
-					Cancel
-				</Button>
-				<Button onclick={saveEditAddress} disabled={editAddressSubmitting}>
-					{editAddressSubmitting ? 'Saving...' : 'Save'}
-				</Button>
-			</Sheet.Footer>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
+<CustomerAddressFormSheet
+	bind:open={addAddressOpen}
+	mode="create"
+	customerId={customerId}
+	customer={customer}
+	onSuccess={onAddressSuccess}
+/>
+<CustomerAddressFormSheet
+	bind:open={editAddressOpen}
+	mode="edit"
+	customerId={customerId}
+	address={editingAddress}
+	onSuccess={onAddressSuccess}
+/>
 
 <DeleteConfirmationModal
 	bind:open={deleteModalOpen}
@@ -1523,97 +828,36 @@
 						<p class="text-sm text-muted-foreground">Loading…</p>
 					</div>
 				{:else}
-					<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-						<table class="w-full text-sm">
-							<thead class="sticky top-0 border-b bg-muted/50">
-								<tr>
-									<th class="w-10 px-4 py-3 text-left font-medium"></th>
-									<th class="px-4 py-3 text-left font-medium">Name</th>
-									<th class="px-4 py-3 text-left font-medium">Customers</th>
-									<th class="px-4 py-3 text-left font-medium">Created</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#if groupModalFiltered.length === 0}
-									<tr>
-										<td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
-											No customer groups found.
-										</td>
-									</tr>
-								{:else}
-									{#each groupModalFiltered as group (group.id)}
-										<tr
-											class="border-b transition-colors hover:bg-muted/30 cursor-pointer last:border-b-0"
-											role="button"
-											tabindex="0"
-											onclick={() => toggleGroupSelection(group.id)}
-											onkeydown={(e) => e.key === 'Enter' && toggleGroupSelection(group.id)}
-										>
-											<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
-												<input
-													type="checkbox"
-													checked={selectedGroupIds.includes(group.id)}
-													class="size-4 rounded border-input"
-													tabindex="-1"
-													onclick={(e) => e.stopPropagation()}
-													onchange={() => toggleGroupSelection(group.id)}
-												/>
-											</td>
-											<td class="px-4 py-3 font-medium">{group.name}</td>
-											<td class="px-4 py-3 text-muted-foreground">–</td>
-											<td class="px-4 py-3 text-muted-foreground">
-												{group.created_at
-													? new Date(group.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })
-													: '–'}
-											</td>
-										</tr>
-									{/each}
-								{/if}
-							</tbody>
-						</table>
-					</div>
+					<PaginationTable showToolbar={false}>
+						<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+							<table class="w-full text-sm">
+								<TableHead columns={groupModalTableColumns} />
+								<TableBody
+									rows={groupModalFiltered}
+									columns={groupModalTableColumns}
+									emptyMessage="No customer groups found."
+									selectedIds={selectedGroupIdSet}
+									onToggleSelect={toggleGroupSelection}
+								/>
+							</table>
+						</div>
+						{#if groupModalPagination && groupModalPagination.total > 0}
+							<TablePagination
+								pagination={groupModalPagination}
+								start={groupModalStart}
+								end={groupModalEnd}
+								onPageChange={goToGroupModalPage}
+							/>
+						{/if}
+					</PaginationTable>
 				{/if}
 			</div>
 
-			<Dialog.Footer class="flex flex-wrap items-center justify-between gap-4 border-t px-6 py-4">
-				<div class="flex items-center justify-between gap-4 px-6 py-4">
-					<div class="flex items-center gap-4">
-						<div class="flex items-center gap-2">
-							<Button
-								variant="outline"
-								size="sm"
-								disabled={!groupModalPagination?.has_previous_page}
-								onclick={() => (groupModalPage = groupModalPage - 1)}
-							>
-								Prev
-							</Button>
-							<span class="text-sm text-muted-foreground">
-								{groupModalPagination?.page ?? 1} of {groupModalPagination?.total_pages ?? 1} pages
-							</span>
-							<Button
-								variant="outline"
-								size="sm"
-								disabled={!groupModalPagination?.has_next_page}
-								onclick={() => (groupModalPage = groupModalPage + 1)}
-							>
-								Next
-							</Button>
-						</div>
-						<p class="text-sm text-muted-foreground">
-							{#if groupModalPagination && groupModalPagination.total > 0}
-								{groupModalStart} – {groupModalEnd} of {groupModalPagination.total} results
-							{:else}
-								0 results
-							{/if}
-						</p>
-					</div>
-				</div>
-				<div class="flex items-center gap-2 ml-auto">
-					<Button variant="outline" onclick={closeAddToGroupModal} disabled={addToGroupSubmitting}>Cancel</Button>
-					<Button onclick={saveAddToGroup} disabled={addToGroupSubmitting || selectedGroupIds.length === 0}>
-						{addToGroupSubmitting ? 'Saving...' : 'Save'}
-					</Button>
-				</div>
+			<Dialog.Footer class="flex-row flex-wrap items-center justify-end gap-2 border-t px-6 py-4">
+				<Button variant="outline" onclick={closeAddToGroupModal} disabled={addToGroupSubmitting}>Cancel</Button>
+				<Button onclick={saveAddToGroup} disabled={addToGroupSubmitting || selectedGroupIds.length === 0}>
+					{addToGroupSubmitting ? 'Saving...' : 'Save'}
+				</Button>
 			</Dialog.Footer>
 		</div>
 	</Dialog.Content>

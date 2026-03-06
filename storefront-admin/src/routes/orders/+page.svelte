@@ -316,8 +316,18 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 		try {
 			const res = await fetch(`${API_BASE}/regions?limit=100`, { cache: 'no-store' });
 			if (res.ok) {
-				const json = (await res.json()) as { data: { id: string; name: string; currency_code: string }[] };
-				regions = json.data;
+				const json = (await res.json()) as
+					| { data?: { id: string; name: string; currency_code: string }[] }
+					| { regions?: { id: string; name: string; currency_code: string }[] };
+
+				const list =
+					('data' in json && Array.isArray(json.data)
+						? json.data
+						: 'regions' in json && Array.isArray(json.regions)
+							? json.regions
+							: []) as { id: string; name: string; currency_code: string }[];
+
+				regions = list;
 				if (regions.length > 0 && !selectedRegion) {
 					selectedRegion = regions[0].id;
 					selectedCurrency = regions[0].currency_code;
@@ -335,10 +345,18 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 		try {
 			const res = await fetch(`${API_BASE}/currencies?limit=100`, { cache: 'no-store' });
 			if (res.ok) {
-				const json = (await res.json()) as {
-					data: { id: string; code: string; name: string; symbol: string }[];
-				};
-				currencies = json.data;
+				const json = (await res.json()) as
+					| { data?: { id: string; code: string; name: string; symbol: string }[] }
+					| { currencies?: { id: string; code: string; name: string; symbol: string }[] };
+
+				const list =
+					('data' in json && Array.isArray(json.data)
+						? json.data
+						: 'currencies' in json && Array.isArray(json.currencies)
+							? json.currencies
+							: []) as { id: string; code: string; name: string; symbol: string }[];
+
+				currencies = list;
 			}
 		} catch (e) {
 			console.error('Failed to fetch currencies:', e);

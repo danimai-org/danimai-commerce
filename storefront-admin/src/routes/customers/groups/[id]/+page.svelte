@@ -1,10 +1,17 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import {
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
 	import { DropdownMenu } from 'bits-ui';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -15,56 +22,102 @@
 	import Users from '@lucide/svelte/icons/users';
 	import Search from '@lucide/svelte/icons/search';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
+	import {
+		getCustomerGroup,
+		listCustomersInGroup,
+		updateCustomerGroup,
+		type CustomerGroupDetail,
+		type ListCustomersInGroupParams,
+		type ListCustomersInGroupResponse
+	} from '$lib/customer-groups/api.js';
+	import { listCustomers, type Customer } from '$lib/customers/api.js';
+	import { createQuery } from '@tanstack/svelte-query';
+	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
 
 	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
-	type CustomerGroupDetail = {
-		id: string;
-		name: string;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-		customer_count: number;
-	};
-
-	type Customer = {
-		id: string;
-		email: string;
-		first_name: string | null;
-		last_name: string | null;
-		has_account: boolean;
-		created_at: string;
-	};
-
-	type Pagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
-
-	const groupId = $derived($page.params.id);
+	const groupId = $derived(page.params?.id ?? '');
 
 	let group = $state<CustomerGroupDetail | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+
+	const emptyCustomersResponse = {
+		data: { rows: [] as Customer[], pagination: { total: 0, page: 1, limit: 10, total_pages: 1, has_next_page: false, has_previous_page: false } },
+		pagination: { total: 0, page: 1, limit: 10, total_pages: 1, has_next_page: false, has_previous_page: false }
+	};
+
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+	const customersQueryKey = $derived(['pagination', 'customer-group-customers', groupId ?? '', paginationQuery] as const);
+	const customersQuery = createQuery(() => ({
+		queryKey: customersQueryKey,
+		queryFn: async ({ queryKey }) => {
+			const id = queryKey[2];
+			const params = queryKey[3] as ListCustomersInGroupParams;
+			return id
+				? listCustomersInGroup(id, params)
+				: Promise.resolve(emptyCustomersResponse);
+		}
+	}));
+	const paginateState = $derived({
+		get query() {
+			return customersQuery;
+		},
+		get loading() {
+			return customersQuery.isPending;
+		},
+		get error() {
+			return customersQuery.error != null
+				? (customersQuery.error instanceof Error ? customersQuery.error.message : String(customersQuery.error))
+				: null;
+		},
+		get start() {
+			const p = (customersQuery.data as ListCustomersInGroupResponse | undefined)?.data?.pagination ?? (customersQuery.data as ListCustomersInGroupResponse | undefined)?.pagination;
+			return p ? (p.page - 1) * p.limit + 1 : 0;
+		},
+		get end() {
+			const p = (customersQuery.data as ListCustomersInGroupResponse | undefined)?.data?.pagination ?? (customersQuery.data as ListCustomersInGroupResponse | undefined)?.pagination;
+			return p ? Math.min(p.page * p.limit, p.total) : 0;
+		},
+		refetch: () => customersQuery.refetch()
+	});
+
+	function goToPage(pageNum: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('page', String(Math.max(1, pageNum)));
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+	}
+
+	const customersQueryData = $derived(customersQuery.data as ListCustomersInGroupResponse | undefined);
+	const customersRows = $derived(customersQueryData?.data?.rows ?? []);
+	const customersPagination = $derived(customersQueryData?.data?.pagination ?? customersQueryData?.pagination ?? null);
+	const customersStart = $derived(paginateState.start);
+	const customersEnd = $derived(paginateState.end);
+	async function customersRefetch() {
+		await customersQuery.refetch();
+	}
+
+	const customersRowsWithDisplay = $derived(
+		customersRows.map((r) => ({
+			...r,
+			display_name: `${r.first_name ?? ''} ${r.last_name ?? ''}`.trim() || '–',
+			account_display: r.has_account ? 'Registered' : 'Guest'
+		}))
+	);
+
+	const customersTableColumns: TableColumn[] = [
+		{ label: 'Email', key: 'email', type: 'text' },
+		{ label: 'Name', key: 'display_name', type: 'text' },
+		{ label: 'Account', key: 'account_display', type: 'text' },
+		{ label: 'Created', key: 'created_at', type: 'date' }
+	];
 
 	async function loadGroup() {
 		if (!groupId) return;
 		loading = true;
 		error = null;
 		try {
-			const res = await fetch(`${API_BASE}/customer-groups/${groupId}`, { cache: 'no-store' });
-			if (!res.ok) {
-				const body = await res.json().catch(() => ({}));
-				error = (body as { message?: string })?.message ?? (res.status === 404 ? 'Customer group not found' : await res.text());
-				group = null;
-				return;
-			}
-			group = (await res.json()) as CustomerGroupDetail;
+			group = await getCustomerGroup(groupId);
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			group = null;
@@ -150,56 +203,11 @@
 		}
 	}
 
-	// Customers in group list
-	let customersPage = $state(1);
-	let customersLimit = $state(10);
-	let customersData = $state<{ data: Customer[]; pagination: Pagination } | null>(null);
-	let customersLoading = $state(false);
-	let customersError = $state<string | null>(null);
-
-	async function fetchCustomersInGroup() {
-		if (!groupId) return;
-		customersLoading = true;
-		customersError = null;
-		try {
-			const params = new URLSearchParams({
-				page: String(customersPage),
-				limit: String(customersLimit),
-				sorting_field: 'created_at',
-				sorting_direction: 'desc'
-			});
-			const res = await fetch(`${API_BASE}/customer-groups/${groupId}/customers?${params}`, { cache: 'no-store' });
-			if (!res.ok) throw new Error(await res.text());
-			customersData = (await res.json()) as { data: Customer[]; pagination: Pagination };
-		} catch (e) {
-			customersError = e instanceof Error ? e.message : String(e);
-			customersData = null;
-		} finally {
-			customersLoading = false;
-		}
-	}
-
-	$effect(() => {
-		if (!group) return;
-		customersPage;
-		customersLimit;
-		fetchCustomersInGroup();
-	});
-
-	const customersInGroup = $derived(customersData?.data ?? []);
-	const customersPagination = $derived(customersData?.pagination ?? null);
-	const customersStart = $derived(
-		customersPagination ? (customersPagination.page - 1) * customersPagination.limit + 1 : 0
-	);
-	const customersEnd = $derived(
-		customersPagination ? Math.min(customersPagination.page * customersPagination.limit, customersPagination.total) : 0
-	);
-
 	// Add customers modal
 	let addCustomersModalOpen = $state(false);
 	let customerModalPage = $state(1);
 	let customerModalSearch = $state('');
-	let customerModalData = $state<{ data: Customer[]; pagination: Pagination } | null>(null);
+	let customerModalData = $state<import('$lib/customers/api.js').ListCustomersResponse | null>(null);
 	let customerModalLoading = $state(false);
 	let addCustomersSubmitting = $state(false);
 	let addCustomersError = $state<string | null>(null);
@@ -208,20 +216,21 @@
 	async function fetchCustomerModalCustomers() {
 		customerModalLoading = true;
 		try {
-			const params = new URLSearchParams({
-				page: String(customerModalPage),
-				limit: '10',
+			customerModalData = await listCustomers({
+				page: customerModalPage,
+				limit: 10,
 				sorting_field: 'created_at',
 				sorting_direction: 'desc'
 			});
-			const res = await fetch(`${API_BASE}/customers?${params}`, { cache: 'no-store' });
-			if (!res.ok) throw new Error(await res.text());
-			customerModalData = (await res.json()) as { data: Customer[]; pagination: Pagination };
 		} catch {
 			customerModalData = null;
 		} finally {
 			customerModalLoading = false;
 		}
+	}
+
+	function goToCustomerModalPage(pageNum: number) {
+		customerModalPage = Math.max(1, pageNum);
 	}
 
 	function openAddCustomersModal() {
@@ -269,7 +278,7 @@
 			selectedCustomerIds = [];
 			addCustomersModalOpen = false;
 			await loadGroup();
-			await fetchCustomersInGroup();
+			await customersRefetch();
 		} catch (e) {
 			addCustomersError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -283,8 +292,8 @@
 		fetchCustomerModalCustomers();
 	});
 
-	const customerModalCustomers = $derived(customerModalData?.data ?? []);
-	const customerModalPagination = $derived(customerModalData?.pagination ?? null);
+	const customerModalCustomers = $derived(customerModalData?.data?.rows ?? []);
+	const customerModalPagination = $derived(customerModalData?.data?.pagination ?? customerModalData?.pagination ?? null);
 	const customerModalFiltered = $derived(
 		customerModalSearch.trim()
 			? customerModalCustomers.filter((c) =>
@@ -301,6 +310,42 @@
 		customerModalPagination
 			? Math.min(customerModalPagination.page * customerModalPagination.limit, customerModalPagination.total)
 			: 0
+	);
+
+	const customerModalRowsWithDisplay = $derived(
+		customerModalFiltered.map((r) => ({
+			...r,
+			display_name: `${r.first_name ?? ''} ${r.last_name ?? ''}`.trim() || '–',
+			account_display: r.has_account ? 'Registered' : 'Guest'
+		}))
+	);
+
+	const customerModalTableColumns: TableColumn[] = [
+		{ label: 'Email', key: 'email', type: 'text' },
+		{ label: 'Name', key: 'display_name', type: 'text' },
+		{ label: 'Account', key: 'account_display', type: 'text' },
+		{ label: 'Created', key: 'created_at', type: 'date' }
+	];
+
+	const selectedCustomerIdSet = $derived(new Set(selectedCustomerIds));
+
+	function toggleSelectAllCustomers() {
+		const ids = customerModalRowsWithDisplay.map((r) => r.id);
+		const allSelected = ids.length > 0 && ids.every((id) => selectedCustomerIds.includes(id));
+		if (allSelected) {
+			selectedCustomerIds = selectedCustomerIds.filter((id) => !ids.includes(id));
+		} else {
+			selectedCustomerIds = [...new Set([...selectedCustomerIds, ...ids])];
+		}
+	}
+
+	const customerModalSelectAllChecked = $derived(
+		customerModalRowsWithDisplay.length > 0 &&
+			customerModalRowsWithDisplay.every((r) => selectedCustomerIds.includes(r.id))
+	);
+	const customerModalSelectAllIndeterminate = $derived(
+		customerModalRowsWithDisplay.some((r) => selectedCustomerIds.includes(r.id)) &&
+			!customerModalSelectAllChecked
 	);
 </script>
 
@@ -321,7 +366,7 @@
 				<span>Customer Groups</span>
 			</button>
 			<ChevronRight class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-			<span class="font-medium text-foreground">{group ? group.name : (groupId ?? '…')}</span>
+			<span class="font-medium text-foreground">{group ? group.name : (loading ? '…' : 'Customer group')}</span>
 		</nav>
 	</div>
 
@@ -385,104 +430,44 @@
 				</div>
 
 				<!-- Customers section -->
-				<section class="rounded-lg border bg-card shadow-sm overflow-hidden">
-					<div class="flex items-center justify-between gap-4 border-b px-6 py-4">
+				<section class="w-full min-w-0 rounded-lg border bg-card shadow-sm overflow-hidden">
+					<div class="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4 rounded-t-lg">
 						<h2 class="text-base font-semibold flex items-center gap-2">
 							<Users class="size-4" />
 							Customers
 						</h2>
 						<Button variant="outline" size="sm" onclick={openAddCustomersModal}>Add</Button>
 					</div>
-					{#if customersLoading}
-						<div class="flex items-center justify-center px-6 py-12">
-							<p class="text-sm text-muted-foreground">Loading…</p>
-						</div>
-					{:else if customersError}
-						<div class="px-6 py-4 text-sm text-destructive">
-							{customersError}
-						</div>
-					{:else if group.customer_count === 0}
-						<div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
-							<span class="text-muted-foreground">No records</span>
-							<p class="text-sm text-muted-foreground">This group doesn't have customers.</p>
-						</div>
-					{:else}
-						<div class="min-h-0 flex-1 overflow-auto">
-							<table class="w-full text-sm">
-								<thead class="sticky top-0 border-b bg-muted/50">
-									<tr>
-										<th class="px-4 py-3 text-left font-medium">Email</th>
-										<th class="px-4 py-3 text-left font-medium">Name</th>
-										<th class="px-4 py-3 text-left font-medium">Account</th>
-										<th class="px-4 py-3 text-left font-medium">Created</th>
-									</tr>
-								</thead>
-								<tbody>
-									{#if customersInGroup.length === 0}
-										<tr>
-											<td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
-												No customers found.
-											</td>
-										</tr>
-									{:else}
-										{#each customersInGroup as customer (customer.id)}
-											<tr class="border-b transition-colors hover:bg-muted/30">
-												<td class="px-4 py-3 font-medium">{customer.email}</td>
-												<td class="px-4 py-3 text-muted-foreground">
-													{customer.first_name || customer.last_name
-														? `${customer.first_name ?? ''} ${customer.last_name ?? ''}`.trim()
-														: '–'}
-												</td>
-												<td class="px-4 py-3 text-muted-foreground">
-													{#if !customer.has_account}
-														<span
-															class="inline-flex items-center rounded-md border border-orange-300 bg-orange-500 px-2.5 py-0.5 text-xs font-medium text-white shadow-sm"
-															>Guest</span
-														>
-													{:else}
-														Registered
-													{/if}
-												</td>
-												<td class="px-4 py-3 text-muted-foreground">
-													{customer.created_at
-														? new Date(customer.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })
-														: '–'}
-												</td>
-											</tr>
-										{/each}
-									{/if}
-								</tbody>
-							</table>
-						</div>
-						{#if customersPagination && customersPagination.total > 0}
-							<div class="flex flex-wrap items-center justify-between gap-4 border-t px-6 py-4">
-								<p class="text-sm text-muted-foreground">
-									{customersStart} – {customersEnd} of {customersPagination.total} results
-								</p>
-								<div class="flex items-center gap-2">
-									<Button
-										variant="outline"
-										size="sm"
-										disabled={!customersPagination.has_previous_page}
-										onclick={() => (customersPage = customersPage - 1)}
-									>
-										Prev
-									</Button>
-									<span class="text-sm text-muted-foreground">
-										{customersPagination.page} of {customersPagination.total_pages} pages
-									</span>
-									<Button
-										variant="outline"
-										size="sm"
-										disabled={!customersPagination.has_next_page}
-										onclick={() => (customersPage = customersPage + 1)}
-									>
-										Next
-									</Button>
-								</div>
+					<PaginationTable showToolbar={false}>
+						{#if paginateState.error}
+							<div class="px-6 py-4 text-sm text-destructive">
+								{paginateState.error}
+							</div>
+						{:else if paginateState.loading}
+							<div class="flex items-center justify-center px-6 py-12">
+								<p class="text-sm text-muted-foreground">Loading…</p>
+							</div>
+						{:else}
+							<div class="min-h-0 flex-1 overflow-auto">
+								<table class="w-full text-sm">
+									<TableHead columns={customersTableColumns} />
+									<TableBody
+										rows={customersRowsWithDisplay}
+										columns={customersTableColumns}
+										emptyMessage="No customers found."
+									/>
+								</table>
+							</div>
+							<div class="px-6">
+								<TablePagination
+									pagination={customersPagination}
+									start={customersStart}
+									end={customersEnd}
+									onPageChange={goToPage}
+								/>
 							</div>
 						{/if}
-					{/if}
+					</PaginationTable>
 				</section>
 
 				<!-- Metadata & JSON -->
@@ -574,112 +559,42 @@
 						<p class="text-sm text-muted-foreground">Loading…</p>
 					</div>
 				{:else}
-					<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-						<table class="w-full text-sm">
-							<thead class="sticky top-0 border-b bg-muted/50">
-								<tr>
-									<th class="w-10 px-4 py-3 text-left font-medium"></th>
-									<th class="px-4 py-3 text-left font-medium">Email</th>
-									<th class="px-4 py-3 text-left font-medium">Name</th>
-									<th class="px-4 py-3 text-left font-medium">Account</th>
-									<th class="px-4 py-3 text-left font-medium">Created</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#if customerModalFiltered.length === 0}
-									<tr>
-										<td colspan="5" class="px-4 py-8 text-center text-muted-foreground">
-											No customers found.
-										</td>
-									</tr>
-								{:else}
-									{#each customerModalFiltered as customer (customer.id)}
-										<tr
-											class="border-b transition-colors hover:bg-muted/30 cursor-pointer last:border-b-0"
-											role="button"
-											tabindex="0"
-											onclick={() => toggleCustomerSelection(customer.id)}
-											onkeydown={(e) => e.key === 'Enter' && toggleCustomerSelection(customer.id)}
-										>
-											<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
-												<input
-													type="checkbox"
-													checked={selectedCustomerIds.includes(customer.id)}
-													class="size-4 rounded border-input"
-													tabindex="-1"
-													onclick={(e) => e.stopPropagation()}
-													onchange={() => toggleCustomerSelection(customer.id)}
-												/>
-											</td>
-											<td class="px-4 py-3 font-medium">{customer.email}</td>
-											<td class="px-4 py-3 text-muted-foreground">
-												{customer.first_name || customer.last_name
-													? `${customer.first_name ?? ''} ${customer.last_name ?? ''}`.trim()
-													: '–'}
-											</td>
-											<td class="px-4 py-3 text-muted-foreground">
-												{#if !customer.has_account}
-													<span
-														class="inline-flex items-center rounded-md border border-orange-300 bg-orange-500 px-2.5 py-0.5 text-xs font-medium text-white shadow-sm"
-														>Guest</span
-													>
-												{:else}
-													Registered
-												{/if}
-											</td>
-											<td class="px-4 py-3 text-muted-foreground">
-												{customer.created_at
-													? new Date(customer.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })
-													: '–'}
-											</td>
-										</tr>
-									{/each}
-								{/if}
-							</tbody>
-						</table>
-					</div>
+					<PaginationTable showToolbar={false}>
+						<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+							<table class="w-full text-sm">
+								<TableHead
+									columns={customerModalTableColumns}
+									showSelectAll={true}
+									selectAllChecked={customerModalSelectAllChecked}
+									selectAllIndeterminate={customerModalSelectAllIndeterminate}
+									onToggleSelectAll={toggleSelectAllCustomers}
+								/>
+								<TableBody
+									rows={customerModalRowsWithDisplay}
+									columns={customerModalTableColumns}
+									emptyMessage="No customers found."
+									selectedIds={selectedCustomerIdSet}
+									onToggleSelect={toggleCustomerSelection}
+								/>
+							</table>
+						</div>
+						{#if customerModalPagination && customerModalPagination.total > 0}
+							<TablePagination
+								pagination={customerModalPagination}
+								start={customerModalStart}
+								end={customerModalEnd}
+								onPageChange={goToCustomerModalPage}
+							/>
+						{/if}
+					</PaginationTable>
 				{/if}
 			</div>
 
-			<Dialog.Footer class="flex flex-wrap items-center justify-between gap-4 border-t px-6 py-4">
-				<div class="flex items-center justify-between gap-4">
-					<div class="flex items-center gap-4">
-						<div class="flex items-center gap-2">
-							<Button
-								variant="outline"
-								size="sm"
-								disabled={!customerModalPagination?.has_previous_page}
-								onclick={() => (customerModalPage = customerModalPage - 1)}
-							>
-								Prev
-							</Button>
-							<span class="text-sm text-muted-foreground">
-								{customerModalPagination?.page ?? 1} of {customerModalPagination?.total_pages ?? 1} pages
-							</span>
-							<Button
-								variant="outline"
-								size="sm"
-								disabled={!customerModalPagination?.has_next_page}
-								onclick={() => (customerModalPage = customerModalPage + 1)}
-							>
-								Next
-							</Button>
-						</div>
-						<p class="text-sm text-muted-foreground">
-							{#if customerModalPagination && customerModalPagination.total > 0}
-								{customerModalStart} – {customerModalEnd} of {customerModalPagination.total} results
-							{:else}
-								0 results
-							{/if}
-						</p>
-					</div>
-				</div>
-				<div class="flex items-center gap-2 ml-auto">
-					<Button variant="outline" onclick={closeAddCustomersModal} disabled={addCustomersSubmitting}>Cancel</Button>
-					<Button onclick={saveAddCustomers} disabled={addCustomersSubmitting || selectedCustomerIds.length === 0}>
-						{addCustomersSubmitting ? 'Saving...' : 'Save'}
-					</Button>
-				</div>
+			<Dialog.Footer class="flex-row flex-wrap items-center justify-end gap-2 border-t px-6 py-4">
+				<Button variant="outline" onclick={closeAddCustomersModal} disabled={addCustomersSubmitting}>Cancel</Button>
+				<Button onclick={saveAddCustomers} disabled={addCustomersSubmitting || selectedCustomerIds.length === 0}>
+					{addCustomersSubmitting ? 'Saving...' : 'Save'}
+				</Button>
 			</Dialog.Footer>
 		</div>
 	</Dialog.Content>
