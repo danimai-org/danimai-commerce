@@ -1,9 +1,19 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import {
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
+	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import Search from '@lucide/svelte/icons/search';
 	import ShoppingCart from '@lucide/svelte/icons/shopping-cart';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
@@ -17,18 +27,15 @@
 	import X from '@lucide/svelte/icons/x';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import ImageIcon from '@lucide/svelte/icons/image';
-import CreditCard from '@lucide/svelte/icons/credit-card';
-import Lock from '@lucide/svelte/icons/lock';
-import User from '@lucide/svelte/icons/user';
-import Calendar from '@lucide/svelte/icons/calendar';
-import DollarSign from '@lucide/svelte/icons/dollar-sign';
-import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
+	import CreditCard from '@lucide/svelte/icons/credit-card';
+	import Lock from '@lucide/svelte/icons/lock';
+	import User from '@lucide/svelte/icons/user';
+	import Calendar from '@lucide/svelte/icons/calendar';
+	import DollarSign from '@lucide/svelte/icons/dollar-sign';
+	import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 	import { cn } from '$lib/utils.js';
-	import { goto } from '$app/navigation';
 
-	const API_BASE =
-		'http://localhost:8000/admin';
-	
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type Order = {
 		id: string;
@@ -54,50 +61,70 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 		has_previous_page: boolean;
 	};
 
-	let searchQuery = $state('');
-	let page = $state(1);
-	let limit = $state(10);
-	let data = $state<{ data: Order[]; pagination: Pagination } | null>(null);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
-	async function fetchOrders() {
-		loading = true;
-		error = null;
-		try {
-			const params = new URLSearchParams({
-				page: String(page),
-				limit: String(limit),
+	const paginateState = createPagination(
+		async () => {
+			const base = {
+				page: '1',
+				limit: '10',
 				sorting_field: 'created_at',
 				sorting_direction: 'desc'
-			});
+			};
+			const fromUrl = paginationQuery as Record<string, unknown>;
+			const q: Record<string, string> = { ...base };
+			for (const [k, v] of Object.entries(fromUrl)) {
+				if (v != null && v !== '') q[k] = String(v);
+			}
+			const params = new URLSearchParams(q);
 			const res = await fetch(`${API_BASE}/orders?${params}`, { cache: 'no-store' });
 			if (!res.ok) throw new Error(await res.text());
-			data = (await res.json()) as { data: Order[]; pagination: Pagination };
-		} catch (e) {
-			const msg = e instanceof Error ? e.message : String(e);
-			error =
-				msg === 'Failed to fetch'
-					? 'Could not reach the API. Ensure the backend is running (e.g. bun dev in backend).'
-					: msg;
-			data = null;
-		} finally {
-			loading = false;
-		}
-	}
+			return (await res.json()) as { rows: Order[]; pagination: Pagination };
+		},
+		['orders']
+	);
 
 	$effect(() => {
-		page;
-		limit;
-		fetchOrders();
+		page.url.searchParams.toString();
+		paginateState.refetch();
 	});
 
-	const orders = $derived(data?.data ?? []);
-	const pagination = $derived(data?.pagination ?? null);
-	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	function goToPage(pageNum: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('page', String(Math.max(1, pageNum)));
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+	}
+
+	const rawRows = $derived((paginateState.query.data?.rows ?? []) as Order[]);
+	const rows = $derived(
+		rawRows.map((r) => ({ ...r, order_label: `#${r.display_id}` })) as Record<string, unknown>[]
 	);
+	const listPagination = $derived(paginateState.query.data?.pagination ?? null);
+	const start = $derived(
+		listPagination ? (listPagination.page - 1) * listPagination.limit + 1 : 0
+	);
+	const end = $derived(
+		listPagination
+			? Math.min(listPagination.page * listPagination.limit, listPagination.total)
+			: 0
+	);
+
+	let searchQuery = $state('');
+
+	const tableColumns: TableColumn[] = [
+		{
+			label: 'Order',
+			key: 'order_label',
+			type: 'link',
+			cellHref: (row) => `/orders/${row.id}`,
+			textKey: 'order_label'
+		},
+		{ label: 'Status', key: 'status', type: 'text' },
+		{ label: 'Fulfillment', key: 'fulfillment_status', type: 'text' },
+		{ label: 'Payment', key: 'payment_status', type: 'text' },
+		{ label: 'Customer', key: 'email', type: 'text' },
+		{ label: 'Date', key: 'created_at', type: 'date' }
+	];
 
 	function formatDate(iso: string) {
 		try {
@@ -717,7 +744,6 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 				createOrderOpen = false;
 				markAsPaidModalOpen = false;
 				creditCardSheetOpen = false;
-				await fetchOrders();
 				goto(`/orders/${createdOrder.id}`);
 			}
 		} catch (e) {
@@ -738,132 +764,37 @@ import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 			</div>
 			<Button size="sm" onclick={openCreateOrder}>Create</Button>
 		</div>
-		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex flex-wrap items-center justify-between gap-2">
-				<Button variant="outline" size="sm" class="rounded-md">
-					<SlidersHorizontal class="mr-1.5 size-4" />
-					Add filter
-				</Button>
-				<div class="flex items-center gap-2">
-					<div class="relative w-64">
-						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							type="search"
-							placeholder="Search orders..."
-							bind:value={searchQuery}
-							class="h-9 rounded-md pl-9"
+		<PaginationTable searchPlaceholder="Search orders..." bind:searchQuery>
+			{#if paginateState.error}
+				<div
+					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+				>
+					{paginateState.error}
+				</div>
+			{:else if paginateState.loading}
+				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
+					<p class="text-muted-foreground">Loading…</p>
+				</div>
+			{:else}
+				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+					<table class="w-full text-sm">
+						<TableHead columns={tableColumns} />
+						<TableBody
+							rows={rows}
+							columns={tableColumns}
+							emptyMessage="No orders found."
 						/>
-					</div>
-					<button
-						type="button"
-						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-					>
-						<ArrowUpDown class="size-4" />
-						<span class="sr-only">Sort</span>
-					</button>
+					</table>
 				</div>
-			</div>
-		</div>
 
-		{#if error}
-			<div
-				class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-			>
-				{error}
-			</div>
-		{:else if loading}
-			<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
-				<p class="text-muted-foreground">Loading…</p>
-			</div>
-		{:else}
-			<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-				<table class="w-full text-sm">
-					<thead class="sticky top-0 border-b bg-muted/50">
-						<tr>
-							<th class="px-4 py-3 text-left font-medium">Order</th>
-							<th class="px-4 py-3 text-left font-medium">Status</th>
-							<th class="px-4 py-3 text-left font-medium">Fulfillment</th>
-							<th class="px-4 py-3 text-left font-medium">Payment</th>
-							<th class="px-4 py-3 text-left font-medium">Customer</th>
-							<th class="px-4 py-3 text-left font-medium">Date</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#if orders.length === 0}
-							<tr>
-								<td colspan="6" class="px-4 py-8 text-center text-muted-foreground">
-									No orders found.
-								</td>
-							</tr>
-						{:else}
-							{#each orders as order (order.id)}
-								<tr class="border-b transition-colors hover:bg-muted/30">
-									<td class="px-4 py-3 font-medium">
-										<a
-											href="/orders/{order.id}"
-											class="text-primary hover:underline focus:outline-none focus:underline"
-										>
-											#{order.display_id}
-										</a>
-									</td>
-									<td class="px-4 py-3">
-										<span class={statusBadgeClass(order.status)}>
-											{order.status.replace(/_/g, ' ')}
-										</span>
-									</td>
-									<td class="px-4 py-3">
-										<span class={statusBadgeClass(order.fulfillment_status)}>
-											{order.fulfillment_status.replace(/_/g, ' ')}
-										</span>
-									</td>
-									<td class="px-4 py-3">
-										<span class={statusBadgeClass(order.payment_status)}>
-											{order.payment_status.replace(/_/g, ' ')}
-										</span>
-									</td>
-									<td class="px-4 py-3 text-muted-foreground">
-										{order.email ?? '–'}
-									</td>
-									<td class="px-4 py-3 text-muted-foreground">
-										{formatDate(order.created_at)}
-									</td>
-								</tr>
-							{/each}
-						{/if}
-					</tbody>
-				</table>
-			</div>
-			<div class="mt-4 flex items-center justify-between gap-4 border-t py-4">
-				<p class="text-sm text-muted-foreground">
-					{#if pagination && pagination.total > 0}
-						{start} – {end} of {pagination.total} results
-					{:else}
-						0 results
-					{/if}
-				</p>
-				<div class="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={!pagination?.has_previous_page}
-						onclick={() => (page = page - 1)}
-					>
-						Prev
-					</Button>
-					<span class="text-sm text-muted-foreground">
-						{pagination?.page ?? 1} of {pagination?.total_pages ?? 1} pages
-					</span>
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={!pagination?.has_next_page}
-						onclick={() => (page = page + 1)}
-					>
-						Next
-					</Button>
-				</div>
-			</div>
-		{/if}
+				<TablePagination
+					pagination={listPagination}
+					{start}
+					{end}
+					onPageChange={goToPage}
+				/>
+			{/if}
+		</PaginationTable>
 	</div>
 </div>
 
