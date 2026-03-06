@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { Type, type StaticDecode } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   PAGINATED_STORES_PROCESS,
@@ -44,12 +44,19 @@ const UpdateStoreBodySchema = Type.Object({
   default_location_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 });
 
+function asListAndCountStoresInput(
+  q: unknown
+): StaticDecode<typeof ListAndCountStoresSchema> {
+  return q as StaticDecode<typeof ListAndCountStoresSchema>;
+}
+
 export const storeRoutes = new Elysia({ prefix: "/stores" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedStoresProcess>(PAGINATED_STORES_PROCESS);
+      const input = query as unknown as StaticDecode<typeof PaginatedStoresSchema>;
       return process.runOperations({ input });
     },
     {
@@ -68,8 +75,9 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
   )
   .get(
     "/list",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<ListStoresProcess>(LIST_STORES_PROCESS);
+      const input = query as unknown as StaticDecode<typeof ListStoresSchema>;
       return process.runOperations({ input });
     },
     {
@@ -88,11 +96,13 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
   )
   .get(
     "/list-and-count",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<ListAndCountStoresProcess>(
         LIST_AND_COUNT_STORES_PROCESS
       );
-      const [data, count] = await process.runOperations({ input });
+      const [data, count] = await process.runOperations({
+        input: asListAndCountStoresInput(query),
+      });
       return { data, count };
     },
     {

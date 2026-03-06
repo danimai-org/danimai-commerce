@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { Type, type Static, type StaticDecode } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   PAGINATED_CURRENCIES_PROCESS,
@@ -44,15 +44,27 @@ const UpdateCurrencyBodySchema = Type.Object({
   tax_inclusive_pricing: Type.Optional(Type.Boolean()),
 });
 
+// Elysia query params are string | number; process expects StaticDecode (e.g. number). Cast for process input.
+function asPaginatedInput(
+  q: unknown
+): StaticDecode<typeof PaginatedCurrenciesSchema> {
+  return q as StaticDecode<typeof PaginatedCurrenciesSchema>;
+}
+function asListAndCountInput(
+  q: unknown
+): StaticDecode<typeof ListAndCountCurrenciesSchema> {
+  return q as StaticDecode<typeof ListAndCountCurrenciesSchema>;
+}
+
 export const currencyRoutes = new Elysia({ prefix: "/currencies" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedCurrenciesProcess>(
         PAGINATED_CURRENCIES_PROCESS
       );
-      return process.runOperations({ input });
+      return process.runOperations({ input: asPaginatedInput(query) });
     },
     {
       query: PaginatedCurrenciesSchema,
@@ -70,11 +82,14 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
   )
   .get(
     "/available",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<ListAvailableCurrenciesProcess>(
         LIST_AVAILABLE_CURRENCIES_PROCESS
       );
-      return process.runOperations({ input });
+      const result = await process.runOperations({
+        input: query as unknown as StaticDecode<typeof ListAvailableCurrenciesSchema>,
+      });
+      return { data: result.rows, pagination: result.pagination };
     },
     {
       query: ListAvailableCurrenciesSchema,
@@ -92,9 +107,12 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
   )
   .get(
     "/list",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<ListCurrenciesProcess>(LIST_CURRENCIES_PROCESS);
-      return process.runOperations({ input });
+      const result = await process.runOperations({
+        input: query as unknown as StaticDecode<typeof ListCurrenciesSchema>,
+      });
+      return result as Static<typeof ListCurrenciesResponseSchema>;
     },
     {
       query: ListCurrenciesSchema,
@@ -112,11 +130,13 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
   )
   .get(
     "/list-and-count",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<ListAndCountCurrenciesProcess>(
         LIST_AND_COUNT_CURRENCIES_PROCESS
       );
-      const [data, count] = await process.runOperations({ input });
+      const [data, count] = await process.runOperations({
+        input: asListAndCountInput(query),
+      });
       return { data, count };
     },
     {
@@ -177,9 +197,10 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     "/:id",
     async ({ params, body }) => {
       const process = getService<UpdateCurrencyProcess>(UPDATE_CURRENCY_PROCESS);
-      return process.runOperations({
+      const result = await process.runOperations({
         input: { ...(body as { tax_inclusive_pricing?: boolean }), id: params.id },
       });
+      return result as Static<typeof UpdateCurrencyResponseSchema>;
     },
     {
       params: Type.Object({ id: Type.String() }),

@@ -83,7 +83,7 @@
 
 	const paginateState =
 		createPagination<ProductsListResponse>(async (): Promise<ProductsListResponse> => {
-			const q = createPaginationQuery(page.url.searchParams) as Record<string, unknown>;
+			const q = paginationQuery as Record<string, unknown>;
 			const categoryIds = q?.category_ids;
 			const categoryIdsArr =
 				typeof categoryIds === 'string'
@@ -106,7 +106,7 @@
 		}, ['products']);
 
 	$effect(() => {
-		page.url.searchParams.toString();
+		paginationQuery;
 		paginateState.refetch();
 	});
 
@@ -287,59 +287,58 @@
 		syncVariantsFromOptions();
 		// Fetch collections, categories, attributes
 		fetch(`${API_BASE}/collections?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
+			.then((r) => (r.ok ? r.json() : { rows: [] }))
 			.then((j) => {
-				collectionsList = j.data ?? [];
+				collectionsList = (j as { rows?: { id: string; title: string; handle: string }[] }).rows ?? [];
 			})
 			.catch(() => {
 				collectionsList = [];
 			});
 		fetch(`${API_BASE}/product-categories?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
+			.then((r) => (r.ok ? r.json() : { rows: [] }))
 			.then((j) => {
-				categoriesList = j.data ?? [];
+				categoriesList = (j as { rows?: { id: string; value: string; handle: string }[] }).rows ?? [];
 			})
 			.catch(() => {
 				categoriesList = [];
 			});
 		fetch(`${API_BASE}/product-tags?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
+			.then((r) => (r.ok ? r.json() : { rows: [] }))
 			.then((j) => {
-				tagsList = j.data ?? [];
+				tagsList = (j as { rows?: { id: string; value: string }[] }).rows ?? [];
 			})
 			.catch(() => {
 				tagsList = [];
 			});
 		fetch(`${API_BASE}/product-attributes?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
+			.then((r) => (r.ok ? r.json() : { rows: [] }))
 			.then((j) => {
-				attributesList = j.data ?? [];
+				attributesList = (j as { rows?: { id: string; title: string; type: string }[] }).rows ?? [];
 			})
 			.catch(() => {
 				attributesList = [];
 			});
 		fetch(`${API_BASE}/product-attribute-groups?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
+			.then((r) => (r.ok ? r.json() : { rows: [] }))
 			.then((j) => {
-				attributeGroupsList = j.data ?? [];
+				attributeGroupsList = (j as { rows?: { id: string; title: string }[] }).rows ?? [];
 			})
 			.catch(() => {
 				attributeGroupsList = [];
 			});
 		// Fetch sales channels and set defaults
 		fetch(`${API_BASE}/sales-channels?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
+			.then((r) => (r.ok ? r.json() : { rows: [] }))
 			.then((j) => {
-				const salesChannels = j.data ?? [];
-				salesChannelsList = salesChannels.map((ch: { id: string; name: string }) => ({
+				const salesChannels =
+					(j as { rows?: { id: string; name: string; is_default?: boolean }[] }).rows ?? [];
+				salesChannelsList = salesChannels.map((ch) => ({
 					id: ch.id,
 					name: ch.name
 				}));
-				const defaultChannels = salesChannels.filter(
-					(ch: { is_default: boolean }) => ch.is_default
-				);
+				const defaultChannels = salesChannels.filter((ch) => ch.is_default);
 				if (defaultChannels.length > 0) {
-					createSalesChannels = defaultChannels.map((ch: { id: string; name: string }) => ({
+					createSalesChannels = defaultChannels.map((ch) => ({
 						id: ch.id,
 						name: ch.name
 					}));

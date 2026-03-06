@@ -4,7 +4,6 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import {
 		DeleteConfirmationModal,
 		Combobox,
@@ -15,7 +14,6 @@
 		TablePagination,
 		type TableColumn
 	} from '$lib/components/organs/index.js';
-	import Package from '@lucide/svelte/icons/package';
 	import Bell from '@lucide/svelte/icons/bell';
 	import Search from '@lucide/svelte/icons/search';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
@@ -264,8 +262,25 @@
 		try {
 			const res = await fetch(`${API_BASE}/sales-channels?limit=100`, { cache: 'no-store' });
 			if (res.ok) {
-				const j = (await res.json()) as { data?: SalesChannel[] };
-				allSalesChannels = j.data ?? [];
+				const raw = (await res.json()) as
+					| SalesChannel[]
+					| { data?: SalesChannel[] }
+					| { sales_channels?: SalesChannel[] };
+
+				let channels: SalesChannel[] = [];
+				if (Array.isArray(raw)) {
+					channels = raw;
+				} else if (raw && typeof raw === 'object') {
+					if ('data' in raw && Array.isArray((raw as { data?: SalesChannel[] }).data)) {
+						channels = (raw as { data?: SalesChannel[] }).data ?? [];
+					} else if (
+						'sales_channels' in raw &&
+						Array.isArray((raw as { sales_channels?: SalesChannel[] }).sales_channels)
+					) {
+						channels = (raw as { sales_channels?: SalesChannel[] }).sales_channels ?? [];
+					}
+				}
+				allSalesChannels = channels;
 			} else {
 				allSalesChannels = [];
 			}
@@ -281,7 +296,30 @@
 				cache: 'no-store'
 			});
 			if (res.ok) {
-				const channels = (await res.json()) as SalesChannel[];
+				const raw = (await res.json()) as
+					| SalesChannel[]
+					| { data?: SalesChannel[] }
+					| { sales_channels?: SalesChannel[] }
+					| { channels?: SalesChannel[] };
+
+				let channels: SalesChannel[] = [];
+				if (Array.isArray(raw)) {
+					channels = raw;
+				} else if (raw && typeof raw === 'object') {
+					if ('data' in raw && Array.isArray((raw as { data?: SalesChannel[] }).data)) {
+						channels = (raw as { data?: SalesChannel[] }).data ?? [];
+					} else if (
+						'sales_channels' in raw &&
+						Array.isArray((raw as { sales_channels?: SalesChannel[] }).sales_channels)
+					) {
+						channels = (raw as { sales_channels?: SalesChannel[] }).sales_channels ?? [];
+					} else if (
+						'channels' in raw &&
+						Array.isArray((raw as { channels?: SalesChannel[] }).channels)
+					) {
+						channels = (raw as { channels?: SalesChannel[] }).channels ?? [];
+					}
+				}
 				productSalesChannelIds = new Set(channels.map((ch) => ch.id));
 			} else {
 				productSalesChannelIds = new Set();
@@ -306,7 +344,14 @@
 				salesChannelsSheetOpen = false;
 			} else {
 				const text = await res.text();
-				error = text || 'Failed to update sales channels';
+				let message = text;
+				try {
+					const parsed = JSON.parse(text) as { message?: string; error?: string };
+					message = parsed.message || parsed.error || text;
+				} catch {
+					// ignore JSON parse failures
+				}
+				error = message || 'Failed to update sales channels';
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -642,7 +687,16 @@
 		if (s === 'published') return 'Active';
 		if (s === 'draft') return 'Draft';
 		if (s === 'proposed') return 'Unlisted';
+		if (s === 'rejected') return 'Rejected';
 		return s;
+	}
+
+	function statusDotClass(s: string | undefined): string {
+		if (s === 'published') return 'bg-emerald-500';
+		if (s === 'draft' || !s) return 'bg-muted-foreground/60';
+		if (s === 'proposed') return 'bg-amber-500';
+		if (s === 'rejected') return 'bg-red-500';
+		return 'bg-muted-foreground/60';
 	}
 
 	let statusUpdating = $state(false);
@@ -1761,13 +1815,39 @@
 								disabled={statusUpdating || !product}
 							>
 								<Select.Trigger class="w-full">
-									{statusLabel(product?.status)}
+									<span class="flex items-center gap-2">
+										<span
+											class={`inline-block size-2 shrink-0 rounded-full ${statusDotClass(product?.status)}`}
+											aria-hidden="true"
+										/>
+										<span>{statusLabel(product?.status)}</span>
+									</span>
 								</Select.Trigger>
 								<Select.Content>
-									<Select.Item value="published" label="Active">Active</Select.Item>
-									<Select.Item value="draft" label="Draft">Draft</Select.Item>
-									<Select.Item value="proposed" label="Unlisted">Unlisted</Select.Item>
-									<Select.Item value="rejected" label="Rejected">Rejected</Select.Item>
+									<Select.Item value="published" label="Active">
+										<span class="flex items-center gap-2">
+											<span class="inline-block size-2 shrink-0 rounded-full bg-emerald-500" />
+											<span>Active</span>
+										</span>
+									</Select.Item>
+									<Select.Item value="draft" label="Draft">
+										<span class="flex items-center gap-2">
+											<span class="inline-block size-2 shrink-0 rounded-full bg-muted-foreground/60" />
+											<span>Draft</span>
+										</span>
+									</Select.Item>
+									<Select.Item value="proposed" label="Unlisted">
+										<span class="flex items-center gap-2">
+											<span class="inline-block size-2 shrink-0 rounded-full bg-amber-500" />
+											<span>Unlisted</span>
+										</span>
+									</Select.Item>
+									<Select.Item value="rejected" label="Rejected">
+										<span class="flex items-center gap-2">
+											<span class="inline-block size-2 shrink-0 rounded-full bg-red-500" />
+											<span>Rejected</span>
+										</span>
+									</Select.Item>
 								</Select.Content>
 							</Select.Root>
 							<h2 class="mt-6 mb-4 font-semibold">Visibility</h2>

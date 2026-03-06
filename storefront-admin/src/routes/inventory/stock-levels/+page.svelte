@@ -27,14 +27,7 @@
 		deleted_at: string | null;
 	};
 
-	type Pagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
+	
 
 	let searchQuery = $state('');
 
