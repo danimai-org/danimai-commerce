@@ -28,9 +28,10 @@ export const createPaginationQuery = <T extends Static<typeof PaginationSchema>>
 
 export const createPagination = <T>(
 	queryFn: QueryFunction<T>,
-	queryKey: string[]
-) => {
-    let searchText = $state<string>("");
+	queryKey: string[],
+	initialSearchQuery?: ReturnType<typeof createPaginationQuery>
+	) => {
+	let searchText = $state<string>(initialSearchQuery?.search ?? "");
 	const form = $state({
 		sheetOpen: false,
 		mode: "create" as "create" | "edit",
@@ -44,7 +45,7 @@ export const createPagination = <T>(
 	});
 
 	const query = createQuery(() => ({
-		queryKey: ["pagination", ...queryKey],
+		queryKey: ["pagination", ...queryKey, searchText],
 		queryFn,
 	}));
 

@@ -20,6 +20,18 @@
 		showToolbar?: boolean;
 		children?: import('svelte').Snippet;
 	} = $props();
+
+	function debounce(func: (...args: string[]) => void, delay = 300) {
+    let timer: NodeJS.Timeout;
+    return (...args: string[]) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => func.apply(undefined, args), delay);
+    };
+  }
+
+  const debouncedSearch = debounce((search: string) => {
+    searchQuery = search;
+  }, 300);
 </script>
 
 {#if showToolbar}
@@ -39,8 +51,9 @@
 				<Input
 					type="search"
 					placeholder={searchPlaceholder}
-					bind:value={searchQuery}
 					class="h-9 rounded-md pl-9"
+					bind:value={searchQuery}
+					// onchange={(e) => debouncedSearch((e.target as HTMLInputElement).value)}
 				/>
 			</div>
 			{#if showSort}

@@ -1,5 +1,5 @@
 import type { Generated, Selectable, Insertable, Updateable } from "kysely";
-import type { ProductSalesChannelTable } from "@danimai/sales-channel/db";
+import type { ProductSalesChannelTable, SalesChannelTable } from "@danimai/sales-channel/db";
 
 export enum ProductStatusEnum {
   DRAFT = "draft",
@@ -32,6 +32,8 @@ export interface Database {
   product_tag_relations: ProductTagRelationTable;
 
   product_sales_channels: ProductSalesChannelTable;
+
+  sales_channels: SalesChannelTable;
 }
 
 // table products

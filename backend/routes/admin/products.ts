@@ -29,10 +29,6 @@ import {
   UpdateProductResponseSchema,
   DeleteProductsSchema,
 } from "@danimai/product";
-import {
-  LIST_SALES_CHANNELS_BY_IDS_PROCESS,
-  ListSalesChannelsByIdsProcess,
-} from "@danimai/sales-channel";
 import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
@@ -52,28 +48,7 @@ export const productRoutes = new Elysia({ prefix: "/products" })
       if (typeof cleanedQuery.category_ids === "string") {
         cleanedQuery.category_ids = (cleanedQuery.category_ids as string).split(",").map((s) => s.trim()).filter(Boolean);
       }
-      if (cleanedQuery.page !== undefined) {
-        const p = typeof cleanedQuery.page === "string" ? parseInt(cleanedQuery.page, 10) : cleanedQuery.page;
-        cleanedQuery.page = Number.isNaN(p) ? 1 : Math.max(1, p);
-      }
-      if (cleanedQuery.limit !== undefined) {
-        const l = typeof cleanedQuery.limit === "string" ? parseInt(cleanedQuery.limit, 10) : cleanedQuery.limit;
-        cleanedQuery.limit = Number.isNaN(l) ? 10 : Math.max(1, Math.min(100, l));
-      }
-      const result = await process.runOperations({ input: cleanedQuery });
-      const allScIds = [...new Set(result.products.flatMap((p) => p.sales_channel_ids))];
-      let scMap: Record<string, { id: string; name: string; description: string | null; is_default: boolean; metadata: unknown; created_at: string; updated_at: string; deleted_at: string | null }> = {};
-      if (allScIds.length > 0) {
-        const listProcess = getService<ListSalesChannelsByIdsProcess>(LIST_SALES_CHANNELS_BY_IDS_PROCESS);
-        const channels = await listProcess.runOperations({ input: { ids: allScIds } });
-        scMap = Object.fromEntries(channels.map((c) => [c.id, c]));
-      }
-      const products = result.products.map((p) => {
-        const { sales_channel_ids, ...rest } = p;
-        const sales_channels = sales_channel_ids.map((id) => scMap[id]).filter(Boolean);
-        return { ...rest, sales_channels };
-      });
-      return { products, count: result.count, offset: result.offset, limit: result.limit };
+      return process.runOperations({ input: cleanedQuery });
     },
     {
       query: PaginatedProductsQuerySchema,

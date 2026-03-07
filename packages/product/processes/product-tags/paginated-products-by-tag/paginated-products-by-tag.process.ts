@@ -5,18 +5,18 @@ import {
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  type PaginationResponseType,
-  paginationResponse,
   SortOrder,
   ValidationError,
 } from "@danimai/core";
+import { paginationResponse } from "@danimai/core/pagination";
 import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type PaginatedProductsByTagProcessInput,
+  type PaginatedProductsByTagProcessOutput,
   PaginatedProductsByTagSchema,
 } from "./paginated-products-by-tag.schema";
-import type { Database, Product } from "../../../db/type";
+import type { Database } from "../../../db/type";
 
 export type ProductByTagItem = Product & {
   collection: { id: string; title: string; handle: string } | null;
@@ -29,7 +29,10 @@ export const PAGINATED_PRODUCTS_BY_TAG_PROCESS = Symbol(
 
 @Process(PAGINATED_PRODUCTS_BY_TAG_PROCESS)
 export class PaginatedProductsByTagProcess
-  implements ProcessContract<PaginationResponseType<ProductByTagItem>> {
+  implements ProcessContract<
+    typeof PaginatedProductsByTagSchema,
+    PaginatedProductsByTagProcessOutput
+  > {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -82,18 +85,6 @@ export class PaginatedProductsByTagProcess
 
     const sortOrder =
       sorting_direction === SortOrder.ASC ? "asc" : "desc";
-    const allowedSortFields = [
-      "id",
-      "title",
-      "handle",
-      "status",
-      "category_id",
-      "created_at",
-      "updated_at",
-    ];
-    const safeSortField = allowedSortFields.includes(sorting_field)
-      ? sorting_field
-      : "created_at";
 
     const countResult = await this.db
       .selectFrom("products")
@@ -109,7 +100,7 @@ export class PaginatedProductsByTagProcess
       .where("id", "in", ids)
       .where("deleted_at", "is", null)
       .selectAll()
-      .orderBy(sql.ref(`products.${safeSortField}`), sortOrder)
+      .orderBy(sql.ref(`products.${sorting_field}`), sortOrder)
       .limit(limit)
       .offset(offset)
       .execute();

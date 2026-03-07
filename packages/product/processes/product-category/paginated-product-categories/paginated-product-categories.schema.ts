@@ -2,15 +2,12 @@ import { Type, type Static } from "@sinclair/typebox";
 import {
   createFilterableColumnsSchema,
   createPaginatedResponseSchema,
+  createPaginationSchema,
   FilterOperator,
   PaginationSchema,
 } from "@danimai/core";
 import type { ProductCategory } from "../../../db/type";
 import { ProductCategoryResponseSchema } from "../retrieve-product-category/retrieve-product-category.schema";
-
-const paginationQueryProperties = (PaginationSchema as unknown as {
-  properties?: Record<string, ReturnType<typeof Type.Any>>;
-}).properties ?? {};
 
 const productCategoriesFiltersSchema = createFilterableColumnsSchema<
   keyof Pick<ProductCategory, "value" | "parent_id">
@@ -24,12 +21,23 @@ const productCategoriesFiltersSchema = createFilterableColumnsSchema<
   ],
 });
 
-export const PaginatedProductCategoriesSchema = Type.Intersect([
-  PaginationSchema,
-  Type.Object({
-    filters: Type.Optional(productCategoriesFiltersSchema),
-  }),
-]);
+export const PaginatedProductCategoriesSchema = createPaginationSchema(
+  productCategoriesFiltersSchema,
+  [
+    "id",
+    "value",
+    "parent_id",
+    "status",
+    "visibility",
+    "created_at",
+    "updated_at",
+    "deleted_at",
+  ],
+);
+
+const paginationQueryProperties = (PaginationSchema as unknown as {
+  properties?: Record<string, ReturnType<typeof Type.Any>>;
+}).properties ?? {};
 
 /** Query-only schema for Elysia route (single Type.Object, no Intersect). */
 export const PaginatedProductCategoriesQuerySchema = Type.Object({

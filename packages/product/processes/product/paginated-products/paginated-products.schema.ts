@@ -65,7 +65,7 @@ const PaginatedProductItemSchema = Type.Object({
   category: Type.Union([
     Type.Object({
       id: Type.String(),
-      name: Type.String(),
+      value: Type.String(),
     }),
     Type.Null(),
   ]),

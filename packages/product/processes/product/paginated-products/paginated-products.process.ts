@@ -126,23 +126,41 @@ export class PaginatedProductsProcess implements ProcessContract<
         "product_sales_channels.product_id",
         "products.id",
       )
+      .leftJoin("sales_channels", (join) =>
+        join
+          .onRef("sales_channels.id", "=", "product_sales_channels.sales_channel_id")
+          .on("sales_channels.deleted_at", "is", null),
+      )
       .select([
         "products.id as id",
         "products.title as title",
         "products.status as status",
         "products.handle as handle",
-        (eb) => sql<number>`count(product_variants.id) as variant_count`.as("variant_count"),
+        (eb) => sql<number>`count(product_variants.id)::int`.as("variant_count"),
         (eb) => sql<{
           id: string;
           name: string;
-        }[]>`array_agg(jsonb_build_object('id', product_sales_channels.sales_channel_id, 'name', product_sales_channels.name)) as sales_channels`.as("sales_channels"),
-        (eb) => sql<{ id: string; name: string; } | null>`
+        }[]>`
+          CASE
+            WHEN count(sales_channels.id) = 0 THEN ARRAY[]::json[]
+            ELSE  array_agg(
+              DISTINCT jsonb_build_object(
+                'id', sales_channels.id,
+                'name', sales_channels.name
+              )
+            )::json[]
+          END
+        `.as("sales_channels"),
+        (eb) => sql<{ id: string; value: string; } | null>`
           CASE
             WHEN product_categories.id IS NULL THEN NULL
-            ELSE jsonb_build_object('id', product_categories.id, 'name', product_categories.name)
+            ELSE jsonb_build_object(
+              'id', product_categories.id, 
+              'value', product_categories.value
+            )
           END
         `.as('category'),
-      ]).groupBy(["products.id", "products.title", "products.status", "products.handle"])
+      ]).groupBy(["products.id", "products.title", "products.status", "products.handle", "product_categories.id"])
       .execute();
 
 

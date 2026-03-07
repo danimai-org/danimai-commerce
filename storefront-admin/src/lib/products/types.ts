@@ -5,13 +5,16 @@ export type Product = {
 	subtitle?: string | null;
 	description?: string | null;
 	status: string;
-	thumbnail: string | null;
+	thumbnail?: string | null;
 	category_id?: string | null;
-	category?: { id: string; value: string; handle: string } | null;
+	/** List API returns category with id + name (or value for legacy) */
+	category?: { id: string; name?: string; value?: string; handle?: string } | null;
 	created_at?: string;
 	updated_at?: string;
 	sales_channels?: Array<{ id: string; name: string }>;
 	variants?: Array<{ id: string }>;
+	/** List API returns variant_count instead of variants array */
+	variant_count?: number;
 };
 
 export type PaginationMeta = {

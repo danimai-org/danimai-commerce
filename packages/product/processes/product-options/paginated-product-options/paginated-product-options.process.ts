@@ -5,21 +5,27 @@ import {
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  type PaginationResponseType,
-  paginationResponse,
   SortOrder,
 } from "@danimai/core";
+import { paginationResponse } from "@danimai/core/pagination";
 import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type PaginatedProductOptionsProcessInput, PaginatedProductOptionsSchema } from "./paginated-product-options.schema";
-import type { Database, ProductOption } from "../../../db/type";
+import {
+  type PaginatedProductOptionsProcessInput,
+  type PaginatedProductOptionsProcessOutput,
+  PaginatedProductOptionsSchema,
+} from "./paginated-product-options.schema";
+import type { Database } from "../../../db/type";
 
 export const PAGINATED_PRODUCT_OPTIONS_PROCESS = Symbol("PaginatedProductOptions");
 
 // TODO: Implement filters later
 @Process(PAGINATED_PRODUCT_OPTIONS_PROCESS)
 export class PaginatedProductOptionsProcess
-  implements ProcessContract<PaginationResponseType<ProductOption>> {
+  implements ProcessContract<
+    typeof PaginatedProductOptionsSchema,
+    PaginatedProductOptionsProcessOutput
+  > {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,

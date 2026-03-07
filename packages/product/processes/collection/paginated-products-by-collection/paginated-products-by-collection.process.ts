@@ -8,14 +8,16 @@ import {
   SortOrder,
   ValidationError,
 } from "@danimai/core";
+import { paginationResponse } from "@danimai/core/pagination";
 import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type PaginatedProductsByCollectionProcessInput,
+  type PaginatedProductsByCollectionProcessOutput,
   PaginatedProductsByCollectionSchema,
 } from "./paginated-products-by-collection.schema";
 import type { Database, ProductCollection } from "../../../db/type";
-import type { PaginatedProductItem, PaginatedProductsResponse } from "../../product/paginated-products/paginated-products.process";
+import type { PaginatedProductItem } from "../../product/paginated-products/paginated-products.process";
 
 export const PAGINATED_PRODUCTS_BY_COLLECTION_PROCESS = Symbol(
   "PaginatedProductsByCollection"
@@ -23,7 +25,10 @@ export const PAGINATED_PRODUCTS_BY_COLLECTION_PROCESS = Symbol(
 
 @Process(PAGINATED_PRODUCTS_BY_COLLECTION_PROCESS)
 export class PaginatedProductsByCollectionProcess
-  implements ProcessContract<PaginatedProductsResponse> {
+  implements ProcessContract<
+    typeof PaginatedProductsByCollectionSchema,
+    PaginatedProductsByCollectionProcessOutput
+  > {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -74,21 +79,6 @@ export class PaginatedProductsByCollectionProcess
     }
 
     const sortOrder = sorting_direction === SortOrder.ASC ? "asc" : "desc";
-    const allowedSortFields = [
-      "id",
-      "title",
-      "handle",
-      "status",
-      "category_id",
-      "is_giftcard",
-      "discountable",
-      "created_at",
-      "updated_at",
-      "deleted_at",
-    ];
-    const safeSortField = allowedSortFields.includes(sorting_field)
-      ? sorting_field
-      : "created_at";
 
     const countResult = await this.db
       .selectFrom("products")
@@ -105,14 +95,14 @@ export class PaginatedProductsByCollectionProcess
       .where("id", "in", productIds)
       .where("deleted_at", "is", null)
       .selectAll()
-      .orderBy(sql.ref(`products.${safeSortField}`), sortOrder)
+      .orderBy(sql.ref(`products.${sorting_field}`), sortOrder)
       .limit(limit)
       .offset(offset)
       .execute();
 
     const rowIds = rows.map((p) => p.id);
     if (rowIds.length === 0) {
-      return { products: [], count: total, offset, limit };
+      return paginationResponse<PaginatedProductItem>([], total, input);
     }
 
     const variants = await this.db
@@ -166,6 +156,6 @@ export class PaginatedProductsByCollectionProcess
       };
     });
 
-    return { products, count: total, offset, limit };
+    return paginationResponse<PaginatedProductItem>(products, total, input);
   }
 }

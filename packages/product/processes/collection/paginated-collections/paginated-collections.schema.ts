@@ -2,6 +2,7 @@ import { Type, type Static } from "@sinclair/typebox";
 import {
   createFilterableColumnsSchema,
   createPaginatedResponseSchema,
+  createPaginationSchema,
   PaginationSchema,
 } from "@danimai/core";
 import type { ProductCollection } from "../../../db/type";
@@ -18,8 +19,25 @@ function coerceStringArray(value: unknown): string[] | undefined {
   return undefined;
 }
 
-export const PaginatedCollectionsSchema = Type.Object({
-  ...PaginationSchema.properties,
+const collectionsFiltersSchema = createFilterableColumnsSchema<
+  keyof Pick<ProductCollection, "title" | "handle">
+>({
+  title: true,
+  handle: true,
+});
+
+export const PaginatedCollectionsSchema = createPaginationSchema(
+  collectionsFiltersSchema,
+  ["id", "title", "handle", "created_at", "updated_at", "deleted_at"],
+);
+
+const paginationQueryProperties = (PaginationSchema as unknown as {
+  properties?: Record<string, unknown>;
+}).properties ?? {};
+
+/** Query-only schema for Elysia route (single Type.Object; Intersect is not supported by Elysia query validation). */
+export const PaginatedCollectionsQuerySchema = Type.Object({
+  ...paginationQueryProperties,
   search: Type.Optional(Type.String()),
   sales_channel_ids: Type.Optional(
     Type.Transform(Type.Union([Type.String(), Type.Array(Type.String())]))
@@ -27,14 +45,7 @@ export const PaginatedCollectionsSchema = Type.Object({
       .Encode((v: string[] | undefined) => v ?? [])
   ),
   collection_type: Type.Optional(Type.String()),
-  filters: Type.Optional(
-    createFilterableColumnsSchema<
-      keyof Pick<ProductCollection, "title" | "handle">
-    >({
-      title: true,
-      handle: true,
-    })
-  ),
+  filters: Type.Optional(collectionsFiltersSchema),
 });
 
 export type PaginatedCollectionsProcessInput = Static<
