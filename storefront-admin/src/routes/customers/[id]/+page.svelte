@@ -467,6 +467,7 @@
 
 <svelte:head>
 	<title>{customer ? displayTitle : 'Customer'} | Customers | Danimai Store</title>
+	<meta name="description" content="Manage customer." />
 </svelte:head>
 
 <div class="flex h-full flex-col">

@@ -192,6 +192,7 @@
 
 <svelte:head>
 	<title>{group ? group.title : 'Attribute Group'} | Attribute Groups | Danimai Store</title>
+	<meta name="description" content="Manage product attribute groups." />
 </svelte:head>
 
 <div class="flex h-full flex-col">

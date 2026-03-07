@@ -134,7 +134,7 @@ export const productRoutes = new Elysia({ prefix: "/products" })
     },
     {
       params: Type.Object({ id: Type.String() }),
-      body: UpdateProductSchema,
+      body: Type.Omit(UpdateProductSchema, ["id"]),
       response: {
         200: UpdateProductResponseSchema,
         400: ValidationErrorResponseSchema,

@@ -31,6 +31,7 @@ export interface Database {
   product_tags: ProductTagTable;
   product_tag_relations: ProductTagRelationTable;
 
+  sales_channels: SalesChannelTable;
   product_sales_channels: ProductSalesChannelTable;
 
   sales_channels: SalesChannelTable;

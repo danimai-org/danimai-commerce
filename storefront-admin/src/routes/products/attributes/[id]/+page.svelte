@@ -231,6 +231,7 @@
 
 <svelte:head>
 	<title>{attribute ? attribute.title : 'Attribute'} | Attributes | Danimai Store</title>
+	<meta name="description" content="Manage product attributes." />
 </svelte:head>
 
 <div class="flex h-full flex-col">

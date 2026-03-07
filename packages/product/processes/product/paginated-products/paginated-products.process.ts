@@ -108,15 +108,15 @@ export class PaginatedProductsProcess implements ProcessContract<
       return  paginationResponse([], total, input);
     }
 
-    const products = await this.db
+    const products = await (this.db as any)
       .selectFrom("products")
       .where("products.id", "in", productIds)
-      .leftJoin("product_variants", (join) =>
+      .leftJoin("product_variants", (join: any) =>
         join
           .onRef("product_variants.product_id", "=", "products.id")
           .on("product_variants.deleted_at", "is", null),
       )
-      .leftJoin("product_categories", (join) =>
+      .leftJoin("product_categories", (join: any) =>
         join
           .onRef("product_categories.id", "=", "products.category_id")
           .on("product_categories.deleted_at", "is", null),

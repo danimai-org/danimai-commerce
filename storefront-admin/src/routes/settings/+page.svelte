@@ -183,6 +183,11 @@
 
 </script>
 
+<svelte:head>
+    <title>Settings</title>
+    <meta name="description" content="Manage settings." />
+</svelte:head>
+
 <div class="flex h-full flex-col p-6">
 	<div class="mb-6 flex items-center justify-between">
 		<div>

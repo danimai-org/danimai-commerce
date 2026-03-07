@@ -31,9 +31,11 @@
 	import type {
 		Currency,
 		CurrenciesListResponse,
-		AvailableCurrency
+		AvailableCurrency,
+		AvailableCurrenciesResponse
 	} from '$lib/currencies/types.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import { createQuery } from '@tanstack/svelte-query';
 
 	const API_BASE = 'http://localhost:8000/admin';
 
@@ -82,25 +84,15 @@
 	async function fetchStore() {
 		storeLoading = true;
 		try {
-			const res = await fetch(`${API_BASE}/stores?limit=1`, { cache: 'no-store' });
+			const res = await fetch(`${API_BASE}/stores?limit=100`, { cache: 'no-store' });
 			if (!res.ok) throw new Error(await res.text());
-			const json = (await res.json()) as { data: Store[]; pagination: StoreListPagination };
-			storeData = json.data[0] ?? null;
-		} catch {
+			const json = (await res.json()) as { rows: Store[]; pagination: StoreListPagination };
+			storeData = json.rows[0] ?? null;
+		} catch (e) {
+			console.error('Failed to fetch store:', e);
 			storeData = null;
-		} finally {
-			storeLoading = false;
 		}
 	}
-	$effect(() => {
-		fetchStore();
-	});
-
-	// Load store options (regions, channels, locations) so we can show names in store details
-	$effect(() => {
-		if (storeData && !storeOptionsLoading && storeRegions.length === 0 && storeSalesChannels.length === 0)
-			fetchStoreOptions();
-	});
 
 	// Edit store sheet
 	let editStoreOpen = $state(false);
@@ -130,16 +122,16 @@
 			]);
 
 			if (regionsRes.ok) {
-				const json = (await regionsRes.json()) as { data: Region[] };
-				storeRegions = json.data ?? [];
+				const json = (await regionsRes.json()) as { rows: Region[] };
+				storeRegions = json.rows ?? [];
 			}
 			if (channelsRes.ok) {
-				const json = (await channelsRes.json()) as { data: SalesChannel[] };
-				storeSalesChannels = json.data ?? [];
+				const json = (await channelsRes.json()) as { rows: SalesChannel[] };
+				storeSalesChannels = json.rows ?? [];
 			}
 			if (locationsRes.ok) {
-				const json = (await locationsRes.json()) as { data: StockLocation[] };
-				storeStockLocations = json.data ?? [];
+				const json = (await locationsRes.json()) as { rows: StockLocation[] };
+				storeStockLocations = json.rows ?? [];
 			}
 			storeCurrencies = currenciesData.rows;
 		} catch (e) {
@@ -321,64 +313,65 @@
 	const selectAllChecked = $derived(rows.length > 0 && selectedIds.size === rows.length);
 	const selectAllIndeterminate = $derived(selectedIds.size > 0 && selectedIds.size < rows.length);
 
-	// Add currencies sheet
+	// Add currencies sheet: pagination from URL (add_page, add_limit, add_currency_code), same structure
 	let addOpen = $state(false);
-	let availableData = $state<import('$lib/currencies/types.js').AvailableCurrenciesResponse | null>(null);
-	let availableLoading = $state(false);
-	let availablePage = $state(1);
-	let availableLimit = $state(50);
-	let availableSearch = $state('');
-	let availableSearchDebounced = $state('');
 	let addSelected = $state<Map<string, boolean>>(new Map());
 	let addSubmitting = $state(false);
 	let addError = $state<string | null>(null);
 
+	const addPaginationQuery = $derived.by(() => {
+		const p = page.url.searchParams;
+		return {
+			page: Number(p.get('add_page')) || 1,
+			limit: Number(p.get('add_limit')) || 10,
+			search: p.get('add_currency_code') ?? ''
+		};
+	});
+
+	const availableQuery = createQuery(() => ({
+		queryKey: ['pagination', 'availableCurrencies', addPaginationQuery],
+		queryFn: () => listAvailableCurrencies(addPaginationQuery),
+		enabled: addOpen
+	}));
+
+	const availableQueryData = $derived(availableQuery.data as AvailableCurrenciesResponse | undefined);
+	const availableList = $derived(availableQueryData?.data ?? []);
+	const availablePagination = $derived(availableQueryData?.pagination ?? null);
+	const availableLoading = $derived(availableQuery.isPending);
+	const availableStart = $derived(
+		availablePagination ? (availablePagination.page - 1) * availablePagination.limit + 1 : 0
+	);
+	const availableEnd = $derived(
+		availablePagination
+			? Math.min(availablePagination.page * availablePagination.limit, availablePagination.total)
+			: 0
+	);
+
+	function goToAvailablePage(pageNum: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('add_page', String(Math.max(1, pageNum)));
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+	}
+
 	function openAdd() {
 		addOpen = true;
-		availablePage = 1;
-		availableSearch = '';
-		availableSearchDebounced = '';
-		addSelected = new Map();
 		addError = null;
+		addSelected = new Map();
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('add_page', '1');
+		params.set('add_limit', '10');
+		if (!params.has('add_currency_code')) params.set('add_currency_code', '');
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
 	function closeAdd() {
-		addOpen = false;
-	}
-
-	async function fetchAvailable() {
-		availableLoading = true;
-		try {
-			availableData = await listAvailableCurrencies({
-				page: availablePage,
-				limit: availableLimit,
-				search: availableSearchDebounced
-			});
-		} catch (e) {
-			addError = e instanceof Error ? e.message : String(e);
-			availableData = null;
-		} finally {
-			availableLoading = false;
+		if (!addSubmitting) {
+			addOpen = false;
+			addError = null;
+			addSelected = new Map();
 		}
 	}
 
-	$effect(() => {
-		const t = setTimeout(() => {
-			availableSearchDebounced = availableSearch;
-		}, 300);
-		return () => clearTimeout(t);
-	});
-
-	$effect(() => {
-		if (!addOpen) return;
-		const _ = availablePage;
-		const __ = availableLimit;
-		const ___ = availableSearchDebounced;
-		fetchAvailable();
-	});
-
-	const availableList = $derived(availableData?.data ?? []);
-	const availablePagination = $derived(availableData?.pagination ?? null);
 	const toAdd = $derived(availableList.filter((c) => !c.active && addSelected.has(c.code)));
 
 	function toggleAddSelect(item: AvailableCurrency) {
@@ -427,6 +420,13 @@
 	}
 </script>
 
+<svelte:head>
+    <title>
+        {editStoreSubmitting ? '● Saving... ' : ''}
+        {storeData?.name ? `${storeData.name} | Settings` : 'Store Settings'}
+    </title>
+    <meta name="description" content="Manage store details and active currencies." />
+</svelte:head>
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex items-center justify-between border-b pb-4">
@@ -627,8 +627,14 @@
 						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 						<Input
 							type="search"
-							placeholder="Search"
-							bind:value={availableSearch}
+							placeholder="Search by currency code"
+							value={page.url.searchParams.get('add_currency_code') ?? ''}
+							oninput={(e) => {
+								const params = new URLSearchParams(page.url.searchParams);
+								params.set('add_currency_code', (e.currentTarget as HTMLInputElement).value);
+								params.set('add_page', '1');
+								goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+							}}
 							class="h-9 rounded-md pl-9"
 						/>
 					</div>
@@ -702,19 +708,14 @@
 				{#if availablePagination && availablePagination.total > 0}
 					<div class="mt-4 flex items-center justify-between border-t pt-4">
 						<p class="text-sm text-muted-foreground">
-							{(availablePagination.page - 1) * availablePagination.limit + 1} –
-							{Math.min(
-								availablePagination.page * availablePagination.limit,
-								availablePagination.total
-							)}{' '}
-							of {availablePagination.total} results
+							{availableStart} – {availableEnd} of {availablePagination.total} results
 						</p>
 						<div class="flex gap-2">
 							<Button
 								variant="outline"
 								size="sm"
 								disabled={!availablePagination.has_previous_page}
-								onclick={() => (availablePage = availablePage - 1)}
+								onclick={() => goToAvailablePage(availablePagination.page - 1)}
 							>
 								Prev
 							</Button>
@@ -725,7 +726,7 @@
 								variant="outline"
 								size="sm"
 								disabled={!availablePagination.has_next_page}
-								onclick={() => (availablePage = availablePage + 1)}
+								onclick={() => goToAvailablePage(availablePagination.page + 1)}
 							>
 								Next
 							</Button>

@@ -1,14 +1,22 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
+	import {
+		DeleteConfirmationModal,
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
+	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import { DropdownMenu } from 'bits-ui';
-	import Search from '@lucide/svelte/icons/search';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import Folder from '@lucide/svelte/icons/folder';
 	import Clock from '@lucide/svelte/icons/clock';
 	import DollarSign from '@lucide/svelte/icons/dollar-sign';
@@ -164,24 +172,85 @@
 
 	let campaigns = $state<Campaign[]>(loadCampaigns());
 	let searchQuery = $state('');
-	let page = $state(1);
-	const limit = 10;
 
-	const filtered = $derived(
-		searchQuery.trim()
-			? campaigns.filter(
-					(c) =>
-						c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-						c.identifier.toLowerCase().includes(searchQuery.toLowerCase()) ||
-						(c.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
-				)
-			: campaigns
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+
+	const paginateState = createPagination(
+		async () => {
+			const all = loadCampaigns();
+			const q = searchQuery.trim().toLowerCase();
+			const filtered = q
+				? all.filter(
+						(c) =>
+							c.name.toLowerCase().includes(q) ||
+							c.identifier.toLowerCase().includes(q) ||
+							(c.description?.toLowerCase().includes(q) ?? false)
+					)
+				: all;
+			const pageNum = Number((paginationQuery as Record<string, string>)?.['page']) || 1;
+			const limitNum = Number((paginationQuery as Record<string, string>)?.['limit']) || 10;
+			const total = filtered.length;
+			const totalPages = Math.max(1, Math.ceil(total / limitNum));
+			const startIdx = (pageNum - 1) * limitNum;
+			const rows = filtered.slice(startIdx, startIdx + limitNum);
+			return {
+				rows,
+				pagination: {
+					total,
+					page: pageNum,
+					limit: limitNum,
+					total_pages: totalPages,
+					has_next_page: pageNum < totalPages,
+					has_previous_page: pageNum > 1
+				}
+			};
+		},
+		['campaigns']
 	);
-	const total = $derived(filtered.length);
-	const totalPages = $derived(Math.max(1, Math.ceil(total / limit)));
-	const start = $derived(total > 0 ? (page - 1) * limit + 1 : 0);
-	const end = $derived(Math.min(page * limit, total));
-	const pageData = $derived(filtered.slice((page - 1) * limit, page * limit));
+
+	$effect(() => {
+		searchQuery;
+		page.url.searchParams.toString();
+		paginateState.refetch();
+	});
+
+	function goToPage(pageNum: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('page', String(Math.max(1, pageNum)));
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+	}
+
+	const rows = $derived((paginateState.query.data?.rows ?? []) as Record<string, unknown>[]);
+	const listPagination = $derived(paginateState.query.data?.pagination ?? null);
+	const start = $derived(
+		listPagination ? (listPagination.page - 1) * listPagination.limit + 1 : 0
+	);
+	const end = $derived(
+		listPagination ? Math.min(listPagination.page * listPagination.limit, listPagination.total) : 0
+	);
+
+	const tableColumns: TableColumn[] = [
+		{ label: 'Name', key: 'name', type: 'text' },
+		{ label: 'Description', key: 'description', type: 'text' },
+		{ label: 'Identifier', key: 'identifier', type: 'text' },
+		{ label: 'Start date', key: 'start_date', type: 'date' },
+		{ label: 'End date', key: 'end_date', type: 'date' },
+		{
+			label: 'Actions',
+			key: 'actions',
+			type: 'actions',
+			actions: [
+				{ label: 'View', key: 'view', type: 'button', onClick: (item) => openView(item as Campaign) },
+				{ label: 'Edit', key: 'edit', type: 'button', onClick: (item) => openEdit(item as Campaign) },
+				{
+					label: 'Delete',
+					key: 'delete',
+					type: 'button',
+					onClick: (item) => openDeleteModal(item as Campaign)
+				}
+			]
+		}
+	];
 
 	// Create campaign sheet
 	let createOpen = $state(false);
@@ -213,6 +282,9 @@
 	let viewOpen = $state(false);
 	let viewingCampaign = $state<Campaign | null>(null);
 	let promotions = $state<Promotion[]>(loadPromotions());
+	let viewingCampaignPromotions = $derived(
+		viewingCampaign ? promotions.filter((p) => p.campaign_id === viewingCampaign!.id) : []
+	);
 	let editingInfo = $state(false);
 	let editingConfig = $state(false);
 	let viewName = $state('');
@@ -288,6 +360,7 @@
 		campaigns = [...campaigns, newCampaign];
 		saveCampaignsToStorage(campaigns);
 		closeCreate();
+		paginateState.refetch();
 	}
 
 	function openEdit(c: Campaign) {
@@ -331,6 +404,7 @@
 		);
 		saveCampaignsToStorage(campaigns);
 		closeEdit();
+		paginateState.refetch();
 	}
 
 	function deleteCampaign(c: Campaign) {
@@ -348,6 +422,7 @@
 			deleteCampaign(campaignToDelete);
 			campaignToDelete = null;
 			deleteModalOpen = false;
+			paginateState.refetch();
 		}
 	}
 
@@ -416,6 +491,7 @@
 		saveCampaignsToStorage(campaigns);
 		viewingCampaign = campaigns.find((c) => c.id === viewingCampaign!.id) || null;
 		editingInfo = false;
+		paginateState.refetch();
 	}
 
 	function startEditConfig() {
@@ -451,6 +527,7 @@
 		saveCampaignsToStorage(campaigns);
 		viewingCampaign = campaigns.find((c) => c.id === viewingCampaign!.id) || null;
 		editingConfig = false;
+		paginateState.refetch();
 	}
 
 	function openCreatePromotion(campaignId: string) {
@@ -517,65 +594,8 @@
 		closeCreatePromotion();
 	}
 
-	function addCodeCondition() {
-		detailCodeConditions = [
-			...detailCodeConditions,
-			{ id: crypto.randomUUID(), field: 'currency_code', op: 'equals', value: '' }
-		];
-	}
 
-	function clearCodeConditions() {
-		detailCodeConditions = [];
-	}
-
-	function removeCodeCondition(id: string) {
-		detailCodeConditions = detailCodeConditions.filter((c) => c.id !== id);
-	}
-
-	function addCartCondition() {
-		detailCartConditions = [
-			...detailCartConditions,
-			{ id: crypto.randomUUID(), field: 'minimum_quantity_of_items', op: 'equals', value: '' }
-		];
-	}
-	function clearCartConditions() {
-		detailCartConditions = [];
-	}
-	function removeCartCondition(id: string) {
-		detailCartConditions = detailCartConditions.filter((c) => c.id !== id);
-	}
-
-	function addItemCondition() {
-		detailItemConditions = [
-			...detailItemConditions,
-			{ id: crypto.randomUUID(), field: 'quantity_promotion_applies_to', op: 'equals', value: '' }
-		];
-	}
-	function clearItemConditions() {
-		detailItemConditions = [];
-	}
-	function removeItemCondition(id: string) {
-		detailItemConditions = detailItemConditions.filter((c) => c.id !== id);
-	}
-
-	function addShippingCondition() {
-		detailShippingConditions = [
-			...detailShippingConditions,
-			{ id: crypto.randomUUID(), field: 'shipping_method', op: 'equals', value: '' }
-		];
-	}
-	function clearShippingConditions() {
-		detailShippingConditions = [];
-	}
-	function removeShippingCondition(id: string) {
-		detailShippingConditions = detailShippingConditions.filter((c) => c.id !== id);
-	}
-
-	const campaignPromotions = $derived(
-		viewingCampaign
-			? promotions.filter((p) => p.campaign_id === viewingCampaign!.id)
-			: []
-	);
+	
 
 	$effect(() => {
 		if (!editOpen) editingCampaign = null;
@@ -668,140 +688,49 @@
 
 <svelte:head>
 	<title>Campaigns | Promotions | Danimai Store</title>
+	<meta name="description" content="Manage promotional campaigns." />
 </svelte:head>
 
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div class="mb-4 flex flex-col gap-4">
-			<div class="flex items-center justify-between gap-4 border-b pb-4">
-				<h1 class="relative flex items-center gap-2 text-xl font-semibold">
-					<Folder class="relative size-5 shrink-0" />
-					Campaigns
-				</h1>
-				<Button size="sm" onclick={openCreate}>Create</Button>
-			</div>
-			<div class="flex flex-wrap items-center justify-end gap-2">
-				<div class="relative w-64">
-					<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-					<Input
-						type="search"
-						placeholder="Search"
-						bind:value={searchQuery}
-						class="h-9 rounded-md pl-9"
-					/>
-				</div>
-				<Button variant="outline" size="icon" class="size-9">
-					<SlidersHorizontal class="size-4" />
-					<span class="sr-only">Filters</span>
-				</Button>
-			</div>
-		</div>
-
-		<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-			<table class="w-full text-sm">
-				<thead class="sticky top-0 border-b bg-muted/50">
-					<tr>
-						<th class="px-4 py-3 text-left font-medium">Name</th>
-						<th class="px-4 py-3 text-left font-medium">Description</th>
-						<th class="px-4 py-3 text-left font-medium">Identifier</th>
-						<th class="px-4 py-3 text-left font-medium">Start date</th>
-						<th class="px-4 py-3 text-left font-medium">End date</th>
-						<th class="w-10 px-4 py-3"></th>
-					</tr>
-				</thead>
-				<tbody>
-					{#if pageData.length === 0}
-						<tr>
-							<td colspan="6" class="px-4 py-8 text-center text-muted-foreground">
-								No campaigns found.
-							</td>
-						</tr>
-					{:else}
-						{#each pageData as campaign (campaign.id)}
-							<tr class="border-b transition-colors hover:bg-muted/30">
-								<td class="px-4 py-3">
-									<button
-										onclick={() => openView(campaign)}
-										class="font-medium text-left hover:underline cursor-pointer"
-									>
-										{campaign.name}
-									</button>
-								</td>
-								<td class="px-4 py-3 text-muted-foreground">
-									{campaign.description ?? '-'}
-								</td>
-								<td class="px-4 py-3 text-muted-foreground">{campaign.identifier}</td>
-								<td class="px-4 py-3 text-muted-foreground">
-									{formatDate(campaign.start_date) || '-'}
-								</td>
-								<td class="px-4 py-3 text-muted-foreground">
-									{formatDate(campaign.end_date) || '-'}
-								</td>
-								<td class="px-4 py-3">
-									<DropdownMenu.Root>
-										<DropdownMenu.Trigger
-											class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
-										>
-											<MoreHorizontal class="size-4" />
-											<span class="sr-only">Actions</span>
-										</DropdownMenu.Trigger>
-										<DropdownMenu.Portal>
-											<DropdownMenu.Content
-												class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-												sideOffset={4}
-											>
-												<DropdownMenu.Item
-													textValue="Edit"
-													class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-													onSelect={() => openEdit(campaign)}
-												>
-													<Pencil class="size-4" />
-													Edit
-												</DropdownMenu.Item>
-												<DropdownMenu.Item
-													textValue="Delete"
-													class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-													onSelect={() => openDeleteModal(campaign)}
-												>
-													<Trash2 class="size-4" />
-													Delete
-												</DropdownMenu.Item>
-											</DropdownMenu.Content>
-										</DropdownMenu.Portal>
-									</DropdownMenu.Root>
-								</td>
-							</tr>
-						{/each}
-					{/if}
-				</tbody>
-			</table>
-		</div>
-
-		<div class="mt-4 flex items-center justify-between gap-4 border-t py-4">
-			<p class="text-sm text-muted-foreground">
-				{#if total > 0}
-					{start} – {end} of {total} results
-				{:else}
-					0 results
-				{/if}
-			</p>
+		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
 			<div class="flex items-center gap-2">
-				<Button variant="outline" size="sm" disabled={page <= 1} onclick={() => (page = page - 1)}>
-					Prev
-				</Button>
-				<span class="text-sm text-muted-foreground">
-					{page} of {totalPages} pages
-				</span>
-				<Button
-					variant="outline"
-					size="sm"
-					disabled={page >= totalPages}
-					onclick={() => (page = page + 1)}
-				>
-					Next
-				</Button>
+				<Folder class="size-4" />
+				<span class="font-semibold">Campaigns</span>
 			</div>
+			<Button size="sm" onclick={openCreate}>Create</Button>
 		</div>
+		<PaginationTable searchPlaceholder="Search" bind:searchQuery>
+			{#if paginateState.error}
+				<div
+					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+				>
+					{paginateState.error}
+				</div>
+			{:else if paginateState.loading}
+				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
+					<p class="text-muted-foreground">Loading…</p>
+				</div>
+			{:else}
+				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+					<table class="w-full text-sm">
+						<TableHead columns={tableColumns} />
+						<TableBody
+							rows={rows}
+							columns={tableColumns}
+							emptyMessage="No campaigns found."
+						/>
+					</table>
+				</div>
+
+				<TablePagination
+					pagination={listPagination}
+					{start}
+					{end}
+					onPageChange={goToPage}
+				/>
+			{/if}
+		</PaginationTable>
 	</div>
 </div>
 
@@ -1366,11 +1295,11 @@
 									</Button>
 								{/if}
 							</div>
-							{#if campaignPromotions.length === 0}
+							{#if viewingCampaignPromotions.length === 0}
 								<p class="text-sm text-muted-foreground">No promotions associated with this campaign.</p>
 							{:else}
 								<div class="flex flex-col gap-2">
-									{#each campaignPromotions as promotion (promotion.id)}
+									{#each viewingCampaignPromotions as promotion (promotion.id)}
 										<div class="flex items-center justify-between rounded-md border p-3">
 											<div class="flex flex-col gap-1">
 												<span class="text-sm font-medium">{promotion.code || 'Automatic'}</span>

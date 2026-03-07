@@ -200,6 +200,7 @@
 
 <svelte:head>
 	<title>{tag ? `# ${tag.value} | Tag` : 'Tag'} | Danimai Store</title>
+	<meta name="description" content="Manage product tags." />
 </svelte:head>
 
 <div class="flex h-full flex-col">
