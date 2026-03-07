@@ -113,7 +113,7 @@
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => openDeleteConfirm(item as unknown as ProductsListResponse)
+					onClick: (item) => (openDeleteConfirm as unknown as (item: Product) => void)(item as Product)
 				}
 			]
 		}

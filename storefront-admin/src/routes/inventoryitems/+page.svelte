@@ -32,13 +32,15 @@
 		async () => {
 			return client.inventory.items.get({ query: paginationQuery });
 		},
-		['inventory-items']
+		['inventory-items'],
+		undefined,
+		{
+			queryKeyPart: () => [
+				paginationQuery?.page ?? '1',
+				paginationQuery?.limit ?? '10'
+			]
+		}
 	);
-
-	$effect(() => {
-		paginationQuery;
-		paginateState.refetch();
-	});
 
 	const rows = $derived(
 		(paginateState.query.data?.data?.rows ?? []) as unknown as InventoryItem[]
@@ -118,7 +120,7 @@
 			label: 'SKU',
 			key: 'sku',
 			type: 'link',
-			cellHref: (row) => `/inventory/items/${String(row.id ?? '')}`,
+			cellHref: (row) => `/inventoryitems/${String(row.id ?? '')}`,
 			textKey: 'sku'
 		},
 		{ label: 'Requires shipping', key: 'requires_shipping_display', type: 'text' },
@@ -133,7 +135,7 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => goto(`/inventory/items/${(item as InventoryItem).id}`)
+					onClick: (item) => goto(`/inventoryitems/${(item as InventoryItem).id}`)
 				},
 				{
 					label: 'Delete',

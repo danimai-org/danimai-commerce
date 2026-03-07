@@ -1,20 +1,28 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { createQuery } from '@tanstack/svelte-query';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import ChevronRight from '@lucide/svelte/icons/chevron-right';
-	import Package from '@lucide/svelte/icons/package';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import { DeleteConfirmationModal } from '$lib/components/organs/modal/index.js';
+	import {
+		DeleteConfirmationModal,
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
+	import { createPaginationQuery, createPagination, type PaginationMeta } from '$lib/api/pagination.svelte.js';
+	import { client } from '$lib/client.js';
 	import { DropdownMenu } from 'bits-ui';
 
 	const API_BASE = 'http://localhost:8000/admin';
-	
-	const itemId = $derived($page.params.id);
+
+	const itemId = $derived(page.params?.id ?? '');
 
 	type InventoryItem = {
 		id: string;
@@ -79,11 +87,42 @@
 		name: string | null;
 	};
 
-	let data = $state<DetailData | null>(null);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
+	function clientPaginationMeta(total: number, page: number, limit: number): PaginationMeta {
+		const total_pages = Math.max(1, Math.ceil(total / limit));
+		const safePage = Math.max(1, Math.min(page, total_pages));
+		return {
+			total,
+			page: safePage,
+			limit,
+			total_pages,
+			has_next_page: safePage < total_pages,
+			has_previous_page: safePage > 1
+		};
+	}
+
+	const itemDetailQuery = createQuery(() => ({
+		queryKey: ['inventory-item-detail', itemId],
+		queryFn: async (): Promise<DetailData | null> => {
+			if (!itemId) return null;
+			const res = await fetch(`${API_BASE}/inventory/items/${itemId}`, { cache: 'no-store' });
+			if (!res.ok) {
+				if (res.status === 404) return null;
+				throw new Error(await res.text());
+			}
+			return res.json() as Promise<DetailData>;
+		},
+		enabled: !!itemId
+	}));
+
+	const data = $derived(itemDetailQuery.data ?? null);
+	const loading = $derived(itemDetailQuery.isPending);
+	const error = $derived(
+		itemDetailQuery.error != null
+			? (itemDetailQuery.error instanceof Error ? itemDetailQuery.error.message : String(itemDetailQuery.error))
+			: (data === null && itemDetailQuery.isSuccess && itemId ? 'Inventory item not found' : null)
+	);
+
 	let manageLocationsSheetOpen = $state(false);
-	let stockLocations = $state<StockLocation[]>([]);
 	let addLocationId = $state('');
 	let addStockedQty = $state('0');
 	let addReservedQty = $state('0');
@@ -147,34 +186,119 @@
 		)
 	);
 
-	async function loadItem() {
-		if (!itemId) return;
-		loading = true;
-		error = null;
-		try {
-			const res = await fetch(`${API_BASE}/inventory/items/${itemId}`, {
-				cache: 'no-store',
-			});
-			if (!res.ok) {
-				if (res.status === 404) {
-					error = 'Inventory item not found';
-					return;
-				}
-				throw new Error(await res.text());
-			}
-			data = (await res.json()) as DetailData;
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			data = null;
-		} finally {
-			loading = false;
-		}
+	// URL params for client-side pagination
+	const levelsPage = $derived(Math.max(1, parseInt(page.url.searchParams.get('levels_page') ?? '1', 10) || 1));
+	const levelsLimit = $derived(Math.max(1, Math.min(100, parseInt(page.url.searchParams.get('levels_limit') ?? '10', 10) || 10)));
+	const variantsPage = $derived(Math.max(1, parseInt(page.url.searchParams.get('variants_page') ?? '1', 10) || 1));
+	const variantsLimit = $derived(Math.max(1, Math.min(100, parseInt(page.url.searchParams.get('variants_limit') ?? '10', 10) || 10)));
+	const locationsSheetPage = $derived(Math.max(1, parseInt(page.url.searchParams.get('locations_sheet_page') ?? '1', 10) || 1));
+	const locationsSheetLimit = $derived(Math.max(1, Math.min(100, parseInt(page.url.searchParams.get('locations_sheet_limit') ?? '10', 10) || 10)));
+
+	const levelsTotal = $derived(data?.levels?.length ?? 0);
+	const levelsPaginationMeta = $derived(clientPaginationMeta(levelsTotal, levelsPage, levelsLimit));
+	const levelsOffset = $derived((levelsPaginationMeta.page - 1) * levelsLimit);
+	const levelsRows = $derived(data?.levels?.slice(levelsOffset, levelsOffset + levelsLimit) ?? []);
+	const levelsStart = $derived(levelsTotal === 0 ? 0 : levelsOffset + 1);
+	const levelsEnd = $derived(Math.min(levelsOffset + levelsLimit, levelsTotal));
+
+	function goToLevelsPage(pageNum: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('levels_page', String(Math.max(1, pageNum)));
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	$effect(() => {
-		itemId;
-		loadItem();
-	});
+	const variantsTotal = $derived((data?.associated_variants ?? []).length);
+	const variantsPaginationMeta = $derived(clientPaginationMeta(variantsTotal, variantsPage, variantsLimit));
+	const variantsOffset = $derived((variantsPaginationMeta.page - 1) * variantsLimit);
+	const variantsRows = $derived((data?.associated_variants ?? []).slice(variantsOffset, variantsOffset + variantsLimit));
+	const variantsStart = $derived(variantsTotal === 0 ? 0 : variantsOffset + 1);
+	const variantsEnd = $derived(Math.min(variantsOffset + variantsLimit, variantsTotal));
+
+	function goToVariantsPage(pageNum: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('variants_page', String(Math.max(1, pageNum)));
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+	}
+
+	function goToLocationsSheetPage(pageNum: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('locations_sheet_page', String(Math.max(1, pageNum)));
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+	}
+
+	const stockLocationsPaginateState = createPagination(
+		async () =>
+			client['stock-locations'].get({
+				query: createPaginationQuery(
+					new URLSearchParams({
+						page: String(locationsSheetPage),
+						limit: String(locationsSheetLimit)
+						
+					})
+				)
+			}),
+		['stock-locations-picker'],
+		undefined,
+		{
+			enabled: () => manageLocationsSheetOpen,
+			queryKeyPart: () => [String(locationsSheetPage), String(locationsSheetLimit)]
+		}
+	);
+
+	const stockLocationsRows = $derived(
+		(stockLocationsPaginateState.query.data?.data?.rows ?? []) as unknown as StockLocation[]
+	);
+	const stockLocationsPagination = $derived(stockLocationsPaginateState.query.data?.data?.pagination ?? null);
+	const stockLocationsStart = $derived(stockLocationsPaginateState.start);
+	const stockLocationsEnd = $derived(stockLocationsPaginateState.end);
+
+	const levelsColumns: TableColumn[] = [
+		{ label: 'Location', key: 'location_name', type: 'text' },
+		{ label: 'Reserved', key: 'reserved_quantity', type: 'text' },
+		{ label: 'In stock', key: 'stocked_quantity', type: 'text' },
+		{ label: 'Available', key: 'available_quantity', type: 'text' },
+		{
+			label: 'Actions',
+			key: 'actions',
+			type: 'actions',
+			actions: [
+				{ label: 'Edit', key: 'edit', type: 'button', onClick: () => openManageLocationsSheet() }
+			]
+		}
+	];
+
+	const levelsRowsForTable = $derived(
+		levelsRows.map((level) => ({
+			...level,
+			location_name: level.location?.name ?? level.location_id
+		}))
+	);
+
+	const variantsColumns: TableColumn[] = [
+		{ label: 'Product', key: 'product_title', type: 'text' },
+		{ label: 'Variant title', key: 'title', type: 'text' },
+		{ label: 'SKU', key: 'sku', type: 'text' },
+		{
+			label: 'Link',
+			key: 'product_id',
+			type: 'link',
+			cellHref: (row) => `/products/${(row as { product_id: string | null }).product_id ?? ''}`,
+			textKey: 'product_id',
+			linkLabel: 'View'
+		}
+	];
+
+	const variantsRowsForTable = $derived(
+		variantsRows.map((v) => ({
+			...v,
+			product_title: v.product_id ? (productTitles[v.product_id] ?? '–') : '–'
+		}))
+	);
+
+	const stockLocationsColumns: TableColumn[] = [
+		{ label: 'Name', key: 'name', type: 'text' },
+		{ label: 'ID', key: 'id', type: 'text' }
+	];
 
 	function openAddVariantSheet() {
 		addVariantSheetOpen = true;
@@ -215,7 +339,7 @@
 				throw new Error(text || `HTTP ${res.status}`);
 			}
 			addVariantSheetOpen = false;
-			await loadItem();
+			await itemDetailQuery.refetch();
 		} catch (e) {
 			addVariantError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -249,7 +373,7 @@
 				throw new Error(text || `HTTP ${res.status}`);
 			}
 			editDetailsSheetOpen = false;
-			await loadItem();
+			await itemDetailQuery.refetch();
 		} catch (e) {
 			editDetailsError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -257,7 +381,7 @@
 		}
 	}
 
-	async function openManageLocationsSheet() {
+	function openManageLocationsSheet() {
 		manageLocationsSheetOpen = true;
 		levelsError = null;
 		addLocationId = '';
@@ -276,27 +400,16 @@
 				data.levels.map((l) => [l.id, String(l.available_quantity)])
 			);
 		}
-		try {
-			const res = await fetch(`${API_BASE}/stock-locations?limit=100`, {
-				cache: 'no-store'
-			});
-			if (res.ok) {
-				const j = (await res.json()) as { data?: StockLocation[] };
-				stockLocations = j.data ?? [];
-			}
-		} catch {
-			stockLocations = [];
-		}
 	}
 
 	const existingLocationIds = $derived(
 		new Set((data?.levels ?? []).map((l) => l.location_id))
 	);
 	const locationsToAdd = $derived(
-		stockLocations.filter((loc) => !existingLocationIds.has(loc.id))
+		stockLocationsRows.filter((loc) => !existingLocationIds.has(loc.id))
 	);
 	const locationNameById = $derived(
-		Object.fromEntries(stockLocations.map((loc) => [loc.id, loc.name ?? loc.id]))
+		Object.fromEntries(stockLocationsRows.map((loc) => [loc.id, loc.name ?? loc.id]))
 	);
 
 	async function addLevel() {
@@ -324,7 +437,7 @@
 			addStockedQty = '0';
 			addReservedQty = '0';
 			addAvailableQty = '0';
-			await loadItem();
+			await itemDetailQuery.refetch();
 			if (data?.levels) {
 				levelStockEdit = Object.fromEntries(
 					data.levels.map((l) => [l.id, String(l.stocked_quantity)])
@@ -366,7 +479,7 @@
 					throw new Error(text || `HTTP ${res.status}`);
 				}
 			}
-			await loadItem();
+			await itemDetailQuery.refetch();
 			if (data?.levels) {
 				levelStockEdit = Object.fromEntries(
 					data.levels.map((l) => [l.id, String(l.stocked_quantity)])
@@ -396,7 +509,7 @@
 				const text = await res.text();
 				throw new Error(text || `HTTP ${res.status}`);
 			}
-			await loadItem();
+			await itemDetailQuery.refetch();
 			levelStockEdit = Object.fromEntries(
 				(data?.levels ?? []).map((l) => [l.id, String(l.stocked_quantity)])
 			);
@@ -446,7 +559,7 @@
 				return;
 			}
 			deleteItemModalOpen = false;
-			goto('/inventory/items');
+			goto('/inventoryitems');
 		} catch (e) {
 			deleteItemError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -464,7 +577,7 @@
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<!-- Breadcrumbs -->
 		<div class="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-b pb-4 text-sm text-muted-foreground">
-			<a href="/inventory/items" class="hover:text-foreground">Inventory</a>
+			<a href="/inventoryitems" class="hover:text-foreground">Inventory</a>
 			<span>/</span>
 			<span class="text-foreground">{displayName}</span>
 			{#if data && !loading}
@@ -527,7 +640,7 @@
 							</dl>
 						</div>
 
-						<!-- Associated variants -->
+						<!-- Associated variants header -->
 						<div class="rounded-lg border bg-card p-6 shadow-sm self-start w-52">
 							<div class="flex flex-col gap-2">
 								<div>
@@ -542,93 +655,56 @@
 									<p class="text-xs text-muted-foreground">Set SKU in Edit details to link variants.</p>
 								{/if}
 							</div>
-							{#if associatedVariants.length === 0}
-								<p class="mt-4 text-sm text-muted-foreground">No associated variants.</p>
-							{:else}
-								<ul class="mt-4 space-y-2">
-									{#each associatedVariants as v (v.id)}
-										<li>
-											<a
-												href="/products/{v.product_id}"
-												class="flex items-center gap-3 rounded-md border p-3 text-left text-sm hover:bg-muted/50"
-											>
-												{#if v.thumbnail || (v.product_id && productThumbnails[v.product_id])}
-													<img
-														src={v.thumbnail || (v.product_id ? productThumbnails[v.product_id] : '')}
-														alt=""
-														class="size-12 shrink-0 rounded-md border border-input object-cover"
-													/>
-												{:else}
-													<Package class="size-8 shrink-0 text-muted-foreground" />
-												{/if}
-												<div class="min-w-0 flex-1">
-													<p class="font-medium">{v.product_id ? productTitles[v.product_id] ?? '…' : '–'}</p>
-													<p class="text-xs text-muted-foreground">{v.title}</p>
-													<p class="mt-0.5 text-xs text-muted-foreground">SKU {v.sku ?? '–'}</p>
-												</div>
-												<ChevronRight class="size-4 shrink-0 text-muted-foreground" />
-											</a>
-										</li>
-									{/each}
-								</ul>
-							{/if}
 						</div>
+					</div>
+
+					<!-- Associated variants table - Full width -->
+					<div class="rounded-lg border bg-card p-6 shadow-sm">
+						<h2 class="font-semibold">Associated variants</h2>
+						<PaginationTable showToolbar={false}>
+							<div class="mt-4 min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+								<table class="w-full text-sm">
+									<TableHead columns={variantsColumns} />
+									<TableBody
+										rows={variantsRowsForTable}
+										columns={variantsColumns}
+										emptyMessage="No associated variants."
+									/>
+								</table>
+							</div>
+							<TablePagination
+								pagination={variantsPaginationMeta}
+								start={variantsStart}
+								end={variantsEnd}
+								onPageChange={goToVariantsPage}
+							/>
+						</PaginationTable>
 					</div>
 
 					<!-- Locations card - Full width -->
 					<div class="rounded-lg border bg-card p-6 shadow-sm">
-					<div class="flex items-center justify-between">
-						<h2 class="font-semibold">Locations</h2>
-						<Button variant="outline" size="sm" onclick={openManageLocationsSheet}>Manage locations</Button>
-					</div>
-					<div class="mt-4 overflow-auto rounded-lg border">
-						<table class="w-full text-sm">
-							<thead class="border-b bg-muted/50">
-								<tr>
-									<th class="px-3 py-2 text-left font-medium">Location</th>
-									<th class="px-3 py-2 text-left font-medium">Reserved</th>
-									<th class="px-3 py-2 text-left font-medium">In stock</th>
-									<th class="px-3 py-2 text-left font-medium">Available</th>
-									<th class="w-10 px-3 py-2"></th>
-								</tr>
-							</thead>
-							<tbody>
-								{#if data.levels.length === 0}
-									<tr>
-										<td colspan="5" class="px-3 py-8 text-center text-muted-foreground">
-											No locations.
-										</td>
-									</tr>
-								{:else}
-									{#each data.levels as level (level.id)}
-										<tr class="border-b last:border-0">
-											<td class="px-3 py-2 text-xs">{level.location?.name ?? level.location_id}</td>
-											<td class="px-3 py-2">{level.reserved_quantity}</td>
-											<td class="px-3 py-2">{level.stocked_quantity}</td>
-											<td class="px-3 py-2">{level.available_quantity}</td>
-											<td class="px-3 py-2">
-												<Button
-													variant="ghost"
-													size="icon"
-													class="size-8 text-muted-foreground hover:text-foreground"
-													onclick={openManageLocationsSheet}
-													aria-label="Edit locations"
-												>
-													<Pencil class="size-4" />
-												</Button>
-											</td>
-										</tr>
-									{/each}
-								{/if}
-							</tbody>
-						</table>
-					</div>
-					{#if data.levels.length > 0}
-						<div class="mt-2 flex items-center justify-between gap-4 border-t py-2 text-xs text-muted-foreground">
-							<span>1 – {data.levels.length} of {data.levels.length} results</span>
-							<span>1 of 1 pages</span>
+						<div class="flex items-center justify-between">
+							<h2 class="font-semibold">Locations</h2>
+							<Button variant="outline" size="sm" onclick={openManageLocationsSheet}>Manage locations</Button>
 						</div>
-					{/if}
+						<PaginationTable showToolbar={false}>
+							<div class="mt-4 min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+								<table class="w-full text-sm">
+									<TableHead columns={levelsColumns} />
+									<TableBody
+										rows={levelsRowsForTable}
+										columns={levelsColumns}
+										emptyMessage="No locations."
+									/>
+								</table>
+							</div>
+							<TablePagination
+								pagination={levelsPaginationMeta}
+								start={levelsStart}
+								end={levelsEnd}
+								onPageChange={goToLevelsPage}
+							/>
+						</PaginationTable>
 					</div>
 
 					<!-- Reservations card - Full width -->
@@ -733,9 +809,35 @@
 								{levelsSaving ? 'Adding…' : 'Add'}
 							</Button>
 						</div>
-						{#if locationsToAdd.length === 0 && stockLocations.length > 0}
+						{#if locationsToAdd.length === 0 && stockLocationsRows.length > 0}
 							<p class="text-xs text-muted-foreground">All locations already have stock for this item.</p>
 						{/if}
+					</div>
+					<!-- Stock locations list (paginated) -->
+					<div class="mb-6">
+						<p class="mb-2 text-sm font-medium">Stock locations</p>
+						<PaginationTable showToolbar={false}>
+							{#if stockLocationsPaginateState.loading}
+								<p class="py-4 text-sm text-muted-foreground">Loading…</p>
+							{:else}
+								<div class="overflow-auto rounded-lg border">
+									<table class="w-full text-sm">
+										<TableHead columns={stockLocationsColumns} />
+										<TableBody
+											rows={stockLocationsRows}
+											columns={stockLocationsColumns}
+											emptyMessage="No stock locations."
+										/>
+									</table>
+								</div>
+								<TablePagination
+									pagination={stockLocationsPagination}
+									start={stockLocationsStart}
+									end={stockLocationsEnd}
+									onPageChange={goToLocationsSheetPage}
+								/>
+							{/if}
+						</PaginationTable>
 					</div>
 					<!-- Existing levels (editable) -->
 					{#if data.levels.length === 0}

@@ -8,6 +8,7 @@ export { default as LocationFormSheet } from './location-form-sheet/location-for
 export { default as PriceListFormSheet } from './price-list-form-sheet/price-list-form-sheet.svelte';
 export { default as TaxRegionFormSheet } from './tax-region-form-sheet/tax-region-form-sheet.svelte';
 export { default as CurrencyFormSheet } from './currency-form-sheet/currency-form-sheet.svelte';
+export { AddCurrenciesSheet } from './add-currencies-sheet/index.js';
 export { default as PaginationTable } from './pagination-table/pagination-table.svelte';
 export { Combobox } from './combobox/index.js';
 export type { ComboboxOption } from './combobox/index.js';
@@ -20,3 +21,5 @@ export {
 	EditPromotionSheet
 } from './promotion/index.js';
 export type { Promotion, Campaign } from './promotion/index.js';
+export { ProductSalesChannelsSheet, ProductDetailVariantsSection } from './product-detail/index.js';
+export type { SalesChannel as ProductDetailSalesChannel } from './product-detail/index.js';
