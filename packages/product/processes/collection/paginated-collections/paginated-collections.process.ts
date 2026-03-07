@@ -11,7 +11,6 @@ import { paginationResponse } from "@danimai/core/pagination";
 import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
-  type PaginatedCollectionsProcessInput,
   type PaginatedCollectionsProcessOutput,
   PaginatedCollectionsSchema,
 } from "./paginated-collections.schema";
@@ -19,7 +18,6 @@ import type { Database } from "../../../db/type";
 
 export const PAGINATED_COLLECTIONS_PROCESS = Symbol("PaginatedCollections");
 
-// TODO: Implement filters later
 @Process(PAGINATED_COLLECTIONS_PROCESS)
 export class PaginatedCollectionsProcess
   implements ProcessContract<
@@ -37,7 +35,7 @@ export class PaginatedCollectionsProcess
     schema: PaginatedCollectionsSchema,
   }) context: ProcessContextType<typeof PaginatedCollectionsSchema>) {
     const { input } = context;
-    const { page = 1, limit = 10, sorting_field = "created_at", sorting_direction = SortOrder.DESC, search, sales_channel_ids } = input;
+    const { page = 1, limit = 10, sorting_field = "created_at", sorting_direction = SortOrder.DESC, search } = input;
 
     let baseQuery = this.db
       .selectFrom("product_collections")
@@ -53,32 +51,13 @@ export class PaginatedCollectionsProcess
       );
     }
 
-    if (sales_channel_ids && sales_channel_ids.length > 0) {
-      const collectionIdsInChannel = this.db
-        .selectFrom("product_collection_relations")
-        .innerJoin("product_sales_channels" as any, "product_sales_channels.product_id", "product_collection_relations.product_id")
-        .where("product_sales_channels.sales_channel_id", "in", sales_channel_ids)
-        .select("product_collection_relations.product_collection_id")
-        .distinct();
-      baseQuery = baseQuery.where("product_collections.id", "in", collectionIdsInChannel);
-    }
-
-    // Get total count before pagination
     const countResult = await baseQuery
       .select(({ fn }) => fn.count<number>("product_collections.id").as("count"))
       .executeTakeFirst();
 
     const total = Number(countResult?.count || 0);
 
-    // Apply sorting using sql template for dynamic column names
-    const sortOrder = sorting_direction === SortOrder.ASC ? "asc" : "desc";
-    // Validate sorting_field against allowed columns to prevent SQL injection
-    const allowedSortFields = ["id", "title", "handle", "created_at", "updated_at", "deleted_at"];
-    const safeSortField = allowedSortFields.includes(sorting_field) ? sorting_field : "created_at";
-
-    // Apply pagination and include product count
-    const offset = (Number(page) - 1) * Number(limit);
-    const dataWithCount = await baseQuery
+    const collections = await baseQuery
       .leftJoin(
         "product_collection_relations",
         "product_collection_relations.product_collection_id",
@@ -92,15 +71,19 @@ export class PaginatedCollectionsProcess
         "product_collections.created_at",
         "product_collections.updated_at",
         "product_collections.deleted_at",
-        sql<number>`count(product_collection_relations.product_id)::int`.as("product_count"),
+        (eb) => sql<number>`
+        (
+          select count(product_collection_relations.product_id)
+          from product_collection_relations
+          where product_collection_relations.product_collection_id = product_collections.id
+        )::int`.as("product_count"),
       ])
       .groupBy("product_collections.id")
-      .orderBy(sql.ref(`product_collections.${safeSortField}`), sortOrder)
-      .limit(Number(limit))
-      .offset(offset)
+      .orderBy(sql.ref(`${sorting_field}`), sorting_direction)
+      .limit(limit)
+      .offset((page - 1) * limit)
       .execute();
 
-    // Return paginated response
-    return paginationResponse(dataWithCount, total, input);
+    return paginationResponse(collections, total, input);
   }
 }

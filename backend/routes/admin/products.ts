@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   CREATE_PRODUCT_PROCESS,
@@ -28,6 +28,7 @@ import {
   UpdateProductsResponseSchema,
   UpdateProductResponseSchema,
   DeleteProductsSchema,
+  PaginatedProductsSchema,
 } from "@danimai/product";
 import { handleProcessError } from "../../utils/error-handler";
 import {
@@ -48,10 +49,10 @@ export const productRoutes = new Elysia({ prefix: "/products" })
       if (typeof cleanedQuery.category_ids === "string") {
         cleanedQuery.category_ids = (cleanedQuery.category_ids as string).split(",").map((s) => s.trim()).filter(Boolean);
       }
-      return process.runOperations({ input: cleanedQuery });
+      return process.runOperations({ input: cleanedQuery as StaticDecode<typeof PaginatedProductsSchema> });
     },
     {
-      query: PaginatedProductsQuerySchema,
+      query: PaginatedProductsSchema,
       response: {
         200: PaginatedProductsResponseSchema,
         400: ValidationErrorResponseSchema,

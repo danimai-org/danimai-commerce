@@ -1,59 +1,24 @@
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type StaticDecode } from "@sinclair/typebox";
 import {
-  createFilterableColumnsSchema,
   createPaginatedResponseSchema,
   createPaginationSchema,
-  PaginationSchema,
 } from "@danimai/core";
-import type { ProductCollection } from "../../../db/type";
 import { ProductCollectionResponseSchema } from "../retrieve-collection/retrieve-collection.schema";
 
-function coerceStringArray(value: unknown): string[] | undefined {
-  if (value === undefined || value === null) return undefined;
-  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string");
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed === "") return undefined;
-    return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
-  }
-  return undefined;
-}
-
-const collectionsFiltersSchema = createFilterableColumnsSchema<
-  keyof Pick<ProductCollection, "title" | "handle">
->({
-  title: true,
-  handle: true,
-});
-
 export const PaginatedCollectionsSchema = createPaginationSchema(
-  collectionsFiltersSchema,
-  ["id", "title", "handle", "created_at", "updated_at", "deleted_at"],
+  Type.Object({
+  }),
+  ["title", "handle", "created_at"],
 );
 
-const paginationQueryProperties = (PaginationSchema as unknown as {
-  properties?: Record<string, unknown>;
-}).properties ?? {};
 
-/** Query-only schema for Elysia route (single Type.Object; Intersect is not supported by Elysia query validation). */
-export const PaginatedCollectionsQuerySchema = Type.Object({
-  ...paginationQueryProperties,
-  search: Type.Optional(Type.String()),
-  sales_channel_ids: Type.Optional(
-    Type.Transform(Type.Union([Type.String(), Type.Array(Type.String())]))
-      .Decode(coerceStringArray)
-      .Encode((v: string[] | undefined) => v ?? [])
-  ),
-  collection_type: Type.Optional(Type.String()),
-  filters: Type.Optional(collectionsFiltersSchema),
-});
-
-export type PaginatedCollectionsProcessInput = Static<
+export type PaginatedCollectionsProcessInput = StaticDecode<
   typeof PaginatedCollectionsSchema
 >;
 
 export const PaginatedCollectionsResponseSchema =
   createPaginatedResponseSchema(ProductCollectionResponseSchema);
-export type PaginatedCollectionsProcessOutput = Static<
+
+export type PaginatedCollectionsProcessOutput = StaticDecode<
   typeof PaginatedCollectionsResponseSchema
 >;

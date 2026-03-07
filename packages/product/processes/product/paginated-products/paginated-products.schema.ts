@@ -1,60 +1,26 @@
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static, type StaticDecode } from "@sinclair/typebox";
 import {
-  createFilterableColumnsSchema,
+  commaSeparatedIds,
   createPaginatedResponseSchema,
   createPaginationSchema,
-  FilterOperator,
-  PaginationSchema,
 } from "@danimai/core";
-import type { Product, } from "../../../db/type";
 import { ProductStatusEnum } from "../../../db/type";
 
 export const PaginatedProductsSchema = createPaginationSchema(
   Type.Object({
     status: Type.Optional(Type.Enum(ProductStatusEnum)),
-    category_ids: Type.Optional(Type.Array(Type.String())),
-    tag_ids: Type.Optional(Type.Array(Type.String())),
-    sales_channel_ids: Type.Optional(Type.Array(Type.String())),
-    collection_ids: Type.Optional(Type.Array(Type.String())),
+    category_ids: commaSeparatedIds(),
+    tag_ids: commaSeparatedIds(),
+    sales_channel_ids: commaSeparatedIds(),
+    collection_ids: commaSeparatedIds(),
     }),
     ["products.title", "products.handle", "products.status"]
   );
 
-export type PaginatedProductsProcessInput = Static<
+export type PaginatedProductsProcessInput = StaticDecode<
   typeof PaginatedProductsSchema
 >;
 
-const paginationQueryProperties = (PaginationSchema as unknown as {
-  properties?: Record<string, ReturnType<typeof Type.Any>>;
-}).properties ?? {};
-
-/** Query-only schema for Elysia route (single Type.Object, no Intersect). */
-export const PaginatedProductsQuerySchema = Type.Object({
-  ...paginationQueryProperties,
-  category_id: Type.Optional(Type.String()),
-  category_ids: Type.Optional(Type.Array(Type.String())),
-  search: Type.Optional(Type.String()),
-  filters: Type.Optional(
-    createFilterableColumnsSchema<
-      keyof Pick<Product, "title" | "handle" | "status" | "category_id">
-    >({
-      title: true,
-      handle: true,
-      status: [
-        FilterOperator.EQUAL,
-        FilterOperator.NOT_EQUAL,
-        FilterOperator.IN,
-        FilterOperator.NOT_IN,
-      ],
-      category_id: [
-        FilterOperator.EQUAL,
-        FilterOperator.NOT_EQUAL,
-        FilterOperator.IS_NULL,
-        FilterOperator.IS_NOT_NULL,
-      ],
-    }),
-  ),
-});
 
 const PaginatedProductItemSchema = Type.Object({
   id: Type.String(),

@@ -1,4 +1,17 @@
-import { Type, type Static, type TObject, type TSchema, type StaticDecode } from "@sinclair/typebox";
+import { Type, type Static, type TObject, type TSchema, type StaticDecode, type TProperties } from "@sinclair/typebox";
+
+/** Optional schema that accepts string (comma-separated) or string[] and decodes to string[]. */
+export function commaSeparatedIds() {
+  return Type.Optional(
+    Type.Transform(Type.Union([Type.String(), Type.Array(Type.String())]))
+      .Decode((v: string | string[] | undefined) => {
+        if (v === undefined || v === null) return undefined;
+        if (typeof v === "string") return v.split(",").map((s) => s.trim()).filter(Boolean);
+        return Array.isArray(v) ? v.map((s) => String(s).trim()).filter(Boolean) : [];
+      })
+      .Encode((v: string[] | undefined) => v ?? [])
+  );
+}
 
 export enum SortOrder {
     ASC = "asc",
@@ -33,23 +46,19 @@ export const PaginationSchema = Type.Object({
     search: Type.Optional(Type.Transform(Type.String()).Decode((v: string) => v?.trim() ?? "").Encode((v: string) => v?.trim() ?? "")),
 });
 
-export const createPaginationSchema = <T extends TSchema>(
-    filter_schema: T,
+export const createPaginationSchema = <T extends TProperties>(
+    filter_schema: TObject<T>,
     sorting_fields: string[],
-) => Type.Intersect([
-    PaginationSchema,
-    Type.Object({
-        sorting_direction: Type.Optional(Type.Enum(SortOrder, {
-            default: SortOrder.DESC,
-        })),
-        sorting_field: Type.Optional(Type.String({
-            default: sorting_fields[0],
-            enum: sorting_fields,
-        })),
-    }),
-    Type.Object({
-        filters: Type.Optional(filter_schema),
-    }),
-]);
+) => Type.Object({
+    ...PaginationSchema.properties,
+    sorting_direction: Type.Optional(Type.Enum(SortOrder, {
+        default: SortOrder.DESC,
+    })),
+    sorting_field: Type.Optional(Type.String({
+        default: sorting_fields[0],
+        enum: sorting_fields,
+    })),
+    filters: Type.Optional(filter_schema)
+});
 
 export type PaginationType = StaticDecode<typeof PaginationSchema>;

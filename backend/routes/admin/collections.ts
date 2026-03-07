@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { Type, type StaticDecode } from "@sinclair/typebox";
 import { getService, PaginationSchema } from "@danimai/core";
 import {
   CREATE_COLLECTIONS_PROCESS,
@@ -54,8 +54,11 @@ export const collectionRoutes = new Elysia({ prefix: "/collections" })
   .get(
     "/",
     async ({ query }) => {
+      console.log(query);
       const process = getService<PaginatedCollectionsProcess>(PAGINATED_COLLECTIONS_PROCESS);
-      return process.runOperations({ input: query });
+      return process.runOperations({
+        input: query as StaticDecode<typeof PaginatedCollectionsSchema>
+      });
     },
     {
       query: PaginatedCollectionsSchema,
