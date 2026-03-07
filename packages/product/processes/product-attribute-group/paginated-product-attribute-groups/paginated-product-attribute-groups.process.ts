@@ -1,6 +1,5 @@
 import {
   InjectDB,
-  InjectLogger,
   Process,
   ProcessContext,
   type ProcessContextType,
@@ -9,9 +8,7 @@ import {
 } from "@danimai/core";
 import { paginationResponse } from "@danimai/core/pagination";
 import { Kysely, sql } from "kysely";
-import type { Logger } from "@logtape/logtape";
 import {
-  type PaginatedProductAttributeGroupsProcessInput,
   type PaginatedProductAttributeGroupsProcessOutput,
   PaginatedProductAttributeGroupsSchema,
 } from "./paginated-product-attribute-groups.schema";
@@ -28,19 +25,27 @@ export class PaginatedProductAttributeGroupsProcess
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
-    @InjectLogger()
-    private readonly logger: Logger
   ) { }
 
   async runOperations(@ProcessContext({
     schema: PaginatedProductAttributeGroupsSchema,
   }) context: ProcessContextType<typeof PaginatedProductAttributeGroupsSchema>) {
     const { input } = context;
-    const { page = 1, limit = 10, sorting_field = "created_at", sorting_direction = SortOrder.DESC } = input;
+    const {
+      page = 1,
+      limit = 10,
+      sorting_field = "created_at",
+      sorting_direction = SortOrder.DESC,
+      search,
+    } = input;
 
     let query = this.db
       .selectFrom("product_attribute_groups")
       .where("deleted_at", "is", null);
+    
+    if(search && search.trim()) {
+      query = query.where("title", "ilike", `%${search.trim()}%`);
+    }
 
     const countResult = await query
       .select(({ fn }) => fn.count<number>("id").as("count"))
@@ -48,18 +53,14 @@ export class PaginatedProductAttributeGroupsProcess
 
     const total = Number(countResult?.count || 0);
 
-    const sortOrder = sorting_direction === SortOrder.ASC ? "asc" : "desc";
-    const allowedSortFields = ["id", "title", "created_at", "updated_at", "deleted_at"];
-    const safeSortField = allowedSortFields.includes(sorting_field) ? sorting_field : "created_at";
-    query = query.orderBy(sql.ref(`product_attribute_groups.${safeSortField}`), sortOrder);
+    query = query.orderBy(sql.ref(`${sorting_field}`), sorting_direction);
 
-    const offset = (page - 1) * limit;
-    const data = await query
+    const attributeGroups = await query
       .selectAll()
       .limit(limit)
-      .offset(offset)
+      .offset((page - 1) * limit)
       .execute();
 
-    return paginationResponse<ProductAttributeGroup>(data, total, input);
+    return paginationResponse(attributeGroups, total, input);
   }
 }

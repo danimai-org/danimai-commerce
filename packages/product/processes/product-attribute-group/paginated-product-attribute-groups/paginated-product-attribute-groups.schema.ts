@@ -1,4 +1,4 @@
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static, type StaticDecode } from "@sinclair/typebox";
 import {
   PaginationSchema,
   createPaginatedResponseSchema,
@@ -6,27 +6,17 @@ import {
 } from "@danimai/core";
 import { ProductAttributeGroupResponseSchema } from "../retrieve-product-attribute-group/retrieve-product-attribute-group.schema";
 
-const productAttributeGroupFiltersSchema = Type.Object({});
-
+// Request/Input schema
 export const PaginatedProductAttributeGroupsSchema = createPaginationSchema(
-  productAttributeGroupFiltersSchema,
-  ["id", "title", "created_at", "updated_at", "deleted_at"],
+  Type.Object({}),
+  ["title", "created_at"],
 );
 
-const paginationQueryProperties = (PaginationSchema as unknown as {
-  properties?: Record<string, unknown>;
-}).properties ?? {};
-
-/** Query-only schema for Elysia route (single Type.Object; Intersect is not supported by Elysia query validation). */
-export const PaginatedProductAttributeGroupsQuerySchema = Type.Object({
-  ...paginationQueryProperties,
-  filters: Type.Optional(productAttributeGroupFiltersSchema),
-});
-
-export type PaginatedProductAttributeGroupsProcessInput = Static<
+export type PaginatedProductAttributeGroupsProcessInput = StaticDecode<
   typeof PaginatedProductAttributeGroupsSchema
 >;
 
+// Response schema
 export const PaginatedProductAttributeGroupsResponseSchema =
   createPaginatedResponseSchema(ProductAttributeGroupResponseSchema);
 export type PaginatedProductAttributeGroupsProcessOutput = Static<
