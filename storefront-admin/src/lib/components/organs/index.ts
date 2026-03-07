@@ -1,5 +1,5 @@
 export { DeleteConfirmationModal } from './modal/index.js';
-export { PageHeader, CardSection, StatusBadge, SearchInput } from './order/index.js';
+export { PageHeader, CardSection, StatusBadge, SearchInput, CreateOrderDialog } from './order/index.js';
 export { default as SalesChannelFormSheet } from './sales-channel-form-sheet/sales-channel-form-sheet.svelte';
 export { default as RoleFormSheet } from './role-form-sheet/role-form-sheet.svelte';
 export { default as CustomerFormSheet } from './customer-form-sheet/customer-form-sheet.svelte';

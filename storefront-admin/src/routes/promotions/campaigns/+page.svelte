@@ -282,6 +282,9 @@
 	let viewOpen = $state(false);
 	let viewingCampaign = $state<Campaign | null>(null);
 	let promotions = $state<Promotion[]>(loadPromotions());
+	let viewingCampaignPromotions = $derived(
+		viewingCampaign ? promotions.filter((p) => p.campaign_id === viewingCampaign!.id) : []
+	);
 	let editingInfo = $state(false);
 	let editingConfig = $state(false);
 	let viewName = $state('');
@@ -591,65 +594,8 @@
 		closeCreatePromotion();
 	}
 
-	function addCodeCondition() {
-		detailCodeConditions = [
-			...detailCodeConditions,
-			{ id: crypto.randomUUID(), field: 'currency_code', op: 'equals', value: '' }
-		];
-	}
 
-	function clearCodeConditions() {
-		detailCodeConditions = [];
-	}
-
-	function removeCodeCondition(id: string) {
-		detailCodeConditions = detailCodeConditions.filter((c) => c.id !== id);
-	}
-
-	function addCartCondition() {
-		detailCartConditions = [
-			...detailCartConditions,
-			{ id: crypto.randomUUID(), field: 'minimum_quantity_of_items', op: 'equals', value: '' }
-		];
-	}
-	function clearCartConditions() {
-		detailCartConditions = [];
-	}
-	function removeCartCondition(id: string) {
-		detailCartConditions = detailCartConditions.filter((c) => c.id !== id);
-	}
-
-	function addItemCondition() {
-		detailItemConditions = [
-			...detailItemConditions,
-			{ id: crypto.randomUUID(), field: 'quantity_promotion_applies_to', op: 'equals', value: '' }
-		];
-	}
-	function clearItemConditions() {
-		detailItemConditions = [];
-	}
-	function removeItemCondition(id: string) {
-		detailItemConditions = detailItemConditions.filter((c) => c.id !== id);
-	}
-
-	function addShippingCondition() {
-		detailShippingConditions = [
-			...detailShippingConditions,
-			{ id: crypto.randomUUID(), field: 'shipping_method', op: 'equals', value: '' }
-		];
-	}
-	function clearShippingConditions() {
-		detailShippingConditions = [];
-	}
-	function removeShippingCondition(id: string) {
-		detailShippingConditions = detailShippingConditions.filter((c) => c.id !== id);
-	}
-
-	const campaignPromotions = $derived(
-		viewingCampaign
-			? promotions.filter((p) => p.campaign_id === viewingCampaign!.id)
-			: []
-	);
+	
 
 	$effect(() => {
 		if (!editOpen) editingCampaign = null;
@@ -742,6 +688,7 @@
 
 <svelte:head>
 	<title>Campaigns | Promotions | Danimai Store</title>
+	<meta name="description" content="Manage promotional campaigns." />
 </svelte:head>
 
 <div class="flex h-full flex-col">
@@ -1348,11 +1295,11 @@
 									</Button>
 								{/if}
 							</div>
-							{#if campaignPromotions.length === 0}
+							{#if viewingCampaignPromotions.length === 0}
 								<p class="text-sm text-muted-foreground">No promotions associated with this campaign.</p>
 							{:else}
 								<div class="flex flex-col gap-2">
-									{#each campaignPromotions as promotion (promotion.id)}
+									{#each viewingCampaignPromotions as promotion (promotion.id)}
 										<div class="flex items-center justify-between rounded-md border p-3">
 											<div class="flex flex-col gap-1">
 												<span class="text-sm font-medium">{promotion.code || 'Automatic'}</span>

@@ -420,6 +420,13 @@
 	}
 </script>
 
+<svelte:head>
+    <title>
+        {editStoreSubmitting ? '● Saving... ' : ''}
+        {storeData?.name ? `${storeData.name} | Settings` : 'Store Settings'}
+    </title>
+    <meta name="description" content="Manage store details and active currencies." />
+</svelte:head>
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex items-center justify-between border-b pb-4">

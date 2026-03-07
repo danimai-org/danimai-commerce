@@ -351,6 +351,7 @@
 
 <svelte:head>
 	<title>{group ? group.name : 'Customer group'} | Customer Groups | Danimai Store</title>
+	<meta name="description" content="Manage customer group." />
 </svelte:head>
 
 <div class="flex h-full flex-col">

@@ -467,6 +467,7 @@
 
 <svelte:head>
 	<title>{category ? category.value : 'Category'} | Categories | Danimai Store</title>
+	<meta name="description" content="Manage product categories." />
 </svelte:head>
 
 <div class="flex h-full flex-col">

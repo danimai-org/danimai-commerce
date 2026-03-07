@@ -21,8 +21,6 @@
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
 	import ArrowDown from '@lucide/svelte/icons/arrow-down';
 	import User from '@lucide/svelte/icons/user';
-	import Mail from '@lucide/svelte/icons/mail';
-	import Phone from '@lucide/svelte/icons/phone';
 	import BarChart3 from '@lucide/svelte/icons/bar-chart-3';
 
 	const API_BASE =

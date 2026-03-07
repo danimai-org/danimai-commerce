@@ -456,7 +456,8 @@
 </script>
 
 <svelte:head>
-	<title>Inventory &gt; {displayName}</title>
+	<title>{displayName} | Inventory | Danimai Store</title>
+	<meta name="description" content="Manage inventory item." />
 </svelte:head>
 
 <div class="flex h-full flex-col">

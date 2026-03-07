@@ -502,6 +502,7 @@
 
 <svelte:head>
 	<title>{collection ? collection.title : 'Collection'} | Collections | Danimai Store</title>
+	<meta name="description" content="Manage product collections." />
 </svelte:head>
 
 <div class="flex h-full flex-col">

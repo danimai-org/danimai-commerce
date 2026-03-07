@@ -329,6 +329,11 @@
 	];
 </script>
 
+<svelte:head>
+	<title>Categories | Products | Danimai Store</title>
+	<meta name="description" content="Manage product categories." />
+</svelte:head>
+
 <div class="flex h-full flex-col">
 	<!-- Content -->
 	<div class="flex min-h-0 flex-1 flex-col p-6">

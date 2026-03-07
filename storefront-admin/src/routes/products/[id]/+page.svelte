@@ -1717,6 +1717,7 @@
 
 <svelte:head>
 	<title>{product ? `${product.title} | Product` : 'Product'} | Danimai Store</title>
+	<meta name="description" content="Manage product." />
 </svelte:head>
 
 <div class="flex h-full flex-col">

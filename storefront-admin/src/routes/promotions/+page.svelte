@@ -16,9 +16,6 @@
 		type Campaign
 	} from '$lib/components/organs/index.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
-	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
-	import Pencil from '@lucide/svelte/icons/pencil';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Folder from '@lucide/svelte/icons/folder';
 
 	// Load from localStorage or use default
@@ -259,6 +256,7 @@
 
 <svelte:head>
 	<title>Promotions | Danimai Store</title>
+	<meta name="description" content="Manage promotions." />
 </svelte:head>
 
 <div class="flex h-full flex-col">
