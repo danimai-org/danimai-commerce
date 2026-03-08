@@ -9,6 +9,7 @@ import {
   UPDATE_INVENTORY_ITEM_PROCESS,
   SET_INVENTORY_LEVEL_PROCESS,
   DELETE_INVENTORY_LEVEL_PROCESS,
+  DELETE_INVENTORY_ITEMS_PROCESS,
   PaginatedInventoryItemsProcess,
   PaginatedInventoryLevelsProcess,
   CreateInventoryItemsProcess,
@@ -16,6 +17,7 @@ import {
   UpdateInventoryItemProcess,
   SetInventoryLevelProcess,
   DeleteInventoryLevelProcess,
+  DeleteInventoryItemsProcess,
   PaginatedInventoryItemsSchema,
   PaginatedInventoryItemsResponseSchema,
   CreateInventoryItemsSchema,
@@ -28,6 +30,8 @@ import {
   SetInventoryLevelSchema,
   SetInventoryLevelResponseSchema,
   DeleteInventoryLevelSchema,
+  DeleteInventoryItemsSchema,
+  DeleteInventoryItemsResponseSchema,
 } from "@danimai/inventory";
 import {
   LIST_STOCK_LOCATIONS_BY_IDS_PROCESS,
@@ -177,6 +181,29 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
         tags: ["Inventory"],
         summary: "Get paginated inventory items",
         description: "Gets a paginated list of inventory items",
+      },
+    }
+  )
+  .delete(
+    "/items",
+    async ({ body: input }) => {
+      const process = getService<DeleteInventoryItemsProcess>(
+        DELETE_INVENTORY_ITEMS_PROCESS
+      );
+      await process.runOperations({ input });
+      return undefined;
+    },
+    {
+      body: DeleteInventoryItemsSchema,
+      response: {
+        200: DeleteInventoryItemsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Inventory"],
+        summary: "Delete inventory items",
+        description: "Soft-deletes one or more inventory items by ID",
       },
     }
   )

@@ -29,7 +29,9 @@
 	};
 
 	type StockLocationRow = {
+
 		id: string;
+		
 		name: string | null;
 		address?: StockLocationAddress | null;
 		created_at: string;

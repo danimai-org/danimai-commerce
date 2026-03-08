@@ -34,6 +34,9 @@ export async function deleteInventoryItems(ids: string[]): Promise<void> {
 		} catch {
 			// use text as-is
 		}
+		if (res.status === 404) {
+			message = 'Inventory item not found';
+		}
 		throw new Error(message);
 	}
 }

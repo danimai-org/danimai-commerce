@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { createQuery } from '@tanstack/svelte-query';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
@@ -8,218 +9,141 @@
 		DeleteConfirmationModal,
 		Combobox,
 		MultiSelectCombobox,
-		PaginationTable,
-		TableHead,
-		TableBody,
-		TablePagination,
-		type TableColumn
+		ProductDetailVariantsSection,
+		ProductSalesChannelsSheet
 	} from '$lib/components/organs/index.js';
-	import Bell from '@lucide/svelte/icons/bell';
-	import Search from '@lucide/svelte/icons/search';
-	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
-	import ImageIcon from '@lucide/svelte/icons/image';
 	import Upload from '@lucide/svelte/icons/upload-cloud';
 	import Share2 from '@lucide/svelte/icons/share-2';
-	import Truck from '@lucide/svelte/icons/truck';
-	import FolderTree from '@lucide/svelte/icons/folder-tree';
-	import Ruler from '@lucide/svelte/icons/ruler';
 	import Lock from '@lucide/svelte/icons/lock';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import X from '@lucide/svelte/icons/x';
-	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import Info from '@lucide/svelte/icons/info';
-	import Plus from '@lucide/svelte/icons/plus';
-	import { DropdownMenu } from 'bits-ui';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { cn } from '$lib/utils.js';
-	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
+	import type { Product } from '$lib/products/types.js';
+	import type { ProductCategory } from '$lib/product-categories/types.js';
+	import type { ProductCollection } from '$lib/product-collection/types.js';
 
-	const API_BASE = 'http://localhost:8000/admin';
+	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
-	const variantQuery = $derived(createPaginationQuery($page.url.searchParams));
-	function updateVariantUrl(updates: { page?: number; search?: string }) {
-		const params = new URLSearchParams($page.url.searchParams);
-		if (updates.page != null) params.set('page', String(updates.page));
-		if (updates.search !== undefined) {
-			const s = updates.search.trim();
-			if (s) params.set('search', s);
-			else params.delete('search');
-			params.set('page', '1');
-		}
-		goto(`${$page.url.pathname}?${params.toString()}`, { replaceState: true });
-	}
-
-	type ProductAttribute = {
-		id: string;
-		title: string;
-		type: string;
-		value: string;
-	};
-
-	type Product = {
-		id: string;
-		title: string;
-		handle: string;
-		subtitle: string | null;
-		description: string | null;
-		status: string;
-		thumbnail: string | null;
-		category_id: string | null;
-		attribute_group_id?: string | null;
+	type ProductDetail = Product & {
+		metadata?: Record<string, unknown>;
+		attributes?: Array<{ id: string; title: string; value?: string }>;
 		discountable?: boolean;
-		metadata?: Record<string, string | number> | null;
-		collection?: { id: string; title: string; handle: string } | null;
-		collections?: Array<{ id: string; title: string; handle: string }>;
 		collection_ids?: string[];
-		attributes?: ProductAttribute[];
 		tag_ids?: string[];
+		collections?: ProductCollection[];
 		tags?: Array<{ id: string; value: string }>;
-		created_at: string;
-		updated_at: string;
+		attribute_group_id?: string | null;
 	};
-
-	type ProductOption = {
-		id: string;
-		title: string;
-		product_id: string | null;
-	};
-
+	type SalesChannel = { 
+		 id: string;
+		 name: string;
+		 is_default?: boolean 
+		};
+		
 	type ProductVariant = {
 		id: string;
 		title: string;
 		sku: string | null;
 		product_id: string | null;
-		thumbnail: string | null;
+		thumbnail?: string | null;
 		manage_inventory: boolean;
 		allow_backorder?: boolean;
-		barcode?: string | null;
 		ean?: string | null;
 		upc?: string | null;
-		created_at: string;
-		updated_at: string;
+		barcode?: string | null;
+		created_at?: string;
+		updated_at?: string;
 	};
+	type ProductOption = { id: string; title: string; product_id: string | null };
 
-	type ProductCategory = { id: string; value: string; handle: string };
-	type ProductCollection = { id: string; title: string; handle: string };
+	const productId = $derived(page.params?.id ?? '');
 
-	const productId = $derived($page.params.id);
-
-	let product = $state<Product | null>(null);
-	let options = $state<ProductOption[]>([]);
-	let variants = $state<ProductVariant[]>([]);
-	let category = $state<ProductCategory | null>(null);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
-
-	// Sales Channels
-	type SalesChannel = { id: string; name: string; is_default: boolean };
-	let salesChannelsSheetOpen = $state(false);
-	let allSalesChannels = $state<SalesChannel[]>([]);
-	let productSalesChannelIds = $state<Set<string>>(new Set());
-	let salesChannelsSearchQuery = $state('');
-	let salesChannelsSubmitting = $state(false);
-
-	// Media (product image)
-	let addMediaSheetOpen = $state(false);
-	let productImageUrl = $state('');
-	let productImageFilePreview = $state<string | null>(null);
-	let addMediaSubmitting = $state(false);
-	let addMediaError = $state<string | null>(null);
-	let productImageFile = $state<File | null>(null);
-
-	// Variant image picker
-	let variantImageSheetOpen = $state(false);
-	let variantImageVariant = $state<ProductVariant | null>(null);
-	let variantImageUrl = $state('');
-	let variantImageSubmitting = $state(false);
-
-	// Option values: when single option, use variant titles as values
-	const optionValues = $derived.by(() => {
-		if (options.length !== 1 || variants.length === 0) return [] as string[];
-		const titles = [...new Set(variants.map((v) => v.title.trim()).filter(Boolean))];
-		return titles;
-	});
-
-	// Options that are assigned to this product (have at least one value from variants), with their values
-	const optionsWithValues = $derived.by(() => {
-		if (variants.length === 0) return [] as { option: ProductOption; values: string[] }[];
-		// When no options from API but we have variants, show one inferred option (e.g. Size) with variant titles as values
-		if (options.length === 0) {
-			const values = [...new Set(variants.map((v) => v.title.trim()).filter(Boolean))];
-			if (values.length === 0) return [];
-			return [{ option: { id: '', title: 'Size', product_id: null }, values }];
-		}
-		if (options.length === 1) {
-			const values = [...new Set(variants.map((v) => v.title.trim()).filter(Boolean))];
-			if (values.length === 0) return [];
-			return [{ option: options[0], values }];
-		}
-		const result: { option: ProductOption; values: string[] }[] = [];
-		options.forEach((opt, index) => {
-			const valueSet = new Set<string>();
-			variants.forEach((v) => {
-				const parts = v.title
-					.split('/')
-					.map((p) => p.trim())
-					.filter(Boolean);
-				// Allow variant title with fewer parts than options (e.g. "S" when 2 options exist → assign to first option)
-				if (parts[index]) valueSet.add(parts[index]);
-			});
-			if (valueSet.size > 0) {
-				result.push({ option: opt, values: [...valueSet] });
-			}
-		});
-		return result;
-	});
-
-	async function loadProduct() {
-		if (!productId) return;
-		loading = true;
-		error = null;
-		try {
-			const res = await fetch(`${API_BASE}/products/${productId}`, { cache: 'no-store' });
+	const productDetailQuery = createQuery(() => ({
+		queryKey: ['product-detail', productId],
+		queryFn: async (): Promise<ProductDetail | null> => {
+			const id = productId;
+			if (!id) return null;
+			const res = await fetch(`${API_BASE}/products/${id}`, { cache: 'no-store' });
 			if (!res.ok) {
-				if (res.status === 404) {
-					error = 'Product not found';
-					return;
-				}
+				if (res.status === 404) return null;
 				throw new Error(await res.text());
 			}
-			product = (await res.json()) as Product;
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			product = null;
-		} finally {
-			loading = false;
-		}
+			return res.json() as Promise<ProductDetail>;
+		},
+		enabled: !!productId
+	}));
+
+	const product = $derived((productDetailQuery.data ?? null) as ProductDetail | null);
+	const loading = $derived(productDetailQuery.isPending);
+	const productError = $derived(
+		productDetailQuery.error != null
+			? (productDetailQuery.error instanceof Error
+					? productDetailQuery.error.message
+					: String(productDetailQuery.error))
+			: null
+	);
+	let operationError = $state<string | null>(null);
+	const error = $derived(productError ?? operationError);
+
+	let variants = $state<ProductVariant[]>([]);
+	let options = $state<ProductOption[]>([]);
+	let category = $state<ProductCategory | null>(null);
+	let allSalesChannels = $state<SalesChannel[]>([]);
+	let productSalesChannelIds = $state<Set<string>>(new Set());
+	let salesChannelsSheetOpen = $state(false);
+	let salesChannelsSubmitting = $state(false);
+	let productImageUrl = $state('');
+	let productImageFile = $state<File | null>(null);
+	let productImageFilePreview = $state<string | null>(null);
+	let addMediaSheetOpen = $state(false);
+	let addMediaError = $state<string | null>(null);
+	let addMediaSubmitting = $state(false);
+	let variantImageVariant = $state<ProductVariant | null>(null);
+	let variantImageUrl = $state('');
+	let variantImageSheetOpen = $state(false);
+	let variantImageSubmitting = $state(false);
+
+	async function loadProduct() {
+		await productDetailQuery.refetch();
 	}
 
-	async function loadOptionsAndVariants() {
-		if (!productId) return;
-		try {
-			const [optRes, varRes] = await Promise.all([
-				fetch(`${API_BASE}/product-options?limit=100`, { cache: 'no-store' }),
-				fetch(`${API_BASE}/product-variants?limit=100`, { cache: 'no-store' })
-			]);
-			if (optRes.ok) {
-				const j = (await optRes.json()) as { data?: ProductOption[] };
-				// Include options for this product or options with no product_id (global options; API may not return product_id)
-				options = (j.data ?? []).filter((o) => o.product_id == null || o.product_id === productId);
-			} else {
-				options = [];
-			}
-			if (varRes.ok) {
-				const j = (await varRes.json()) as { data?: ProductVariant[] };
-				variants = (j.data ?? []).filter((v) => v.product_id === productId);
-				await loadVariantPrices();
-			} else {
-				variants = [];
-			}
-		} catch {
+
+
+	$effect(() => {
+		productId;
+		loadProduct();
+	});
+
+	$effect(() => {
+		if (product?.id) {
+			loadOptionsAndVariants();
+			fetchProductSalesChannels();
+			fetchSalesChannels();
+		} else {
 			options = [];
 			variants = [];
+		}
+	});
+
+	async function loadOptionsAndVariants() {
+		const id = product?.id;
+		if (!id) return;
+		try {
+			const [optRes, varRes] = await Promise.all([
+				fetch(`${API_BASE}/product-options?product_id=${id}&limit=100`, { cache: 'no-store' }),
+				fetch(`${API_BASE}/product-variants?product_id=${id}&limit=100`, { cache: 'no-store' })
+			]);
+			const optJson = optRes.ok ? ((await optRes.json()) as { rows?: ProductOption[] }) : null;
+			const varJson = varRes.ok ? ((await varRes.json()) as { rows?: ProductVariant[] }) : null;
+			options = optJson?.rows ?? [];
+			variants = varJson?.rows ?? [];
+		} catch {
+			variants = [];
+			options = [];
 		}
 	}
 
@@ -231,8 +155,8 @@
 		try {
 			const res = await fetch(`${API_BASE}/product-categories?limit=100`, { cache: 'no-store' });
 			if (res.ok) {
-				const j = (await res.json()) as { data?: ProductCategory[] };
-				category = (j.data ?? []).find((c) => c.id === product!.category_id) ?? null;
+				const j = (await res.json()) as { rows?: ProductCategory[] };
+				category = (j.rows ?? []).find((c) => c.id === product!.category_id) ?? null;
 			} else {
 				category = null;
 			}
@@ -241,22 +165,8 @@
 		}
 	}
 
-	$effect(() => {
-		productId;
-		loadProduct();
-	});
 
-	$effect(() => {
-		if (product?.id) {
-			loadOptionsAndVariants();
-			// Fetch product sales channels and all sales channels
-			fetchProductSalesChannels();
-			fetchSalesChannels();
-		} else {
-			options = [];
-			variants = [];
-		}
-	});
+	
 
 	async function fetchSalesChannels() {
 		try {
@@ -265,14 +175,15 @@
 				const raw = (await res.json()) as
 					| SalesChannel[]
 					| { data?: SalesChannel[] }
+					| { rows?: SalesChannel[] }
 					| { sales_channels?: SalesChannel[] };
 
 				let channels: SalesChannel[] = [];
 				if (Array.isArray(raw)) {
 					channels = raw;
 				} else if (raw && typeof raw === 'object') {
-					if ('data' in raw && Array.isArray((raw as { data?: SalesChannel[] }).data)) {
-						channels = (raw as { data?: SalesChannel[] }).data ?? [];
+					if ('rows' in raw && Array.isArray((raw as { rows?: SalesChannel[] }).rows)) {
+						channels = (raw as { rows?: SalesChannel[] }).rows ?? [];
 					} else if (
 						'sales_channels' in raw &&
 						Array.isArray((raw as { sales_channels?: SalesChannel[] }).sales_channels)
@@ -351,10 +262,10 @@
 				} catch {
 					// ignore JSON parse failures
 				}
-				error = message || 'Failed to update sales channels';
+				operationError = message || 'Failed to update sales channels';
 			}
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			operationError = e instanceof Error ? e.message : String(e);
 		} finally {
 			salesChannelsSubmitting = false;
 		}
@@ -418,7 +329,7 @@
 				body: JSON.stringify({ thumbnail })
 			});
 			if (res.ok) {
-				product = (await res.json()) as Product;
+				await productDetailQuery.refetch();
 				if (productImageFilePreview) {
 					URL.revokeObjectURL(productImageFilePreview);
 					productImageFilePreview = null;
@@ -435,11 +346,7 @@
 		}
 	}
 
-	function openVariantImageSheet(v: ProductVariant) {
-		variantImageVariant = v;
-		variantImageUrl = v.thumbnail ?? '';
-		variantImageSheetOpen = true;
-	}
+
 
 	async function saveVariantImage() {
 		const v = variantImageVariant;
@@ -457,20 +364,14 @@
 				);
 				variantImageSheetOpen = false;
 			} else {
-				error = await res.text();
+				operationError = await res.text();
 			}
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			operationError = e instanceof Error ? e.message : String(e);
 		} finally {
 			variantImageSubmitting = false;
 		}
 	}
-
-	const filteredSalesChannels = $derived(
-		allSalesChannels.filter((ch) =>
-			ch.name.toLowerCase().includes(salesChannelsSearchQuery.toLowerCase())
-		)
-	);
 
 	$effect(() => {
 		if (product?.category_id) {
@@ -484,113 +385,7 @@
 		product?.handle ? (product.handle.startsWith('/') ? product.handle : `/${product.handle}`) : '—'
 	);
 
-	const formatDate = (s: string) => {
-		try {
-			return new Date(s).toLocaleDateString('en-US', {
-				month: 'short',
-				day: 'numeric',
-				year: 'numeric'
-			});
-		} catch {
-			return '—';
-		}
-	};
-
-	const variantPage = $derived(Math.max(1, Number(variantQuery.page) || 1));
-	const variantLimit = $derived(Math.max(1, Math.min(100, Number(variantQuery.limit) || 10)));
-	let variantSearchQuery = $state('');
-	$effect(() => {
-		variantSearchQuery = variantQuery.search ?? '';
-	});
-	$effect(() => {
-		const currentSearch = ($page.url.searchParams.get('search') ?? '').trim();
-		if (variantSearchQuery.trim() !== currentSearch) {
-			updateVariantUrl({ search: variantSearchQuery });
-		}
-	});
-	const filteredVariants = $derived(
-		variantSearchQuery.trim()
-			? variants.filter(
-					(v) =>
-						v.title.toLowerCase().includes(variantSearchQuery.toLowerCase()) ||
-						(v.sku ?? '').toLowerCase().includes(variantSearchQuery.toLowerCase())
-				)
-			: variants
-	);
-	const variantTotal = $derived(filteredVariants.length);
-	const variantTotalPages = $derived(Math.max(1, Math.ceil(variantTotal / variantLimit)));
-	const paginatedVariants = $derived(
-		filteredVariants.slice((variantPage - 1) * variantLimit, variantPage * variantLimit)
-	);
-	const variantStart = $derived(variantTotal > 0 ? (variantPage - 1) * variantLimit + 1 : 0);
-	const variantEnd = $derived(Math.min(variantPage * variantLimit, variantTotal));
-	const variantPagination = $derived({
-		total: variantTotal,
-		page: variantPage,
-		limit: variantLimit,
-		total_pages: variantTotalPages,
-		has_next_page: variantPage < variantTotalPages,
-		has_previous_page: variantPage > 1
-	});
-	const variantTableRows = $derived(
-		paginatedVariants.map((v) => {
-			const priceInCents = variantPricesMap.get(v.id);
-			return {
-				...v,
-				price_display: priceInCents
-					? `€${(parseFloat(priceInCents) / 100).toFixed(2)}`
-					: '—'
-			};
-		}) as Record<string, unknown>[]
-	);
-	const variantTableColumns: TableColumn[] = [
-		{
-			label: 'Variant',
-			key: 'title',
-			type: 'link',
-			cellHref: () => '#',
-			thumbnailKey: 'thumbnail',
-			textKey: 'title'
-		},
-		{ label: 'SKU', key: 'sku', type: 'text' },
-		{ label: 'Inventory', key: 'manage_inventory', type: 'boolean' },
-		{ label: 'Price', key: 'price_display', type: 'text' },
-		{ label: 'Created', key: 'created_at', type: 'date' },
-		{ label: 'Updated', key: 'updated_at', type: 'date' },
-		{
-			label: 'Actions',
-			key: 'actions',
-			type: 'actions',
-			actions: [
-				{
-					label: 'Edit',
-					key: 'edit',
-					type: 'button',
-					onClick: (row) => {
-						const v = variants.find((x) => x.id === row.id);
-						if (v) openEditVariantSheet(v);
-					}
-				},
-				{
-					label: 'Delete',
-					key: 'delete',
-					type: 'button',
-					onClick: (row) => {
-						const v = variants.find((x) => x.id === row.id);
-						if (v) openDeleteVariantConfirm(v);
-					}
-				}
-			]
-		}
-	];
-	function goToVariantPage(pageNum: number) {
-		updateVariantUrl({ page: Math.max(1, Math.min(variantTotalPages, pageNum)) });
-	}
-	$effect(() => {
-		if (variantTotalPages >= 1 && variantPage > variantTotalPages) {
-			updateVariantUrl({ page: variantTotalPages });
-		}
-	});
+	
 
 	let editSheetOpen = $state(false);
 	let editTitle = $state('');
@@ -645,7 +440,7 @@
 		editProductAttributesList = (product.attributes ?? []).map((a) => ({
 			attribute_id: a.id,
 			title: a.title,
-			value: a.value
+			value: a.value ?? ''
 		}));
 		editAttributeGroupId = product.attribute_group_id ?? '';
 		editProductAddAttributeId = '';
@@ -781,9 +576,9 @@
 			const res = await fetch(`${API_BASE}/product-attributes?limit=100`, { cache: 'no-store' });
 			if (res.ok) {
 				const j = (await res.json()) as {
-					data?: Array<{ id: string; title: string; type: string }>;
+					rows?: Array<{ id: string; title: string; type: string }>;
 				};
-				availableAttributesList = j.data ?? [];
+				availableAttributesList = j.rows ?? [];
 			} else {
 				availableAttributesList = [];
 			}
@@ -800,7 +595,7 @@
 		editAttributesList = (product.attributes ?? []).map((a) => ({
 			attribute_id: a.id,
 			title: a.title,
-			value: a.value
+			value: a.value ?? ''
 		}));
 		editAttributeGroupId = product.attribute_group_id ?? '';
 		addAttributeId = '';
@@ -840,8 +635,8 @@
 		try {
 			const res = await fetch(`${API_BASE}/product-attribute-groups?limit=100`, { cache: 'no-store' });
 			if (res.ok) {
-				const j = (await res.json()) as { data?: Array<{ id: string; title: string }> };
-				attributeGroupsList = j.data ?? [];
+				const j = (await res.json()) as { rows?: Array<{ id: string; title: string }> };
+				attributeGroupsList = j.rows ?? [];
 			} else {
 				attributeGroupsList = [];
 			}
@@ -897,10 +692,10 @@
 			const res = await fetch(`${API_BASE}/collections?limit=100`, { cache: 'no-store' });
 			if (res.ok) {
 				const j = (await res.json()) as {
-					data?: ProductCollection[];
+					rows?: ProductCollection[];
 					collections?: ProductCollection[];
 				};
-				collectionsList = j.data ?? j.collections ?? [];
+				collectionsList = j.rows ?? j.collections ?? [];
 			} else {
 				collectionsList = [];
 			}
@@ -913,8 +708,8 @@
 		try {
 			const res = await fetch(`${API_BASE}/product-categories?limit=100`, { cache: 'no-store' });
 			if (res.ok) {
-				const j = (await res.json()) as { data?: ProductCategory[] };
-				categoriesList = j.data ?? [];
+				const j = (await res.json()) as { rows?: ProductCategory[]; data?: ProductCategory[] };
+				categoriesList = j.rows ?? j.data ?? [];
 			} else {
 				categoriesList = [];
 			}
@@ -927,8 +722,8 @@
 		try {
 			const res = await fetch(`${API_BASE}/product-tags?limit=100`, { cache: 'no-store' });
 			if (res.ok) {
-				const j = (await res.json()) as { data?: Array<{ id: string; value: string }> };
-				tagsList = j.data ?? [];
+				const j = (await res.json()) as { rows?: Array<{ id: string; value: string }> };
+				tagsList = j.rows ?? [];
 			} else {
 				tagsList = [];
 			}
@@ -983,9 +778,9 @@
 				body: JSON.stringify({ collection_ids: orgCollectionIds, tag_ids: orgTagIds })
 			});
 			if (!orgRes.ok) throw new Error(await orgRes.text());
+			await loadProduct();
+			await loadCategory();
 			closeOrgSheet();
-			loadProduct();
-			loadCategory();
 		} catch (e) {
 			orgError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -1495,13 +1290,17 @@
 					}
 				} else {
 					editVariantAttributes = (product?.attributes ?? []).map((a) => ({
-						...a,
+						id: a.id,
+						title: a.title,
+						type: 'type' in a && typeof a.type === 'string' ? a.type : 'text',
 						value: a.value ?? ''
 					}));
 				}
 			} catch {
 				editVariantAttributes = (product?.attributes ?? []).map((a) => ({
-					...a,
+					id: a.id,
+					title: a.title,
+					type: 'type' in a && typeof a.type === 'string' ? a.type : 'text',
 					value: a.value ?? ''
 				}));
 			}
@@ -1820,32 +1619,32 @@
 										<span
 											class={`inline-block size-2 shrink-0 rounded-full ${statusDotClass(product?.status)}`}
 											aria-hidden="true"
-										/>
+										></span>
 										<span>{statusLabel(product?.status)}</span>
 									</span>
 								</Select.Trigger>
 								<Select.Content>
 									<Select.Item value="published" label="Active">
 										<span class="flex items-center gap-2">
-											<span class="inline-block size-2 shrink-0 rounded-full bg-emerald-500" />
+											<span class="inline-block size-2 shrink-0 rounded-full bg-emerald-500"></span>
 											<span>Active</span>
 										</span>
 									</Select.Item>
 									<Select.Item value="draft" label="Draft">
 										<span class="flex items-center gap-2">
-											<span class="inline-block size-2 shrink-0 rounded-full bg-muted-foreground/60" />
+											<span class="inline-block size-2 shrink-0 rounded-full bg-muted-foreground/60"></span>
 											<span>Draft</span>
 										</span>
 									</Select.Item>
 									<Select.Item value="proposed" label="Unlisted">
 										<span class="flex items-center gap-2">
-											<span class="inline-block size-2 shrink-0 rounded-full bg-amber-500" />
+											<span class="inline-block size-2 shrink-0 rounded-full bg-amber-500"></span>
 											<span>Unlisted</span>
 										</span>
 									</Select.Item>
 									<Select.Item value="rejected" label="Rejected">
 										<span class="flex items-center gap-2">
-											<span class="inline-block size-2 shrink-0 rounded-full bg-red-500" />
+											<span class="inline-block size-2 shrink-0 rounded-full bg-red-500"></span>
 											<span>Rejected</span>
 										</span>
 									</Select.Item>
@@ -1935,8 +1734,8 @@
 							<div class="mt-4 flex flex-col gap-2">
 								{#if productSalesChannelIds.size > 0}
 									{#each Array.from(productSalesChannelIds)
-										.map((id) => allSalesChannels.find((ch) => ch.id === id))
-										.filter((ch): ch is NonNullable<typeof ch> => ch != null) as channel}
+										.map((id) => allSalesChannels.find((ch: SalesChannel) => ch.id === id))
+										.filter((ch): ch is SalesChannel => ch != null) as channel}
 										<div class="flex items-center gap-2 text-sm">
 											<Share2 class="size-4 text-muted-foreground" />
 											<span>{channel.name}</span>
@@ -2038,70 +1837,20 @@
 							{/if}
 						</div>
 
-						<!-- Options & Variants card (merged) -->
-						<div class="rounded-lg border bg-card p-6 shadow-sm">
-							<div class="flex items-center justify-between">
-								<h2 class="font-semibold">Options & Variants</h2>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									onclick={openVariantsEditSheet}
-									aria-label="Edit options and variants"
-								>
-									<Pencil class="size-4" />
-								</Button>
-							</div>
-
-							<!-- Options section: only options assigned to this product, with their values -->
-							{#if optionsWithValues.length === 0}
-								<p class="mt-4 text-sm text-muted-foreground">No options defined.</p>
-							{:else}
-								<div class="mt-4 flex flex-col gap-4">
-									{#each optionsWithValues as { option: opt, values: vals } (opt.id)}
-										<div>
-											<p class="text-sm font-medium text-muted-foreground">{opt.title}</p>
-											<div class="mt-1.5 flex flex-wrap gap-1.5">
-												{#each vals as val (val)}
-													<span
-														class="inline-flex items-center rounded-md border bg-muted/50 px-2.5 py-1 text-sm"
-													>
-														{val}
-													</span>
-												{/each}
-											</div>
-										</div>
-									{/each}
-								</div>
-							{/if}
-
-							<!-- Variants section -->
-							<div class="mt-4">
-								<PaginationTable
-									bind:searchQuery={variantSearchQuery}
-									searchPlaceholder="Search variants…"
-									showFilter={false}
-									showSort={false}
-								>
-									<div class="overflow-x-auto rounded-lg border bg-card">
-										<table class="w-full text-sm">
-											<TableHead columns={variantTableColumns} />
-											<TableBody
-												rows={variantTableRows}
-												columns={variantTableColumns}
-												emptyMessage="No variants."
-											/>
-										</table>
-									</div>
-									<TablePagination
-										pagination={variantPagination}
-										start={variantStart}
-										end={variantEnd}
-										onPageChange={goToVariantPage}
-									/>
-								</PaginationTable>
-							</div>
-						</div>
+						<ProductDetailVariantsSection
+							variants={variants}
+							options={options}
+							variantPricesMap={variantPricesMap}
+							onEditVariant={(row) => {
+								const v = variants.find((x) => x.id === row.id);
+								if (v) openEditVariantSheet(v);
+							}}
+							onDeleteVariant={(row) => {
+								const v = variants.find((x) => x.id === row.id);
+								if (v) openDeleteVariantConfirm(v);
+							}}
+							onEditOptionsAndVariants={openVariantsEditSheet}
+						/>
 
 						<!-- Metadata / JSON placeholders -->
 						<div class="grid gap-4 sm:grid-cols-2">
@@ -3086,88 +2835,13 @@
 		</Sheet.Root>
 	{/if}
 
-	<!-- Sales Channels Sheet -->
-	<Sheet.Root bind:open={salesChannelsSheetOpen}>
-		<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-			<div class="flex h-full flex-col">
-				<div class="flex-1 overflow-auto p-6 pt-12">
-					<h2 class="text-lg font-semibold">Sales Channels</h2>
-					<p class="mt-1 text-sm text-muted-foreground">
-						Select which sales channels this product should be available in.
-					</p>
-					<div class="mt-6 flex flex-col gap-4">
-						<div class="relative">
-							<Search
-								class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-							/>
-							<Input
-								type="search"
-								placeholder="Search sales channels"
-								bind:value={salesChannelsSearchQuery}
-								class="h-9 rounded-md pl-9"
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							{#if filteredSalesChannels.length === 0}
-								<p class="py-8 text-center text-sm text-muted-foreground">
-									No sales channels found.
-								</p>
-							{:else}
-								{#each filteredSalesChannels as channel (channel.id)}
-									<div class="flex items-center justify-between rounded-md border p-3">
-										<div class="flex flex-col gap-1">
-											<span class="text-sm font-medium">{channel.name}</span>
-											{#if channel.is_default}
-												<span class="text-xs text-muted-foreground">Default</span>
-											{/if}
-										</div>
-										<button
-											type="button"
-											role="switch"
-											aria-checked={productSalesChannelIds.has(channel.id)}
-											aria-label={`Toggle ${channel.name}`}
-											class={cn(
-												'relative inline-flex h-6 min-h-6 w-11 min-w-11 flex-none shrink-0 cursor-pointer items-center self-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-												productSalesChannelIds.has(channel.id) ? 'bg-primary' : 'bg-input'
-											)}
-											onclick={() => {
-												const newSet = new Set(productSalesChannelIds);
-												if (newSet.has(channel.id)) {
-													newSet.delete(channel.id);
-												} else {
-													newSet.add(channel.id);
-												}
-												productSalesChannelIds = newSet;
-											}}
-										>
-											<span
-												class={cn(
-													'pointer-events-none block size-5 shrink-0 rounded-full border border-input bg-white shadow ring-0 transition-transform',
-													productSalesChannelIds.has(channel.id)
-														? 'translate-x-5'
-														: 'translate-x-[1px]'
-												)}
-											></span>
-										</button>
-									</div>
-								{/each}
-							{/if}
-						</div>
-					</div>
-				</div>
-				<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-					<Button
-						variant="outline"
-						onclick={() => (salesChannelsSheetOpen = false)}
-						disabled={salesChannelsSubmitting}
-					>
-						Cancel
-					</Button>
-					<Button onclick={updateProductSalesChannels} disabled={salesChannelsSubmitting}>
-						{salesChannelsSubmitting ? 'Saving…' : 'Save'}
-					</Button>
-				</Sheet.Footer>
-			</div>
-		</Sheet.Content>
-	</Sheet.Root>
+	<ProductSalesChannelsSheet
+		bind:open={salesChannelsSheetOpen}
+		channels={allSalesChannels}
+		selectedIds={productSalesChannelIds}
+		onSelectedIdsChange={(set) => (productSalesChannelIds = set)}
+		onSave={updateProductSalesChannels}
+		onCancel={() => (salesChannelsSheetOpen = false)}
+		submitting={salesChannelsSubmitting}
+	/>
 </div>

@@ -26,10 +26,16 @@ export const createPaginationQuery = <T extends Static<typeof PaginationSchema>>
 	return searchParams;
 };
 
+export type CreatePaginationOptions = {
+	enabled?: () => boolean;
+	queryKeyPart?: () => unknown[];
+};
+
 export const createPagination = <T>(
 	queryFn: QueryFunction<T>,
 	queryKey: string[],
-	initialSearchQuery?: ReturnType<typeof createPaginationQuery>
+	initialSearchQuery?: ReturnType<typeof createPaginationQuery>,
+	options?: CreatePaginationOptions
 	) => {
 	let searchText = $state<string>(initialSearchQuery?.search ?? "");
 	const form = $state({
@@ -45,8 +51,9 @@ export const createPagination = <T>(
 	});
 
 	const query = createQuery(() => ({
-		queryKey: ["pagination", ...queryKey, searchText],
+		queryKey: ["pagination", ...queryKey, searchText, ...(options?.queryKeyPart?.() ?? [])],
 		queryFn,
+		enabled: options?.enabled?.() ?? true,
 	}));
 
 	const pagination = $derived(query.data?.pagination ?? null);

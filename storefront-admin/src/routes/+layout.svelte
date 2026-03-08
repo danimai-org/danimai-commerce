@@ -81,7 +81,7 @@
 		if (path.startsWith('/users')) rolesPermissionsOpen = true;
 	});
 	$effect(() => {
-		if (path.startsWith('/inventory')) inventoryOpen = true;
+		if (path.startsWith('/inventory') || path.startsWith('/inventoryitems')) inventoryOpen = true;
 	});
 	$effect(() => {
 		if (path.startsWith('/customers')) customersOpen = true;
@@ -274,7 +274,7 @@
 											{#snippet child({ props: triggerProps })}
 												<SidebarMenuButton
 													{...triggerProps}
-													isActive={path.startsWith('/inventory')}
+													isActive={path.startsWith('/inventory') || path.startsWith('/inventoryitems')}
 													tooltipContent="Manage Inventory"
 												>
 													<Layers />
@@ -291,16 +291,16 @@
 											<SidebarMenuSub>
 												<SidebarMenuSubItem>
 													<SidebarMenuSubButton
-														href="/inventory/items"
-														isActive={path.startsWith('/inventory/items')}
+														href="/inventoryitems"
+														isActive={path.startsWith('/inventoryitems')}
 													>
 														Inventory Item
 													</SidebarMenuSubButton>
 												</SidebarMenuSubItem>
 												<SidebarMenuSubItem>
 													<SidebarMenuSubButton
-														href="/inventory/locations"
-														isActive={path.startsWith('/inventory/locations')}
+														href="/inventoryitems/locations"
+														isActive={path.startsWith('/inventoryitems/locations')}
 													>
 														Location
 													</SidebarMenuSubButton>
