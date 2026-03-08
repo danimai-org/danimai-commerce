@@ -1,6 +1,7 @@
 import {
   InjectDB,
   InjectLogger,
+  NotFoundError,
   Process,
   ProcessContext,
   type ProcessContextType,
@@ -15,7 +16,7 @@ import type { Database } from "../../../db/type";
 export const DELETE_PRODUCT_ATTRIBUTES_PROCESS = Symbol("DeleteProductAttributes");
 
 @Process(DELETE_PRODUCT_ATTRIBUTES_PROCESS)
-export class DeleteProductAttributesProcess implements ProcessContract<void> {
+export class DeleteProductAttributesProcess implements ProcessContract<typeof DeleteProductAttributesSchema, void> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -25,7 +26,7 @@ export class DeleteProductAttributesProcess implements ProcessContract<void> {
 
   async runOperations(@ProcessContext({
     schema: DeleteProductAttributesSchema,
-  }) context: ProcessContextType<typeof DeleteProductAttributesSchema>): Promise<void> {
+  }) context: ProcessContextType<typeof DeleteProductAttributesSchema>) {
     const { input } = context;
 
     await this.validateAttributes(input);
@@ -33,9 +34,17 @@ export class DeleteProductAttributesProcess implements ProcessContract<void> {
   }
 
   async validateAttributes(input: DeleteProductAttributesProcessInput) {
+    const uniqueIds = new Set(input.attribute_ids);
+    if (uniqueIds.size !== input.attribute_ids.length) {
+      throw new ValidationError("Attribute IDs must be unique", [{
+        type: "not_unique",
+        message: "Attribute IDs must be unique",
+        path: "attribute_ids",
+      }]);
+    }
     const attributes = await this.db
       .selectFrom("product_attributes")
-      .where("id", "in", input.attribute_ids)
+      .where("product_attributes.id", "in", input.attribute_ids)
       .where("deleted_at", "is", null)
       .selectAll()
       .execute();
@@ -43,14 +52,8 @@ export class DeleteProductAttributesProcess implements ProcessContract<void> {
     if (attributes.length !== input.attribute_ids.length) {
       const foundIds = attributes.map((a) => a.id);
       const missingIds = input.attribute_ids.filter((id) => !foundIds.includes(id));
-      throw new ValidationError(
-        `Product attributes not found: ${missingIds.join(", ")}`,
-        [{
-          type: "not_found",
-          message: `Product attributes not found: ${missingIds.join(", ")}`,
-          path: "attribute_ids",
-        }]
-      );
+      
+      throw new NotFoundError(`Product attributes not found: ${missingIds.join(", ")}`);
     }
 
     return attributes;
@@ -61,11 +64,22 @@ export class DeleteProductAttributesProcess implements ProcessContract<void> {
       attribute_ids: input.attribute_ids,
     });
 
-    await this.db
-      .updateTable("product_attributes")
-      .set({ deleted_at: new Date().toISOString() })
-      .where("id", "in", input.attribute_ids)
-      .where("deleted_at", "is", null)
-      .execute();
+    await this.db.transaction().execute(async (trx) => {
+      await trx
+        .deleteFrom("product_attribute_values")
+        .where("attribute_id", "in", input.attribute_ids)
+        .execute();
+      
+      await trx
+        .deleteFrom("product_attribute_group_relations")
+        .where("product_attribute_id", "in", input.attribute_ids)
+        .execute();
+      
+      await trx
+        .deleteFrom("product_attributes")
+        .where("id", "in", input.attribute_ids)
+        .where("deleted_at", "is", null)
+        .execute();
+    });
   }
 }

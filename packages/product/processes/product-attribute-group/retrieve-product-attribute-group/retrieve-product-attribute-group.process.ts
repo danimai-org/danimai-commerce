@@ -1,31 +1,25 @@
 import {
   InjectDB,
-  InjectLogger,
+  NotFoundError,
   Process,
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  ValidationError,
 } from "@danimai/core";
-import { Kysely } from "kysely";
-import type { Logger } from "@logtape/logtape";
-import { type RetrieveProductAttributeGroupProcessInput, RetrieveProductAttributeGroupSchema } from "./retrieve-product-attribute-group.schema";
-import type { Database, ProductAttributeGroup } from "../../../db/type";
+import { Kysely, sql } from "kysely";
+import {  type RetrieveProductAttributeGroupProcessOutput, RetrieveProductAttributeGroupSchema } from "./retrieve-product-attribute-group.schema";
+import type { Database } from "../../../db/type";
+import type { Static } from "@sinclair/typebox";
 
-export type RetrieveProductAttributeGroupResult = ProductAttributeGroup & {
-  attributes: Array<{ id: string; title: string; type: string }>;
-};
 
 export const RETRIEVE_PRODUCT_ATTRIBUTE_GROUP_PROCESS = Symbol("RetrieveProductAttributeGroup");
 
 @Process(RETRIEVE_PRODUCT_ATTRIBUTE_GROUP_PROCESS)
 export class RetrieveProductAttributeGroupProcess
-  implements ProcessContract<RetrieveProductAttributeGroupResult | undefined> {
+  implements ProcessContract<typeof RetrieveProductAttributeGroupSchema, RetrieveProductAttributeGroupProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
-    @InjectLogger()
-    private readonly logger: Logger
   ) { }
 
   async runOperations(@ProcessContext({
@@ -35,42 +29,51 @@ export class RetrieveProductAttributeGroupProcess
 
     const group = await this.db
       .selectFrom("product_attribute_groups")
-      .where("id", "=", input.id)
-      .where("deleted_at", "is", null)
-      .selectAll()
+      .where("product_attribute_groups.id", "=", input.id)
+      .where("product_attribute_groups.deleted_at", "is", null)
+      .leftJoin("product_attribute_group_relations", (join) =>
+        join
+          .onRef("product_attribute_group_relations.attribute_group_id", "=", "product_attribute_groups.id")
+      ).leftJoin("product_attributes", (join) =>
+        join
+          .onRef("product_attributes.id", "=", "product_attribute_group_relations.product_attribute_id")
+          .on("product_attributes.deleted_at", "is", null)
+      )
+      .select([
+        "product_attribute_groups.id",
+        "product_attribute_groups.title",
+        "product_attribute_groups.metadata",
+        "product_attribute_groups.created_at",
+        "product_attribute_groups.updated_at",
+        "product_attribute_groups.deleted_at",
+        () => sql<Static<typeof RetrieveProductAttributeGroupSchema["attributes"]>[]>`
+          CASE
+            WHEN count(product_attributes.id) = 0 THEN ARRAY[]::json[]
+            ELSE array_agg(
+              DISTINCT jsonb_build_object(
+                'id', product_attributes.id,
+                'title', product_attributes.title,
+                'type', product_attributes.type
+              )
+            )::json[]
+          END
+        `.as('attributes'),
+      ])
+      .groupBy([
+        "product_attribute_groups.id",
+        "product_attribute_groups.title",
+        "product_attribute_groups.metadata",
+        "product_attribute_groups.created_at",
+        "product_attribute_groups.updated_at",
+        "product_attribute_groups.deleted_at",
+      ])
       .executeTakeFirst();
 
     if (!group) {
-      throw new ValidationError("Product attribute group not found", [{
-        type: "not_found",
-        message: "Product attribute group not found",
-        path: "id",
-      }]);
+      throw new NotFoundError("Product attribute group not found");
     }
 
-    const attributeRows = await this.db
-      .selectFrom("product_attribute_group_attributes")
-      .innerJoin(
-        "product_attributes",
-        "product_attributes.id",
-        "product_attribute_group_attributes.attribute_id"
-      )
-      .where("product_attribute_group_attributes.attribute_group_id", "=", input.id)
-      .where("product_attributes.deleted_at", "is", null)
-      .select([
-        "product_attributes.id",
-        "product_attributes.title",
-        "product_attributes.type",
-      ])
-      .execute();
 
-    type AttrRow = { id?: string; title?: string; type?: string; "product_attributes.id"?: string; "product_attributes.title"?: string; "product_attributes.type"?: string };
-    const attributes = (attributeRows as AttrRow[]).map((row) => ({
-      id: String(row.id ?? row["product_attributes.id"] ?? ""),
-      title: String(row.title ?? row["product_attributes.title"] ?? ""),
-      type: String(row.type ?? row["product_attributes.type"] ?? ""),
-    }));
-
-    return { ...group, attributes };
+    return group;
   }
 }

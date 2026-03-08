@@ -1,12 +1,8 @@
 import { Type, type Static, type StaticDecode } from "@sinclair/typebox";
 import {
-  createFilterableColumnsSchema,
   createPaginatedResponseSchema,
   createPaginationSchema,
-  FilterOperator,
-  PaginationSchema,
 } from "@danimai/core";
-import type { ProductCategory } from "../../../db/type";
 import { ProductCategoryResponseSchema } from "../retrieve-product-category/retrieve-product-category.schema";
 
 // Request/Input schema

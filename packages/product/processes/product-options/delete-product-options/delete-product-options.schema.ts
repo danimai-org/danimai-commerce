@@ -1,7 +1,7 @@
 import { Type, type Static } from "@sinclair/typebox";
 
 export const DeleteProductOptionsSchema = Type.Object({
-  option_ids: Type.Array(Type.String()),
+  option_ids: Type.Array(Type.String(), {maxItems: 100}),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
 });
 

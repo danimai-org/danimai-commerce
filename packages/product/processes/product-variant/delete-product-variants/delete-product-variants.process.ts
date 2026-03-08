@@ -1,21 +1,21 @@
 import {
   InjectDB,
   InjectLogger,
+  NotFoundError,
   Process,
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  ValidationError,
 } from "@danimai/core";
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type DeleteProductVariantsProcessInput, DeleteProductVariantsSchema } from "./delete-product-variants.schema";
+import { DeleteProductVariantsSchema } from "./delete-product-variants.schema";
 import type { Database } from "../../../db/type";
 
 export const DELETE_PRODUCT_VARIANTS_PROCESS = Symbol("DeleteProductVariants");
 
 @Process(DELETE_PRODUCT_VARIANTS_PROCESS)
-export class DeleteProductVariantsProcess implements ProcessContract<void> {
+export class DeleteProductVariantsProcess implements ProcessContract<typeof DeleteProductVariantsSchema, void> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -25,48 +25,34 @@ export class DeleteProductVariantsProcess implements ProcessContract<void> {
 
   async runOperations(@ProcessContext({
     schema: DeleteProductVariantsSchema,
-  }) context: ProcessContextType<typeof DeleteProductVariantsSchema>): Promise<void> {
+  }) context: ProcessContextType<typeof DeleteProductVariantsSchema>) {
     const { input } = context;
 
-    await this.validateVariants(input);
-    await this.deleteVariants(input);
-  }
-
-  async validateVariants(input: DeleteProductVariantsProcessInput) {
     const variants = await this.db
       .selectFrom("product_variants")
       .where("id", "in", input.variant_ids)
       .where("deleted_at", "is", null)
-      .selectAll()
+      .select("id")
       .execute();
 
     if (variants.length !== input.variant_ids.length) {
       const foundIds = variants.map((v) => v.id);
       const missingIds = input.variant_ids.filter((id) => !foundIds.includes(id));
-      throw new ValidationError(
-        `Product variants not found: ${missingIds.join(", ")}`,
-        [{
-          type: "not_found",
-          message: `Product variants not found: ${missingIds.join(", ")}`,
-          path: "variant_ids",
-        }]
+      throw new NotFoundError(
+        `Product variants not found: ${missingIds.join(", ")}`
       );
     }
 
-    return variants;
-  }
-
-  async deleteVariants(input: DeleteProductVariantsProcessInput) {
-    this.logger.info("Deleting product variants", {
-      variant_ids: input.variant_ids,
+    await this.db.transaction().execute(async (trx) => {
+      this.logger.info("Deleting product variants", {
+        variant_ids: input.variant_ids,
+      });
+      await trx
+        .updateTable("product_variants")
+        .set({ deleted_at: new Date() })
+        .where("id", "in", input.variant_ids)
+        .where("deleted_at", "is", null)
+        .execute();
     });
-
-    // Soft delete the variants
-    await this.db
-      .updateTable("product_variants")
-      .set({ deleted_at: new Date().toISOString() })
-      .where("id", "in", input.variant_ids)
-      .where("deleted_at", "is", null)
-      .execute();
   }
 }

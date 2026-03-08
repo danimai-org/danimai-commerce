@@ -1,10 +1,26 @@
-import { ValidationError } from "@danimai/core";
+import { NotFoundError, ValidationError } from "@danimai/core";
 import type { Context } from "elysia";
 
 export function handleProcessError(err: unknown, set: Context["set"]) {
-  if (err instanceof ValidationError) {
+  if (err instanceof NotFoundError) {
+    set.status = 404;
+    return {
+      error: "NotFound",
+      message: err.message,
+    };
+  }
 
-    console.log(err.errors);
+  if (err instanceof ValidationError) {
+    const isNotFound = err.errors?.some(
+      (e: { type?: string }) => e.type === "not_found"
+    );
+    if (isNotFound) {
+      set.status = 404;
+      return {
+        error: "NotFound",
+        message: err.message,
+      };
+    }
     set.status = 400;
     return {
       error: "ValidationError",

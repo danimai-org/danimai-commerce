@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService, PaginationSchema } from "@danimai/core";
 import {
   CREATE_PRODUCT_ATTRIBUTES_PROCESS,
@@ -28,6 +28,7 @@ import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
   NoContentResponseSchema,
+  NotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
@@ -40,9 +41,9 @@ export const productAttributeRoutes = new Elysia({ prefix: "/product-attributes"
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedProductAttributesProcess>(PAGINATED_PRODUCT_ATTRIBUTES_PROCESS);
-      return process.runOperations({ input });
+      return process.runOperations({ input: query as StaticDecode<typeof PaginatedProductAttributesSchema> });
     },
     {
       query: PaginatedProductAttributesSchema,
@@ -69,6 +70,7 @@ export const productAttributeRoutes = new Elysia({ prefix: "/product-attributes"
       response: {
         200: RetrieveProductAttributeResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {
@@ -149,13 +151,14 @@ export const productAttributeRoutes = new Elysia({ prefix: "/product-attributes"
       const process = getService<DeleteProductAttributesProcess>(DELETE_PRODUCT_ATTRIBUTES_PROCESS);
       await process.runOperations({ input });
       set.status = 204;
-      return undefined;
+      return;
     },
     {
       body: DeleteProductAttributesSchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {

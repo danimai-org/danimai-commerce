@@ -37,6 +37,7 @@ import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
   NoContentResponseSchema,
+  NotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
@@ -54,7 +55,6 @@ export const collectionRoutes = new Elysia({ prefix: "/collections" })
   .get(
     "/",
     async ({ query }) => {
-      console.log(query);
       const process = getService<PaginatedCollectionsProcess>(PAGINATED_COLLECTIONS_PROCESS);
       return process.runOperations({
         input: query as StaticDecode<typeof PaginatedCollectionsSchema>
@@ -120,6 +120,7 @@ export const collectionRoutes = new Elysia({ prefix: "/collections" })
       response: {
         200: RetrieveCollectionResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {
@@ -189,6 +190,7 @@ export const collectionRoutes = new Elysia({ prefix: "/collections" })
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {

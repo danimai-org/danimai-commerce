@@ -35,3 +35,13 @@ export const InternalErrorResponseSchema = Type.Object(
 export const NoContentResponseSchema = Type.Undefined({
   description: "No content",
 });
+
+export const NotFoundResponseSchema = Type.Object(
+  {
+    error: Type.Literal("NotFound"),
+    message: Type.String(),
+  },
+  {
+    description: "Resource not found",
+  }
+);

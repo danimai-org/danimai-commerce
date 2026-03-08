@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   CREATE_PRODUCT_OPTIONS_PROCESS,
@@ -10,7 +10,7 @@ import {
   UpdateProductOptionsProcess,
   DeleteProductOptionsProcess,
   PaginatedProductOptionsProcess,
-  PaginatedProductOptionsQuerySchema,
+  PaginatedProductOptionsSchema,
   PaginatedProductOptionsResponseSchema,
   RETRIEVE_PRODUCT_OPTION_PROCESS,
   RetrieveProductOptionProcess,
@@ -25,6 +25,7 @@ import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
   NoContentResponseSchema,
+  NotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
@@ -38,12 +39,12 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedProductOptionsProcess>(PAGINATED_PRODUCT_OPTIONS_PROCESS);
-      return process.runOperations({ input });
+      return process.runOperations({ input: query as StaticDecode<typeof PaginatedProductOptionsSchema> });
     },
     {
-      query: PaginatedProductOptionsQuerySchema,
+      query: PaginatedProductOptionsSchema,
       response: {
         200: PaginatedProductOptionsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -67,6 +68,7 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
       response: {
         200: RetrieveProductOptionResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {
@@ -132,6 +134,7 @@ export const productOptionRoutes = new Elysia({ prefix: "/product-options" })
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {

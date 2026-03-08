@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { Type, type StaticDecode } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   CREATE_PRODUCT_CATEGORIES_PROCESS,
@@ -12,7 +12,7 @@ import {
   BatchLinkProductsToCategoryProcess,
   PAGINATED_PRODUCT_CATEGORIES_PROCESS,
   PaginatedProductCategoriesProcess,
-  PaginatedProductCategoriesQuerySchema,
+  PaginatedProductCategoriesSchema,
   PaginatedProductCategoriesResponseSchema,
   RETRIEVE_PRODUCT_CATEGORY_PROCESS,
   RetrieveProductCategoryProcess,
@@ -28,6 +28,7 @@ import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
   NoContentResponseSchema,
+  NotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
@@ -49,19 +50,10 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
     "/",
     async ({ query }) => {
       const process = getService<PaginatedProductCategoriesProcess>(PAGINATED_PRODUCT_CATEGORIES_PROCESS);
-      const input: Record<string, unknown> = { ...query };
-      if (query.page !== undefined) {
-        const p = typeof query.page === "string" ? parseInt(query.page, 10) : query.page;
-        input.page = Number.isNaN(p) ? 1 : Math.max(1, p);
-      }
-      if (query.limit !== undefined) {
-        const l = typeof query.limit === "string" ? parseInt(query.limit, 10) : query.limit;
-        input.limit = Number.isNaN(l) ? 10 : Math.max(1, Math.min(100, l));
-      }
-      return process.runOperations({ input });
+      return process.runOperations({ input: query as StaticDecode<typeof PaginatedProductCategoriesSchema> });
     },
     {
-      query: PaginatedProductCategoriesQuerySchema,
+      query: PaginatedProductCategoriesSchema,
       response: {
         200: PaginatedProductCategoriesResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -85,6 +77,7 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
       response: {
         200: RetrieveProductCategoryResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {
@@ -150,6 +143,7 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {

@@ -1,27 +1,23 @@
 import {
   InjectDB,
-  InjectLogger,
+  NotFoundError,
   Process,
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  ValidationError,
 } from "@danimai/core";
 import { Kysely } from "kysely";
-import type { Logger } from "@logtape/logtape";
-import { type RetrieveProductAttributeProcessInput, RetrieveProductAttributeSchema } from "./retrieve-product-attribute.schema";
-import type { Database, ProductAttribute } from "../../../db/type";
+import { type RetrieveProductAttributeProcessInput, type RetrieveProductAttributeProcessOutput, RetrieveProductAttributeSchema } from "./retrieve-product-attribute.schema";
+import type { Database } from "../../../db/type";
 
 export const RETRIEVE_PRODUCT_ATTRIBUTE_PROCESS = Symbol("RetrieveProductAttribute");
 
 @Process(RETRIEVE_PRODUCT_ATTRIBUTE_PROCESS)
 export class RetrieveProductAttributeProcess
-  implements ProcessContract<ProductAttribute | undefined> {
+  implements ProcessContract<typeof RetrieveProductAttributeSchema, RetrieveProductAttributeProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
-    @InjectLogger()
-    private readonly logger: Logger
   ) { }
 
   async runOperations(@ProcessContext({
@@ -31,17 +27,13 @@ export class RetrieveProductAttributeProcess
 
     const attribute = await this.db
       .selectFrom("product_attributes")
-      .where("id", "=", input.id)
-      .where("deleted_at", "is", null)
+      .where("product_attributes.id", "=", input.id)
+      .where("product_attributes.deleted_at", "is", null)
       .selectAll()
       .executeTakeFirst();
 
     if (!attribute) {
-      throw new ValidationError("Product attribute not found", [{
-        type: "not_found",
-        message: "Product attribute not found",
-        path: "id",
-      }]);
+      throw new NotFoundError("Product attribute not found");
     }
 
     return attribute;

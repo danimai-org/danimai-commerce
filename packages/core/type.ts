@@ -23,10 +23,10 @@ export interface DanimaiInitialize {
   };
 }
 
-export interface ProcessContextType<TInput extends TObject<any> | TIntersect<any>> {
+export interface ProcessContextType<TInput extends TObject<any>> {
   input: StaticDecode<TInput>;
 };
 
-export interface ProcessContract<TInput extends TObject<any> | TIntersect<any>, TProcessReturn = void> {
+export interface ProcessContract<TInput extends TObject<any>, TProcessReturn = void> {
   runOperations(context: ProcessContextType<TInput>): Promise<TProcessReturn>;
 }

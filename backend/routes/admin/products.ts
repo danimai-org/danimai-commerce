@@ -14,7 +14,6 @@ import {
   UpdateProductsProcess,
   DeleteProductsProcess,
   PaginatedProductsProcess,
-  PaginatedProductsQuerySchema,
   PaginatedProductsResponseSchema,
   CreateProductSchema,
   CreateProductsSchema,
@@ -34,6 +33,7 @@ import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
   NoContentResponseSchema,
+  NotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
@@ -43,13 +43,7 @@ export const productRoutes = new Elysia({ prefix: "/products" })
     "/",
     async ({ query }) => {
       const process = getService<PaginatedProductsProcess>(PAGINATED_PRODUCTS_PROCESS);
-      const cleanedQuery: Record<string, unknown> = Object.fromEntries(
-        Object.entries(query).filter(([_, value]) => value !== null && value !== undefined && value !== "")
-      );
-      if (typeof cleanedQuery.category_ids === "string") {
-        cleanedQuery.category_ids = (cleanedQuery.category_ids as string).split(",").map((s) => s.trim()).filter(Boolean);
-      }
-      return process.runOperations({ input: cleanedQuery as StaticDecode<typeof PaginatedProductsSchema> });
+      return process.runOperations({ input: query as StaticDecode<typeof PaginatedProductsSchema> });
     },
     {
       query: PaginatedProductsSchema,
@@ -76,6 +70,7 @@ export const productRoutes = new Elysia({ prefix: "/products" })
       response: {
         200: RetrieveProductResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {
@@ -89,7 +84,7 @@ export const productRoutes = new Elysia({ prefix: "/products" })
     "/",
     async ({ body: input }) => {
       const process = getService<CreateProductProcess>(CREATE_PRODUCT_PROCESS);
-      return process.runOperations({ input });
+      return process.runOperations({ input: body as StaticDecode<typeof CreateProductSchema> });
     },
     {
       body: CreateProductSchema,
@@ -179,8 +174,9 @@ export const productRoutes = new Elysia({ prefix: "/products" })
     {
       body: DeleteProductsSchema,
       response: {
-        204: NoContentResponseSchema,        
+        204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {

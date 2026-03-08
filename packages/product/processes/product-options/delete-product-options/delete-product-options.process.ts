@@ -1,6 +1,7 @@
 import {
   InjectDB,
   InjectLogger,
+  NotFoundError,
   Process,
   ProcessContext,
   type ProcessContextType,
@@ -9,13 +10,13 @@ import {
 } from "@danimai/core";
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type DeleteProductOptionsProcessInput, DeleteProductOptionsSchema } from "./delete-product-options.schema";
+import { DeleteProductOptionsSchema } from "./delete-product-options.schema";
 import type { Database } from "../../../db/type";
 
 export const DELETE_PRODUCT_OPTIONS_PROCESS = Symbol("DeleteProductOptions");
 
 @Process(DELETE_PRODUCT_OPTIONS_PROCESS)
-export class DeleteProductOptionsProcess implements ProcessContract<void> {
+export class DeleteProductOptionsProcess implements ProcessContract<typeof DeleteProductOptionsSchema, void> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -25,87 +26,60 @@ export class DeleteProductOptionsProcess implements ProcessContract<void> {
 
   async runOperations(@ProcessContext({
     schema: DeleteProductOptionsSchema,
-  }) context: ProcessContextType<typeof DeleteProductOptionsSchema>): Promise<void> {
+  }) context: ProcessContextType<typeof DeleteProductOptionsSchema>) {
     const { input } = context;
 
-    await this.validateOptions(input);
-    await this.deleteVariantOptionRelations(input);
-    await this.deleteOptionValues(input);
-    await this.deleteOptions(input);
-  }
-
-  async validateOptions(input: DeleteProductOptionsProcessInput) {
     const options = await this.db
       .selectFrom("product_options")
-      .where("id", "in", input.option_ids)
-      .where("deleted_at", "is", null)
-      .selectAll()
+      .where("product_options.id", "in", input.option_ids)
+      .select("product_options.id")
       .execute();
 
     if (options.length !== input.option_ids.length) {
       const foundIds = options.map((o) => o.id);
       const missingIds = input.option_ids.filter((id) => !foundIds.includes(id));
-      throw new ValidationError(
-        `Product options not found: ${missingIds.join(", ")}`,
-        [{
-          type: "not_found",
-          message: `Product options not found: ${missingIds.join(", ")}`,
-          path: "option_ids",
-        }]
+      throw new NotFoundError(
+        `Product options not found: ${missingIds.join(", ")}`
       );
     }
 
-    return options;
-  }
+    await this.db.transaction().execute(async (trx) => {
+      const optionValueIds = await trx
+        .selectFrom("product_option_values")
+        .where("option_id", "in", input.option_ids)
+        .select("id")
+        .execute()
+        .then((rows) => rows.map((r) => r.id));
 
-  async deleteVariantOptionRelations(input: DeleteProductOptionsProcessInput) {
-    // Delete variant-option relations for the options being deleted
-    // This allows deletion of options even when they're used by variants
-    const optionValueIds = await this.db
-      .selectFrom("product_option_values")
-      .where("option_id", "in", input.option_ids)
-      .where("deleted_at", "is", null)
-      .select("id")
-      .execute()
-      .then((rows) => rows.map((r) => r.id));
+      if (optionValueIds.length > 0) {
+        this.logger.info("Deleting variant-option relations", {
+          option_ids: input.option_ids,
+          option_value_ids: optionValueIds,
+        });
+        await trx
+          .deleteFrom("product_variant_option_relations")
+          .where("option_value_id", "in", optionValueIds)
+          .execute();
+      }
 
-    if (optionValueIds.length > 0) {
-      this.logger.info("Deleting variant-option relations", {
+      this.logger.info("Deleting product option values", {
         option_ids: input.option_ids,
-        option_value_ids: optionValueIds,
+      });
+      await trx
+        .updateTable("product_option_values")
+        .set({ deleted_at: new Date() })
+        .where("option_id", "in", input.option_ids)
+        .execute();
+
+      this.logger.info("Deleting product options", {
+        option_ids: input.option_ids,
       });
 
-      await this.db
-        .deleteFrom("product_variant_option_relations")
-        .where("option_value_id", "in", optionValueIds)
+      await trx
+        .updateTable("product_options")
+        .set({ deleted_at: new Date() })
+        .where("id", "in", input.option_ids)
         .execute();
-    }
-  }
-
-  async deleteOptionValues(input: DeleteProductOptionsProcessInput) {
-    this.logger.info("Deleting product option values", {
-      option_ids: input.option_ids,
     });
-
-    // Soft delete all option values associated with these options
-    await this.db
-      .updateTable("product_option_values")
-      .set({ deleted_at: new Date().toISOString() })
-      .where("option_id", "in", input.option_ids)
-      .where("deleted_at", "is", null)
-      .execute();
-  }
-
-  async deleteOptions(input: DeleteProductOptionsProcessInput) {
-    this.logger.info("Deleting product options", {
-      option_ids: input.option_ids,
-    });
-
-    await this.db
-      .updateTable("product_options")
-      .set({ deleted_at: new Date().toISOString() })
-      .where("id", "in", input.option_ids)
-      .where("deleted_at", "is", null)
-      .execute();
   }
 }

@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   CREATE_PRODUCT_ATTRIBUTE_GROUPS_PROCESS,
@@ -24,6 +24,7 @@ import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
   NoContentResponseSchema,
+  NotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
@@ -37,9 +38,9 @@ export const productAttributeGroupRoutes = new Elysia({ prefix: "/product-attrib
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedProductAttributeGroupsProcess>(PAGINATED_PRODUCT_ATTRIBUTE_GROUPS_PROCESS);
-      return process.runOperations({ input });
+      return process.runOperations({ input: query as StaticDecode<typeof PaginatedProductAttributeGroupsSchema> });
     },
     {
       query: PaginatedProductAttributeGroupsSchema,
@@ -66,6 +67,7 @@ export const productAttributeGroupRoutes = new Elysia({ prefix: "/product-attrib
       response: {
         200: RetrieveProductAttributeGroupResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {
@@ -131,6 +133,7 @@ export const productAttributeGroupRoutes = new Elysia({ prefix: "/product-attrib
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {

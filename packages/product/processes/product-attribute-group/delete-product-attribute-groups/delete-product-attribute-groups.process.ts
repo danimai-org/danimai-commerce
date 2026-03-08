@@ -1,6 +1,7 @@
 import {
   InjectDB,
   InjectLogger,
+  NotFoundError,
   Process,
   ProcessContext,
   type ProcessContextType,
@@ -15,7 +16,7 @@ import type { Database } from "../../../db/type";
 export const DELETE_PRODUCT_ATTRIBUTE_GROUPS_PROCESS = Symbol("DeleteProductAttributeGroups");
 
 @Process(DELETE_PRODUCT_ATTRIBUTE_GROUPS_PROCESS)
-export class DeleteProductAttributeGroupsProcess implements ProcessContract<void> {
+export class DeleteProductAttributeGroupsProcess implements ProcessContract<typeof DeleteProductAttributeGroupsSchema, void> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -25,7 +26,7 @@ export class DeleteProductAttributeGroupsProcess implements ProcessContract<void
 
   async runOperations(@ProcessContext({
     schema: DeleteProductAttributeGroupsSchema,
-  }) context: ProcessContextType<typeof DeleteProductAttributeGroupsSchema>): Promise<void> {
+  }) context: ProcessContextType<typeof DeleteProductAttributeGroupsSchema>) {
     const { input } = context;
 
     await this.validateGroups(input);
@@ -33,9 +34,18 @@ export class DeleteProductAttributeGroupsProcess implements ProcessContract<void
   }
 
   async validateGroups(input: DeleteProductAttributeGroupsProcessInput) {
+    const uniqueIds = new Set(input.attribute_group_ids);
+    if (uniqueIds.size !== input.attribute_group_ids.length) {
+      throw new ValidationError("Attribute group IDs must be unique", [{
+        type: "not_unique",
+        message: "Attribute group IDs must be unique",
+        path: "attribute_group_ids",
+      }]);
+    }
+    
     const groups = await this.db
       .selectFrom("product_attribute_groups")
-      .where("id", "in", input.attribute_group_ids)
+      .where("product_attribute_groups.id", "in", input.attribute_group_ids)
       .where("deleted_at", "is", null)
       .selectAll()
       .execute();
@@ -43,14 +53,7 @@ export class DeleteProductAttributeGroupsProcess implements ProcessContract<void
     if (groups.length !== input.attribute_group_ids.length) {
       const foundIds = groups.map((g) => g.id);
       const missingIds = input.attribute_group_ids.filter((id) => !foundIds.includes(id));
-      throw new ValidationError(
-        `Product attribute groups not found: ${missingIds.join(", ")}`,
-        [{
-          type: "not_found",
-          message: `Product attribute groups not found: ${missingIds.join(", ")}`,
-          path: "attribute_group_ids",
-        }]
-      );
+      throw new NotFoundError(`Product attribute groups not found: ${missingIds.join(", ")}`);
     }
   }
 
@@ -59,11 +62,16 @@ export class DeleteProductAttributeGroupsProcess implements ProcessContract<void
       attribute_group_ids: input.attribute_group_ids,
     });
 
-    await this.db
-      .updateTable("product_attribute_groups")
-      .set({ deleted_at: new Date().toISOString() })
+    await this.db.transaction().execute(async (trx) => {
+      await trx
+      .deleteFrom("product_attribute_groups")
       .where("id", "in", input.attribute_group_ids)
-      .where("deleted_at", "is", null)
       .execute();
+      
+      await trx
+        .deleteFrom("product_attribute_group_relations")
+        .where("attribute_group_id", "in", input.attribute_group_ids)
+        .execute();
+    });
   }
 }

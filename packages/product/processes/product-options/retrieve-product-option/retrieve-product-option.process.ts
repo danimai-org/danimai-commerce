@@ -1,27 +1,23 @@
 import {
   InjectDB,
-  InjectLogger,
+  NotFoundError,
   Process,
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  ValidationError,
 } from "@danimai/core";
 import { Kysely } from "kysely";
-import type { Logger } from "@logtape/logtape";
-import { type RetrieveProductOptionProcessInput, RetrieveProductOptionSchema } from "./retrieve-product-option.schema";
-import type { Database, ProductOption } from "../../../db/type";
+import { type RetrieveProductOptionProcessOutput, RetrieveProductOptionSchema } from "./retrieve-product-option.schema";
+import type { Database } from "../../../db/type";
 
 export const RETRIEVE_PRODUCT_OPTION_PROCESS = Symbol("RetrieveProductOption");
 
 @Process(RETRIEVE_PRODUCT_OPTION_PROCESS)
 export class RetrieveProductOptionProcess
-  implements ProcessContract<ProductOption | undefined> {
+  implements ProcessContract<typeof RetrieveProductOptionSchema, RetrieveProductOptionProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
-    @InjectLogger()
-    private readonly logger: Logger
   ) { }
 
   async runOperations(@ProcessContext({
@@ -31,17 +27,13 @@ export class RetrieveProductOptionProcess
 
     const option = await this.db
       .selectFrom("product_options")
-      .where("id", "=", input.id)
-      .where("deleted_at", "is", null)
+      .where("product_options.id", "=", input.id)
+      .where("product_options.deleted_at", "is", null)
       .selectAll()
       .executeTakeFirst();
 
     if (!option) {
-      throw new ValidationError("Product option not found", [{
-        type: "not_found",
-        message: "Product option not found",
-        path: "id",
-      }]);
+      throw new NotFoundError("Product option not found");
     }
 
     return option;

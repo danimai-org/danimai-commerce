@@ -1,6 +1,7 @@
 import {
   InjectDB,
   InjectLogger,
+  NotFoundError,
   Process,
   ProcessContext,
   type ProcessContextType,
@@ -15,7 +16,7 @@ import type { Database } from "../../../db/type";
 export const DELETE_PRODUCTS_PROCESS = Symbol("DeleteProducts");
 
 @Process(DELETE_PRODUCTS_PROCESS)
-export class DeleteProductsProcess implements ProcessContract<void> {
+export class DeleteProductsProcess implements ProcessContract<typeof DeleteProductsSchema, void> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -25,7 +26,7 @@ export class DeleteProductsProcess implements ProcessContract<void> {
 
   async runOperations(@ProcessContext({
     schema: DeleteProductsSchema,
-  }) context: ProcessContextType<typeof DeleteProductsSchema>): Promise<void> {
+  }) context: ProcessContextType<typeof DeleteProductsSchema>) {
     const { input } = context;
 
     await this.validateProducts(input);
@@ -35,9 +36,18 @@ export class DeleteProductsProcess implements ProcessContract<void> {
   }
 
   async validateProducts(input: DeleteProductsProcessInput) {
+    const uniqueIds = new Set(input.product_ids);
+
+    if (uniqueIds.size !== input.product_ids.length) {
+      throw new ValidationError("Product IDs must be unique", [{
+        type: "not_unique",
+        message: "Product IDs must be unique",
+        path: "product_ids",
+      }]);
+    }
     const products = await this.db
       .selectFrom("products")
-      .where("id", "in", input.product_ids)
+      .where("products.id", "in", input.product_ids)
       .where("deleted_at", "is", null)
       .selectAll()
       .execute();
@@ -45,14 +55,7 @@ export class DeleteProductsProcess implements ProcessContract<void> {
     if (products.length !== input.product_ids.length) {
       const foundIds = products.map((p) => p.id);
       const missingIds = input.product_ids.filter((id) => !foundIds.includes(id));
-      throw new ValidationError(
-        `Products not found: ${missingIds.join(", ")}`,
-        [{
-          type: "not_found",
-          message: `Products not found: ${missingIds.join(", ")}`,
-          path: "product_ids",
-        }]
-      );
+      throw new NotFoundError(`Products not found: ${missingIds.join(", ")}`);
     }
 
     return products;
@@ -95,11 +98,6 @@ export class DeleteProductsProcess implements ProcessContract<void> {
 
     await trx
       .deleteFrom("product_attribute_values")
-      .where("product_id", "in", productIds)
-      .execute();
-
-    await trx
-      .deleteFrom("product_attribute_group_relations")
       .where("product_id", "in", productIds)
       .execute();
 

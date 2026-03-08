@@ -1,27 +1,23 @@
 import {
   InjectDB,
-  InjectLogger,
+  NotFoundError,
   Process,
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  ValidationError,
 } from "@danimai/core";
 import { Kysely } from "kysely";
-import type { Logger } from "@logtape/logtape";
-import { type RetrieveProductTagProcessInput, RetrieveProductTagSchema } from "./retrieve-product-tag.schema";
-import type { Database, ProductTag } from "../../../db/type";
+import { type RetrieveProductTagProcessOutput, RetrieveProductTagSchema } from "./retrieve-product-tag.schema";
+import type { Database } from "../../../db/type";
 
 export const RETRIEVE_PRODUCT_TAG_PROCESS = Symbol("RetrieveProductTag");
 
 @Process(RETRIEVE_PRODUCT_TAG_PROCESS)
 export class RetrieveProductTagProcess
-  implements ProcessContract<ProductTag | undefined> {
+  implements ProcessContract<typeof RetrieveProductTagSchema, RetrieveProductTagProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
-    @InjectLogger()
-    private readonly logger: Logger
   ) { }
 
   async runOperations(@ProcessContext({
@@ -31,17 +27,13 @@ export class RetrieveProductTagProcess
 
     const tag = await this.db
       .selectFrom("product_tags")
-      .where("id", "=", input.id)
-      .where("deleted_at", "is", null)
+      .where("product_tags.id", "=", input.id)
+      .where("product_tags.deleted_at", "is", null)
       .selectAll()
       .executeTakeFirst();
 
     if (!tag) {
-      throw new ValidationError("Product tag not found", [{
-        type: "not_found",
-        message: "Product tag not found",
-        path: "id",
-      }]);
+      throw new NotFoundError("Product tag not found");
     }
 
     return tag;

@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService, PaginationSchema } from "@danimai/core";
 import {
   CREATE_PRODUCT_TAGS_PROCESS,
@@ -29,6 +29,7 @@ import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
   NoContentResponseSchema,
+  NotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
@@ -41,9 +42,9 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedProductTagsProcess>(PAGINATED_PRODUCT_TAGS_PROCESS);
-      return process.runOperations({ input });
+      return process.runOperations({ input: query as StaticDecode<typeof PaginatedProductTagsSchema> });
     },
     {
       query: PaginatedProductTagsSchema,
@@ -70,6 +71,7 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
       response: {
         200: RetrieveProductTagResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {
@@ -157,6 +159,7 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {

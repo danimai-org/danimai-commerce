@@ -1,6 +1,7 @@
 import {
   InjectDB,
   InjectLogger,
+  NotFoundError,
   Process,
   ProcessContext,
   type ProcessContextType,
@@ -15,7 +16,7 @@ import type { Database } from "../../../db/type";
 export const DELETE_PRODUCT_CATEGORIES_PROCESS = Symbol("DeleteProductCategories");
 
 @Process(DELETE_PRODUCT_CATEGORIES_PROCESS)
-export class DeleteProductCategoriesProcess implements ProcessContract<void> {
+export class DeleteProductCategoriesProcess implements ProcessContract<typeof DeleteProductCategoriesSchema, void> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -25,91 +26,51 @@ export class DeleteProductCategoriesProcess implements ProcessContract<void> {
 
   async runOperations(@ProcessContext({
     schema: DeleteProductCategoriesSchema,
-  }) context: ProcessContextType<typeof DeleteProductCategoriesSchema>): Promise<void> {
+  }) context: ProcessContextType<typeof DeleteProductCategoriesSchema>) {
     const { input } = context;
 
-    await this.validateCategories(input);
-    await this.unassignProductsFromCategories(input);
-    await this.unassignChildCategories(input);
-    await this.checkCategoryUsage(input);
-    await this.deleteCategories(input);
-  }
-
-  async unassignProductsFromCategories(input: DeleteProductCategoriesProcessInput) {
-    await this.db
-      .updateTable("products")
-      .set({ category_id: null })
-      .where("category_id", "in", input.category_ids)
-      .where("deleted_at", "is", null)
-      .execute();
-  }
-
-  async unassignChildCategories(input: DeleteProductCategoriesProcessInput) {
-    await this.db
-      .updateTable("product_categories")
-      .set({ parent_id: null })
-      .where("parent_id", "in", input.category_ids)
-      .where("deleted_at", "is", null)
-      .execute();
-  }
-
-  async validateCategories(input: DeleteProductCategoriesProcessInput) {
-    const categories = await this.db
+     const categories = await this.db
       .selectFrom("product_categories")
-      .where("id", "in", input.category_ids)
+      .where("product_categories.id", "in", input.category_ids)
       .where("deleted_at", "is", null)
-      .selectAll()
+      .select("product_categories.id")
       .execute();
 
     if (categories.length !== input.category_ids.length) {
       const foundIds = categories.map((c) => c.id);
       const missingIds = input.category_ids.filter((id) => !foundIds.includes(id));
-      throw new ValidationError(
-        `Categories not found: ${missingIds.join(", ")}`,
-        [{
-          type: "not_found",
-          message: `Categories not found: ${missingIds.join(", ")}`,
-          path: "category_ids",
-        }]
-      );
+
+      throw new NotFoundError(`Categories not found: ${missingIds.join(", ")}`);
     }
 
-    return categories;
+    await this.deleteCategories(input);
   }
 
-  async checkCategoryUsage(input: DeleteProductCategoriesProcessInput) {
-    const productsWithCategories = await this.db
-      .selectFrom("products")
-      .where("category_id", "in", input.category_ids)
-      .where("deleted_at", "is", null)
-      .select("category_id")
-      .execute();
-
-    if (productsWithCategories.length > 0) {
-      const usedCategoryIds = [
-        ...new Set(productsWithCategories.map((p) => p.category_id)),
-      ].filter((id): id is string => id !== null);
-      throw new ValidationError(
-        `Categories are in use by products: ${usedCategoryIds.join(", ")}`,
-        [{
-          type: "not_found",
-          message: `Categories are in use by products: ${usedCategoryIds.join(", ")}`,
-          path: "category_ids",
-        }]
-      );
-    }
-  }
 
   async deleteCategories(input: DeleteProductCategoriesProcessInput) {
-    this.logger.info("Deleting product categories", {
-      category_ids: input.category_ids,
-    });
+    await this.db.transaction().execute(async (trx) => {
+       await trx
+        .updateTable("products")
+        .where("products.id", "in", input.category_ids)
+        .set({ category_id: null })
+        .execute();
+      
+      // Delete child categories recursively
+       await trx.withRecursive('CategoryHierarchy', (qb) => qb
+      .selectFrom('product_categories')
+      .select('id')
+      .where('id', 'in', input.category_ids)
+      .unionAll((qb) => qb
+        .selectFrom('product_categories as c')
+        .innerJoin('CategoryHierarchy as ch', 'c.parent_id', 'ch.id')
+        .select('c.id')
+      )
+    )
+    .deleteFrom('product_categories')
+    .where('id', 'in', (qb) => qb.selectFrom('CategoryHierarchy').select('id'))
+    .execute();
 
-    await this.db
-      .updateTable("product_categories")
-      .set({ deleted_at: new Date().toISOString() })
-      .where("id", "in", input.category_ids)
-      .where("deleted_at", "is", null)
-      .execute();
+    });
   }
+
 }

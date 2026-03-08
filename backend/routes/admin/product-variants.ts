@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   CREATE_PRODUCT_VARIANTS_PROCESS,
@@ -10,7 +10,7 @@ import {
   UpdateProductVariantsProcess,
   DeleteProductVariantsProcess,
   PaginatedProductVariantsProcess,
-  PaginatedProductVariantsQuerySchema,
+  PaginatedProductVariantsSchema,
   PaginatedProductVariantsResponseSchema,
   RETRIEVE_PRODUCT_VARIANT_PROCESS,
   RetrieveProductVariantProcess,
@@ -25,6 +25,7 @@ import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
   NoContentResponseSchema,
+  NotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
@@ -43,12 +44,12 @@ export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedProductVariantsProcess>(PAGINATED_PRODUCT_VARIANTS_PROCESS);
-      return process.runOperations({ input });
+      return process.runOperations({ input: query as StaticDecode<typeof PaginatedProductVariantsSchema> });
     },
     {
-      query: PaginatedProductVariantsQuerySchema,
+      query: PaginatedProductVariantsSchema,
       response: {
         200: PaginatedProductVariantsResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -72,6 +73,7 @@ export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
       response: {
         200: RetrieveProductVariantResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {
@@ -137,6 +139,7 @@ export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {
