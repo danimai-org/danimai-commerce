@@ -20,28 +20,22 @@
 	import { listCategories, deleteCategories } from '$lib/product-categories/api.js';
 	import type { ProductCategory } from '$lib/product-categories/types.js';
 	import type { CategoriesListResponse } from '$lib/product-categories/types.js';
+	import { client } from '$lib/client';
 
 	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
-	const paginateState = createPagination<CategoriesListResponse>(
-		async (): Promise<CategoriesListResponse> => {
-			const q = paginationQuery as Record<string, unknown>;
-			const params = {
-				page: q?.page != null ? Number(q.page) : 1,
-				limit: q?.limit != null ? Number(q.limit) : 10,
-				sorting_field: (q?.sorting_field as string) ?? 'created_at',
-				sorting_direction: (q?.sorting_direction as 'asc' | 'desc') ?? 'desc'
-			};
-			return listCategories(params);
+	const paginateState = $state(createPagination(
+		async () => {
+			return client['product-categories'].get({ query: paginationQuery });
 		},
 		['product-categories']
-	);
+	));
 
 	$effect(() => {
 		page.url.searchParams.toString();
-		paginateState.refetch();
+		paginateState?.refetch();
 	});
 
 	function goToPage(pageNum: number) {
@@ -50,7 +44,7 @@
 		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	const queryData = $derived(paginateState.query.data as CategoriesListResponse | undefined);
+	const queryData = $derived(paginateState?.query.data as CategoriesListResponse | undefined);
 	const rawRows = $derived(queryData?.data?.rows ?? []);
 	function getHandle(category: ProductCategory): string {
 		const h = category.handle;

@@ -21,6 +21,7 @@
 	import { listCollections, deleteCollections } from '$lib/product-collection/api.js';
 	import type { ProductCollection } from '$lib/product-collection/types.js';
 	import type { CollectionsListResponse } from '$lib/product-collection/types.js';
+	import { client } from '$lib/client';
 
 	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
@@ -40,21 +41,9 @@
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
-	const paginateState = createPagination<CollectionsListResponse>(
-		async (): Promise<CollectionsListResponse> => {
-			const q = paginationQuery as Record<string, unknown>;
-			const params = {
-				page: q?.page != null ? Number(q.page) : 1,
-				limit: q?.limit != null ? Number(q.limit) : 10,
-				sorting_field: (q?.sorting_field as string) ?? 'created_at',
-				sorting_direction: (q?.sorting_direction as 'asc' | 'desc') ?? 'desc',
-				search: searchQuery.trim() || undefined,
-				sales_channel_ids:
-					selectedSalesChannelIds.size > 0 ? [...selectedSalesChannelIds] : undefined,
-				collection_type:
-					selectedCollectionTypes.size > 0 ? [...selectedCollectionTypes] : undefined
-			};
-			return listCollections(params);
+	const paginateState = createPagination(
+		async () => {
+			return client['collections'].get({ query: paginationQuery });
 		},
 		['collections']
 	);
@@ -79,56 +68,7 @@
 		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	function toggleFilterType(id: FilterKind) {
-		activeFilterTypes = new Set(activeFilterTypes);
-		if (activeFilterTypes.has(id)) activeFilterTypes.delete(id);
-		else activeFilterTypes.add(id);
-	}
-
-	function toggleSalesChannel(id: string) {
-		selectedSalesChannelIds = new Set(selectedSalesChannelIds);
-		if (selectedSalesChannelIds.has(id)) selectedSalesChannelIds.delete(id);
-		else selectedSalesChannelIds.add(id);
-		syncPageOne();
-	}
-
-	function clearSalesChannelFilter() {
-		selectedSalesChannelIds = new Set();
-		syncPageOne();
-	}
-
-	function toggleCollectionType(t: string) {
-		selectedCollectionTypes = new Set(selectedCollectionTypes);
-		if (selectedCollectionTypes.has(t)) selectedCollectionTypes.delete(t);
-		else selectedCollectionTypes.add(t);
-		syncPageOne();
-	}
-
-	function clearCollectionTypeFilter() {
-		selectedCollectionTypes = new Set();
-		syncPageOne();
-	}
-
-	function clearFilters() {
-		activeFilterTypes = new Set();
-		searchQuery = '';
-		selectedSalesChannelIds = new Set();
-		selectedCollectionTypes = new Set();
-		syncPageOne();
-	}
-
-	function removeFilterChip() {
-		searchQuery = '';
-		syncPageOne();
-	}
-
-	const hasActiveFilters = $derived(
-		searchQuery.trim() !== '' ||
-			activeFilterTypes.size > 0 ||
-			selectedSalesChannelIds.size > 0 ||
-			selectedCollectionTypes.size > 0
-	);
-
+	
 	let prevSearch = $state('');
 	$effect(() => {
 		if (searchQuery !== prevSearch) {
@@ -141,24 +81,18 @@
 	$effect(() => {
 		if (salesChannelsLoaded) return;
 		salesChannelsLoaded = true;
-		fetch(`${API_BASE}/sales-channels?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
-			.then((j) => {
-				const list = j.data ?? [];
-				salesChannelsList = list.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }));
-			})
-			.catch(() => {
-				salesChannelsList = [];
-			});
+		client['sales-channels'].get({ query: { limit: 100 } }).then((data: SalesChannelListResponse) => {
+			salesChannelsList = data.data?.rows.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })) ?? [];
+		});
 	});
 
-	const queryData = $derived(paginateState.query.data as CollectionsListResponse | undefined);
-	const rawRows = $derived(queryData?.data?.rows ?? []);
+	const queryData = $derived(paginateState.query.data as ProductCollectionListResponse | undefined);
+	const rawRows = $derived((queryData?.data?.rows ?? []) as ProductCollection[]);
 	function getHandle(collection: ProductCollection): string {
 		return collection.handle.startsWith('/') ? collection.handle : `/${collection.handle}`;
 	}
 	const rows = $derived(rawRows.map((c) => ({ ...c, handle_display: getHandle(c) })));
-	const pagination = $derived(queryData?.data?.pagination ?? null);
+	const pagination = $derived(queryData?.data?.pagination ?? queryData?.pagination ?? null);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
 
@@ -189,13 +123,13 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => openEditSheet(item as ProductCollection)
+					onClick: (item) => openEditSheet(item as Parameters<typeof openEditSheet>[0])
 				},
 				{
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => openDeleteConfirm(item as unknown as CollectionsListResponse)
+					onClick: (item) => openDeleteConfirm(item as Parameters<typeof openDeleteConfirm>[0])
 				}
 			]
 		}

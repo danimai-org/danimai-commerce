@@ -3,28 +3,24 @@ import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   CREATE_PRODUCT_PROCESS,
-  CREATE_PRODUCTS_PROCESS,
+ 
   UPDATE_PRODUCT_PROCESS,
-  UPDATE_PRODUCTS_PROCESS,
+
   DELETE_PRODUCTS_PROCESS,
   PAGINATED_PRODUCTS_PROCESS,
   CreateProductProcess,
-  CreateProductsProcess,
   UpdateProductProcess,
-  UpdateProductsProcess,
   DeleteProductsProcess,
   PaginatedProductsProcess,
   PaginatedProductsResponseSchema,
   CreateProductSchema,
-  CreateProductsSchema,
+  
   CreateProductResponseSchema,
-  CreateProductsResponseSchema,
   RETRIEVE_PRODUCT_PROCESS,
   RetrieveProductProcess,
   RetrieveProductResponseSchema,
   UpdateProductSchema,
-  UpdateProductsSchema,
-  UpdateProductsResponseSchema,
+
   UpdateProductResponseSchema,
   DeleteProductsSchema,
   PaginatedProductsSchema,
@@ -82,9 +78,9 @@ export const productRoutes = new Elysia({ prefix: "/products" })
   )
   .post(
     "/",
-    async ({ body: input }) => {
+    async ({ body: input }: { body: StaticDecode<typeof CreateProductSchema> }) => {
       const process = getService<CreateProductProcess>(CREATE_PRODUCT_PROCESS);
-      return process.runOperations({ input: body as StaticDecode<typeof CreateProductSchema> });
+      return process.runOperations({ input: input as StaticDecode<typeof CreateProductSchema> });
     },
     {
       body: CreateProductSchema,
@@ -102,14 +98,14 @@ export const productRoutes = new Elysia({ prefix: "/products" })
   )
   .post(
     "/batch",
-    async ({ body: input }) => {
-      const process = getService<CreateProductsProcess>(CREATE_PRODUCTS_PROCESS);
+    async ({ body: input }: { body: StaticDecode<typeof CreateProductSchema> }) => {
+      const process = getService<CreateProductProcess>(CREATE_PRODUCT_PROCESS);
       return process.runOperations({ input });
     },
     {
-      body: CreateProductsSchema,
+      body: CreateProductSchema,
       response: {
-        200: CreateProductsResponseSchema,
+        200: CreateProductResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -122,7 +118,7 @@ export const productRoutes = new Elysia({ prefix: "/products" })
   )
   .put(
     "/:id",
-    async ({ params, body }) => {
+    async ({ params, body }: { params: { id: string }, body: StaticDecode<typeof UpdateProductSchema> }) => {
       const process = getService<UpdateProductProcess>(UPDATE_PRODUCT_PROCESS);
       return process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
@@ -145,14 +141,14 @@ export const productRoutes = new Elysia({ prefix: "/products" })
   )
   .put(
     "/batch",
-    async ({ body: input }) => {
-      const process = getService<UpdateProductsProcess>(UPDATE_PRODUCTS_PROCESS);
+    async ({ body: input }: { body: StaticDecode<typeof UpdateProductSchema> }) => {
+      const process = getService<UpdateProductProcess>(UPDATE_PRODUCT_PROCESS);
       return process.runOperations({ input });
     },
     {
-      body: UpdateProductsSchema,
+      body: UpdateProductSchema,
       response: {
-        200: UpdateProductsResponseSchema,
+        200: UpdateProductResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },

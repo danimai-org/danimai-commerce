@@ -11,13 +11,13 @@ import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import { randomUUID } from "crypto";
 import { type UpdateProductProcessInput, UpdateProductSchema } from "./update-product.schema";
-import type { Database, Product } from "../../../db/type";
+import type { Database, Product, ProductStatusEnum } from "../../../db/type";
 
 export const UPDATE_PRODUCT_PROCESS = Symbol("UpdateProduct");
 
 @Process(UPDATE_PRODUCT_PROCESS)
 export class UpdateProductProcess
-  implements ProcessContract<Product | undefined> {
+  implements ProcessContract<typeof UpdateProductSchema, Product | undefined> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -142,7 +142,7 @@ export class UpdateProductProcess
       description?: string | null;
       is_giftcard?: boolean;
       discountable?: boolean;
-      status?: "draft" | "proposed" | "published" | "rejected";
+      status?: ProductStatusEnum;
       thumbnail?: string | null;
       external_id?: string | null;
       category_id?: string | null;
@@ -175,7 +175,7 @@ export class UpdateProductProcess
     }
 
     if (input.status !== undefined) {
-      updateData.status = input.status;
+      updateData.status = input.status as ProductStatusEnum;
     }
 
     if (input.thumbnail !== undefined) {
@@ -252,10 +252,10 @@ export class UpdateProductProcess
       }]);
     }
     const groupAttrPairs = await this.db
-      .selectFrom("product_attribute_group_attributes")
-      .select(["attribute_group_id", "attribute_id"])
+      .selectFrom("product_attribute_group_relations")
+      .select(["attribute_group_id", "product_attribute_id"])
       .execute();
-    const validPairs = new Set(groupAttrPairs.map((r) => `${r.attribute_group_id}:${r.attribute_id}`));
+    const validPairs = new Set(groupAttrPairs.map((r) => `${r.attribute_group_id}:${r.product_attribute_id}`));
     for (const a of attributes) {
       if (!validPairs.has(`${a.attribute_group_id}:${a.attribute_id}`)) {
         throw new ValidationError("Attribute not assigned to group", [{
@@ -267,7 +267,7 @@ export class UpdateProductProcess
     }
     const productGroupIds = await this.db
       .selectFrom("product_attribute_group_relations")
-      .where("product_id", "=", productId)
+      .where("product_attribute_id", "=", productId)
       .select("attribute_group_id")
       .execute()
       .then((rows) => new Set(rows.map((r) => r.attribute_group_id)));
@@ -288,7 +288,7 @@ export class UpdateProductProcess
   ) {
     await this.db
       .deleteFrom("product_attribute_group_relations")
-      .where("product_id", "=", productId)
+      .where("product_attribute_id", "=", productId)
       .execute();
 
     if (groups.length === 0) return;
@@ -298,7 +298,7 @@ export class UpdateProductProcess
       .values(
         groups.map((g, i) => ({
           id: randomUUID(),
-          product_id: productId,
+          product_attribute_id: productId,
           attribute_group_id: g.attribute_group_id,
           required: g.required ?? false,
           rank: g.rank ?? i,
@@ -313,7 +313,7 @@ export class UpdateProductProcess
   ) {
     await this.db
       .deleteFrom("product_attribute_values")
-      .where("product_id", "=", productId)
+      .where("product_attribute_id", "=", productId)
       .execute();
 
     if (attributes.length === 0) return;
@@ -322,7 +322,7 @@ export class UpdateProductProcess
       id: randomUUID(),
       attribute_group_id: a.attribute_group_id,
       attribute_id: a.attribute_id,
-      product_id: productId,
+      product_attribute_id: productId,
       value: a.value,
       metadata: null,
       deleted_at: null,

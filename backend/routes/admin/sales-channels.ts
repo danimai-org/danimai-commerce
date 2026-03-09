@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   CREATE_SALES_CHANNELS_PROCESS,
@@ -46,7 +46,7 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
       const process = getService<PaginatedSalesChannelsProcess>(
         PAGINATED_SALES_CHANNELS_PROCESS
       );
-      return process.runOperations({ input: query });
+      return process.runOperations({ input: query as StaticDecode<typeof PaginatedSalesChannelsSchema> & { page?: number; limit?: number } });
     },
     {
       query: PaginatedSalesChannelsSchema,
@@ -64,7 +64,7 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
   )
   .post(
     "/",
-    async ({ body }) => {
+    async ({ body }: { body: StaticDecode<typeof CreateSalesChannelsSchema> }) => {
       const process = getService<CreateSalesChannelsProcess>(CREATE_SALES_CHANNELS_PROCESS);
       return process.runOperations({ input: body });
     },

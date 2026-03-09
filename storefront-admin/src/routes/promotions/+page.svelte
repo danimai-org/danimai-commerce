@@ -53,34 +53,17 @@
 
 	const paginateState = createPagination(
 		async () => {
-			const allPromotions = loadPromotions();
-			const campaignsList = loadCampaigns();
+			const all = loadPromotions();
 			const q = searchQuery.trim().toLowerCase();
-			const filteredList = q
-				? allPromotions.filter((p) => {
-						const codeMatch = p.code?.toLowerCase().includes(q) ?? false;
-						const methodMatch = p.method.toLowerCase().includes(q);
-						const campaign = p.campaign_id
-							? campaignsList.find((c) => c.id === p.campaign_id)
-							: null;
-						const campaignMatch = campaign
-							? campaign.name.toLowerCase().includes(q)
-							: false;
-						return codeMatch || methodMatch || campaignMatch;
-					})
-				: allPromotions;
+			const filtered = q
+				? all.filter((p) => p.code.toLowerCase().includes(q))
+				: all;
 			const pageNum = Number((paginationQuery as Record<string, string>)?.['page']) || 1;
 			const limitNum = Number((paginationQuery as Record<string, string>)?.['limit']) || 10;
-			const total = filteredList.length;
+			const total = filtered.length;
 			const totalPages = Math.max(1, Math.ceil(total / limitNum));
 			const startIdx = (pageNum - 1) * limitNum;
-			const slice = filteredList.slice(startIdx, startIdx + limitNum);
-			const rows = slice.map((p) => {
-				const campaign = p.campaign_id
-					? campaignsList.find((c) => c.id === p.campaign_id)
-					: null;
-				return { ...p, campaign_name: campaign?.name ?? '—' };
-			});
+			const rows = filtered.slice(startIdx, startIdx + limitNum);
 			return {
 				rows,
 				pagination: {

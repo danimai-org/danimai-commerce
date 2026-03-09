@@ -16,27 +16,21 @@
 	import { cn } from '$lib/utils.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
-	import { listTags, deleteTags, createTag, updateTag } from '$lib/product-tags/api.js';
+	import { deleteTags, createTag, updateTag } from '$lib/product-tags/api.js';
 	import type { TagsResponse, ProductTag } from '$lib/product-tags/types.js';
+	import { client } from '$lib/client';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
-	const paginateState = createPagination<TagsResponse>(
-		async (): Promise<TagsResponse> => {
-			const q = paginationQuery as Record<string, unknown>;
-			const params = {
-				page: q?.page != null ? Number(q.page) : 1,
-				limit: q?.limit != null ? Number(q.limit) : 10,
-				sorting_field: (q?.sorting_field as string) ?? 'created_at',
-				sorting_direction: (q?.sorting_direction as 'asc' | 'desc') ?? 'desc'
-			};
-			return listTags(params);
+	const paginateState = $state(createPagination(
+		async () => {
+			return client['product-tags'].get({ query: paginationQuery });
 		},
 		['product-tags']
-	);
+	));
 
 	$effect(() => {
 		page.url.searchParams.toString();
-		paginateState.refetch();
+		paginateState?.refetch();
 	});
 
 	function goToPage(pageNum: number) {
@@ -45,11 +39,11 @@
 		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	const queryData = $derived(paginateState.query.data as TagsResponse | undefined);
+	const queryData = $derived(paginateState?.query.data as TagsResponse | undefined);
 	const rows = $derived((queryData?.data?.rows ?? []) as Record<string, unknown>[]);
 	const pagination = $derived((queryData?.data?.pagination ?? null) as PaginationMeta | null);
-	const start = $derived(paginateState.start);
-	const end = $derived(paginateState.end);
+	const start = $derived(paginateState?.start);
+	const end = $derived(paginateState?.end);
 
 	function confirmDeleteTag() {
 		paginateState.confirmDelete((item) =>
@@ -66,25 +60,10 @@
 		},
 		{ label: 'Created', key: 'created_at', type: 'date' },
 		{ label: 'Updated', key: 'updated_at', type: 'date' },
-		{
-			label: 'Actions',
-			key: 'actions',
-			type: 'actions',
-			actions: [
-				{
-					label: 'Edit',
-					key: 'edit',
-					type: 'button',
-					onClick: (item) => openEdit(item as unknown as ProductTag)
-				},
-				{
-					label: 'Delete',
-					key: 'delete',
-					type: 'button',
-					onClick: (item) => paginateState.openDeleteConfirm(item as unknown as TagsResponse)
-				}
-			]
-		}
+		{ label: 'Actions', key: 'actions', type: 'actions', actions: [	
+			{ label: 'Edit', key: 'edit', type: 'button', onClick: (item) => openEdit(item as unknown as ProductTag) },
+			{ label: 'Delete', key: 'delete', type: 'button', onClick: (item) => paginateState.openDeleteConfirm((item as unknown as ProductTag)) }
+		] },
 	];
 
 	// Create sheet (local state)

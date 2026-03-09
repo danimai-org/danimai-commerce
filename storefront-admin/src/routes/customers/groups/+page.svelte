@@ -22,11 +22,15 @@
 		type ListCustomerGroupsResponse
 	} from '$lib/customer-groups/api.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import { client } from '$lib/client';
+	import type { CustomerGroup } from '$lib/customer-groups/api.js';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
 	const paginateState = createPagination(
-		async () => listCustomerGroups(paginationQuery as ListCustomerGroupsParams),
+		async () => {
+			return client['customer-groups'].get({ query: paginationQuery });
+		},
 		['customer-groups']
 	);
 
@@ -37,7 +41,7 @@
 	}
 
 	const queryData = $derived(paginateState.query.data as ListCustomerGroupsResponse | undefined);
-	const rows = $derived(queryData?.data?.rows ?? []);
+	const rows = $derived((queryData?.data?.rows ?? []) as CustomerGroup[]);
 	const pagination = $derived(queryData?.data?.pagination ?? queryData?.pagination ?? null);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);

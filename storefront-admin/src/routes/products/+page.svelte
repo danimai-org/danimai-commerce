@@ -19,20 +19,7 @@
 	import { SvelteURLSearchParams,  } from 'svelte/reactivity';
 	import {untrack} from "svelte"
 
-	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
-
-	async function deleteProducts(ids: string[]): Promise<void> {
-		const res = await fetch(`${API_BASE}/products`, {
-			method: 'DELETE',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ product_ids: ids })
-		});
-		if (!res.ok) {
-			const text = await res.text();
-			throw new Error(text || `HTTP ${res.status}`);
-		}
-	}
-
+	
 	let createOpen = $state(false);
 
 	const paginationQuery = createPaginationQuery(page.url.searchParams);
@@ -44,6 +31,11 @@
 		['products'],
 		paginationQuery
 	);
+
+
+	async function deleteProducts(ids: string[]): Promise<void> {
+		const res = await client.products.delete({  product_ids: ids });
+	}
 
 	const queryData = $derived(paginateState.query.data as ProductsListResponse | undefined);
 	const rawRows = $derived(queryData?.data?.rows ?? []);
@@ -59,11 +51,7 @@
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
 	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
-	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
-	const confirmDelete = $derived(paginateState.confirmDelete);
 	const deleteItem = $derived(paginateState.deleteItem);
-	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
-	const deleteError = $derived(paginateState.deleteError);
 	const refetch = $derived(paginateState.refetch);
 	const searchText = $derived(paginateState.searchText);
 
@@ -182,14 +170,14 @@
 		(deleteItem as unknown as Product | null)?.handle ??
 		(deleteItem as unknown as Product | null)?.id ??
 		''}
-	onConfirm={() => confirmDelete((p) => deleteProducts([(p as unknown as Product).id]))}
-	onCancel={closeDeleteConfirm}
-	submitting={deleteSubmitting}
+	onConfirm={() => paginateState.confirmDelete((p) => deleteProducts([(p as unknown as Product).id]))}
+	onCancel={paginateState.closeDeleteConfirm}
+	submitting={paginateState.deleteSubmitting}
 />
-{#if deleteError}
+{#if paginateState.deleteError}
 	<div
 		class="mt-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 	>
-		{deleteError}
+		{paginateState.deleteError}
 	</div>
 {/if}

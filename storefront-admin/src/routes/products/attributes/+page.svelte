@@ -16,15 +16,14 @@
 	import { cn } from '$lib/utils.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import {
-		listAttributes,
 		deleteAttributes,
 		createAttribute,
 		updateAttribute
 	} from '$lib/product-attributes/api.js';
 	import type { AttributesResponse } from '$lib/product-attributes/types.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
+	import { client } from '$lib/client';
 
-	const paginationQuery = $derived.by(() => createPaginationQuery($page.url.searchParams));
 
 	const ATTRIBUTE_TYPES = [
 		{ value: 'string', label: 'String' },
@@ -33,22 +32,19 @@
 		{ value: 'date', label: 'Date' }
 	] as const;
 
-	type ProductAttribute = {
-		id: string;
-		title: string;
-		type: string;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
+	
+
+	$effect(() => {
+		$page.url.searchParams.toString();
+		paginateState?.refetch();
+	});
 
 	function openCreate() {
 		paginateState.openCreate();
 		formTitle = '';
 		formType = 'string';
 	}
-	function openEdit(attr: ProductAttribute) {
+	function openEdit(attr: AttributesResponse['data']['rows'][number]) {
 		(paginateState.openEdit as unknown as (item: ProductAttribute) => void)(attr);
 		formTitle = attr.title;
 		formType = attr.type;
@@ -67,7 +63,7 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (row) => openEdit(row as ProductAttribute)
+					onClick: (row) => openEdit(row as ProductAttribute | null)
 				},
 				{
 					label: 'Delete',
@@ -85,23 +81,18 @@
 	let formTitle = $state('');
 	let formType = $state('string');
 
-	const paginateState = createPagination<AttributesResponse>(
-		async (): Promise<AttributesResponse> => {
-			const q = paginationQuery as Record<string, unknown>;
-			const params = {
-				page: q?.page != null ? Number(q.page) : 1,
-				limit: q?.limit != null ? Number(q.limit) : 10,
-				sorting_field: (q?.sorting_field as string) ?? 'created_at',
-				sorting_direction: (q?.sorting_direction as 'asc' | 'desc') ?? 'desc'
-			};
-			return listAttributes(params);
+	const paginationQuery = $derived.by(() => createPaginationQuery($page.url.searchParams));
+	const paginateState = $state(createPagination(
+		async () => {
+			
+			return client['product-attributes'].get({ query: paginationQuery });
 		},
 		['product-attributes']
-	);
+	));
 
 	$effect(() => {
 		$page.url.searchParams.toString();
-		paginateState.refetch();
+		paginateState?.refetch();
 	});
 
 	function goToPage(pageNum: number) {

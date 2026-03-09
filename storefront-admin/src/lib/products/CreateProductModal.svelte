@@ -3,6 +3,13 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import {
+		PaginationTable,
+		TableHead,
+		TablePagination,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
+	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import Info from '@lucide/svelte/icons/info';
 	import Check from '@lucide/svelte/icons/check';
 	import Upload from '@lucide/svelte/icons/upload-cloud';
@@ -85,6 +92,52 @@
 	let createOptions = $state<ProductOption[]>([]);
 	let createVariants = $state<ProductVariantForm[]>([]);
 
+	let variantSearch = $state('');
+	let variantPage = $state(1);
+	let variantLimit = $state(10);
+
+	const filteredVariants = $derived(
+		variantSearch.trim()
+			? createVariants.filter((v) => {
+					const q = variantSearch.toLowerCase();
+					const title = (v.title ?? '').toLowerCase();
+					const optionsStr = Object.values(v.options).join(' ').toLowerCase();
+					const sku = (v.sku ?? '').toLowerCase();
+					return title.includes(q) || optionsStr.includes(q) || sku.includes(q);
+				})
+			: createVariants
+	);
+	const displayedVariants = $derived(
+		filteredVariants.slice((variantPage - 1) * variantLimit, variantPage * variantLimit)
+	);
+	const variantTotal = $derived(filteredVariants.length);
+	const variantPagination = $derived({
+		total: variantTotal,
+		page: variantPage,
+		limit: variantLimit,
+		total_pages: Math.max(1, Math.ceil(variantTotal / variantLimit)),
+		has_next_page: variantPage * variantLimit < variantTotal,
+		has_previous_page: variantPage > 1
+	} as PaginationMeta);
+	const variantStart = $derived(
+		variantTotal === 0 ? 0 : (variantPage - 1) * variantLimit + 1
+	);
+	const variantEnd = $derived(Math.min(variantPage * variantLimit, variantTotal));
+
+	const variantTableColumns: TableColumn[] = [
+		{ label: 'Option', key: 'option' },
+		{ label: 'Title', key: 'title' },
+		{ label: 'SKU', key: 'sku' },
+		{ label: 'Available count', key: 'availableCount' },
+		{ label: 'Allow backorder', key: 'allow_backorder' },
+		{ label: 'Price EUR', key: 'priceAmount' }
+	];
+
+	$effect(() => {
+		const totalPages = Math.max(1, Math.ceil(variantTotal / variantLimit));
+		if (variantPage > totalPages) variantPage = totalPages;
+	});
+
 	let collectionsList = $state<{ id: string; title: string; handle: string }[]>([]);
 	let categoriesList = $state<{ id: string; value: string; handle: string }[]>([]);
 	let tagsList = $state<{ id: string; value: string }[]>([]);
@@ -111,6 +164,7 @@
 					}
 				: v;
 		});
+		variantPage = 1;
 	}
 
 	function addAttributeEntry() {
@@ -156,6 +210,8 @@
 		createMediaUrl = '';
 		createMediaFile = null;
 		createError = null;
+		variantSearch = '';
+		variantPage = 1;
 		syncVariantsFromOptions();
 		fetch(`${API_BASE}/collections?limit=100`)
 			.then((r) => (r.ok ? r.json() : { data: [] }))
@@ -190,7 +246,7 @@
 				attributesList = [];
 			});
 		fetch(`${API_BASE}/product-attribute-groups?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
+			.then((r) => (r.ok ? r.json() : { rows: [] }))
 			.then((j) => {
 				attributeGroupsList = j.data ?? [];
 			})
@@ -1084,74 +1140,79 @@
 							<p class="text-xs text-muted-foreground">
 								Edit title, SKU, inventory, and price per variant.
 							</p>
-							<div class="mt-2 overflow-auto rounded-lg border">
-								<table class="w-full text-sm">
-									<thead class="border-b bg-muted/50">
-										<tr>
-											<th class="px-3 py-2 text-left font-medium">Option</th>
-											<th class="px-3 py-2 text-left font-medium">Title</th>
-											<th class="px-3 py-2 text-left font-medium">SKU</th>
-											<th class="px-3 py-2 text-left font-medium">Available count</th>
-											<th class="px-3 py-2 text-left font-medium">Allow backorder</th>
-											<th class="px-3 py-2 text-left font-medium">Price EUR</th>
-										</tr>
-									</thead>
-									<tbody>
-										{#each createVariants as v, i (i)}
-											<tr class="border-b last:border-0">
-												<td class="px-3 py-2 text-muted-foreground">
-													{Object.values(v.options).join(' / ')}
-												</td>
-												<td class="px-3 py-2">
-													<Input bind:value={v.title} class="h-8 w-full min-w-[100px]" />
-												</td>
-												<td class="px-3 py-2">
-													<Input bind:value={v.sku} placeholder="SKU" class="h-8 w-24" />
-												</td>
-												<td class="px-3 py-2">
-													<Input
-														type="number"
-														bind:value={v.availableCount}
-														placeholder="0"
-														min="0"
-														class={cn(
-															'h-8 w-20',
-															String(v.availableCount || '').trim() &&
-																!v.sku.trim() &&
-																'border-destructive'
-														)}
-														disabled={!v.sku.trim()}
-													/>
-													{#if String(v.availableCount || '').trim() && !v.sku.trim()}
-														<p class="mt-0.5 text-xs text-destructive">SKU required</p>
-													{/if}
-												</td>
-												<td class="px-3 py-2">
-													<input
-														type="checkbox"
-														bind:checked={v.allow_backorder}
-														class="rounded border-input"
-													/>
-												</td>
-												<td class="px-3 py-2">
-													<div class="relative w-20">
-														<span
-															class="absolute top-1/2 left-2 -translate-y-1/2 text-xs text-muted-foreground"
-															>€</span
-														>
+							<PaginationTable
+								bind:searchQuery={variantSearch}
+								searchPlaceholder="Search variants"
+								showFilter={false}
+								showSort={false}
+								showToolbar={true}
+							>
+								<div class="mt-2 min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+									<table class="w-full text-sm">
+										<TableHead columns={variantTableColumns} />
+										<tbody>
+											{#each displayedVariants as v (v.variant_rank)}
+												<tr class="border-b last:border-0">
+													<td class="px-3 py-2 text-muted-foreground">
+														{Object.values(v.options).join(' / ')}
+													</td>
+													<td class="px-3 py-2">
+														<Input bind:value={v.title} class="h-8 w-full min-w-[100px]" />
+													</td>
+													<td class="px-3 py-2">
+														<Input bind:value={v.sku} placeholder="SKU" class="h-8 w-24" />
+													</td>
+													<td class="px-3 py-2">
 														<Input
-															bind:value={v.priceAmount}
-															type="text"
+															type="number"
+															bind:value={v.availableCount}
 															placeholder="0"
-															class="h-8 pl-6"
+															min="0"
+															class={cn(
+																'h-8 w-20',
+																String(v.availableCount || '').trim() &&
+																	!v.sku.trim() &&
+																	'border-destructive'
+															)}
+															disabled={!v.sku.trim()}
 														/>
-													</div>
-												</td>
-											</tr>
-										{/each}
-									</tbody>
-								</table>
-							</div>
+														{#if String(v.availableCount || '').trim() && !v.sku.trim()}
+															<p class="mt-0.5 text-xs text-destructive">SKU required</p>
+														{/if}
+													</td>
+													<td class="px-3 py-2">
+														<input
+															type="checkbox"
+															bind:checked={v.allow_backorder}
+															class="rounded border-input"
+														/>
+													</td>
+													<td class="px-3 py-2">
+														<div class="relative w-20">
+															<span
+																class="absolute top-1/2 left-2 -translate-y-1/2 text-xs text-muted-foreground"
+																>€</span
+															>
+															<Input
+																bind:value={v.priceAmount}
+																type="text"
+																placeholder="0"
+																class="h-8 pl-6"
+															/>
+														</div>
+													</td>
+												</tr>
+											{/each}
+										</tbody>
+									</table>
+								</div>
+								<TablePagination
+									pagination={variantPagination}
+									start={variantStart}
+									end={variantEnd}
+									onPageChange={(p) => (variantPage = p)}
+								/>
+							</PaginationTable>
 						</div>
 					{:else}
 						<p class="mt-2 text-sm text-muted-foreground">

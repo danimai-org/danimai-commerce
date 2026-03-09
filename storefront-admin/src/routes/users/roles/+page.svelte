@@ -4,8 +4,6 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { PaginationTable, TableHead, TableBody, TablePagination, DeleteConfirmationModal, RoleFormSheet, type TableColumn } from '$lib/components/organs/index.js';
 	import ShieldCheck from '@lucide/svelte/icons/shield-check';
-	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
-	import { DropdownMenu } from 'bits-ui';
 	import { client } from '$lib/client.js';
 	import { createPagination, createPaginationQuery } from '$lib/api/pagination.svelte.js';
 

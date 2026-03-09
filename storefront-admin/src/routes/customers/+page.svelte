@@ -15,30 +15,18 @@
 	import Users from '@lucide/svelte/icons/users';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import {
-		listCustomers,
 		createCustomers,
 		updateCustomer,
 		deleteCustomers,
 		type Customer,
-		type ListCustomersResponse
 	} from '$lib/customers/api.js';
+	import { client } from '$lib/client';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
 	const paginateState = createPagination(
-		async (): Promise<ListCustomersResponse> => {
-			const q = paginationQuery as {
-				page?: number | string;
-				limit?: number | string;
-				sorting_field?: string;
-				sorting_direction?: 'asc' | 'desc';
-			};
-			return listCustomers({
-				page: q?.page != null ? Number(q.page) : 1,
-				limit: q?.limit != null ? Number(q.limit) : 10,
-				sorting_field: q?.sorting_field,
-				sorting_direction: q?.sorting_direction
-			});
+		async () => {
+			return client['customers'].get({ query: paginationQuery });
 		},
 		['customers']
 	);
@@ -49,9 +37,10 @@
 		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	const rows = $derived((paginateState.query.data?.data?.rows ?? []) as Customer[]);
+	const queryData = $derived(paginateState.query.data as CustomerListResponse | undefined);
+	const rows = $derived((queryData?.data?.rows ?? []) as Customer[]);
 	const rowsWithDisplay = $derived(
-		rows.map((r) => ({
+		rows.map((r: Customer) => ({
 			...r,
 			name:
 				r.first_name || r.last_name
@@ -59,8 +48,8 @@
 					: '–',
 			account_type: r.has_account ? 'Account' : 'Guest'
 		}))
-	);
-	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
+	);		
+	const pagination = $derived(queryData?.data?.pagination ?? queryData?.pagination ?? null);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
 	const openCreate = $derived(paginateState.openCreate);
@@ -69,7 +58,6 @@
 	const formSheetOpen = $derived(paginateState.formSheetOpen);
 	const formMode = $derived(paginateState.formMode);
 	const formItem = $derived(paginateState.formItem) as Customer | null;
-	const deleteConfirmOpen = $derived(paginateState.deleteConfirmOpen);
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
 	const deleteItem = $derived(paginateState.deleteItem) as Customer | null;
 	const deleteError = $derived(paginateState.deleteError);
@@ -98,17 +86,21 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => openEdit(item as Parameters<typeof openEdit>[0])
+					onClick: (item) => openEdit(item as Customer)
 				},
 				{
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => openDeleteConfirm(item as Parameters<typeof openDeleteConfirm>[0])
+					onClick: (item) => openDeleteConfirm(item as Customer)
 				}
 			]
 		}
 	];
+
+	
+		
+	
 
 	let formFirstName = $state('');
 	let formLastName = $state('');

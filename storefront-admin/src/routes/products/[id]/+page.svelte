@@ -2,8 +2,9 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { createQuery } from '@tanstack/svelte-query';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
+import { Button } from '$lib/components/ui/button/index.js';
+import { Input } from '$lib/components/ui/input/index.js';
+import ProductVariantsTable from '$lib/products/ProductVariantsTable.svelte';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import {
 		DeleteConfirmationModal,
@@ -12,9 +13,13 @@
 		ProductDetailVariantsSection,
 		ProductSalesChannelsSheet
 	} from '$lib/components/organs/index.js';
+	import ProductStatusVisibilityCard from '$lib/components/organs/product-detail/ProductStatusVisibilityCard.svelte';
+	import ProductOrganisationCard from '$lib/components/organs/product-detail/ProductOrganisationCard.svelte';
+	import ProductSalesChannelsCard from '$lib/components/organs/product-detail/ProductSalesChannelsCard.svelte';
+	import ProductAttributesCard from '$lib/components/organs/product-detail/ProductAttributesCard.svelte';
+	import ProductShippingConfigCard from '$lib/components/organs/product-detail/ProductShippingConfigCard.svelte';
+	import ProductJsonSheet from '$lib/components/organs/product-detail/ProductJsonSheet.svelte';
 	import Upload from '@lucide/svelte/icons/upload-cloud';
-	import Share2 from '@lucide/svelte/icons/share-2';
-	import Lock from '@lucide/svelte/icons/lock';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
@@ -25,6 +30,7 @@
 	import type { Product } from '$lib/products/types.js';
 	import type { ProductCategory } from '$lib/product-categories/types.js';
 	import type { ProductCollection } from '$lib/product-collection/types.js';
+	import { client } from '$lib/client';
 
 	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
@@ -64,15 +70,11 @@
 
 	const productDetailQuery = createQuery(() => ({
 		queryKey: ['product-detail', productId],
-		queryFn: async (): Promise<ProductDetail | null> => {
+		queryFn: async () => {
 			const id = productId;
 			if (!id) return null;
-			const res = await fetch(`${API_BASE}/products/${id}`, { cache: 'no-store' });
-			if (!res.ok) {
-				if (res.status === 404) return null;
-				throw new Error(await res.text());
-			}
-			return res.json() as Promise<ProductDetail>;
+			const res = await client.products({id}).get();
+			return res.data;
 		},
 		enabled: !!productId
 	}));
@@ -477,22 +479,6 @@
 		editError = null;
 	}
 
-	function statusLabel(s: string | undefined): string {
-		if (!s) return 'Draft';
-		if (s === 'published') return 'Active';
-		if (s === 'draft') return 'Draft';
-		if (s === 'proposed') return 'Unlisted';
-		if (s === 'rejected') return 'Rejected';
-		return s;
-	}
-
-	function statusDotClass(s: string | undefined): string {
-		if (s === 'published') return 'bg-emerald-500';
-		if (s === 'draft' || !s) return 'bg-muted-foreground/60';
-		if (s === 'proposed') return 'bg-amber-500';
-		if (s === 'rejected') return 'bg-red-500';
-		return 'bg-muted-foreground/60';
-	}
 
 	let statusUpdating = $state(false);
 
@@ -1597,209 +1583,27 @@
 						</div>
 					</div>
 
-					<!-- Right: Status, Visibility, and Organisation cards (span both rows) -->
+					<!-- Right: Status, Visibility, Organisation, Sales Channels, Attributes, Shipping -->
 					<div class="row-span-2 flex w-52 flex-col gap-6 self-start">
-						<div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
-							<h2 class="mb-4 font-semibold">Status</h2>
-							<Select.Root
-								type="single"
-								value={product?.status ?? 'draft'}
-								onValueChange={(v) => {
-									if (
-										v &&
-										(v === 'draft' || v === 'proposed' || v === 'published' || v === 'rejected')
-									) {
-										updateStatus(v);
-									}
-								}}
-								disabled={statusUpdating || !product}
-							>
-								<Select.Trigger class="w-full">
-									<span class="flex items-center gap-2">
-										<span
-											class={`inline-block size-2 shrink-0 rounded-full ${statusDotClass(product?.status)}`}
-											aria-hidden="true"
-										></span>
-										<span>{statusLabel(product?.status)}</span>
-									</span>
-								</Select.Trigger>
-								<Select.Content>
-									<Select.Item value="published" label="Active">
-										<span class="flex items-center gap-2">
-											<span class="inline-block size-2 shrink-0 rounded-full bg-emerald-500"></span>
-											<span>Active</span>
-										</span>
-									</Select.Item>
-									<Select.Item value="draft" label="Draft">
-										<span class="flex items-center gap-2">
-											<span class="inline-block size-2 shrink-0 rounded-full bg-muted-foreground/60"></span>
-											<span>Draft</span>
-										</span>
-									</Select.Item>
-									<Select.Item value="proposed" label="Unlisted">
-										<span class="flex items-center gap-2">
-											<span class="inline-block size-2 shrink-0 rounded-full bg-amber-500"></span>
-											<span>Unlisted</span>
-										</span>
-									</Select.Item>
-									<Select.Item value="rejected" label="Rejected">
-										<span class="flex items-center gap-2">
-											<span class="inline-block size-2 shrink-0 rounded-full bg-red-500"></span>
-											<span>Rejected</span>
-										</span>
-									</Select.Item>
-								</Select.Content>
-							</Select.Root>
-							<h2 class="mt-6 mb-4 font-semibold">Visibility</h2>
-							<Select.Root
-								type="single"
-								value={product?.status === 'published' ? 'public' : 'private'}
-								onValueChange={(v) => {
-									if (v === 'public') updateStatus('published');
-									if (v === 'private') updateStatus('draft');
-								}}
-								disabled={statusUpdating || !product}
-							>
-								<Select.Trigger class="w-full">
-									{product?.status === 'published' ? 'Public' : 'Private'}
-								</Select.Trigger>
-								<Select.Content>
-									<Select.Item value="public" label="Public">Public</Select.Item>
-									<Select.Item value="private" label="Private">Private</Select.Item>
-								</Select.Content>
-							</Select.Root>
-						</div>
-						<div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
-							<div class="flex items-center justify-between gap-2">
-								<h2 class="font-semibold">Organisation</h2>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									onclick={openOrgSheet}
-									aria-label="Edit organisation"
-								>
-									<Pencil class="size-4" />
-								</Button>
-							</div>
-							<dl class="mt-4 grid gap-3 text-sm">
-								<div>
-									<dt class="font-medium text-muted-foreground">Category</dt>
-									<dd class="mt-0.5">{category?.value ?? '—'}</dd>
-								</div>
-								<div>
-									<dt class="font-medium text-muted-foreground">Collections</dt>
-									<dd class="mt-0.5">
-										{#if product?.collections?.length}
-											{product.collections.map((c) => c.title).join(', ')}
-										{:else if product?.collection_ids?.length}
-											{product.collection_ids.length} collection(s)
-										{:else}
-											—
-										{/if}
-									</dd>
-								</div>
-								<div>
-									<dt class="font-medium text-muted-foreground">Tags</dt>
-									<dd class="mt-0.5">
-										{#if product?.tags?.length}
-											{product.tags.map((t) => t.value).join(', ')}
-										{:else if product?.tag_ids?.length}
-											{product.tag_ids.length} tag(s)
-										{:else}
-											—
-										{/if}
-									</dd>
-								</div>
-							</dl>
-						</div>
-
-						<!-- Sales Channels -->
-						<div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
-							<div class="flex items-center justify-between">
-								<h2 class="font-semibold">Sales Channels</h2>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									onclick={() => {
-										salesChannelsSheetOpen = true;
-										fetchSalesChannels();
-									}}
-									aria-label="Edit sales channels"
-								>
-									<Pencil class="size-4" />
-								</Button>
-							</div>
-							<div class="mt-4 flex flex-col gap-2">
-								{#if productSalesChannelIds.size > 0}
-									{#each Array.from(productSalesChannelIds)
-										.map((id) => allSalesChannels.find((ch: SalesChannel) => ch.id === id))
-										.filter((ch): ch is SalesChannel => ch != null) as channel}
-										<div class="flex items-center gap-2 text-sm">
-											<Share2 class="size-4 text-muted-foreground" />
-											<span>{channel.name}</span>
-										</div>
-									{/each}
-								{:else}
-									<div class="flex items-center gap-2 text-sm">
-										<Share2 class="size-4 text-muted-foreground" />
-										<span>No sales channels selected</span>
-									</div>
-								{/if}
-							</div>
-							<p class="mt-1 text-xs text-muted-foreground">
-								Available in {productSalesChannelIds.size} of {allSalesChannels.length} sales channels
-							</p>
-						</div>
-
-						<!-- Attributes -->
-						<div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
-							<div class="flex items-center justify-between">
-								<h2 class="font-semibold">Attributes</h2>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									onclick={openEditAttributesSheet}
-									aria-label="Edit attributes"
-								>
-									<Pencil class="size-4" />
-								</Button>
-							</div>
-							<dl class="mt-4 space-y-3 text-sm">
-								{#if product?.attributes && product.attributes.length > 0}
-									{#each product.attributes as attr (attr.id)}
-										<div>
-											<dt class="font-medium text-muted-foreground">{attr.title}</dt>
-											<dd class="break-words text-foreground">{attr.value}</dd>
-										</div>
-									{/each}
-								{:else}
-									<div>
-										<dt class="font-medium text-muted-foreground">No attributes</dt>
-										<dd>—</dd>
-									</div>
-								{/if}
-							</dl>
-						</div>
-
-						<!-- Shipping configuration -->
-						<div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
-							<div class="flex items-center justify-between">
-								<h2 class="font-semibold">Shipping configuration</h2>
-								<Button variant="outline" size="sm" disabled>Edit</Button>
-							</div>
-							<div
-								class="mt-4 flex w-full items-center gap-3 rounded-md border p-3 text-left text-sm"
-							>
-								<Lock class="size-4 text-muted-foreground" />
-								<div>
-									<p class="font-medium">Default Shipping Profile</p>
-									<p class="text-xs text-muted-foreground">default</p>
-								</div>
-							</div>
-						</div>
+						<ProductStatusVisibilityCard
+							status={product?.status as 'draft' | 'proposed' | 'published' | 'rejected' | undefined}
+							disabled={statusUpdating || !product}
+							onStatusChange={updateStatus}
+						/>
+						<ProductOrganisationCard {product} {category} onOpenOrgSheet={openOrgSheet} />
+						<ProductSalesChannelsCard
+							{allSalesChannels}
+							{productSalesChannelIds}
+							onOpenSalesChannelsSheet={() => {
+								salesChannelsSheetOpen = true;
+								fetchSalesChannels();
+							}}
+						/>
+						<ProductAttributesCard
+							attributes={product?.attributes ?? []}
+							onOpenEditAttributesSheet={openEditAttributesSheet}
+						/>
+						<ProductShippingConfigCard />
 					</div>
 
 					<!-- Media + Options (row 2, column 1) -->
@@ -2369,25 +2173,11 @@
 		</Sheet.Root>
 
 		<!-- JSON view sheet -->
-		<Sheet.Root bind:open={jsonSheetOpen}>
-			<Sheet.Content side="right" class="w-full max-w-2xl sm:max-w-2xl">
-				<div class="flex h-full flex-col">
-					<div class="shrink-0 border-b px-6 py-4">
-						<h2 class="text-lg font-semibold">JSON {jsonKeysCount} keys</h2>
-					</div>
-					<div class="min-h-0 flex-1 overflow-auto p-6">
-						{#if productJsonForView}
-							<pre
-								class="rounded-md border bg-zinc-900 p-4 font-mono text-sm break-all whitespace-pre-wrap text-zinc-300"><code
-									>{JSON.stringify(productJsonForView, null, 2)}</code
-								></pre>
-						{:else}
-							<p class="text-sm text-muted-foreground">No data</p>
-						{/if}
-					</div>
-				</div>
-			</Sheet.Content>
-		</Sheet.Root>
+		<ProductJsonSheet
+			bind:open={jsonSheetOpen}
+			{productJsonForView}
+			{jsonKeysCount}
+		/>
 
 		<!-- Variants edit sheet -->
 		<Sheet.Root bind:open={variantsEditSheetOpen}>
@@ -2495,102 +2285,10 @@
 						</div>
 
 						<!-- Product variants table -->
-						<div class="mt-6">
-							<h3 class="text-sm font-medium">Product variants</h3>
-							<p class="text-xs text-muted-foreground">
-								Edit title, SKU, inventory, and price per variant.
-							</p>
-							<div class="mt-2 overflow-auto rounded-lg border">
-								<table class="w-full text-sm">
-									<thead class="border-b bg-muted/50">
-										<tr>
-											<th class="px-3 py-2 text-left font-medium">Option</th>
-											<th class="px-3 py-2 text-left font-medium">Title</th>
-											<th class="px-3 py-2 text-left font-medium">SKU</th>
-											<th class="px-3 py-2 text-left font-medium">Managed inventory</th>
-											<th class="px-3 py-2 text-left font-medium">Allow backorder</th>
-											<th class="px-3 py-2 text-left font-medium">Price EUR</th>
-										</tr>
-									</thead>
-									<tbody>
-										{#if editSheetVariantRows.length === 0}
-											<tr>
-												<td colspan="6" class="px-3 py-8 text-center text-muted-foreground">
-													Add options and values above to generate variants.
-												</td>
-											</tr>
-										{:else}
-											{#each editSheetVariantRows as row (row.key)}
-												<tr class="border-b last:border-0">
-													<td class="px-3 py-2 text-muted-foreground">{row.optionTitle}</td>
-													<td class="px-3 py-2">
-														<Input
-															value={row.title}
-															oninput={(e) =>
-																updateEditSheetVariantRow(row.key, {
-																	title: (e.currentTarget as HTMLInputElement).value
-																})}
-															class="h-8 w-full min-w-[80px]"
-														/>
-													</td>
-													<td class="px-3 py-2">
-														<Input
-															value={row.sku}
-															oninput={(e) =>
-																updateEditSheetVariantRow(row.key, {
-																	sku: (e.currentTarget as HTMLInputElement).value
-																})}
-															placeholder="SKU"
-															class="h-8 w-24"
-														/>
-													</td>
-													<td class="px-3 py-2">
-														<input
-															type="checkbox"
-															class="rounded border-muted-foreground/50"
-															checked={row.manage_inventory}
-															onchange={(e) =>
-																updateEditSheetVariantRow(row.key, {
-																	manage_inventory: (e.currentTarget as HTMLInputElement).checked
-																})}
-														/>
-													</td>
-													<td class="px-3 py-2">
-														<input
-															type="checkbox"
-															class="rounded border-muted-foreground/50"
-															checked={row.allow_backorder}
-															onchange={(e) =>
-																updateEditSheetVariantRow(row.key, {
-																	allow_backorder: (e.currentTarget as HTMLInputElement).checked
-																})}
-														/>
-													</td>
-													<td class="px-3 py-2">
-														<div class="relative w-20">
-															<span
-																class="absolute top-1/2 left-2 -translate-y-1/2 text-xs text-muted-foreground"
-																>€</span
-															>
-															<Input
-																type="text"
-																value={row.priceAmount}
-																oninput={(e) =>
-																	updateEditSheetVariantRow(row.key, {
-																		priceAmount: (e.currentTarget as HTMLInputElement).value
-																	})}
-																placeholder="0"
-																class="h-8 pl-6"
-															/>
-														</div>
-													</td>
-												</tr>
-											{/each}
-										{/if}
-									</tbody>
-								</table>
-							</div>
-						</div>
+						<ProductVariantsTable
+							rows={editSheetVariantRows}
+							updateRow={updateEditSheetVariantRow}
+						/>
 						{#if variantsEditError}
 							<p class="mt-4 text-sm text-destructive">{variantsEditError}</p>
 						{/if}

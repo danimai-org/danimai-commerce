@@ -31,12 +31,12 @@ export class RetrieveProductAttributeGroupProcess
       .selectFrom("product_attribute_groups")
       .where("product_attribute_groups.id", "=", input.id)
       .where("product_attribute_groups.deleted_at", "is", null)
-      .leftJoin("product_attribute_group_relations", (join) =>
+      .leftJoin("product_attribute_group_attributes", (join) =>
         join
-          .onRef("product_attribute_group_relations.attribute_group_id", "=", "product_attribute_groups.id")
+          .onRef("product_attribute_group_attributes.attribute_group_id", "=", "product_attribute_groups.id")
       ).leftJoin("product_attributes", (join) =>
         join
-          .onRef("product_attributes.id", "=", "product_attribute_group_relations.product_attribute_id")
+          .onRef("product_attributes.id", "=", "product_attribute_group_attributes.attribute_id")
           .on("product_attributes.deleted_at", "is", null)
       )
       .select([
