@@ -1,103 +1,48 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { createQuery } from '@tanstack/svelte-query';
-import { Button } from '$lib/components/ui/button/index.js';
-import { Input } from '$lib/components/ui/input/index.js';
-import ProductVariantsTable from '$lib/products/ProductVariantsTable.svelte';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import ProductVariantsTable from '$lib/products/ProductVariantsTable.svelte';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import {
 		DeleteConfirmationModal,
-		Combobox,
-		MultiSelectCombobox,
 		ProductDetailVariantsSection,
-		ProductSalesChannelsSheet
+		ProductHero,
+		ProductStatus,
+		ProductOrganisation,
+		ProductSalesChannel,
+		ProductAttribute,
+		MetadataComponent,
+		JSONComponent
 	} from '$lib/components/organs/index.js';
-	import ProductStatusVisibilityCard from '$lib/components/organs/product-detail/ProductStatusVisibilityCard.svelte';
-	import ProductOrganisationCard from '$lib/components/organs/product-detail/ProductOrganisationCard.svelte';
-	import ProductSalesChannelsCard from '$lib/components/organs/product-detail/ProductSalesChannelsCard.svelte';
-	import ProductAttributesCard from '$lib/components/organs/product-detail/ProductAttributesCard.svelte';
 	import ProductShippingConfigCard from '$lib/components/organs/product-detail/ProductShippingConfigCard.svelte';
-	import ProductJsonSheet from '$lib/components/organs/product-detail/ProductJsonSheet.svelte';
 	import Upload from '@lucide/svelte/icons/upload-cloud';
 	import Pencil from '@lucide/svelte/icons/pencil';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import X from '@lucide/svelte/icons/x';
-	import Info from '@lucide/svelte/icons/info';
-	import * as Select from '$lib/components/ui/select/index.js';
 	import { cn } from '$lib/utils.js';
-	import type { Product } from '$lib/products/types.js';
-	import type { ProductCategory } from '$lib/product-categories/types.js';
-	import type { ProductCollection } from '$lib/product-collection/types.js';
-	import { client } from '$lib/client';
+	import { useProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
+	import type { ProductVariant } from '$lib/hooks/use-product-detail.svelte.js';
 
 	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
-	type ProductDetail = Product & {
-		metadata?: Record<string, unknown>;
-		attributes?: Array<{ id: string; title: string; value?: string }>;
-		discountable?: boolean;
-		collection_ids?: string[];
-		tag_ids?: string[];
-		collections?: ProductCollection[];
-		tags?: Array<{ id: string; value: string }>;
-		attribute_group_id?: string | null;
-	};
-	type SalesChannel = { 
-		 id: string;
-		 name: string;
-		 is_default?: boolean 
-		};
-		
-	type ProductVariant = {
-		id: string;
-		title: string;
-		sku: string | null;
-		product_id: string | null;
-		thumbnail?: string | null;
-		manage_inventory: boolean;
-		allow_backorder?: boolean;
-		ean?: string | null;
-		upc?: string | null;
-		barcode?: string | null;
-		created_at?: string;
-		updated_at?: string;
-	};
-	type ProductOption = { id: string; title: string; product_id: string | null };
-
 	const productId = $derived(page.params?.id ?? '');
+	const {
+		product,
+		loading,
+		error,
+		category,
+		options,
+		variants,
+		allSalesChannels,
+		productSalesChannelIds,
+		setProductSalesChannelIds,
+		loadProduct,
+		loadCategory,
+		loadOptionsAndVariants,
+		updateProductSalesChannels
+	} = useProductDetail(() => page.params?.id ?? '');
 
-	const productDetailQuery = createQuery(() => ({
-		queryKey: ['product-detail', productId],
-		queryFn: async () => {
-			const id = productId;
-			if (!id) return null;
-			const res = await client.products({id}).get();
-			return res.data;
-		},
-		enabled: !!productId
-	}));
-
-	const product = $derived((productDetailQuery.data ?? null) as ProductDetail | null);
-	const loading = $derived(productDetailQuery.isPending);
-	const productError = $derived(
-		productDetailQuery.error != null
-			? (productDetailQuery.error instanceof Error
-					? productDetailQuery.error.message
-					: String(productDetailQuery.error))
-			: null
-	);
-	let operationError = $state<string | null>(null);
-	const error = $derived(productError ?? operationError);
-
-	let variants = $state<ProductVariant[]>([]);
-	let options = $state<ProductOption[]>([]);
-	let category = $state<ProductCategory | null>(null);
-	let allSalesChannels = $state<SalesChannel[]>([]);
-	let productSalesChannelIds = $state<Set<string>>(new Set());
-	let salesChannelsSheetOpen = $state(false);
-	let salesChannelsSubmitting = $state(false);
 	let productImageUrl = $state('');
 	let productImageFile = $state<File | null>(null);
 	let productImageFilePreview = $state<string | null>(null);
@@ -108,168 +53,22 @@ import ProductVariantsTable from '$lib/products/ProductVariantsTable.svelte';
 	let variantImageUrl = $state('');
 	let variantImageSheetOpen = $state(false);
 	let variantImageSubmitting = $state(false);
+	let variantImageError = $state<string | null>(null);
+	let availableAttributesList = $state<Array<{ id: string; title: string; type: string }>>([]);
 
-	async function loadProduct() {
-		await productDetailQuery.refetch();
-	}
-
-
-
-	$effect(() => {
-		productId;
-		loadProduct();
-	});
-
-	$effect(() => {
-		if (product?.id) {
-			loadOptionsAndVariants();
-			fetchProductSalesChannels();
-			fetchSalesChannels();
-		} else {
-			options = [];
-			variants = [];
-		}
-	});
-
-	async function loadOptionsAndVariants() {
-		const id = product?.id;
-		if (!id) return;
+	async function loadAvailableAttributes() {
 		try {
-			const [optRes, varRes] = await Promise.all([
-				fetch(`${API_BASE}/product-options?product_id=${id}&limit=100`, { cache: 'no-store' }),
-				fetch(`${API_BASE}/product-variants?product_id=${id}&limit=100`, { cache: 'no-store' })
-			]);
-			const optJson = optRes.ok ? ((await optRes.json()) as { rows?: ProductOption[] }) : null;
-			const varJson = varRes.ok ? ((await varRes.json()) as { rows?: ProductVariant[] }) : null;
-			options = optJson?.rows ?? [];
-			variants = varJson?.rows ?? [];
-		} catch {
-			variants = [];
-			options = [];
-		}
-	}
-
-	async function loadCategory() {
-		if (!product?.category_id) {
-			category = null;
-			return;
-		}
-		try {
-			const res = await fetch(`${API_BASE}/product-categories?limit=100`, { cache: 'no-store' });
+			const res = await fetch(`${API_BASE}/product-attributes?limit=100`, { cache: 'no-store' });
 			if (res.ok) {
-				const j = (await res.json()) as { rows?: ProductCategory[] };
-				category = (j.rows ?? []).find((c) => c.id === product!.category_id) ?? null;
+				const j = (await res.json()) as {
+					rows?: Array<{ id: string; title: string; type: string }>;
+				};
+				availableAttributesList = j.rows ?? [];
 			} else {
-				category = null;
+				availableAttributesList = [];
 			}
 		} catch {
-			category = null;
-		}
-	}
-
-
-	
-
-	async function fetchSalesChannels() {
-		try {
-			const res = await fetch(`${API_BASE}/sales-channels?limit=100`, { cache: 'no-store' });
-			if (res.ok) {
-				const raw = (await res.json()) as
-					| SalesChannel[]
-					| { data?: SalesChannel[] }
-					| { rows?: SalesChannel[] }
-					| { sales_channels?: SalesChannel[] };
-
-				let channels: SalesChannel[] = [];
-				if (Array.isArray(raw)) {
-					channels = raw;
-				} else if (raw && typeof raw === 'object') {
-					if ('rows' in raw && Array.isArray((raw as { rows?: SalesChannel[] }).rows)) {
-						channels = (raw as { rows?: SalesChannel[] }).rows ?? [];
-					} else if (
-						'sales_channels' in raw &&
-						Array.isArray((raw as { sales_channels?: SalesChannel[] }).sales_channels)
-					) {
-						channels = (raw as { sales_channels?: SalesChannel[] }).sales_channels ?? [];
-					}
-				}
-				allSalesChannels = channels;
-			} else {
-				allSalesChannels = [];
-			}
-		} catch {
-			allSalesChannels = [];
-		}
-	}
-
-	async function fetchProductSalesChannels() {
-		if (!productId) return;
-		try {
-			const res = await fetch(`${API_BASE}/sales-channels/products/${productId}/sales-channels`, {
-				cache: 'no-store'
-			});
-			if (res.ok) {
-				const raw = (await res.json()) as
-					| SalesChannel[]
-					| { data?: SalesChannel[] }
-					| { sales_channels?: SalesChannel[] }
-					| { channels?: SalesChannel[] };
-
-				let channels: SalesChannel[] = [];
-				if (Array.isArray(raw)) {
-					channels = raw;
-				} else if (raw && typeof raw === 'object') {
-					if ('data' in raw && Array.isArray((raw as { data?: SalesChannel[] }).data)) {
-						channels = (raw as { data?: SalesChannel[] }).data ?? [];
-					} else if (
-						'sales_channels' in raw &&
-						Array.isArray((raw as { sales_channels?: SalesChannel[] }).sales_channels)
-					) {
-						channels = (raw as { sales_channels?: SalesChannel[] }).sales_channels ?? [];
-					} else if (
-						'channels' in raw &&
-						Array.isArray((raw as { channels?: SalesChannel[] }).channels)
-					) {
-						channels = (raw as { channels?: SalesChannel[] }).channels ?? [];
-					}
-				}
-				productSalesChannelIds = new Set(channels.map((ch) => ch.id));
-			} else {
-				productSalesChannelIds = new Set();
-			}
-		} catch {
-			productSalesChannelIds = new Set();
-		}
-	}
-
-	async function updateProductSalesChannels() {
-		if (!productId) return;
-		salesChannelsSubmitting = true;
-		try {
-			const salesChannelIds = Array.from(productSalesChannelIds);
-			const res = await fetch(`${API_BASE}/sales-channels/products/${productId}/sales-channels`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ sales_channel_ids: salesChannelIds })
-			});
-			if (res.ok) {
-				await fetchProductSalesChannels();
-				salesChannelsSheetOpen = false;
-			} else {
-				const text = await res.text();
-				let message = text;
-				try {
-					const parsed = JSON.parse(text) as { message?: string; error?: string };
-					message = parsed.message || parsed.error || text;
-				} catch {
-					// ignore JSON parse failures
-				}
-				operationError = message || 'Failed to update sales channels';
-			}
-		} catch (e) {
-			operationError = e instanceof Error ? e.message : String(e);
-		} finally {
-			salesChannelsSubmitting = false;
+			availableAttributesList = [];
 		}
 	}
 
@@ -331,7 +130,7 @@ import ProductVariantsTable from '$lib/products/ProductVariantsTable.svelte';
 				body: JSON.stringify({ thumbnail })
 			});
 			if (res.ok) {
-				await productDetailQuery.refetch();
+				await loadProduct();
 				if (productImageFilePreview) {
 					URL.revokeObjectURL(productImageFilePreview);
 					productImageFilePreview = null;
@@ -361,124 +160,18 @@ import ProductVariantsTable from '$lib/products/ProductVariantsTable.svelte';
 				body: JSON.stringify({ thumbnail: variantImageUrl || null })
 			});
 			if (res.ok) {
-				variants = variants.map((x) =>
-					x.id === v.id ? { ...x, thumbnail: variantImageUrl || null } : x
-				);
+				await loadOptionsAndVariants();
+				variantImageError = null;
 				variantImageSheetOpen = false;
 			} else {
-				operationError = await res.text();
+				variantImageError = await res.text();
 			}
 		} catch (e) {
-			operationError = e instanceof Error ? e.message : String(e);
+			variantImageError = e instanceof Error ? e.message : String(e);
 		} finally {
 			variantImageSubmitting = false;
 		}
 	}
-
-	$effect(() => {
-		if (product?.category_id) {
-			loadCategory();
-		} else {
-			category = null;
-		}
-	});
-
-	const handleDisplay = $derived(
-		product?.handle ? (product.handle.startsWith('/') ? product.handle : `/${product.handle}`) : '—'
-	);
-
-	
-
-	let editSheetOpen = $state(false);
-	let editTitle = $state('');
-	let editSubtitle = $state('');
-	let editHandle = $state('');
-	let editDescription = $state('');
-	let editStatus = $state<'draft' | 'proposed' | 'published' | 'rejected'>('draft');
-	let editDiscountable = $state(true);
-	let editProductAttributesList = $state<EditAttributeRow[]>([]);
-	let editProductAddAttributeId = $state('');
-	let editProductAddAttributeValue = $state('');
-	let editError = $state<string | null>(null);
-	let editSubmitting = $state(false);
-
-	let orgSheetOpen = $state(false);
-	let orgCollectionIds = $state<string[]>([]);
-	let orgCategoryId = $state('');
-	let orgTagIds = $state<string[]>([]);
-	let orgError = $state<string | null>(null);
-	let orgSubmitting = $state(false);
-	let collectionsList = $state<ProductCollection[]>([]);
-	let categoriesList = $state<ProductCategory[]>([]);
-	let tagsList = $state<Array<{ id: string; value: string }>>([]);
-	let attributeGroupsList = $state<Array<{ id: string; title: string }>>([]);
-
-	type EditAttributeRow = { attribute_id: string; title: string; value: string };
-	let editAttributeGroupId = $state('');
-	let editAttributesSheetOpen = $state(false);
-	let editAttributesList = $state<EditAttributeRow[]>([]);
-	let availableAttributesList = $state<Array<{ id: string; title: string; type: string }>>([]);
-	let editAttributesSubmitting = $state(false);
-	let editAttributesError = $state<string | null>(null);
-	let addAttributeId = $state('');
-	let addAttributeValue = $state('');
-
-	async function openEditSheet() {
-		if (!product || !product.id) {
-			await loadProduct();
-			if (!product || !product.id) return;
-		}
-		editSheetOpen = true;
-		editTitle = product.title ?? '';
-		editSubtitle = product.subtitle ?? '';
-		editHandle = product.handle
-			? product.handle.startsWith('/')
-				? product.handle.slice(1)
-				: product.handle
-			: '';
-		editDescription = product.description ?? '';
-		editStatus = (product.status as 'draft' | 'proposed' | 'published' | 'rejected') || 'draft';
-		editDiscountable = product.discountable !== false;
-		editProductAttributesList = (product.attributes ?? []).map((a) => ({
-			attribute_id: a.id,
-			title: a.title,
-			value: a.value ?? ''
-		}));
-		editAttributeGroupId = product.attribute_group_id ?? '';
-		editProductAddAttributeId = '';
-		editProductAddAttributeValue = '';
-		editError = null;
-		loadAvailableAttributes();
-		loadAttributeGroups();
-	}
-
-	const editProductAttributesAvailableToAdd = $derived(
-		availableAttributesList.filter(
-			(a) => !editProductAttributesList.some((e) => e.attribute_id === a.id)
-		)
-	);
-
-	function removeEditProductAttribute(index: number) {
-		editProductAttributesList = editProductAttributesList.filter((_, i) => i !== index);
-	}
-
-	function addEditProductAttribute() {
-		if (!editProductAddAttributeId) return;
-		const att = availableAttributesList.find((a) => a.id === editProductAddAttributeId);
-		if (!att) return;
-		editProductAttributesList = [
-			...editProductAttributesList,
-			{ attribute_id: att.id, title: att.title, value: editProductAddAttributeValue.trim() }
-		];
-		editProductAddAttributeId = '';
-		editProductAddAttributeValue = '';
-	}
-
-	function closeEditSheet() {
-		editSheetOpen = false;
-		editError = null;
-	}
-
 
 	let statusUpdating = $state(false);
 
@@ -503,313 +196,12 @@ import ProductVariantsTable from '$lib/products/ProductVariantsTable.svelte';
 		}
 	}
 
-	async function submitEditProduct() {
-		if (!product) return;
-		editError = null;
-		if (!editTitle.trim()) {
-			editError = 'Title is required';
-			return;
-		}
-		editSubmitting = true;
-		try {
-			const handle =
-				editHandle.trim() ||
-				editTitle
-					.toLowerCase()
-					.replace(/\s+/g, '-')
-					.replace(/[^a-z0-9-]/g, '');
-			const body: Record<string, unknown> = {
-				title: editTitle.trim(),
-				subtitle: editSubtitle.trim() || undefined,
-				description: editDescription.trim() || undefined,
-				handle,
-				status: editStatus,
-				discountable: editDiscountable,
-				attribute_group_id: editAttributeGroupId || undefined,
-				attribute_groups:
-					editAttributeGroupId && editProductAttributesList.length > 0
-						? [{ attribute_group_id: editAttributeGroupId, required: false, rank: 0 }]
-						: undefined,
-				attributes:
-					editAttributeGroupId && editProductAttributesList.length > 0
-						? editProductAttributesList.map((a) => ({
-								attribute_group_id: editAttributeGroupId,
-								attribute_id: a.attribute_id,
-								value: a.value
-							}))
-						: undefined
-			};
-			const res = await fetch(`${API_BASE}/products/${product.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body)
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			closeEditSheet();
-			loadProduct();
-		} catch (e) {
-			editError = e instanceof Error ? e.message : String(e);
-		} finally {
-			editSubmitting = false;
-		}
-	}
-
-	async function loadAvailableAttributes() {
-		try {
-			const res = await fetch(`${API_BASE}/product-attributes?limit=100`, { cache: 'no-store' });
-			if (res.ok) {
-				const j = (await res.json()) as {
-					rows?: Array<{ id: string; title: string; type: string }>;
-				};
-				availableAttributesList = j.rows ?? [];
-			} else {
-				availableAttributesList = [];
-			}
-		} catch {
-			availableAttributesList = [];
-		}
-	}
-
-	async function openEditAttributesSheet() {
-		if (!product || !product.id) {
-			await loadProduct();
-			if (!product || !product.id) return;
-		}
-		editAttributesList = (product.attributes ?? []).map((a) => ({
-			attribute_id: a.id,
-			title: a.title,
-			value: a.value ?? ''
-		}));
-		editAttributeGroupId = product.attribute_group_id ?? '';
-		addAttributeId = '';
-		addAttributeValue = '';
-		editAttributesError = null;
-		editAttributesSheetOpen = true;
-		loadAvailableAttributes();
-		loadAttributeGroups();
-	}
-
-	function closeEditAttributesSheet() {
-		editAttributesSheetOpen = false;
-		editAttributesError = null;
-	}
-
-	function removeAttributeFromEdit(index: number) {
-		editAttributesList = editAttributesList.filter((_, i) => i !== index);
-	}
-
-	function addAttributeToEdit() {
-		if (!addAttributeId) return;
-		const att = availableAttributesList.find((a) => a.id === addAttributeId);
-		if (!att) return;
-		editAttributesList = [
-			...editAttributesList,
-			{ attribute_id: att.id, title: att.title, value: addAttributeValue.trim() }
-		];
-		addAttributeId = '';
-		addAttributeValue = '';
-	}
-
-	const attributesAvailableToAdd = $derived(
-		availableAttributesList.filter((a) => !editAttributesList.some((e) => e.attribute_id === a.id))
-	);
-
-	async function loadAttributeGroups() {
-		try {
-			const res = await fetch(`${API_BASE}/product-attribute-groups?limit=100`, { cache: 'no-store' });
-			if (res.ok) {
-				const j = (await res.json()) as { rows?: Array<{ id: string; title: string }> };
-				attributeGroupsList = j.rows ?? [];
-			} else {
-				attributeGroupsList = [];
-			}
-		} catch {
-			attributeGroupsList = [];
-		}
-	}
-
-	async function submitEditAttributes() {
-		if (!product) return;
-		if (editAttributesList.length > 0 && !editAttributeGroupId) {
-			editAttributesError = 'Select an attribute group when setting attributes.';
-			return;
-		}
-		editAttributesError = null;
-		editAttributesSubmitting = true;
-		try {
-			const body = {
-				attribute_group_id: editAttributeGroupId || undefined,
-				attribute_groups:
-					editAttributeGroupId && editAttributesList.length > 0
-						? [{ attribute_group_id: editAttributeGroupId, required: false, rank: 0 }]
-						: undefined,
-				attributes:
-					editAttributeGroupId && editAttributesList.length > 0
-						? editAttributesList.map((a) => ({
-								attribute_group_id: editAttributeGroupId,
-								attribute_id: a.attribute_id,
-								value: a.value
-							}))
-						: []
-			};
-			const res = await fetch(`${API_BASE}/products/${product.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body)
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			closeEditAttributesSheet();
-			loadProduct();
-		} catch (e) {
-			editAttributesError = e instanceof Error ? e.message : String(e);
-		} finally {
-			editAttributesSubmitting = false;
-		}
-	}
-
-	async function loadCollectionsList() {
-		try {
-			const res = await fetch(`${API_BASE}/collections?limit=100`, { cache: 'no-store' });
-			if (res.ok) {
-				const j = (await res.json()) as {
-					rows?: ProductCollection[];
-					collections?: ProductCollection[];
-				};
-				collectionsList = j.rows ?? j.collections ?? [];
-			} else {
-				collectionsList = [];
-			}
-		} catch {
-			collectionsList = [];
-		}
-	}
-
-	async function loadCategoriesList() {
-		try {
-			const res = await fetch(`${API_BASE}/product-categories?limit=100`, { cache: 'no-store' });
-			if (res.ok) {
-				const j = (await res.json()) as { rows?: ProductCategory[]; data?: ProductCategory[] };
-				categoriesList = j.rows ?? j.data ?? [];
-			} else {
-				categoriesList = [];
-			}
-		} catch {
-			categoriesList = [];
-		}
-	}
-
-	async function loadTagsList() {
-		try {
-			const res = await fetch(`${API_BASE}/product-tags?limit=100`, { cache: 'no-store' });
-			if (res.ok) {
-				const j = (await res.json()) as { rows?: Array<{ id: string; value: string }> };
-				tagsList = j.rows ?? [];
-			} else {
-				tagsList = [];
-			}
-		} catch {
-			tagsList = [];
-		}
-	}
-
-	async function openOrgSheet() {
-		if (!product || !product.id) {
-			await loadProduct();
-			if (!product || !product.id) return;
-		}
-		orgSheetOpen = true;
-		orgCollectionIds = [...(product.collection_ids ?? product.collections?.map((c) => c.id) ?? [])];
-		orgCategoryId = product.category_id ?? '';
-		orgTagIds = [...(product.tag_ids ?? [])];
-		orgError = null;
-		loadCollectionsList();
-		loadCategoriesList();
-		loadTagsList();
-	}
-
-	function closeOrgSheet() {
-		orgSheetOpen = false;
-		orgError = null;
-	}
-
-	async function submitOrgSheet() {
-		if (!product) return;
-		orgError = null;
-		orgSubmitting = true;
-		try {
-			if (orgCategoryId) {
-				const res = await fetch(`${API_BASE}/product-categories/${orgCategoryId}/products`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ product_ids: [product.id] })
-				});
-				if (!res.ok) throw new Error(await res.text());
-			} else {
-				const res = await fetch(`${API_BASE}/products/${product.id}`, {
-					method: 'PUT',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ category_id: '' })
-				});
-				if (!res.ok) throw new Error(await res.text());
-			}
-			const orgRes = await fetch(`${API_BASE}/products/${product.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ collection_ids: orgCollectionIds, tag_ids: orgTagIds })
-			});
-			if (!orgRes.ok) throw new Error(await orgRes.text());
-			await loadProduct();
-			await loadCategory();
-			closeOrgSheet();
-		} catch (e) {
-			orgError = e instanceof Error ? e.message : String(e);
-		} finally {
-			orgSubmitting = false;
-		}
-	}
-
-	let orgTagCreating = $state(false);
-	async function createAndSelectOrgTag(tagValue: string) {
-		const value = tagValue.trim();
-		if (!value || orgTagCreating) return;
-		orgTagCreating = true;
-		try {
-			const res = await fetch(`${API_BASE}/product-tags`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ value })
-			});
-			if (!res.ok) throw new Error(await res.text());
-			const tag = (await res.json()) as { id: string; value: string };
-			tagsList = [...tagsList, { id: tag.id, value: tag.value }];
-			orgTagIds = [...orgTagIds, tag.id];
-		} catch {
-			// leave so user can retry
-		} finally {
-			orgTagCreating = false;
-		}
-	}
-	const tagsOptions = $derived(tagsList.map((t) => ({ id: t.id, value: t.value })));
-	const collectionsOptions = $derived(collectionsList.map((c) => ({ id: c.id, value: c.title })));
-
-	let metadataSheetOpen = $state(false);
-	let metadataRows = $state<Array<{ key: string; value: string }>>([]);
-	let metadataError = $state<string | null>(null);
-	let metadataSubmitting = $state(false);
-
 	const metadataKeysCount = $derived(
 		product?.metadata && typeof product.metadata === 'object'
 			? Object.keys(product.metadata).length
 			: 0
 	);
 
-	let jsonSheetOpen = $state(false);
 	let variantsEditSheetOpen = $state(false);
 	let variantsEditError = $state<string | null>(null);
 	let variantsEditSubmitting = $state(false);
@@ -1433,71 +825,6 @@ import ProductVariantsTable from '$lib/products/ProductVariantsTable.svelte';
 		}
 	}
 
-	const productJsonForView = $derived.by(() => {
-		if (!product) return null;
-		return {
-			...product,
-			options,
-			variants,
-			category
-		};
-	});
-	const jsonKeysCount = $derived(productJsonForView ? Object.keys(productJsonForView).length : 0);
-
-	function openMetadataSheet() {
-		if (!product) return;
-		const meta =
-			product.metadata && typeof product.metadata === 'object'
-				? (product.metadata as Record<string, unknown>)
-				: {};
-		metadataRows = Object.entries(meta).map(([k, v]) => ({ key: k, value: String(v ?? '') }));
-		if (metadataRows.length === 0) metadataRows = [{ key: '', value: '' }];
-		metadataSheetOpen = true;
-		metadataError = null;
-	}
-
-	function closeMetadataSheet() {
-		metadataSheetOpen = false;
-		metadataError = null;
-	}
-
-	function addMetadataRow() {
-		metadataRows = [...metadataRows, { key: '', value: '' }];
-	}
-
-	function removeMetadataRow(index: number) {
-		metadataRows = metadataRows.filter((_, i) => i !== index);
-	}
-
-	async function submitMetadata() {
-		if (!product) return;
-		metadataError = null;
-		metadataSubmitting = true;
-		try {
-			const meta: Record<string, string | number> = {};
-			for (const row of metadataRows) {
-				const k = row.key.trim();
-				if (!k) continue;
-				const num = Number(row.value);
-				meta[k] = Number.isNaN(num) ? row.value : num;
-			}
-			const res = await fetch(`${API_BASE}/products/${product.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ metadata: meta })
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			closeMetadataSheet();
-			loadProduct();
-		} catch (e) {
-			metadataError = e instanceof Error ? e.message : String(e);
-		} finally {
-			metadataSubmitting = false;
-		}
-	}
 </script>
 
 <svelte:head>
@@ -1538,70 +865,27 @@ import ProductVariantsTable from '$lib/products/ProductVariantsTable.svelte';
 					style="grid-template-columns: 1fr 13rem; grid-auto-rows: minmax(0, auto); align-items: start;"
 				>
 					<!-- Product card (row 1) -->
-					<div class="min-w-0 self-start rounded-lg border bg-card p-6 shadow-sm">
-						<!-- Product header -->
-						<section class="flex flex-col gap-6 pb-4">
-							<div class="flex items-center justify-between gap-4">
-								<h1 class="text-2xl font-semibold tracking-tight">{product.title}</h1>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									onclick={openEditSheet}
-									aria-label="Edit product"
-								>
-									<Pencil class="size-4" />
-								</Button>
-							</div>
-						</section>
-						<!-- Details (pl-0 so content aligns with header above) -->
-						<div class="rounded-lg bg-card pt-6 pr-6 pb-6 pl-0">
-							<dl class="mt-0 grid gap-3 text-sm">
-								<div class="flex justify-between gap-4">
-									<dt class="shrink-0 font-medium text-muted-foreground">Description</dt>
-									<dd class="text-right">{product.description || '—'}</dd>
-								</div>
-								<div class="flex justify-between gap-4">
-									<dt class="shrink-0 font-medium text-muted-foreground">Subtitle</dt>
-									<dd class="text-right">{product.subtitle || '—'}</dd>
-								</div>
-								<div class="flex justify-between gap-4">
-									<dt class="shrink-0 font-medium text-muted-foreground">Handle</dt>
-									<dd class="text-right">{handleDisplay}</dd>
-								</div>
-								<div class="flex justify-between gap-4">
-									<dt class="shrink-0 font-medium text-muted-foreground">Discountable</dt>
-									<dd class="text-right">
-										{product.discountable === true
-											? 'True'
-											: product.discountable === false
-												? 'False'
-												: '—'}
-									</dd>
-								</div>
-							</dl>
-						</div>
-					</div>
+					<ProductHero product={product} onSaved={loadProduct} />
 
 					<!-- Right: Status, Visibility, Organisation, Sales Channels, Attributes, Shipping -->
 					<div class="row-span-2 flex w-52 flex-col gap-6 self-start">
-						<ProductStatusVisibilityCard
+						<ProductStatus
 							status={product?.status as 'draft' | 'proposed' | 'published' | 'rejected' | undefined}
 							disabled={statusUpdating || !product}
 							onStatusChange={updateStatus}
 						/>
-						<ProductOrganisationCard {product} {category} onOpenOrgSheet={openOrgSheet} />
-						<ProductSalesChannelsCard
+						<ProductOrganisation {product} {category} onSaved={async () => { await loadProduct(); await loadCategory(); }} />
+						<ProductSalesChannel
 							{allSalesChannels}
 							{productSalesChannelIds}
-							onOpenSalesChannelsSheet={() => {
-								salesChannelsSheetOpen = true;
-								fetchSalesChannels();
-							}}
+							setProductSalesChannelIds={setProductSalesChannelIds}
+							updateProductSalesChannels={updateProductSalesChannels}
+							onSaved={loadProduct}
 						/>
-						<ProductAttributesCard
+						<ProductAttribute
 							attributes={product?.attributes ?? []}
-							onOpenEditAttributesSheet={openEditAttributesSheet}
+							{product}
+							onSaved={loadProduct}
 						/>
 						<ProductShippingConfigCard />
 					</div>
@@ -1656,42 +940,15 @@ import ProductVariantsTable from '$lib/products/ProductVariantsTable.svelte';
 							onEditOptionsAndVariants={openVariantsEditSheet}
 						/>
 
-						<!-- Metadata / JSON placeholders -->
+						<!-- Metadata / JSON -->
 						<div class="grid gap-4 sm:grid-cols-2">
-							<div class="rounded-lg border bg-card p-4 shadow-sm">
-								<div class="flex items-center justify-between gap-2">
-									<h3 class="font-medium">Metadata</h3>
-									<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-										{metadataKeysCount} keys
-									</span>
-									<Button
-										variant="ghost"
-										size="icon"
-										class="size-8 shrink-0"
-										onclick={openMetadataSheet}
-									>
-										<ExternalLink class="size-4" />
-										<span class="sr-only">Open</span>
-									</Button>
-								</div>
-							</div>
-							<div class="rounded-lg border bg-card p-4 shadow-sm">
-								<div class="flex items-center justify-between gap-2">
-									<h3 class="font-medium">JSON</h3>
-									<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-										{jsonKeysCount} keys
-									</span>
-									<Button
-										variant="ghost"
-										size="icon"
-										class="size-8 shrink-0"
-										onclick={() => (jsonSheetOpen = true)}
-									>
-										<ExternalLink class="size-4" />
-										<span class="sr-only">Open</span>
-									</Button>
-								</div>
-							</div>
+							<MetadataComponent
+								keysCount={metadataKeysCount}
+								productId={product?.id}
+								metadata={product?.metadata}
+								onSaved={loadProduct}
+							/>
+							<JSONComponent product={product} options={options} variants={variants} category={category} />
 						</div>
 					</div>
 				</div>
@@ -1777,6 +1034,9 @@ import ProductVariantsTable from '$lib/products/ProductVariantsTable.svelte';
 					{/if}
 				</Sheet.Header>
 				<div class="flex flex-col gap-4 p-6">
+					{#if variantImageError}
+						<p class="text-sm text-destructive">{variantImageError}</p>
+					{/if}
 					<div class="flex flex-col gap-2">
 						<label for="variant-image-url" class="text-sm font-medium">Image URL</label>
 						<Input
@@ -1799,385 +1059,13 @@ import ProductVariantsTable from '$lib/products/ProductVariantsTable.svelte';
 					{/if}
 				</div>
 				<div class="flex justify-end gap-2 border-t p-4">
-					<Button variant="outline" onclick={() => (variantImageSheetOpen = false)}>Cancel</Button>
+					<Button variant="outline" onclick={() => { variantImageSheetOpen = false; variantImageError = null; }}>Cancel</Button>
 					<Button onclick={saveVariantImage} disabled={variantImageSubmitting}>
 						{variantImageSubmitting ? 'Saving…' : 'Save'}
 					</Button>
 				</div>
 			</Sheet.Content>
 		</Sheet.Root>
-
-		<!-- Edit Product sheet -->
-		<Sheet.Root bind:open={editSheetOpen}>
-			<Sheet.Content class="flex w-full flex-col sm:max-w-lg" side="right">
-				<Sheet.Header class="flex flex-col items-center gap-1.5 text-center sm:text-center">
-					<Sheet.Title>Edit Product</Sheet.Title>
-				</Sheet.Header>
-				<div class="flex flex-1 flex-col gap-4 overflow-auto px-4 pb-4">
-					<div class="flex flex-col gap-2">
-						<label for="edit-status" class="text-sm font-medium">Status</label>
-						<select
-							id="edit-status"
-							bind:value={editStatus}
-							class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-						>
-							<option value="draft">Draft</option>
-							<option value="proposed">Proposed</option>
-							<option value="published">Published</option>
-							<option value="rejected">Rejected</option>
-						</select>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="edit-title" class="text-sm font-medium">Title</label>
-						<Input id="edit-title" bind:value={editTitle} class="h-9" />
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="edit-subtitle" class="text-sm font-medium">
-							Subtitle <span class="font-normal text-muted-foreground">(Optional)</span>
-						</label>
-						<Input id="edit-subtitle" bind:value={editSubtitle} class="h-9" />
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="edit-handle" class="text-sm font-medium">Handle</label>
-						<div class="relative flex w-full items-center">
-							<span class="absolute start-3 text-sm text-muted-foreground">/</span>
-							<Input
-								id="edit-handle"
-								bind:value={editHandle}
-								class="h-9 pl-6"
-								placeholder="product-handle"
-							/>
-						</div>
-					</div>
-					<div class="flex flex-col gap-2">
-						<span class="text-sm font-medium">Attributes</span>
-						<div class="space-y-2">
-							{#each editProductAttributesList as row, i (row.attribute_id + i)}
-								<div class="flex items-center gap-2 rounded-md border p-2">
-									<div class="min-w-0 flex-1">
-										<span class="text-sm font-medium text-muted-foreground">{row.title}</span>
-										<Input bind:value={row.value} class="mt-1 h-9" placeholder="Value" />
-									</div>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										class="size-8 shrink-0"
-										aria-label="Remove attribute"
-										onclick={() => removeEditProductAttribute(i)}
-									>
-										<Trash2 class="size-4" />
-									</Button>
-								</div>
-							{/each}
-							{#if editProductAttributesAvailableToAdd.length > 0}
-								<div class="flex flex-wrap items-end gap-2 rounded-md border border-dashed p-2">
-									<select
-										bind:value={editProductAddAttributeId}
-										class="flex h-9 min-w-32 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-									>
-										<option value="">Add attribute…</option>
-										{#each editProductAttributesAvailableToAdd as att (att.id)}
-											<option value={att.id}>{att.title}</option>
-										{/each}
-									</select>
-									<Input
-										bind:value={editProductAddAttributeValue}
-										class="h-9 min-w-24 flex-1"
-										placeholder="Value"
-									/>
-									<Button
-										type="button"
-										variant="secondary"
-										size="sm"
-										onclick={addEditProductAttribute}
-										disabled={!editProductAddAttributeId}
-									>
-										Add
-									</Button>
-								</div>
-							{/if}
-						</div>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="edit-description" class="text-sm font-medium">
-							Description <span class="font-normal text-muted-foreground">(Optional)</span>
-						</label>
-						<textarea
-							id="edit-description"
-							bind:value={editDescription}
-							rows="3"
-							class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-						></textarea>
-					</div>
-					<div class="flex flex-col gap-2">
-						<div class="flex items-center gap-2">
-							<button
-								id="edit-discountable"
-								type="button"
-								role="switch"
-								aria-checked={editDiscountable}
-								aria-label="Discountable"
-								class={cn(
-									'relative inline-flex h-6 min-h-6 w-11 min-w-11 flex-none shrink-0 cursor-pointer items-center self-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-									editDiscountable ? 'bg-primary' : 'bg-input'
-								)}
-								onclick={() => (editDiscountable = !editDiscountable)}
-							>
-								<span
-									class={cn(
-										'pointer-events-none block size-5 shrink-0 rounded-full border border-input bg-white shadow ring-0 transition-transform',
-										editDiscountable ? 'translate-x-5' : 'translate-x-[1px]'
-									)}
-								></span>
-							</button>
-							<label for="edit-discountable" class="text-sm font-medium">Discountable</label>
-						</div>
-						<p class="text-xs text-muted-foreground">
-							When unchecked, discounts will not be applied to this product.
-						</p>
-					</div>
-					{#if editError}
-						<p class="text-sm text-destructive">{editError}</p>
-					{/if}
-				</div>
-				<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-					<Button variant="outline" onclick={closeEditSheet} disabled={editSubmitting}>
-						Cancel
-					</Button>
-					<Button onclick={submitEditProduct} disabled={editSubmitting}>
-						{editSubmitting ? 'Saving…' : 'Save'}
-					</Button>
-				</Sheet.Footer>
-			</Sheet.Content>
-		</Sheet.Root>
-
-		<!-- Edit Attributes sheet -->
-		<Sheet.Root bind:open={editAttributesSheetOpen}>
-			<Sheet.Content class="flex w-full flex-col sm:max-w-lg" side="right">
-				<Sheet.Header class="flex flex-col items-center gap-1.5 text-center sm:text-center">
-					<Sheet.Title>Edit Attributes</Sheet.Title>
-				</Sheet.Header>
-				<div class="flex flex-1 flex-col gap-4 overflow-auto px-4 pb-4">
-					<div class="space-y-3">
-						{#each editAttributesList as row, i (row.attribute_id + i)}
-							<div class="flex items-center gap-2 rounded-md border p-2">
-								<div class="min-w-0 flex-1">
-									<span class="text-sm font-medium text-muted-foreground">{row.title}</span>
-									<Input bind:value={row.value} class="mt-1 h-9" placeholder="Value" />
-								</div>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									aria-label="Remove attribute"
-									onclick={() => removeAttributeFromEdit(i)}
-								>
-									<Trash2 class="size-4" />
-								</Button>
-							</div>
-						{/each}
-					</div>
-					{#if attributesAvailableToAdd.length > 0}
-						<div class="flex flex-col gap-2 rounded-md border border-dashed p-3">
-							<span class="text-sm font-medium">Add attribute</span>
-							<div class="flex flex-wrap items-end gap-2">
-								<select
-									bind:value={addAttributeId}
-									class="flex h-9 min-w-32 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-								>
-									<option value="">Select…</option>
-									{#each attributesAvailableToAdd as att (att.id)}
-										<option value={att.id}>{att.title}</option>
-									{/each}
-								</select>
-								<Input
-									bind:value={addAttributeValue}
-									class="h-9 min-w-24 flex-1"
-									placeholder="Value"
-								/>
-								<Button
-									type="button"
-									variant="secondary"
-									size="sm"
-									onclick={addAttributeToEdit}
-									disabled={!addAttributeId}
-								>
-									Add
-								</Button>
-							</div>
-						</div>
-					{/if}
-					{#if editAttributesError}
-						<p class="text-sm text-destructive">{editAttributesError}</p>
-					{/if}
-				</div>
-				<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-					<Button
-						variant="outline"
-						onclick={closeEditAttributesSheet}
-						disabled={editAttributesSubmitting}
-					>
-						Cancel
-					</Button>
-					<Button onclick={submitEditAttributes} disabled={editAttributesSubmitting}>
-						{editAttributesSubmitting ? 'Saving…' : 'Save'}
-					</Button>
-				</Sheet.Footer>
-			</Sheet.Content>
-		</Sheet.Root>
-
-		<!-- Edit Organization sheet (Product organization / category selection) -->
-		<Sheet.Root bind:open={orgSheetOpen}>
-			<Sheet.Content
-				class="flex w-full flex-col sm:max-w-lg"
-				side="right"
-				onOpenAutoFocus={(e) => e.preventDefault()}
-			>
-				<Sheet.Header class="flex flex-col gap-1.5 px-4 pt-4 text-left">
-					<div class="flex items-center gap-2">
-						<Sheet.Title>Product organization</Sheet.Title>
-						<span
-							class="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
-							title="Assign a category (type), collections, and tags to organize this product."
-							aria-label="Info"
-						>
-							<Info class="size-3" />
-						</span>
-					</div>
-				</Sheet.Header>
-				<div class="flex flex-1 flex-col gap-4 overflow-auto px-4 pb-4">
-					<!-- Type (Category selection) -->
-					<div class="flex flex-col gap-2">
-						<label for="org-categories" class="text-sm font-medium">Type</label>
-						<Combobox
-							id="org-categories"
-							bind:value={orgCategoryId}
-							options={categoriesList}
-							placeholder="Select category…"
-							emptyMessage="No categories found"
-						/>
-					</div>
-					<!-- Collections -->
-					<div class="flex flex-col gap-3">
-						<h3 class="text-sm font-medium">Collections</h3>
-						<MultiSelectCombobox
-							id="org-collections"
-							bind:value={orgCollectionIds}
-							options={collectionsOptions}
-							placeholder="Search collections…"
-							emptyMessage="No collections yet."
-						/>
-					</div>
-					<div class="flex flex-col gap-2">
-						<div class="flex items-center justify-between gap-2">
-							<label for="org-tags-search" class="text-sm font-medium">
-								Tags <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								disabled={orgTagCreating}
-								onclick={async () => {
-									const name = window.prompt('New tag name');
-									if (name) await createAndSelectOrgTag(name);
-								}}
-							>
-								{orgTagCreating ? 'Creating…' : 'Create tag'}
-							</Button>
-						</div>
-						<MultiSelectCombobox
-							id="org-tags"
-							bind:value={orgTagIds}
-							options={tagsOptions}
-							placeholder="Type to search…"
-							emptyMessage="No tags found"
-						/>
-					</div>
-					{#if orgError}
-						<p class="text-sm text-destructive">{orgError}</p>
-					{/if}
-				</div>
-				<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-					<Button variant="outline" onclick={closeOrgSheet} disabled={orgSubmitting}>Cancel</Button>
-					<Button onclick={submitOrgSheet} disabled={orgSubmitting}>
-						{orgSubmitting ? 'Saving…' : 'Save'}
-					</Button>
-				</Sheet.Footer>
-			</Sheet.Content>
-		</Sheet.Root>
-
-		<!-- Edit Metadata sheet -->
-		<Sheet.Root bind:open={metadataSheetOpen}>
-			<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
-				<div class="flex h-full flex-col">
-					<div class="flex-1 overflow-auto p-6 pt-12">
-						<div class="flex flex-col gap-6">
-							<h2 class="text-lg font-semibold">Edit Metadata</h2>
-
-							{#if metadataError}
-								<div
-									class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-								>
-									{metadataError}
-								</div>
-							{/if}
-
-							<div class="overflow-hidden rounded-md border">
-								<table class="w-full text-sm">
-									<thead class="border-b bg-muted/50">
-										<tr>
-											<th class="px-4 py-3 text-left font-medium">Key</th>
-											<th class="px-4 py-3 text-left font-medium">Value</th>
-											<th class="w-10 px-4 py-3"></th>
-										</tr>
-									</thead>
-									<tbody>
-										{#each metadataRows as row, i}
-											<tr class="border-b last:border-0">
-												<td class="px-4 py-2">
-													<Input bind:value={row.key} placeholder="Key" class="h-9 w-full" />
-												</td>
-												<td class="px-4 py-2">
-													<Input bind:value={row.value} placeholder="Value" class="h-9 w-full" />
-												</td>
-												<td class="px-4 py-2">
-													<Button
-														variant="ghost"
-														size="icon"
-														class="size-8 shrink-0 text-destructive hover:bg-destructive/10"
-														onclick={() => removeMetadataRow(i)}
-														aria-label="Remove row"
-													>
-														<Trash2 class="size-4" />
-													</Button>
-												</td>
-											</tr>
-										{/each}
-									</tbody>
-								</table>
-							</div>
-							<Button variant="outline" size="sm" onclick={addMetadataRow}>Add row</Button>
-						</div>
-					</div>
-					<div class="flex justify-end gap-2 border-t p-4">
-						<Button variant="outline" onclick={closeMetadataSheet}>Cancel</Button>
-						<Button onclick={submitMetadata} disabled={metadataSubmitting}>
-							{metadataSubmitting ? 'Saving…' : 'Save'}
-						</Button>
-					</div>
-				</div>
-			</Sheet.Content>
-		</Sheet.Root>
-
-		<!-- JSON view sheet -->
-		<ProductJsonSheet
-			bind:open={jsonSheetOpen}
-			{productJsonForView}
-			{jsonKeysCount}
-		/>
 
 		<!-- Variants edit sheet -->
 		<Sheet.Root bind:open={variantsEditSheetOpen}>
@@ -2532,14 +1420,4 @@ import ProductVariantsTable from '$lib/products/ProductVariantsTable.svelte';
 			</Sheet.Content>
 		</Sheet.Root>
 	{/if}
-
-	<ProductSalesChannelsSheet
-		bind:open={salesChannelsSheetOpen}
-		channels={allSalesChannels}
-		selectedIds={productSalesChannelIds}
-		onSelectedIdsChange={(set) => (productSalesChannelIds = set)}
-		onSave={updateProductSalesChannels}
-		onCancel={() => (salesChannelsSheetOpen = false)}
-		submitting={salesChannelsSubmitting}
-	/>
 </div>

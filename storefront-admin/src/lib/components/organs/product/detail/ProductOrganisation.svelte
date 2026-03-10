@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
+	import ProductOrganisationSheet from './ProductOrganisationSheet.svelte';
 	import type { Product } from '$lib/products/types.js';
 	import type { ProductCategory } from '$lib/product-categories/types.js';
+	import type { ProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
 
 	type ProductWithOrgFields = Product & {
 		collection_ids?: string[];
@@ -11,9 +13,15 @@
 		tags?: Array<{ id: string; value: string }>;
 	};
 
-	export let product: ProductWithOrgFields | null = null;
-	export let category: ProductCategory | null = null;
-	export let onOpenOrgSheet: () => void;
+	interface Props {
+		product: ProductWithOrgFields | ProductDetail | null;
+		category: ProductCategory | null;
+		onSaved: () => void | Promise<void>;
+	}
+
+	let { product, category, onSaved }: Props = $props();
+
+	let orgSheetOpen = $state(false);
 </script>
 
 <div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
@@ -23,7 +31,7 @@
 			variant="ghost"
 			size="icon"
 			class="size-8 shrink-0"
-			onclick={onOpenOrgSheet}
+			onclick={() => (orgSheetOpen = true)}
 			aria-label="Edit organisation"
 		>
 			<Pencil class="size-4" />
@@ -61,3 +69,4 @@
 	</dl>
 </div>
 
+<ProductOrganisationSheet bind:open={orgSheetOpen} product={product as ProductDetail | null} onSaved={onSaved} />

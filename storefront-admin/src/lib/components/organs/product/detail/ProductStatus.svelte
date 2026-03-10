@@ -1,11 +1,13 @@
 <script lang="ts">
 	import * as Select from '$lib/components/ui/select/index.js';
 
-	export let status: 'draft' | 'proposed' | 'published' | 'rejected' | undefined;
-	export let disabled = false;
-	export let onStatusChange: (
-		status: 'draft' | 'proposed' | 'published' | 'rejected'
-	) => void;
+	interface Props {
+		status: 'draft' | 'proposed' | 'published' | 'rejected' | undefined;
+		disabled?: boolean;
+		onStatusChange: (status: 'draft' | 'proposed' | 'published' | 'rejected') => void;
+	}
+
+	let { status, disabled = false, onStatusChange }: Props = $props();
 
 	function statusLabel(s: string | undefined): string {
 		if (!s) return 'Draft';
@@ -35,7 +37,7 @@
 				onStatusChange(v);
 			}
 		}}
-		disabled={disabled}
+		{disabled}
 	>
 		<Select.Trigger class="w-full">
 			<span class="flex items-center gap-2">
@@ -81,7 +83,7 @@
 			if (v === 'public') onStatusChange('published');
 			if (v === 'private') onStatusChange('draft');
 		}}
-		disabled={disabled}
+		{disabled}
 	>
 		<Select.Trigger class="w-full">
 			{status === 'published' ? 'Public' : 'Private'}
@@ -92,4 +94,3 @@
 		</Select.Content>
 	</Select.Root>
 </div>
-

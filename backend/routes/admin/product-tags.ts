@@ -20,7 +20,7 @@ import {
   RetrieveProductTagProcess,
   RetrieveProductTagResponseSchema,
   CreateProductTagSchema,
-  CreateProductTagsResponseSchema,
+  CreateProductTagResponseSchema,
   UpdateProductTagSchema,
   UpdateProductTagsResponseSchema,
   DeleteProductTagsSchema,
@@ -112,7 +112,7 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
     {
       body: CreateProductTagSchema,
       response: {
-        200: CreateProductTagsResponseSchema,
+          200: CreateProductTagResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },

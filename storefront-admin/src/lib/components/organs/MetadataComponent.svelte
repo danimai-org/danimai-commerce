@@ -1,0 +1,41 @@
+<script lang="ts">
+	import { Button } from '$lib/components/ui/button/index.js';
+	import ExternalLink from '@lucide/svelte/icons/external-link';
+	import EditMetadataSheet from './EditMetadataSheet.svelte';
+
+	interface Props {
+		keysCount: number;
+		productId: string | null | undefined;
+		metadata: Record<string, unknown> | null | undefined;
+		onSaved: () => void | Promise<void>;
+	}
+
+	let { keysCount = 0, productId, metadata, onSaved }: Props = $props();
+
+	let metadataSheetOpen = $state(false);
+</script>
+
+<div class="rounded-lg border bg-card p-4 shadow-sm">
+	<div class="flex items-center justify-between gap-2">
+		<h3 class="font-medium">Metadata</h3>
+		<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+			{keysCount} keys
+		</span>
+		<Button
+			variant="ghost"
+			size="icon"
+			class="size-8 shrink-0"
+			onclick={() => (metadataSheetOpen = true)}
+		>
+			<ExternalLink class="size-4" />
+			<span class="sr-only">Open</span>
+		</Button>
+	</div>
+</div>
+
+<EditMetadataSheet
+	bind:open={metadataSheetOpen}
+	{productId}
+	{metadata}
+	onSaved={onSaved}
+/>

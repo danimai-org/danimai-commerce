@@ -1,9 +1,18 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
+	import EditAttributesSheet from './EditAttributesSheet.svelte';
+	import type { ProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
 
-	export let attributes: Array<{ id: string; title: string; value?: string }> = [];
-	export let onOpenEditAttributesSheet: () => void;
+	interface Props {
+		attributes?: Array<{ id: string; title: string; value?: string }>;
+		product: ProductDetail | null;
+		onSaved: () => void | Promise<void>;
+	}
+
+	let { attributes = [], product, onSaved }: Props = $props();
+
+	let editAttributesSheetOpen = $state(false);
 </script>
 
 <div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
@@ -13,7 +22,7 @@
 			variant="ghost"
 			size="icon"
 			class="size-8 shrink-0"
-			onclick={onOpenEditAttributesSheet}
+			onclick={() => (editAttributesSheetOpen = true)}
 			aria-label="Edit attributes"
 		>
 			<Pencil class="size-4" />
@@ -24,7 +33,7 @@
 			{#each attributes as attr (attr.id)}
 				<div>
 					<dt class="font-medium text-muted-foreground">{attr.title}</dt>
-					<dd class="break-words text-foreground">{attr.value ?? '—'}</dd>
+					<dd class="wrap-break-word text-foreground">{attr.value ?? '—'}</dd>
 				</div>
 			{/each}
 		{:else}
@@ -36,3 +45,4 @@
 	</dl>
 </div>
 
+<EditAttributesSheet bind:open={editAttributesSheetOpen} {product} onSaved={onSaved} />

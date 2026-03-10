@@ -2,6 +2,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import Share2 from '@lucide/svelte/icons/share-2';
 	import Pencil from '@lucide/svelte/icons/pencil';
+	import ProductSalesChannelsSheet from '$lib/components/organs/product-detail/ProductSalesChannelsSheet.svelte';
 
 	type SalesChannel = {
 		id: string;
@@ -9,9 +10,37 @@
 		is_default?: boolean;
 	};
 
-	export let allSalesChannels: SalesChannel[] = [];
-	export let productSalesChannelIds: Set<string> = new Set();
-	export let onOpenSalesChannelsSheet: () => void;
+	interface Props {
+		allSalesChannels: SalesChannel[];
+		productSalesChannelIds: Set<string>;
+		setProductSalesChannelIds: (set: Set<string>) => void;
+		updateProductSalesChannels: (selectedIds: Set<string>) => Promise<void>;
+		onSaved: () => void | Promise<void>;
+	}
+
+	let {
+		allSalesChannels = [],
+		productSalesChannelIds = new Set(),
+		setProductSalesChannelIds,
+		updateProductSalesChannels,
+		onSaved
+	}: Props = $props();
+
+	let sheetOpen = $state(false);
+	let submitting = $state(false);
+
+	async function handleSave() {
+		submitting = true;
+		try {
+			await updateProductSalesChannels(productSalesChannelIds);
+			await onSaved();
+			sheetOpen = false;
+		} catch {
+			// error can be shown by parent or sheet
+		} finally {
+			submitting = false;
+		}
+	}
 </script>
 
 <div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
@@ -21,7 +50,7 @@
 			variant="ghost"
 			size="icon"
 			class="size-8 shrink-0"
-			onclick={onOpenSalesChannelsSheet}
+			onclick={() => (sheetOpen = true)}
 			aria-label="Edit sales channels"
 		>
 			<Pencil class="size-4" />
@@ -49,3 +78,12 @@
 	</p>
 </div>
 
+<ProductSalesChannelsSheet
+	bind:open={sheetOpen}
+	channels={allSalesChannels}
+	selectedIds={productSalesChannelIds}
+	onSelectedIdsChange={setProductSalesChannelIds}
+	onSave={handleSave}
+	onCancel={() => (sheetOpen = false)}
+	submitting={submitting}
+/>
