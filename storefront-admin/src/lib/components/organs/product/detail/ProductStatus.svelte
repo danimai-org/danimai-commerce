@@ -1,13 +1,8 @@
 <script lang="ts">
 	import * as Select from '$lib/components/ui/select/index.js';
+	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
 
-	interface Props {
-		status: 'draft' | 'proposed' | 'published' | 'rejected' | undefined;
-		disabled?: boolean;
-		onStatusChange: (status: 'draft' | 'proposed' | 'published' | 'rejected') => void;
-	}
-
-	let { status, disabled = false, onStatusChange }: Props = $props();
+	const status = $derived(getProductDetail().data?.status ?? 'draft');
 
 	function statusLabel(s: string | undefined): string {
 		if (!s) return 'Draft';
@@ -34,10 +29,10 @@
 		value={status ?? 'draft'}
 		onValueChange={(v) => {
 			if (v && (v === 'draft' || v === 'proposed' || v === 'published' || v === 'rejected')) {
-				onStatusChange(v);
+				// onStatusChange(v);
 			}
 		}}
-		{disabled}
+		// {disabled}
 	>
 		<Select.Trigger class="w-full">
 			<span class="flex items-center gap-2">
@@ -79,11 +74,11 @@
 	<Select.Root
 		type="single"
 		value={status === 'published' ? 'public' : 'private'}
-		onValueChange={(v) => {
-			if (v === 'public') onStatusChange('published');
-			if (v === 'private') onStatusChange('draft');
+		onValueChange={() => {
+			// if (v === 'public') onStatusChange('published');
+			// if (v === 'private') onStatusChange('draft');
 		}}
-		{disabled}
+		// {disabled}
 	>
 		<Select.Trigger class="w-full">
 			{status === 'published' ? 'Public' : 'Private'}

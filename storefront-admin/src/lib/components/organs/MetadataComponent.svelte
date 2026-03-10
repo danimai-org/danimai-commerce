@@ -4,13 +4,12 @@
 	import EditMetadataSheet from './EditMetadataSheet.svelte';
 
 	interface Props {
-		keysCount: number;
 		productId: string | null | undefined;
 		metadata: Record<string, unknown> | null | undefined;
 		onSaved: () => void | Promise<void>;
 	}
 
-	let { keysCount = 0, productId, metadata, onSaved }: Props = $props();
+	let { productId, metadata, onSaved }: Props = $props();
 
 	let metadataSheetOpen = $state(false);
 </script>
@@ -19,7 +18,7 @@
 	<div class="flex items-center justify-between gap-2">
 		<h3 class="font-medium">Metadata</h3>
 		<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-			{keysCount} keys
+			{Object.keys(metadata ?? {}).length} keys
 		</span>
 		<Button
 			variant="ghost"

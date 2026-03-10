@@ -18,6 +18,7 @@
 	import CreateProductModal from '$lib/products/CreateProductModal.svelte';
 	import { SvelteURLSearchParams,  } from 'svelte/reactivity';
 	import {untrack} from "svelte"
+	import { resolve } from '$app/paths';
 
 	
 	let createOpen = $state(false);
@@ -34,7 +35,7 @@
 
 
 	async function deleteProducts(ids: string[]): Promise<void> {
-		const res = await client.products.delete({  product_ids: ids });
+		await client.products.delete({  product_ids: ids });
 	}
 
 	const queryData = $derived(paginateState.query.data as ProductsListResponse | undefined);
@@ -52,7 +53,6 @@
 	const end = $derived(paginateState.end);
 	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
 	const deleteItem = $derived(paginateState.deleteItem);
-	const refetch = $derived(paginateState.refetch);
 	const searchText = $derived(paginateState.searchText);
 
 	function goWithParams(params: Record<string, string>) {
@@ -95,7 +95,7 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => goto(`/products/${item.id}`)
+					onClick: (item) => goto(resolve(`/products/${item.id}`))
 				},
 				{
 					label: 'Delete',
@@ -161,7 +161,7 @@
 	</div>
 </div>
 
-<CreateProductModal bind:open={createOpen} onSuccess={() => refetch()} />
+<CreateProductModal bind:open={createOpen} onSuccess={() => paginateState.query.refetch()} />
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}

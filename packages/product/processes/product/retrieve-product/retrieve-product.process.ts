@@ -69,7 +69,14 @@ export class RetrieveProductProcess
         join
           .onRef("product_tags.id", "=", "product_tag_relations.product_tag_id")
           .on("product_tags.deleted_at", "is", null),
-      )
+    )
+      // Product Sales Channels
+      .leftJoin("product_sales_channels", "product_sales_channels.product_id", "products.id")
+      .leftJoin("sales_channels", (join) =>
+        join
+          .onRef("sales_channels.id", "=", "product_sales_channels.sales_channel_id")
+          .on("sales_channels.deleted_at", "is", null),
+    )
       .select([
         "products.id",
         "products.title",
@@ -77,6 +84,8 @@ export class RetrieveProductProcess
         "products.description",
         "products.created_at",
         "products.updated_at",
+        "products.metadata",
+       "products.status",
        () =>  sql<Static<typeof RetrieveProductSchema["category"]> | null>`
         CASE
           WHEN product_categories.id IS NULL THEN NULL
@@ -123,12 +132,25 @@ export class RetrieveProductProcess
           )::json[]
         END
        `.as('tags'),
+       () =>  sql<Static<typeof RetrieveProductSchema["sales_channels"]>[]>`
+        CASE
+          WHEN count(sales_channels.id) = 0 THEN ARRAY[]::json[]
+          ELSE array_agg(
+            DISTINCT jsonb_build_object(
+              'id', sales_channels.id,
+              'name', sales_channels.name
+            )
+          )::json[]
+        END
+       `.as('sales_channels'),
       ])
       .groupBy([
         "products.id",
         "products.title",
         "products.handle",
         "product_categories.id",
+        "products.status",
+        "products.metadata",
       ])
       .executeTakeFirst();
 

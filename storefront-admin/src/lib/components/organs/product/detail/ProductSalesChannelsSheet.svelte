@@ -4,15 +4,16 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import Search from '@lucide/svelte/icons/search';
 	import { cn } from '$lib/utils.js';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	export type SalesChannel = { id: string; name: string; is_default?: boolean };
 
 	interface Props {
 		open: boolean;
-		channels: SalesChannel[];
-		selectedIds: Set<string>;
-		onSelectedIdsChange: (set: Set<string>) => void;
-		onSave: () => void | Promise<void>;
+		channels?: SalesChannel[];
+		selectedIds?: SvelteSet<string>;
+		onSelectedIdsChange: (set: SvelteSet<string>) => void;
+		onSave: () => void;
 		onCancel: () => void;
 		submitting: boolean;
 	}
@@ -20,7 +21,7 @@
 	let {
 		open = $bindable(false),
 		channels = [],
-		selectedIds = new Set(),
+		selectedIds = new SvelteSet<string>(),
 		onSelectedIdsChange,
 		onSave,
 		onCancel,
@@ -36,7 +37,7 @@
 	);
 
 	function toggle(channel: SalesChannel) {
-		const newSet = new Set(selectedIds);
+		const newSet = new SvelteSet(selectedIds);
 		if (newSet.has(channel.id)) {
 			newSet.delete(channel.id);
 		} else {

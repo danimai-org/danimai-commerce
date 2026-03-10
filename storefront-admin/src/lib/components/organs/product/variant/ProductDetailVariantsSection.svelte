@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
 		PaginationTable,
@@ -11,6 +10,7 @@
 	} from '$lib/components/organs/index.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
+	import { SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
 
 	type ProductVariant = {
 		id: string;
@@ -44,7 +44,7 @@
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
 	function updateVariantUrl(updates: { page?: number; search?: string }) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		if (updates.page != null) params.set('page', String(updates.page));
 		if (updates.search !== undefined) {
 			const s = updates.search.trim();
@@ -52,27 +52,17 @@
 			else params.delete('search');
 			params.set('page', '1');
 		}
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		// goto(resolve(`${page.url.pathname}?${params.toString()}`), { replaceState: true });
 	}
 
 	const variantPage = $derived(Math.max(1, Number(paginationQuery.page) || 1));
 	const variantLimit = $derived(Math.max(1, Math.min(100, Number(paginationQuery.limit) || 10)));
-	let variantSearchQuery = $state('');
-
-	$effect(() => {
-		variantSearchQuery = paginationQuery.search ?? '';
-	});
-	$effect(() => {
-		const currentSearch = (page.url.searchParams.get('search') ?? '').trim();
-		if (variantSearchQuery.trim() !== currentSearch) {
-			updateVariantUrl({ search: variantSearchQuery });
-		}
-	});
+	const variantSearchQuery = $derived.by(() => paginationQuery.search ?? '');
 
 	const optionsWithValues = $derived.by(() => {
 		if (options.length === 0) return [] as { option: ProductOption; values: string[] }[];
 		return options.map((opt, optIndex) => {
-			const valuesSet = new Set<string>();
+			const valuesSet = new SvelteSet<string>();
 			if (options.length === 1) {
 				variants.forEach((v) => {
 					if (v.title?.trim()) valuesSet.add(v.title.trim());
@@ -134,28 +124,13 @@
 		},
 		{ label: 'SKU', key: 'sku', type: 'text' },
 		{ label: 'Inventory', key: 'manage_inventory', type: 'boolean' },
-		{ label: 'Price', key: 'price_display', type: 'text' },
+		{ label: 'Price', key: 'price_amount', type: 'text' },
 		{ label: 'Created', key: 'created_at', type: 'date' },
 		{ label: 'Updated', key: 'updated_at', type: 'date' },
-		{
-			label: 'Actions',
-			key: 'actions',
-			type: 'actions',
-			actions: [
-				{
-					label: 'Edit',
-					key: 'edit',
-					type: 'button',
-					onClick: (row) => onEditVariant(row)
-				},
-				{
-					label: 'Delete',
-					key: 'delete',
-					type: 'button',
-					onClick: (row) => onDeleteVariant(row)
-				}
-			]
-		}
+		{ label: 'Actions', key: 'actions', type: 'actions', actions: [
+			{ label: 'Edit', key: 'edit', type: 'button', onClick: (row) => onEditVariant(row) },
+			{ label: 'Delete', key: 'delete', type: 'button', onClick: (row) => onDeleteVariant(row) }
+		] },
 	];
 
 	function goToVariantPage(pageNum: number) {
@@ -209,7 +184,7 @@
 	<!-- Variants section -->
 	<div class="mt-4">
 		<PaginationTable
-			bind:searchQuery={variantSearchQuery}
+			searchQuery={variantSearchQuery}
 			searchPlaceholder="Search variants…"
 			showFilter={false}
 			showSort={false}

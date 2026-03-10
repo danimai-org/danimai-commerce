@@ -1,4 +1,6 @@
 import { Type, type Static } from "@sinclair/typebox";
+import { ProductStatusEnum } from "../../../db/type";
+
 // input schema
 export const RetrieveProductSchema = Type.Object({
   id: Type.String(),
@@ -31,6 +33,11 @@ const RetrieveProductTagSchema = Type.Object({
   value: Type.String(),
 });
 
+const RetrieveSalesChannelSchema = Type.Object({
+  id: Type.String(),
+  name: Type.String(),
+});
+
 export const RetrieveProductResponseSchema = Type.Object({
   id: Type.String(),
   title: Type.String(),
@@ -42,6 +49,9 @@ export const RetrieveProductResponseSchema = Type.Object({
   collections: Type.Array(RetrieveProductCollectionSchema),
   attributes: Type.Array(RetrieveProductAttributeSchema),
   tags: Type.Array(RetrieveProductTagSchema),
+  status: Type.Enum(ProductStatusEnum),
+  sales_channels: Type.Array(RetrieveSalesChannelSchema),
+  metadata: Type.Union([Type.Null(), Type.Record(Type.String(), Type.Union([Type.String(), Type.Number(), Type.Array(Type.String()), Type.Array(Type.Number())]))]),
 });
 
 export type RetrieveProductProcessOutput = Static<

@@ -1,11 +1,9 @@
 import { Elysia } from "elysia";
-import { StaticDecode, Type } from "@sinclair/typebox";
+import { type StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   CREATE_PRODUCT_PROCESS,
- 
   UPDATE_PRODUCT_PROCESS,
-
   DELETE_PRODUCTS_PROCESS,
   PAGINATED_PRODUCTS_PROCESS,
   CreateProductProcess,
@@ -78,9 +76,9 @@ export const productRoutes = new Elysia({ prefix: "/products" })
   )
   .post(
     "/",
-    async ({ body: input }: { body: StaticDecode<typeof CreateProductSchema> }) => {
+    async ({ body }) => {
       const process = getService<CreateProductProcess>(CREATE_PRODUCT_PROCESS);
-      return process.runOperations({ input: input as StaticDecode<typeof CreateProductSchema> });
+      return process.runOperations({ input: body as StaticDecode<typeof CreateProductSchema> });
     },
     {
       body: CreateProductSchema,
@@ -98,9 +96,9 @@ export const productRoutes = new Elysia({ prefix: "/products" })
   )
   .post(
     "/batch",
-    async ({ body: input }: { body: StaticDecode<typeof CreateProductSchema> }) => {
+    async ({ body }) => {
       const process = getService<CreateProductProcess>(CREATE_PRODUCT_PROCESS);
-      return process.runOperations({ input });
+      return process.runOperations({ input: body as StaticDecode<typeof CreateProductSchema> });
     },
     {
       body: CreateProductSchema,
@@ -118,10 +116,10 @@ export const productRoutes = new Elysia({ prefix: "/products" })
   )
   .put(
     "/:id",
-    async ({ params, body }: { params: { id: string }, body: StaticDecode<typeof UpdateProductSchema> }) => {
+    async ({ params, body }) => {
       const process = getService<UpdateProductProcess>(UPDATE_PRODUCT_PROCESS);
       return process.runOperations({
-        input: { ...(body as Record<string, unknown>), id: params.id },
+        input: { ...body , id: params.id },
       });
     },
     {
@@ -136,26 +134,6 @@ export const productRoutes = new Elysia({ prefix: "/products" })
         tags: ["Products"],
         summary: "Update a product",
         description: "Updates an existing product by ID",
-      },
-    }
-  )
-  .put(
-    "/batch",
-    async ({ body: input }: { body: StaticDecode<typeof UpdateProductSchema> }) => {
-      const process = getService<UpdateProductProcess>(UPDATE_PRODUCT_PROCESS);
-      return process.runOperations({ input });
-    },
-    {
-      body: UpdateProductSchema,
-      response: {
-        200: UpdateProductResponseSchema,
-        400: ValidationErrorResponseSchema,
-        500: InternalErrorResponseSchema,
-      },
-      detail: {
-        tags: ["Products"],
-        summary: "Update multiple products",
-        description: "Updates multiple products in a single batch operation",
       },
     }
   )

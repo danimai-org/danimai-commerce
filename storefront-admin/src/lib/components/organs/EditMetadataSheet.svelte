@@ -100,7 +100,7 @@
 								</tr>
 							</thead>
 							<tbody>
-								{#each metadataRows as row, i}
+								<!-- {#each metadataRows as row, i}
 									<tr class="border-b last:border-0">
 										<td class="px-4 py-2">
 											<Input bind:value={row.key} placeholder="Key" class="h-9 w-full" />
@@ -120,7 +120,7 @@
 											</Button>
 										</td>
 									</tr>
-								{/each}
+								{/each} -->
 							</tbody>
 						</table>
 					</div>

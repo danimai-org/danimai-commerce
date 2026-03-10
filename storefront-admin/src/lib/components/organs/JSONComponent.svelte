@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
-	import ProductJsonSheet from '$lib/components/organs/product-detail/ProductJsonSheet.svelte';
+	import ProductJsonSheet from '$lib/components/organs/product/detail/ProductJsonSheet.svelte';
 
 	interface Props {
 		product: Record<string, unknown> | null;

@@ -21,15 +21,8 @@ export {
 	EditPromotionSheet
 } from './promotion/index.js';
 export type { Promotion, Campaign } from './promotion/index.js';
-export { ProductSalesChannelsSheet, ProductDetailVariantsSection } from './product-detail/index.js';
-export type { SalesChannel as ProductDetailSalesChannel } from './product-detail/index.js';
-export {
-	ProductHero,
-	ProductStatus,
-	ProductOrganisation,
-	ProductSalesChannel,
-	ProductAttribute
-} from './product/detail/index.js';
+export * from './product/detail/index.js';
 export { default as MetadataComponent } from './MetadataComponent.svelte';
 export { default as JSONComponent } from './JSONComponent.svelte';
 export { default as EditMetadataSheet } from './EditMetadataSheet.svelte';
+export * from './product/variant/index.js';

@@ -1,17 +1,11 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
-	import EditAttributesSheet from './EditAttributesSheet.svelte';
-	import type { ProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
+	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
+    import EditAttributesSheet from './EditAttributesSheet.svelte';
 
-	interface Props {
-		attributes?: Array<{ id: string; title: string; value?: string }>;
-		product: ProductDetail | null;
-		onSaved: () => void | Promise<void>;
-	}
-
-	let { attributes = [], product, onSaved }: Props = $props();
-
+	const attributes = $derived(getProductDetail().data?.attributes ?? []);
+		
 	let editAttributesSheetOpen = $state(false);
 </script>
 
@@ -22,7 +16,9 @@
 			variant="ghost"
 			size="icon"
 			class="size-8 shrink-0"
-			onclick={() => (editAttributesSheetOpen = true)}
+			onclick={() => {
+				editAttributesSheetOpen = true;
+			}}
 			aria-label="Edit attributes"
 		>
 			<Pencil class="size-4" />
@@ -45,4 +41,4 @@
 	</dl>
 </div>
 
-<EditAttributesSheet bind:open={editAttributesSheetOpen} {product} onSaved={onSaved} />
+<EditAttributesSheet bind:open={editAttributesSheetOpen} />

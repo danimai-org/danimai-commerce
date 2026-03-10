@@ -47,7 +47,7 @@ export interface ProductTable {
   thumbnail: string | null;
   discountable: boolean;
   external_id: string | null;
-  metadata: unknown | null;
+  metadata: Record<string, any> | null;
   category_id: string | null;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
