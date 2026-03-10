@@ -39,6 +39,41 @@ export async function listCategories(
 	};
 }
 
+export async function createCategory(payload: {
+	value: string;
+	handle: string;
+}): Promise<ProductCategory> {
+	const res = await fetch(`${getApiBase()}/product-categories`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(payload)
+	});
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(text || `HTTP ${res.status}`);
+	}
+	return (await res.json()) as ProductCategory;
+}
+
+export async function updateCategory(
+	id: string,
+	payload: {
+		value: string;
+		handle: string;
+	}
+): Promise<ProductCategory> {
+	const res = await fetch(`${getApiBase()}/product-categories/${id}`, {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(payload)
+	});
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(text || `HTTP ${res.status}`);
+	}
+	return (await res.json()) as ProductCategory;
+}
+
 export async function deleteCategories(ids: string[]): Promise<void> {
 	const res = await fetch(`${getApiBase()}/product-categories`, {
 		method: 'DELETE',

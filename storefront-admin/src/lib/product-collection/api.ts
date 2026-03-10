@@ -1,4 +1,8 @@
-import type { ProductCollection, CollectionsListResponse, ListCollectionsParams } from './types.js';
+import type {
+	ProductCollection,
+	CollectionsListResponse,
+	ListCollectionsParams
+} from './types.js';
 import type { PaginationMeta } from '$lib/product-categories/types.js';
 
 const getApiBase = () => import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
@@ -50,4 +54,47 @@ export async function deleteCollections(ids: string[]): Promise<void> {
 		const text = await res.text();
 		throw new Error(text || `HTTP ${res.status}`);
 	}
+}
+
+type UpsertCollectionPayload = {
+	title: string;
+	handle: string;
+	metadata?: unknown;
+};
+
+export async function createCollection(payload: UpsertCollectionPayload): Promise<ProductCollection> {
+	const res = await fetch(`${getApiBase()}/collections`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ collections: [payload] })
+	});
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(text || `HTTP ${res.status}`);
+	}
+	const json = (await res.json()) as {
+		collections?: ProductCollection[];
+		collection?: ProductCollection;
+	};
+	if (json.collection) return json.collection;
+	if (json.collections && json.collections[0]) return json.collections[0];
+	throw new Error('Unexpected response from collections create API');
+}
+
+export async function updateCollection(
+	id: string,
+	payload: UpsertCollectionPayload
+): Promise<ProductCollection> {
+	const res = await fetch(`${getApiBase()}/collections/${id}`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(payload)
+	});
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(text || `HTTP ${res.status}`);
+	}
+	const json = (await res.json()) as { collection?: ProductCollection };
+	if (json.collection) return json.collection;
+	throw new Error('Unexpected response from collections update API');
 }

@@ -5,6 +5,9 @@ export { default as RoleFormSheet } from './role-form-sheet/role-form-sheet.svel
 export { default as CustomerFormSheet } from './customer-form-sheet/customer-form-sheet.svelte';
 export { default as CustomerAddressFormSheet } from './customer-address-form-sheet/customer-address-form-sheet.svelte';
 export { default as LocationFormSheet } from './location-form-sheet/location-form-sheet.svelte';
+export { default as CategoryFormSheet } from './category-form-sheet/category-form-sheet.svelte';
+export { default as CollectionFormSheet } from './collection-form-sheet/collection-form-sheet.svelte';
+export { default as TagFormSheet } from './tag-form-sheet/tag-form-sheet.svelte';
 export { default as PriceListFormSheet } from './price-list-form-sheet/price-list-form-sheet.svelte';
 export { default as TaxRegionFormSheet } from './tax-region-form-sheet/tax-region-form-sheet.svelte';
 export { default as CurrencyFormSheet } from './currency-form-sheet/currency-form-sheet.svelte';
