@@ -25,17 +25,28 @@ export class CreateProductTagsProcess
     schema: CreateProductTagSchema,
   }) context: ProcessContextType<typeof CreateProductTagSchema>) {
     const { input } = context;
-const tag = await this.db
+    const existingTag = await this.db
+      .selectFrom("product_tags")
+      .where("value", "ilike", input.value)
+      .where("deleted_at", "is", null)
+      .selectAll()
+      .executeTakeFirst();
+
+    if (existingTag) {
+      return existingTag;
+    }
+
+    const tag = await this.db
       .insertInto("product_tags")
       .values({
         ...input,
-        id: randomUUID(),
       })
       .returningAll()
-  .executeTakeFirst();
+      .executeTakeFirst();
+
     if (!tag) {
       throw new InternalServerError("Failed to create product tag");
     }
-      return tag;
-    }
+    return tag;
   }
+}

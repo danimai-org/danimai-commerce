@@ -6,4 +6,5 @@ export type ValueErrorType =
   | "invalid"
   | "invalid_state"
   | "required"
+  | "already_exists"
   | keyof typeof SchemaValueErrorType;

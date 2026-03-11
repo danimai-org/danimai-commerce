@@ -77,6 +77,19 @@ export class RetrieveProductProcess
           .onRef("sales_channels.id", "=", "product_sales_channels.sales_channel_id")
           .on("sales_channels.deleted_at", "is", null),
     )
+      // Product Options
+      .leftJoin("product_option_values", (join) =>
+        join
+      .onRef("product_option_values.product_id", "=", "products.id")
+      .on("product_option_values.deleted_at", "is", null),
+    )
+    .leftJoin("product_options", "product_options.id", "product_option_values.option_id")
+      // Product Variants
+      .leftJoin("product_variants", "product_variants.product_id", "products.id")
+      .leftJoin("product_variant_option_relations", (join) =>
+        join
+          .onRef("product_variant_option_relations.variant_id", "=", "product_variants.id")
+    )
       .select([
         "products.id",
         "products.title",
@@ -86,6 +99,8 @@ export class RetrieveProductProcess
         "products.updated_at",
         "products.metadata",
        "products.status",
+       "products.discountable",
+       "products.is_giftcard",
        () =>  sql<Static<typeof RetrieveProductSchema["category"]> | null>`
         CASE
           WHEN product_categories.id IS NULL THEN NULL
@@ -143,6 +158,7 @@ export class RetrieveProductProcess
           )::json[]
         END
        `.as('sales_channels'),
+      //  () =>  sql<Static<typeof RetrieveProductSchema["options"]>[]>`
       ])
       .groupBy([
         "products.id",
