@@ -2,14 +2,12 @@ import { Elysia } from "elysia";
 import { Type, type StaticDecode } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
-  CREATE_PRODUCT_CATEGORIES_PROCESS,
-  UPDATE_PRODUCT_CATEGORIES_PROCESS,
+  CREATE_PRODUCT_CATEGORY_PROCESS,
+  UPDATE_PRODUCT_CATEGORY_PROCESS,
   DELETE_PRODUCT_CATEGORIES_PROCESS,
-  BATCH_LINK_PRODUCTS_TO_CATEGORY_PROCESS,
-  CreateProductCategoriesProcess,
-  UpdateProductCategoriesProcess,
+  CreateProductCategoryProcess,
+  UpdateProductCategoryProcess,
   DeleteProductCategoriesProcess,
-  BatchLinkProductsToCategoryProcess,
   PAGINATED_PRODUCT_CATEGORIES_PROCESS,
   PaginatedProductCategoriesProcess,
   PaginatedProductCategoriesSchema,
@@ -18,11 +16,10 @@ import {
   RetrieveProductCategoryProcess,
   RetrieveProductCategoryResponseSchema,
   CreateProductCategorySchema,
-  CreateProductCategoriesResponseSchema,
-  UpdateProductCategorySchema,
-  UpdateProductCategoriesResponseSchema,
+  CreateProductCategoryResponseSchema,
+  UpdateProductCategoryBodySchema,
+  UpdateProductCategoryResponseSchema,
   DeleteProductCategoriesSchema,
-  BatchLinkProductsToCategorySchema,
 } from "@danimai/product";
 import { handleProcessError } from "../../utils/error-handler";
 import {
@@ -31,18 +28,6 @@ import {
   NotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
-
-const UpdateProductCategoryBodySchema = Type.Object({
-  value: Type.Optional(Type.String()),
-  parent_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-  status: Type.Optional(Type.String()),
-  visibility: Type.Optional(Type.String()),
-  metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
-});
-
-const BatchLinkProductsBodySchema = Type.Object({
-  product_ids: Type.Array(Type.String()),
-});
 
 export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" })
   .onError(({ error, set }) => handleProcessError(error, set))
@@ -90,13 +75,13 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
   .post(
     "/",
     async ({ body: input }) => {
-      const process = getService<CreateProductCategoriesProcess>(CREATE_PRODUCT_CATEGORIES_PROCESS);
+      const process = getService<CreateProductCategoryProcess>(CREATE_PRODUCT_CATEGORY_PROCESS);
       return process.runOperations({ input });
     },
     {
       body: CreateProductCategorySchema,
       response: {
-        200: CreateProductCategoriesResponseSchema,
+        200: CreateProductCategoryResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -110,7 +95,7 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
   .put(
     "/:id",
     async ({ params, body }) => {
-      const process = getService<UpdateProductCategoriesProcess>(UPDATE_PRODUCT_CATEGORIES_PROCESS);
+      const process = getService<UpdateProductCategoryProcess>(UPDATE_PRODUCT_CATEGORY_PROCESS);
       return process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
       });
@@ -119,7 +104,7 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
       params: Type.Object({ id: Type.String() }),
       body: UpdateProductCategoryBodySchema,
       response: {
-        200: UpdateProductCategoriesResponseSchema,
+        200: UpdateProductCategoryResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -153,30 +138,3 @@ export const productCategoryRoutes = new Elysia({ prefix: "/product-categories" 
       },
     }
   )
-  .post(
-    "/:id/products",
-    async ({ params, body, set }) => {
-      const process = getService<BatchLinkProductsToCategoryProcess>(
-        BATCH_LINK_PRODUCTS_TO_CATEGORY_PROCESS
-      );
-      await process.runOperations({
-        input: { ...(body as Record<string, unknown>), category_id: params.id },
-      });
-      set.status = 204;
-      return undefined;
-    },
-    {
-      params: Type.Object({ id: Type.String() }),
-      body: BatchLinkProductsBodySchema,
-      response: {
-        204: NoContentResponseSchema,
-        400: ValidationErrorResponseSchema,
-        500: InternalErrorResponseSchema,
-      },
-      detail: {
-        tags: ["Product Categories"],
-        summary: "Link products to category",
-        description: "Links multiple products to a product category in a batch operation",
-      },
-    }
-  );

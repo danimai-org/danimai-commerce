@@ -1,28 +1,24 @@
 import { Elysia } from "elysia";
-import { StaticDecode, Type } from "@sinclair/typebox";
-import { getService, PaginationSchema } from "@danimai/core";
+import { type StaticDecode, Type } from "@sinclair/typebox";
+import { getService } from "@danimai/core";
 import {
   CREATE_PRODUCT_TAGS_PROCESS,
-  UPDATE_PRODUCT_TAGS_PROCESS,
+  UPDATE_PRODUCT_TAG_PROCESS,
   DELETE_PRODUCT_TAGS_PROCESS,
   PAGINATED_PRODUCT_TAGS_PROCESS,
-  PAGINATED_PRODUCTS_BY_TAG_PROCESS,
   CreateProductTagsProcess,
-  UpdateProductTagsProcess,
+  UpdateProductTagProcess,
   DeleteProductTagsProcess,
   PaginatedProductTagsProcess,
-  PaginatedProductsByTagProcess,
   PaginatedProductTagsSchema,
   PaginatedProductTagsResponseSchema,
-  PaginatedProductsByTagSchema,
-  PaginatedProductsByTagResponseSchema,
   RETRIEVE_PRODUCT_TAG_PROCESS,
   RetrieveProductTagProcess,
   RetrieveProductTagResponseSchema,
   CreateProductTagSchema,
   CreateProductTagResponseSchema,
-  UpdateProductTagSchema,
-  UpdateProductTagsResponseSchema,
+  UpdateProductTagBodySchema,
+  UpdateProductTagResponseSchema,
   DeleteProductTagsSchema,
 } from "@danimai/product";
 import { handleProcessError } from "../../utils/error-handler";
@@ -32,11 +28,6 @@ import {
   NotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
-
-const UpdateProductTagBodySchema = Type.Object({
-  value: Type.Optional(Type.String()),
-  metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
-});
 
 export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
   .onError(({ error, set }) => handleProcessError(error, set))
@@ -81,28 +72,6 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
       },
     }
   )
-  .get(
-    "/:id/products",
-    async ({ params, query }) => {
-      const process = getService<PaginatedProductsByTagProcess>(PAGINATED_PRODUCTS_BY_TAG_PROCESS);
-      const input = { tag_id: params.id, ...query };
-      return process.runOperations({ input });
-    },
-    {
-      params: Type.Object({ id: Type.String() }),
-      query: PaginationSchema,
-      response: {
-        200: PaginatedProductsByTagResponseSchema,
-        400: ValidationErrorResponseSchema,
-        500: InternalErrorResponseSchema,
-      },
-      detail: {
-        tags: ["Product Tags"],
-        summary: "Get products by tag",
-        description: "Gets a paginated list of products that have this tag",
-      },
-    }
-  )
   .post(
     "/",
     async ({ body: input }) => {
@@ -112,7 +81,7 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
     {
       body: CreateProductTagSchema,
       response: {
-          200: CreateProductTagResponseSchema,
+        200: CreateProductTagResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -126,7 +95,7 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
   .put(
     "/:id",
     async ({ params, body }) => {
-      const process = getService<UpdateProductTagsProcess>(UPDATE_PRODUCT_TAGS_PROCESS);
+      const process = getService<UpdateProductTagProcess>(UPDATE_PRODUCT_TAG_PROCESS);
       return process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
       });
@@ -135,7 +104,7 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
       params: Type.Object({ id: Type.String() }),
       body: UpdateProductTagBodySchema,
       response: {
-        200: UpdateProductTagsResponseSchema,
+        200: UpdateProductTagResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },

@@ -1,16 +1,16 @@
 import { Type, type Static, type TObject, type TSchema, type StaticDecode, type TProperties } from "@sinclair/typebox";
 
 /** Optional schema that accepts string (comma-separated) or string[] and decodes to string[]. */
-export function commaSeparatedIds() {
-  return Type.Optional(
-    Type.Transform(Type.Union([Type.String(), Type.Array(Type.String())]))
-      .Decode((v: string | string[] | undefined) => {
-        if (v === undefined || v === null) return undefined;
-        if (typeof v === "string") return v.split(",").map((s) => s.trim()).filter(Boolean);
-        return Array.isArray(v) ? v.map((s) => String(s).trim()).filter(Boolean) : [];
-      })
-      .Encode((v: string[] | undefined) => v ?? [])
-  );
+export function commaSeparatedIds({ uniqueItems = true, format = "uuid" }: { uniqueItems?: boolean, format?: string } = {}) {
+    return Type.Optional(
+        Type.Transform(Type.Union([Type.String(), Type.Array(Type.String({ format }), { uniqueItems })]))
+            .Decode((v: string | string[] | undefined) => {
+                if (v === undefined || v === null) return undefined;
+                if (typeof v === "string") return v.split(",").map((s) => s.trim()).filter(Boolean);
+                return Array.isArray(v) ? v.map((s) => String(s).trim()).filter(Boolean) : [];
+            })
+            .Encode((v: string[] | undefined) => v ?? [])
+    );
 }
 
 export enum SortOrder {

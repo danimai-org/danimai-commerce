@@ -1,11 +1,11 @@
-import { Type, type Static } from "@sinclair/typebox";
+import { commaSeparatedIds } from "@danimai/core";
+import { Type, type StaticDecode } from "@sinclair/typebox";
 
 export const DeleteProductAttributesSchema = Type.Object({
-  attribute_ids: Type.Array(Type.String()),
-  metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
+  ids: commaSeparatedIds({ uniqueItems: true, format: "uuid" }),
 });
 
-export type DeleteProductAttributesProcessInput = Static<
+export type DeleteProductAttributesProcessInput = StaticDecode<
   typeof DeleteProductAttributesSchema
 >;
 

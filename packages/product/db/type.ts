@@ -7,7 +7,7 @@ export enum ProductStatusEnum {
   PUBLISHED = "published",
   REJECTED = "rejected",
 }
-  
+
 export interface Database {
   products: ProductTable;
   product_images: ProductImageTable;
@@ -24,7 +24,6 @@ export interface Database {
   product_option_values: ProductOptionValueTable;
 
   product_variants: ProductVariantTable;
-  product_variant_option_relations: ProductVariantOptionRelationTable;
   product_variant_image_relations: ProductVariantImageRelationTable;
 
   product_tags: ProductTagTable;
@@ -32,7 +31,6 @@ export interface Database {
 
   sales_channels: SalesChannelTable;
   product_sales_channels: ProductSalesChannelTable;
-
 }
 
 // table products
@@ -40,7 +38,6 @@ export interface ProductTable {
   id: Generated<string>;
   title: string;
   handle: string;
-  subtitle: string | null;
   description: string | null;
   is_giftcard: boolean;
   status: ProductStatusEnum;
@@ -132,7 +129,7 @@ export interface ProductVariantTable {
   metadata: unknown | null;
   variant_rank: number | null;
   thumbnail: string | null;
-  product_id: string | null;
+  product_id: string;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
   deleted_at: Date | null;
@@ -160,8 +157,9 @@ export interface ProductOptionValueTable {
   id: Generated<string>;
   value: string;
   metadata: unknown | null;
-  option_id: string | null;
-  product_id: string | null;
+  option_id: string;
+  product_id: string;
+  rank: number;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
   deleted_at: Date | null;
@@ -185,8 +183,15 @@ export type NewProductCollection = Insertable<ProductCollectionTable>;
 export type ProductCollectionUpdate = Updateable<ProductCollectionTable>;
 
 // table product_categories
-export type ProductCategoryStatus = "active" | "inactive";
-export type ProductCategoryVisibility = "public" | "private";
+export enum ProductCategoryStatus {
+  ACTIVE = "active",
+  INACTIVE = "inactive",
+}
+
+export enum ProductCategoryVisibility {
+  PUBLIC = "public",
+  PRIVATE = "private",
+}
 
 export interface ProductCategoryTable {
   id: Generated<string>;

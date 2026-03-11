@@ -2,13 +2,13 @@ import { Elysia } from "elysia";
 import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
-  CREATE_PRODUCT_ATTRIBUTE_GROUPS_PROCESS,
-  UPDATE_PRODUCT_ATTRIBUTE_GROUPS_PROCESS,
+  CREATE_PRODUCT_ATTRIBUTE_GROUP_PROCESS,
+  UPDATE_PRODUCT_ATTRIBUTE_GROUP_PROCESS,
   DELETE_PRODUCT_ATTRIBUTE_GROUPS_PROCESS,
   PAGINATED_PRODUCT_ATTRIBUTE_GROUPS_PROCESS,
   RETRIEVE_PRODUCT_ATTRIBUTE_GROUP_PROCESS,
-  CreateProductAttributeGroupsProcess,
-  UpdateProductAttributeGroupsProcess,
+  CreateProductAttributeGroupProcess,
+  UpdateProductAttributeGroupProcess,
   DeleteProductAttributeGroupsProcess,
   PaginatedProductAttributeGroupsProcess,
   RetrieveProductAttributeGroupProcess,
@@ -16,9 +16,10 @@ import {
   PaginatedProductAttributeGroupsResponseSchema,
   RetrieveProductAttributeGroupResponseSchema,
   CreateProductAttributeGroupSchema,
-  CreateProductAttributeGroupsResponseSchema,
-  UpdateProductAttributeGroupsResponseSchema,
+  CreateProductAttributeGroupResponseSchema,
+  UpdateProductAttributeGroupResponseSchema,
   DeleteProductAttributeGroupsSchema,
+  UpdateProductAttributeGroupSchema,
 } from "@danimai/product";
 import { handleProcessError } from "../../utils/error-handler";
 import {
@@ -27,12 +28,6 @@ import {
   NotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
-
-const UpdateProductAttributeGroupBodySchema = Type.Object({
-  title: Type.Optional(Type.String()),
-  metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
-  attribute_ids: Type.Optional(Type.Array(Type.String())),
-});
 
 export const productAttributeGroupRoutes = new Elysia({ prefix: "/product-attribute-groups" })
   .onError(({ error, set }) => handleProcessError(error, set))
@@ -80,13 +75,13 @@ export const productAttributeGroupRoutes = new Elysia({ prefix: "/product-attrib
   .post(
     "/",
     async ({ body: input }) => {
-      const process = getService<CreateProductAttributeGroupsProcess>(CREATE_PRODUCT_ATTRIBUTE_GROUPS_PROCESS);
+      const process = getService<CreateProductAttributeGroupProcess>(CREATE_PRODUCT_ATTRIBUTE_GROUP_PROCESS);
       return process.runOperations({ input });
     },
     {
       body: CreateProductAttributeGroupSchema,
       response: {
-        200: CreateProductAttributeGroupsResponseSchema,
+        200: CreateProductAttributeGroupResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -100,16 +95,16 @@ export const productAttributeGroupRoutes = new Elysia({ prefix: "/product-attrib
   .put(
     "/:id",
     async ({ params, body }) => {
-      const process = getService<UpdateProductAttributeGroupsProcess>(UPDATE_PRODUCT_ATTRIBUTE_GROUPS_PROCESS);
+      const process = getService<UpdateProductAttributeGroupProcess>(UPDATE_PRODUCT_ATTRIBUTE_GROUP_PROCESS);
       return process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
       });
     },
     {
       params: Type.Object({ id: Type.String() }),
-      body: UpdateProductAttributeGroupBodySchema,
+      body: UpdateProductAttributeGroupSchema,
       response: {
-        200: UpdateProductAttributeGroupsResponseSchema,
+        200: UpdateProductAttributeGroupResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },

@@ -3,13 +3,13 @@ import { ProductTagResponseSchema } from "../retrieve-product-tag/retrieve-produ
 
 // Input schema
 export const CreateProductTagSchema = Type.Object({
-  value: Type.String(),
+  value: Type.String({ examples: ["BestSeller"] }),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
 });
 
 export type CreateProductTagProcessInput = StaticDecode<
   typeof CreateProductTagSchema
-  >;
+>;
 
 // Output schema
 export const CreateProductTagResponseSchema = ProductTagResponseSchema;

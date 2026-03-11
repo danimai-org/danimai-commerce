@@ -9,13 +9,13 @@ import { ProductStatusEnum } from "../../../db/type";
 export const PaginatedProductsSchema = createPaginationSchema(
   Type.Object({
     status: Type.Optional(Type.Enum(ProductStatusEnum)),
-    category_ids: commaSeparatedIds(),
-    tag_ids: commaSeparatedIds(),
-    sales_channel_ids: commaSeparatedIds(),
-    collection_ids: commaSeparatedIds(),
-    }),
-    ["products.title", "products.handle", "products.status"]
-  );
+    category_ids: commaSeparatedIds({ format: "uuid" }),
+    tag_ids: commaSeparatedIds({ format: "uuid" }),
+    sales_channel_ids: commaSeparatedIds({ format: "uuid" }),
+    collection_ids: commaSeparatedIds({ format: "uuid" }),
+  }),
+  ["products.title", "products.handle", "products.status"]
+);
 
 export type PaginatedProductsProcessInput = StaticDecode<
   typeof PaginatedProductsSchema
