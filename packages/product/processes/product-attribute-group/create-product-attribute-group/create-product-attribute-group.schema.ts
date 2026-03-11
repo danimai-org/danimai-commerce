@@ -4,16 +4,23 @@ import { ProductAttributeGroupResponseSchema } from "../retrieve-product-attribu
 export const CreateProductAttributeGroupSchema = Type.Object({
   title: Type.String(),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
+  attributes: Type.Optional(Type.Array(
+    Type.Object({
+      attribute_id: Type.String({ format: "uuid" }),
+      required: Type.Optional(Type.Boolean()),
+    }),
+    { uniqueItems: true }
+  )),
 });
 
 export type CreateProductAttributeGroupProcessInput = Static<
   typeof CreateProductAttributeGroupSchema
 >;
 
-export const CreateProductAttributeGroupsResponseSchema = Type.Union([
+export const CreateProductAttributeGroupResponseSchema = Type.Union([
   ProductAttributeGroupResponseSchema,
   Type.Undefined(),
 ]);
-export type CreateProductAttributeGroupsProcessOutput = Static<
-  typeof CreateProductAttributeGroupsResponseSchema
+export type CreateProductAttributeGroupProcessOutput = Static<
+  typeof CreateProductAttributeGroupResponseSchema
 >;

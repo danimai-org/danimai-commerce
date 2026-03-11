@@ -2,26 +2,23 @@ import { Elysia } from "elysia";
 import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService, PaginationSchema } from "@danimai/core";
 import {
-  CREATE_PRODUCT_ATTRIBUTES_PROCESS,
-  UPDATE_PRODUCT_ATTRIBUTES_PROCESS,
+  CREATE_PRODUCT_ATTRIBUTE_PROCESS,
+  UPDATE_PRODUCT_ATTRIBUTE_PROCESS,
   DELETE_PRODUCT_ATTRIBUTES_PROCESS,
   PAGINATED_PRODUCT_ATTRIBUTES_PROCESS,
   RETRIEVE_PRODUCT_ATTRIBUTE_PROCESS,
-  PAGINATED_PRODUCTS_BY_ATTRIBUTE_PROCESS,
-  CreateProductAttributesProcess,
-  UpdateProductAttributesProcess,
+  CreateProductAttributeProcess,
+  UpdateProductAttributeProcess,
   DeleteProductAttributesProcess,
   PaginatedProductAttributesProcess,
   RetrieveProductAttributeProcess,
-  PaginatedProductsByAttributeProcess,
   PaginatedProductAttributesSchema,
   PaginatedProductAttributesResponseSchema,
   RetrieveProductAttributeResponseSchema,
-  PaginatedProductsByAttributeResponseSchema,
   CreateProductAttributeSchema,
-  CreateProductAttributesResponseSchema,
+  CreateProductAttributeResponseSchema,
   UpdateProductAttributeSchema,
-  UpdateProductAttributesResponseSchema,
+  UpdateProductAttributeResponseSchema,
   DeleteProductAttributesSchema,
 } from "@danimai/product";
 import { handleProcessError } from "../../utils/error-handler";
@@ -32,10 +29,6 @@ import {
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
-const UpdateProductAttributeBodySchema = Type.Object({
-  title: Type.Optional(Type.String()),
-  type: Type.Optional(Type.String()),
-});
 
 export const productAttributeRoutes = new Elysia({ prefix: "/product-attributes" })
   .onError(({ error, set }) => handleProcessError(error, set))
@@ -80,38 +73,16 @@ export const productAttributeRoutes = new Elysia({ prefix: "/product-attributes"
       },
     }
   )
-  .get(
-    "/:id/products",
-    async ({ params, query }) => {
-      const process = getService<PaginatedProductsByAttributeProcess>(PAGINATED_PRODUCTS_BY_ATTRIBUTE_PROCESS);
-      const input = { attribute_id: params.id, ...query };
-      return process.runOperations({ input });
-    },
-    {
-      params: Type.Object({ id: Type.String() }),
-      query: PaginationSchema,
-      response: {
-        200: PaginatedProductsByAttributeResponseSchema,
-        400: ValidationErrorResponseSchema,
-        500: InternalErrorResponseSchema,
-      },
-      detail: {
-        tags: ["Product Attributes"],
-        summary: "Get products by attribute",
-        description: "Gets a paginated list of products that have this attribute",
-      },
-    }
-  )
   .post(
     "/",
     async ({ body: input }) => {
-      const process = getService<CreateProductAttributesProcess>(CREATE_PRODUCT_ATTRIBUTES_PROCESS);
+      const process = getService<CreateProductAttributeProcess>(CREATE_PRODUCT_ATTRIBUTE_PROCESS);
       return process.runOperations({ input });
     },
     {
       body: CreateProductAttributeSchema,
       response: {
-        200: CreateProductAttributesResponseSchema,
+        200: CreateProductAttributeResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -125,16 +96,16 @@ export const productAttributeRoutes = new Elysia({ prefix: "/product-attributes"
   .put(
     "/:id",
     async ({ params, body }) => {
-      const process = getService<UpdateProductAttributesProcess>(UPDATE_PRODUCT_ATTRIBUTES_PROCESS);
+      const process = getService<UpdateProductAttributeProcess>(UPDATE_PRODUCT_ATTRIBUTE_PROCESS);
       return process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
       });
     },
     {
       params: Type.Object({ id: Type.String() }),
-      body: UpdateProductAttributeBodySchema,
+      body: UpdateProductAttributeSchema,
       response: {
-        200: UpdateProductAttributesResponseSchema,
+        200: UpdateProductAttributeResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -147,14 +118,14 @@ export const productAttributeRoutes = new Elysia({ prefix: "/product-attributes"
   )
   .delete(
     "/",
-    async ({ body: input, set }) => {
+    async ({ params, set }) => {
       const process = getService<DeleteProductAttributesProcess>(DELETE_PRODUCT_ATTRIBUTES_PROCESS);
-      await process.runOperations({ input });
+      await process.runOperations({ input: params as StaticDecode<typeof DeleteProductAttributesSchema> });
       set.status = 204;
       return;
     },
     {
-      body: DeleteProductAttributesSchema,
+      params: DeleteProductAttributesSchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,

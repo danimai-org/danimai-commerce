@@ -11,10 +11,10 @@ export type CreateProductAttributeProcessInput = Static<
   typeof CreateProductAttributeSchema
 >;
 
-export const CreateProductAttributesResponseSchema = Type.Union([
+export const CreateProductAttributeResponseSchema = Type.Union([
   ProductAttributeResponseSchema,
   Type.Undefined(),
 ]);
-export type CreateProductAttributesProcessOutput = Static<
-  typeof CreateProductAttributesResponseSchema
+export type CreateProductAttributeProcessOutput = Static<
+  typeof CreateProductAttributeResponseSchema
 >;

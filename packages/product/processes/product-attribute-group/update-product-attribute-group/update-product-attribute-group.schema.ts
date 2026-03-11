@@ -5,17 +5,22 @@ export const UpdateProductAttributeGroupSchema = Type.Object({
   id: Type.String(),
   title: Type.Optional(Type.String()),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
-  attribute_ids: Type.Optional(Type.Array(Type.String())),
+  attributes: Type.Optional(Type.Array(
+    Type.Object({
+      attribute_id: Type.String({ format: "uuid" }),
+      required: Type.Optional(Type.Boolean()),
+    }), { uniqueItems: true }
+  )),
 });
 
 export type UpdateProductAttributeGroupProcessInput = Static<
   typeof UpdateProductAttributeGroupSchema
 >;
 
-export const UpdateProductAttributeGroupsResponseSchema = Type.Union([
+export const UpdateProductAttributeGroupResponseSchema = Type.Union([
   ProductAttributeGroupResponseSchema,
   Type.Undefined(),
 ]);
-export type UpdateProductAttributeGroupsProcessOutput = Static<
-  typeof UpdateProductAttributeGroupsResponseSchema
+export type UpdateProductAttributeGroupProcessOutput = Static<
+  typeof UpdateProductAttributeGroupResponseSchema
 >;

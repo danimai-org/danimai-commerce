@@ -8,15 +8,15 @@ import {
 } from "@danimai/core";
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type CreateProductAttributeProcessInput, CreateProductAttributeSchema } from "./create-product-attributes.schema";
-import type { Database, ProductAttribute } from "../../../db/type";
+import { CreateProductAttributeSchema, type CreateProductAttributeProcessOutput } from "./create-product-attribute.schema";
+import type { Database } from "../../../db/type";
 import { randomUUID } from "crypto";
 
-export const CREATE_PRODUCT_ATTRIBUTES_PROCESS = Symbol("CreateProductAttributes");
+export const CREATE_PRODUCT_ATTRIBUTE_PROCESS = Symbol("CreateProductAttribute");
 
-@Process(CREATE_PRODUCT_ATTRIBUTES_PROCESS)
-export class CreateProductAttributesProcess
-  implements ProcessContract<ProductAttribute | undefined> {
+@Process(CREATE_PRODUCT_ATTRIBUTE_PROCESS)
+export class CreateProductAttributeProcess
+  implements ProcessContract<typeof CreateProductAttributeSchema, CreateProductAttributeProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -29,11 +29,18 @@ export class CreateProductAttributesProcess
   }) context: ProcessContextType<typeof CreateProductAttributeSchema>) {
     const { input } = context;
 
-    return this.createProductAttribute(input);
-  }
+    const existingAttribute = await this.db
+      .selectFrom("product_attributes")
+      .where("title", "ilike", input.title)
+      .where("type", "=", input.type)
+      .where("deleted_at", "is", null)
+      .selectAll()
+      .executeTakeFirst();
 
-  async createProductAttribute(input: CreateProductAttributeProcessInput) {
-    this.logger.info("Creating product attribute", { input });
+    if (existingAttribute) {
+      return existingAttribute;
+    }
+
 
     return this.db
       .insertInto("product_attributes")
@@ -44,4 +51,5 @@ export class CreateProductAttributesProcess
       .returningAll()
       .executeTakeFirst();
   }
+
 }

@@ -12,10 +12,10 @@ export type UpdateProductAttributeProcessInput = Static<
   typeof UpdateProductAttributeSchema
 >;
 
-export const UpdateProductAttributesResponseSchema = Type.Union([
+export const UpdateProductAttributeResponseSchema = Type.Union([
   ProductAttributeResponseSchema,
   Type.Undefined(),
 ]);
-export type UpdateProductAttributesProcessOutput = Static<
-  typeof UpdateProductAttributesResponseSchema
+export type UpdateProductAttributeProcessOutput = Static<
+  typeof UpdateProductAttributeResponseSchema
 >;
