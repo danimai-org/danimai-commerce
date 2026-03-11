@@ -1,204 +1,75 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { createQuery } from '@tanstack/svelte-query';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import Search from '@lucide/svelte/icons/search';
-	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
-	import ImageIcon from '@lucide/svelte/icons/image';
-	import Bell from '@lucide/svelte/icons/bell';
-	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
-	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import FolderTree from '@lucide/svelte/icons/folder-tree';
-	import Share2 from '@lucide/svelte/icons/share-2';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-	import * as Select from '$lib/components/ui/select/index.js';
-	import { SidebarTrigger } from '$lib/components/ui/sidebar/index.js';
-	import { DropdownMenu } from 'bits-ui';
-	import Pencil from '@lucide/svelte/icons/pencil';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import X from '@lucide/svelte/icons/x';
-	import Info from '@lucide/svelte/icons/info';
-	import { cn } from '$lib/utils.js';
-
-	const API_BASE = 'http://localhost:8000/admin';
-
-	type ProductCategory = {
-		id: string;
-		value: string;
-		handle: string;
-		metadata: unknown | null;
-		parent_id: string | null;
-		status: string;
-		visibility: string;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	type SalesChannel = {
-		id: string;
-		name: string;
-		description: string | null;
-		is_default: boolean;
-		metadata: unknown;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	type Product = {
-		id: string;
-		title: string;
-		handle: string;
-		status: string;
-		thumbnail: string | null;
-		variants: Array<{ id: string }>;
-		collection: { id: string; title: string; handle: string } | null;
-		sales_channels: SalesChannel[];
-	};
-
-	type ProductsResponse = {
-		products: Product[];
-		count: number;
-		offset: number;
-		limit: number;
-	};
+	import { client } from '$lib/client.js';
+	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
+	import type { ProductCategory } from '$lib/product-categories/types.js';
+	import type { Product } from '$lib/products/types.js';
+	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
+import {
+		CategoryHeroCard,
+		CategoryStatusCard,
+		CategoryProductsCard
+	} from '$lib/components/organs/category/detail/index.js';
+import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
+import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 
 	const categoryId = $derived($page.params.id);
 
 	let category = $state<ProductCategory | null>(null);
-	let productsData = $state<ProductsResponse | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let productPage = $state(1);
-	let productLimit = $state(20);
 
-	// Add products sheet
-	let addProductsSheetOpen = $state(false);
-	let addProductsData = $state<ProductsResponse | null>(null);
-	let addProductsPage = $state(1);
-	let addProductsLimit = $state(20);
-	let addProductsSearch = $state('');
-	let addProductsSelectedIds = $state<Set<string>>(new Set());
-	let addProductsSubmitting = $state(false);
-	let addProductsError = $state<string | null>(null);
-	const addProductsList = $derived(addProductsData?.products ?? []);
-	const addProductsCount = $derived(addProductsData?.count ?? 0);
-	const addProductsOffset = $derived(addProductsData?.offset ?? 0);
-	const addProductsTotalPages = $derived(
-		addProductsLimit > 0 ? Math.ceil(addProductsCount / addProductsLimit) : 1
-	);
-	const addProductsStart = $derived(addProductsOffset + 1);
-	const addProductsEnd = $derived(
-		Math.min(addProductsOffset + addProductsList.length, addProductsCount)
-	);
-	const addProductsFiltered = $derived(
-		addProductsSearch.trim()
-			? addProductsList.filter((p) =>
-					p.title.toLowerCase().includes(addProductsSearch.trim().toLowerCase())
-				)
-			: addProductsList
+	const paginationQuery = $derived.by(() =>
+		createPaginationQuery($page.url.searchParams)
 	);
 
-	async function loadAddProductsList() {
-		try {
-			const params = new URLSearchParams({
-				page: String(addProductsPage),
-				limit: String(addProductsLimit),
-				sorting_field: 'created_at',
-				sorting_direction: 'desc'
-			});
-			const res = await fetch(`${API_BASE}/products?${params}`, { cache: 'no-store' });
-			if (!res.ok) throw new Error(await res.text());
-			addProductsData = (await res.json()) as ProductsResponse;
-		} catch (e) {
-			addProductsData = null;
-		}
-	}
+	const productsQuery = createQuery(() => ({
+		queryKey: ['category-products', categoryId, paginationQuery],
+		queryFn: async () => {
+			const query = { ...paginationQuery, category_id: categoryId } as Record<string, string | number | undefined>;
+			const res = await client.products.get({ query });
+			return res.data;
+		},
+		enabled: !!categoryId,
+		refetchOnWindowFocus: false
+	}));
 
-	$effect(() => {
-		if (addProductsSheetOpen) {
-			addProductsPage;
-			addProductsLimit;
-			loadAddProductsList();
-		}
-	});
-
-	function openAddProductsSheet() {
-		addProductsSheetOpen = true;
-		addProductsSelectedIds = new Set();
-		addProductsPage = 1;
-		addProductsSearch = '';
-		addProductsError = null;
-	}
-
-	function closeAddProductsSheet() {
-		addProductsSheetOpen = false;
-		addProductsError = null;
-	}
-
-	function toggleAddProductSelection(id: string) {
-		addProductsSelectedIds = new Set(addProductsSelectedIds);
-		if (addProductsSelectedIds.has(id)) addProductsSelectedIds.delete(id);
-		else addProductsSelectedIds.add(id);
-		addProductsSelectedIds = new Set(addProductsSelectedIds);
-	}
-
-	function toggleAddProductsSelectAll() {
-		if (addProductsSelectedIds.size === addProductsFiltered.length) {
-			addProductsSelectedIds = new Set();
-		} else {
-			addProductsSelectedIds = new Set(addProductsFiltered.map((p) => p.id));
-		}
-	}
-
-	async function submitAddProducts() {
-		if (!categoryId || !category) return;
-		const ids = Array.from(addProductsSelectedIds);
-		if (ids.length === 0) {
-			addProductsError = 'Select at least one product';
-			return;
-		}
-		addProductsError = null;
-		addProductsSubmitting = true;
-		try {
-			// Update each product to add it to this category
-			for (const productId of ids) {
-				const res = await fetch(`${API_BASE}/products/${productId}`, {
-					method: 'PUT',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ category_id: categoryId })
-				});
-				if (!res.ok) throw new Error(await res.text());
-			}
-			closeAddProductsSheet();
-			loadProducts();
-		} catch (e) {
-			addProductsError = e instanceof Error ? e.message : String(e);
-		} finally {
-			addProductsSubmitting = false;
-		}
-	}
+	const productsData = $derived(productsQuery.data as { data?: { rows: Product[]; pagination: PaginationMeta }; pagination?: PaginationMeta } | undefined);
+	const products = $derived(productsData?.data?.rows ?? ([] as Product[]));
+	const pagination = $derived(productsData?.data?.pagination ?? productsData?.pagination ?? null);
+	const count = $derived(pagination?.total ?? 0);
+	const start = $derived(
+		pagination ? (pagination.page - 1) * pagination.limit + 1 : 0
+	);
+	const end = $derived(
+		pagination ? Math.min(pagination.page * pagination.limit, count) : 0
+	);
+	const totalPages = $derived(pagination?.total_pages ?? 1);
+	const currentPage = $derived(pagination?.page ?? 1);
+	const productsLoading = $derived(productsQuery.isPending);
 
 	async function loadCategory() {
 		if (!categoryId) return;
 		loading = true;
 		error = null;
 		try {
-			const res = await fetch(`${API_BASE}/product-categories/${categoryId}`, {
-				cache: 'no-store'
-			});
-			if (!res.ok) {
-				if (res.status === 404) {
+			const res = await client['product-categories']({ id: categoryId }).get();
+			if (res.error) {
+				const err = res.error as { status?: number; value?: { message?: string } };
+				if (err?.status === 404) {
 					error = 'Category not found';
 					return;
 				}
-				throw new Error(await res.text());
+				error = err?.value?.message ?? String(res.error);
+				category = null;
+				return;
 			}
-			category = (await res.json()) as ProductCategory;
+			category = (res.data ?? null) as ProductCategory | null;
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			category = null;
@@ -207,261 +78,15 @@
 		}
 	}
 
-	async function loadProducts() {
-		if (!categoryId) return;
-		try {
-			const params = new URLSearchParams({
-				page: String(productPage),
-				limit: String(productLimit),
-				sorting_field: 'created_at',
-				sorting_direction: 'desc',
-				category_id: categoryId
-			});
-			const res = await fetch(`${API_BASE}/products?${params}`, { cache: 'no-store' });
-			if (!res.ok) throw new Error(await res.text());
-			productsData = (await res.json()) as ProductsResponse;
-		} catch (e) {
-			productsData = null;
-		}
-	}
-
 	$effect(() => {
 		categoryId;
 		loadCategory();
 	});
 
-	$effect(() => {
-		if (categoryId) {
-			productPage;
-			productLimit;
-			loadProducts();
-		} else {
-			productsData = null;
-		}
-	});
-
-	const products = $derived(productsData?.products ?? []);
-	const count = $derived(productsData?.count ?? 0);
-	const limit = $derived(productsData?.limit ?? productLimit);
-	const offset = $derived(productsData?.offset ?? 0);
-	const totalPages = $derived(limit > 0 ? Math.ceil(count / limit) : 1);
-	const start = $derived(offset + 1);
-	const end = $derived(Math.min(offset + products.length, count));
-
-	function getHandle(c: ProductCategory | null): string {
-		if (!c) return '';
-		return c.handle?.startsWith('/') ? c.handle : `/${c.handle ?? ''}`;
-	}
-
-	function getDescription(c: ProductCategory | null): string {
-		if (!c?.metadata || typeof c.metadata !== 'object') return '—';
-		const desc = (c.metadata as { description?: string }).description;
-		return desc != null && desc !== '' ? String(desc) : '—';
-	}
-
-	function statusLabel(s: string | undefined): string {
-		if (!s) return 'Inactive';
-		if (s === 'active') return 'Active';
-		return 'Inactive';
-	}
-
-	let statusUpdating = $state(false);
-
-	async function updateStatus(newStatus: 'active' | 'inactive') {
-		if (!category) return;
-		statusUpdating = true;
-		try {
-			const res = await fetch(`${API_BASE}/product-categories/${category.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ status: newStatus })
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			loadCategory();
-		} catch (e) {
-			console.error('Failed to update status:', e);
-		} finally {
-			statusUpdating = false;
-		}
-	}
-
-	let editSheetOpen = $state(false);
-	let editTitle = $state('');
-	let editHandle = $state('');
-	let editDescription = $state('');
-	let editStatus = $state<'active' | 'inactive'>('active');
-	let editVisibility = $state<'public' | 'private'>('public');
-	let editError = $state<string | null>(null);
-	let editSubmitting = $state(false);
-
-	function openEditSheet() {
-		if (!category) return;
-		editSheetOpen = true;
-		editTitle = category.value;
-		editHandle = category.handle?.replace(/^\//, '') ?? '';
-		editDescription =
-			typeof category.metadata === 'object' &&
-			category.metadata !== null &&
-			'description' in category.metadata
-				? String((category.metadata as { description?: string }).description ?? '')
-				: '';
-		editStatus = (category.status === 'inactive' ? 'inactive' : 'active') as 'active' | 'inactive';
-		editVisibility = (category.visibility === 'private' ? 'private' : 'public') as
-			| 'public'
-			| 'private';
-		editError = null;
-	}
-
-	function closeEditSheet() {
-		editSheetOpen = false;
-		editError = null;
-	}
-
-	async function submitEditCategory() {
-		if (!category) return;
-		editError = null;
-		if (!editTitle.trim()) {
-			editError = 'Title is required';
-			return;
-		}
-		editSubmitting = true;
-		try {
-			const body: {
-				value: string;
-				parent_id?: string;
-				status?: string;
-				visibility?: string;
-				metadata?: Record<string, string | number>;
-			} = {
-				value: editTitle.trim(),
-				status: editStatus,
-				visibility: editVisibility
-			};
-			if (category.parent_id) body.parent_id = category.parent_id;
-			if (editDescription.trim()) body.metadata = { description: editDescription.trim() };
-			const res = await fetch(`${API_BASE}/product-categories/${category.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body)
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			closeEditSheet();
-			loadCategory();
-		} catch (e) {
-			editError = e instanceof Error ? e.message : String(e);
-		} finally {
-			editSubmitting = false;
-		}
-	}
-
-	let jsonOpen = $state(false);
-	let metadataOpen = $state(false);
-	let metadataRows = $state<Array<{ key: string; value: string }>>([{ key: '', value: '' }]);
-	let metadataError = $state<string | null>(null);
-	let metadataSubmitting = $state(false);
-
-	function openMetadataSheet() {
-		if (!category) return;
-		const meta =
-			category.metadata && typeof category.metadata === 'object'
-				? (category.metadata as Record<string, unknown>)
-				: {};
-		metadataRows = Object.entries(meta).map(([k, v]) => ({ key: k, value: String(v ?? '') }));
-		if (metadataRows.length === 0) metadataRows = [{ key: '', value: '' }];
-		metadataOpen = true;
-		metadataError = null;
-	}
-
-	function closeMetadataSheet() {
-		metadataOpen = false;
-		metadataError = null;
-	}
-
-	function addMetadataRow() {
-		metadataRows = [...metadataRows, { key: '', value: '' }];
-	}
-
-	function removeMetadataRow(index: number) {
-		metadataRows = metadataRows.filter((_, i) => i !== index);
-	}
-
-	async function submitCategoryMetadata() {
-		if (!categoryId || !category) return;
-		metadataError = null;
-		metadataSubmitting = true;
-		try {
-			const meta: Record<string, string | number> = {};
-			for (const row of metadataRows) {
-				const k = row.key.trim();
-				if (!k) continue;
-				const num = Number(row.value);
-				meta[k] = Number.isNaN(num) ? row.value : num;
-			}
-			const res = await fetch(`${API_BASE}/product-categories/${categoryId}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ metadata: meta })
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			closeMetadataSheet();
-			loadCategory();
-		} catch (e) {
-			metadataError = e instanceof Error ? e.message : String(e);
-		} finally {
-			metadataSubmitting = false;
-		}
-	}
-
-	const jsonKeys = $derived(
-		category
-			? [
-					'id',
-					'value',
-					'handle',
-					'metadata',
-					'parent_id',
-					'status',
-					'visibility',
-					'created_at',
-					'updated_at'
-				].length
-			: 0
-	);
-	const metadataKeys = $derived(
-		category?.metadata && typeof category.metadata === 'object'
-			? Object.keys(category.metadata as object).length
-			: 0
-	);
-
-	function goToProductEdit(productId: string) {
-		goto(`/products/${productId}`);
-	}
-
-	async function removeProductDirectly(product: Product) {
-		if (!categoryId || !category) return;
-		try {
-			const res = await fetch(`${API_BASE}/products/${product.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ category_id: '' })
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text);
-			}
-			loadProducts();
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-		}
+	function goToPage(pageNum: number) {
+		const params = new URLSearchParams($page.url.searchParams);
+		params.set('page', String(Math.max(1, pageNum)));
+		goto(`${$page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 </script>
 
@@ -501,642 +126,41 @@
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="flex flex-col gap-8 p-6">
 				<div class="flex gap-6">
-					<div class="flex-1 rounded-lg border bg-card p-6 shadow-sm">
-						<!-- Header: title + status pills + dropdown -->
-						<section class="flex flex-col gap-6 pb-8">
-							<div class="flex items-center justify-between gap-4">
-								<div class="flex flex-wrap items-center gap-2">
-									<h1 class="text-2xl font-semibold tracking-tight">{category.value}</h1>
-									<span
-										class={cn(
-											'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-											category.visibility === 'public' &&
-												'bg-green-500/10 text-green-700 dark:text-green-400',
-											category.visibility === 'private' && 'bg-muted text-muted-foreground'
-										)}
-									>
-										<span
-											class={cn(
-												'size-1.5 shrink-0 rounded-sm bg-current opacity-70',
-												category.visibility === 'public' && 'bg-green-600',
-												category.visibility === 'private' && 'bg-muted-foreground'
-											)}
-										></span>
-										{category.visibility === 'public' ? 'Public' : 'Private'}
-									</span>
-								</div>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									onclick={openEditSheet}
-									aria-label="Edit category"
-								>
-									<Pencil class="size-4" />
-								</Button>
-							</div>
-						</section>
-						<!-- Details card -->
-						<div class="rounded-lg bg-card p-6">
-							<dl class="mt-4 grid gap-3 text-sm">
-								<div class="flex justify-between gap-4">
-									<dt class="shrink-0 font-medium text-muted-foreground">Description</dt>
-									<dd class="text-right">{getDescription(category)}</dd>
-								</div>
-								<div class="flex justify-between gap-4">
-									<dt class="shrink-0 font-medium text-muted-foreground">Handle</dt>
-									<dd class="text-right">{getHandle(category)}</dd>
-								</div>
-							</dl>
-						</div>
-					</div>
-
-					<!-- Right: Status card -->
-					<div class="rounded-lg border bg-card p-6 self-start w-52 shadow-sm">
-						<h2 class="font-semibold mb-4">Status</h2>
-						<Select.Root
-							type="single"
-							value={category?.status ?? 'inactive'}
-							onValueChange={(v) => {
-								if (v && (v === 'active' || v === 'inactive')) {
-									updateStatus(v);
-								}
-							}}
-							disabled={statusUpdating || !category}
-						>
-							<Select.Trigger class="w-full">
-								<span
-									class={cn(
-										'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-										category?.status === 'active' &&
-											'bg-green-500/10 text-green-700 dark:text-green-400',
-										category?.status === 'inactive' && 'bg-red-500/10 text-red-700 dark:text-red-400'
-									)}
-								>
-									<span
-										class={cn(
-											'size-1.5 shrink-0 rounded-sm bg-current opacity-70',
-											category?.status === 'active' && 'bg-green-600',
-											category?.status === 'inactive' && 'bg-red-600'
-										)}
-									></span>
-									{statusLabel(category?.status)}
-								</span>
-							</Select.Trigger>
-							<Select.Content>
-								<Select.Item value="active" label="Active">Active</Select.Item>
-								<Select.Item value="inactive" label="Inactive">Inactive</Select.Item>
-							</Select.Content>
-						</Select.Root>
-					</div>
+					<CategoryHeroCard categoryId={categoryId ?? null} onUpdated={loadCategory} />
+					<CategoryStatusCard category={category as ProductCategory | null} onUpdated={loadCategory} />
 				</div>
 
-				<!-- Products section -->
-				<section class="rounded-lg border bg-card shadow-sm overflow-hidden">
-					<div class="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4 rounded-t-lg">
-						<h2 class="text-base font-semibold">Products</h2>
-						<div class="flex items-center gap-2">
-							<Button type="button" size="sm" class="rounded-md" onclick={openAddProductsSheet}>
-								Add
-							</Button>
-							<Button variant="outline" size="sm" class="rounded-md">
-								<SlidersHorizontal class="mr-1.5 size-4" />
-								Sort
-							</Button>
-							<div class="relative w-48">
-								<Search
-									class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-								/>
-								<Input type="search" placeholder="Search" class="h-9 rounded-md pl-9" />
-							</div>
-							<button
-								type="button"
-								class="flex size-9 shrink-0 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-							>
-								<SlidersHorizontal class="size-4" />
-								<span class="sr-only">Sort</span>
-							</button>
-						</div>
-					</div>
-					<div class="overflow-x-auto">
-						<table class="w-full text-sm">
-							<thead class="sticky top-0 z-10 border-b bg-muted/50">
-								<tr>
-									<th class="w-10 px-4 py-3 text-left font-medium">
-										<input
-											type="checkbox"
-											class="rounded border-muted-foreground/50"
-											aria-label="Select all"
-										/>
-									</th>
-									<th class="px-4 py-3 text-left font-medium">Product</th>
-									<th class="px-4 py-3 text-left font-medium">Collection</th>
-									<th class="px-4 py-3 text-left font-medium">Sales Channels</th>
-									<th class="px-4 py-3 text-left font-medium">Variants</th>
-									<th class="px-4 py-3 text-left font-medium">Status</th>
-									<th class="px-4 py-3 text-left font-medium">Actions</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#if products.length === 0}
-									<tr>
-										<td colspan="7" class="px-4 py-8 text-center text-muted-foreground">
-											No products in this category.
-										</td>
-									</tr>
-								{:else}
-									{#each products as product (product.id)}
-										<tr class="border-b last:border-0">
-											<td class="px-4 py-3">
-												<input
-													type="checkbox"
-													class="rounded border-muted-foreground/50"
-													aria-label="Select row"
-												/>
-											</td>
-											<td class="px-4 py-3">
-												<a
-													href="/products/{product.id}"
-													class="flex items-center gap-3 hover:opacity-80"
-												>
-													{#if product.thumbnail}
-														<img
-															src={product.thumbnail}
-															alt=""
-															class="size-10 shrink-0 rounded-md object-cover"
-														/>
-													{:else}
-														<div
-															class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
-														>
-															<ImageIcon class="size-5" />
-														</div>
-													{/if}
-													<span class="font-medium">{product.title}</span>
-												</a>
-											</td>
-											<td class="px-4 py-3 text-muted-foreground">
-												{product.collection?.title ?? '—'}
-											</td>
-											<td class="px-4 py-3 text-muted-foreground">
-												{product.sales_channels?.length
-													? product.sales_channels.map((sc) => sc.name).join(', ')
-													: '—'}
-											</td>
-											<td class="px-4 py-3 text-muted-foreground">
-												{product.variants?.length ?? 0} variant{(product.variants?.length ?? 0) ===
-												1
-													? ''
-													: 's'}
-											</td>
-											<td class="px-4 py-3">
-												<span
-													class={cn(
-														'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-														product.status === 'published' &&
-															'bg-green-500/10 text-green-700 dark:text-green-400',
-														product.status === 'draft' && 'bg-muted text-muted-foreground',
-														product.status === 'proposed' &&
-															'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-														product.status === 'rejected' && 'bg-destructive/10 text-destructive'
-													)}
-												>
-													<span
-														class={cn(
-															'size-1.5 rounded-full',
-															product.status === 'published' && 'bg-green-600',
-															product.status === 'draft' && 'bg-muted-foreground/60',
-															product.status === 'proposed' && 'bg-amber-600',
-															product.status === 'rejected' && 'bg-destructive'
-														)}
-													></span>
-													{product.status}
-												</span>
-											</td>
-											<td class="px-4 py-3">
-												<button
-													type="button"
-													class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
-													onclick={() => removeProductDirectly(product)}
-													aria-label="Remove product"
-												>
-													<X class="size-4" />
-												</button>
-											</td>
-										</tr>
-									{/each}
-								{/if}
-							</tbody>
-						</table>
-					</div>
-					{#if count > 0}
-						<div class="flex items-center justify-between gap-4 border-t px-6 py-4">
-							<p class="text-sm text-muted-foreground">
-								{start} – {end} of {count} results
-							</p>
-							<div class="flex items-center gap-2">
-								<Button
-									variant="outline"
-									size="sm"
-									disabled={productPage <= 1}
-									onclick={() => (productPage = Math.max(1, productPage - 1))}
-								>
-									Prev
-								</Button>
-								<span class="text-sm text-muted-foreground">
-									{productPage} of {totalPages} pages
-								</span>
-								<Button
-									variant="outline"
-									size="sm"
-									disabled={productPage >= totalPages}
-									onclick={() => (productPage = Math.min(totalPages, productPage + 1))}
-								>
-									Next
-								</Button>
-							</div>
-						</div>
-					{/if}
-				</section>
+				<CategoryProductsCard
+					categoryId={categoryId ?? null}
+					category={category}
+					products={products}
+					count={count}
+					start={start}
+					end={end}
+					totalPages={totalPages}
+					currentPage={currentPage}
+					loading={productsLoading}
+					paginationQuery={paginationQuery ?? {}}
+					onProductsUpdated={async () => {
+						await productsQuery.refetch();
+					}}
+					goToPage={goToPage}
+				/>
 
-				<!-- Metadata & JSON -->
 				<div class="grid gap-4 sm:grid-cols-2">
-					<div class="rounded-lg border bg-card p-4 shadow-sm">
-						<div class="flex items-center justify-between gap-2">
-							<h3 class="font-medium">Metadata</h3>
-							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-								{metadataKeys} keys
-							</span>
-							<Button
-								variant="ghost"
-								size="icon"
-								class="size-8 shrink-0"
-								onclick={openMetadataSheet}
-							>
-								<ExternalLink class="size-4" />
-								<span class="sr-only">Open</span>
-							</Button>
-						</div>
-					</div>
-					<div class="rounded-lg border bg-card p-4 shadow-sm">
-						<div class="flex items-center justify-between gap-2">
-							<h3 class="font-medium">JSON</h3>
-							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-								{jsonKeys} keys
-							</span>
-							<Button
-								variant="ghost"
-								size="icon"
-								class="size-8 shrink-0"
-								onclick={() => (jsonOpen = true)}
-							>
-								<ExternalLink class="size-4" />
-								<span class="sr-only">Open</span>
-							</Button>
-						</div>
-					</div>
+					<MetadataComponent
+						productId={category?.id ?? null}
+						metadata={category?.metadata as Record<string, unknown> | null}
+						onSaved={loadCategory}
+					/>
+					<JSONComponent
+						product={category}
+						options={[]}
+						variants={[]}
+						category={null}
+					/>
 				</div>
 			</div>
 		</div>
 	{/if}
 </div>
-
-<!-- Edit Category sheet -->
-<Sheet.Root bind:open={editSheetOpen}>
-	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
-		<div class="flex h-full flex-col">
-			<div class="flex-1 overflow-auto p-6 pt-12">
-				<div class="flex flex-col gap-6">
-					<div>
-						<h2 class="text-lg font-semibold">Edit Category</h2>
-						<p class="mt-1 text-sm text-muted-foreground">Update category details.</p>
-					</div>
-
-					{#if editError}
-						<div
-							class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-						>
-							{editError}
-						</div>
-					{/if}
-					<div class="flex flex-col gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="edit-cat-title" class="text-sm font-medium">Title</label>
-							<Input
-								id="edit-cat-title"
-								bind:value={editTitle}
-								placeholder="Enter category title"
-								class={cn('h-9', editError && !editTitle.trim() && 'border-destructive')}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="edit-cat-handle" class="flex items-center gap-1.5 text-sm font-medium">
-								Handle
-								<span class="font-normal text-muted-foreground">(Optional)</span>
-								<Tooltip.Root>
-									<Tooltip.Trigger
-										class="rounded-full text-muted-foreground hover:text-foreground"
-										aria-label="Handle info"
-									>
-										<Info class="size-3.5" />
-									</Tooltip.Trigger>
-									<Tooltip.Content>Leave empty to auto-generate from title.</Tooltip.Content>
-								</Tooltip.Root>
-							</label>
-							<div class="relative">
-								<span class="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground">/</span
-								>
-								<Input
-									id="edit-cat-handle"
-									bind:value={editHandle}
-									placeholder="handle"
-									class="h-9 pl-6"
-								/>
-							</div>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="edit-cat-description" class="text-sm font-medium">
-								Description
-								<span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<textarea
-								id="edit-cat-description"
-								bind:value={editDescription}
-								placeholder="Enter description"
-								rows="4"
-								class="flex w-full min-w-0 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-							></textarea>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="edit-cat-visibility" class="text-sm font-medium">Visibility</label>
-							<select
-								id="edit-cat-visibility"
-								bind:value={editVisibility}
-								class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<option value="public">Public</option>
-								<option value="private">Private</option>
-							</select>
-						</div>
-					</div>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeEditSheet} disabled={editSubmitting}>Cancel</Button>
-				<Button onclick={submitEditCategory} disabled={editSubmitting}>
-					{editSubmitting ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
-
-<!-- Edit Metadata sheet -->
-<Sheet.Root bind:open={metadataOpen}>
-	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
-		<div class="flex h-full flex-col">
-			<div class="min-h-0 flex-1 overflow-auto p-6 pt-12">
-				<div class="flex flex-col gap-6">
-					<h2 class="text-lg font-semibold">Edit Metadata</h2>
-
-					{#if metadataError}
-						<div
-							class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-						>
-							{metadataError}
-						</div>
-					{/if}
-
-					<div class="overflow-hidden rounded-md border">
-						<table class="w-full text-sm">
-							<thead class="border-b bg-muted/50">
-								<tr>
-									<th class="px-4 py-3 text-left font-medium">Key</th>
-									<th class="px-4 py-3 text-left font-medium">Value</th>
-									<th class="w-10 px-4 py-3"></th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each metadataRows as row, i}
-									<tr class="border-b last:border-0">
-										<td class="px-4 py-2">
-											<Input bind:value={row.key} placeholder="Key" class="h-9 w-full" />
-										</td>
-										<td class="px-4 py-2">
-											<Input bind:value={row.value} placeholder="Value" class="h-9 w-full" />
-										</td>
-										<td class="px-4 py-2">
-											<Button
-												variant="ghost"
-												size="icon"
-												class="size-8 shrink-0 text-destructive hover:bg-destructive/10"
-												onclick={() => removeMetadataRow(i)}
-												aria-label="Remove row"
-											>
-												<Trash2 class="size-4" />
-											</Button>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-					<Button variant="outline" size="sm" onclick={addMetadataRow}>Add row</Button>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeMetadataSheet}>Cancel</Button>
-				<Button onclick={submitCategoryMetadata} disabled={metadataSubmitting}>
-					{metadataSubmitting ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
-
-<!-- JSON view sheet -->
-<Sheet.Root bind:open={jsonOpen}>
-	<Sheet.Content side="right" class="w-full max-w-2xl sm:max-w-2xl">
-		<div class="flex h-full flex-col">
-			<div class="shrink-0 border-b px-6 py-4">
-				<h2 class="text-lg font-semibold">JSON {jsonKeys} keys</h2>
-			</div>
-			<div class="min-h-0 flex-1 overflow-auto p-6">
-				{#if category}
-					<pre
-						class="rounded-md border bg-zinc-900 p-4 font-mono text-sm break-all whitespace-pre-wrap text-zinc-300"><code
-							>{JSON.stringify(category, null, 2)}</code
-						></pre>
-				{:else}
-					<p class="text-sm text-muted-foreground">No data</p>
-				{/if}
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
-
-<!-- Add products sheet -->
-<Sheet.Root bind:open={addProductsSheetOpen}>
-	<Sheet.Content side="right" class="w-full max-w-4xl sm:max-w-4xl">
-		<div class="flex h-full flex-col">
-			<div class="shrink-0 border-b px-6 py-4">
-				<h2 class="text-lg font-semibold">Add products</h2>
-				<p class="mt-1 text-sm text-muted-foreground">Select products to add to this category.</p>
-			</div>
-			<div class="flex min-h-0 flex-1 flex-col">
-				<div class="flex flex-wrap items-center justify-between gap-4 border-b px-6 py-4">
-					<Button variant="outline" size="sm" class="rounded-md" type="button">
-						<SlidersHorizontal class="mr-1.5 size-4" />
-						Sort
-					</Button>
-					<div class="relative w-48">
-						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							type="search"
-							placeholder="Search"
-							bind:value={addProductsSearch}
-							class="h-9 rounded-md pl-9"
-						/>
-					</div>
-				</div>
-				<div class="min-h-0 flex-1 overflow-auto px-6">
-					<table class="w-full text-sm">
-						<thead class="sticky top-0 z-10 border-b bg-muted/50">
-							<tr>
-								<th class="w-10 px-4 py-3 text-left font-medium">
-									<input
-										type="checkbox"
-										class="rounded border-muted-foreground/50"
-										aria-label="Select all"
-										checked={addProductsFiltered.length > 0 &&
-											addProductsSelectedIds.size === addProductsFiltered.length}
-										onchange={toggleAddProductsSelectAll}
-									/>
-								</th>
-								<th class="px-4 py-3 text-left font-medium">Product</th>
-								<th class="px-4 py-3 text-left font-medium">Collection</th>
-								<th class="px-4 py-3 text-left font-medium">Sales Channels</th>
-								<th class="px-4 py-3 text-left font-medium">Variants</th>
-								<th class="px-4 py-3 text-left font-medium">Status</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#if addProductsFiltered.length === 0}
-								<tr>
-									<td colspan="6" class="px-4 py-8 text-center text-muted-foreground">
-										No products to show.
-									</td>
-								</tr>
-							{:else}
-								{#each addProductsFiltered as p (p.id)}
-									<tr class="border-b last:border-0">
-										<td class="px-4 py-3">
-											<input
-												type="checkbox"
-												class="rounded border-muted-foreground/50"
-												aria-label="Select row"
-												checked={addProductsSelectedIds.has(p.id)}
-												onchange={() => toggleAddProductSelection(p.id)}
-											/>
-										</td>
-										<td class="px-4 py-3">
-											<div class="flex items-center gap-3">
-												{#if p.thumbnail}
-													<img
-														src={p.thumbnail}
-														alt=""
-														class="size-10 shrink-0 rounded-md object-cover"
-													/>
-												{:else}
-													<div
-														class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
-													>
-														<ImageIcon class="size-5" />
-													</div>
-												{/if}
-												<span class="font-medium">{p.title}</span>
-											</div>
-										</td>
-										<td class="px-4 py-3 text-muted-foreground">
-											{p.collection?.title ?? '—'}
-										</td>
-										<td class="px-4 py-3 text-muted-foreground">
-											{p.sales_channels?.length
-												? p.sales_channels.map((sc) => sc.name).join(', ')
-												: '—'}
-										</td>
-										<td class="px-4 py-3 text-muted-foreground">
-											{p.variants?.length ?? 0} variant{(p.variants?.length ?? 0) === 1 ? '' : 's'}
-										</td>
-										<td class="px-4 py-3">
-											<span
-												class={cn(
-													'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-													p.status === 'published' &&
-														'bg-green-500/10 text-green-700 dark:text-green-400',
-													p.status === 'draft' && 'bg-muted text-muted-foreground',
-													p.status === 'proposed' &&
-														'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-													p.status === 'rejected' && 'bg-destructive/10 text-destructive'
-												)}
-											>
-												<span
-													class={cn(
-														'size-1.5 rounded-full',
-														p.status === 'published' && 'bg-green-600',
-														p.status === 'draft' && 'bg-muted-foreground/60',
-														p.status === 'proposed' && 'bg-amber-600',
-														p.status === 'rejected' && 'bg-destructive'
-													)}
-												></span>
-												{p.status}
-											</span>
-										</td>
-									</tr>
-								{/each}
-							{/if}
-						</tbody>
-					</table>
-				</div>
-				{#if addProductsCount > 0}
-					<div class="flex items-center justify-between gap-4 border-t px-6 py-4">
-						<p class="text-sm text-muted-foreground">
-							{addProductsStart} – {addProductsEnd} of {addProductsCount} results
-						</p>
-						<div class="flex items-center gap-2">
-							<Button
-								variant="outline"
-								size="sm"
-								disabled={addProductsPage <= 1}
-								onclick={() => (addProductsPage = Math.max(1, addProductsPage - 1))}
-							>
-								Prev
-							</Button>
-							<span class="text-sm text-muted-foreground">
-								{addProductsPage} of {addProductsTotalPages} pages
-							</span>
-							<Button
-								variant="outline"
-								size="sm"
-								disabled={addProductsPage >= addProductsTotalPages}
-								onclick={() =>
-									(addProductsPage = Math.min(addProductsTotalPages, addProductsPage + 1))}
-							>
-								Next
-							</Button>
-						</div>
-					</div>
-				{/if}
-			</div>
-			{#if addProductsError}
-				<p class="px-6 pb-2 text-sm text-destructive">{addProductsError}</p>
-			{/if}
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeAddProductsSheet}>Cancel</Button>
-				<Button onclick={submitAddProducts} disabled={addProductsSubmitting}>
-					{addProductsSubmitting ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>

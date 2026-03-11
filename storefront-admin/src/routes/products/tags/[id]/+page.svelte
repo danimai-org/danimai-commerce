@@ -2,21 +2,14 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import Search from '@lucide/svelte/icons/search';
-	import ImageIcon from '@lucide/svelte/icons/image';
-	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
-	import ExternalLink from '@lucide/svelte/icons/external-link';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import Pencil from '@lucide/svelte/icons/pencil';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { cn } from '$lib/utils.js';
 	import type { ProductTag } from '$lib/product-tags/types.js';
 	import type { Product } from '$lib/products/types.js';
 	import type { PaginationMeta } from '$lib/product-tags/types.js';
-
-	const API_BASE = 'http://localhost:8000/admin';
+	import { TagHeroCard, TagProductsCard } from '$lib/components/organs/index.js';
+	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
+	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
 	
 
 	type TagProduct = Product & { collection?: { id: string; title: string; handle: string } | null };
@@ -37,7 +30,9 @@
 		loading = true;
 		error = null;
 		try {
-			const res = await fetch(`${API_BASE}/product-tags/${tagId}`, { cache: 'no-store' });
+			const res = await fetch(`http://localhost:8000/admin/product-tags/${tagId}`, {
+				cache: 'no-store'
+			});
 			if (!res.ok) {
 				if (res.status === 404) {
 					error = 'Tag not found';
@@ -63,9 +58,12 @@
 				sorting_field: 'created_at',
 				sorting_direction: 'desc'
 			});
-			const res = await fetch(`${API_BASE}/product-tags/${tagId}/products?${params}`, {
-				cache: 'no-store'
-			});
+			const res = await fetch(
+				`http://localhost:8000/admin/product-tags/${tagId}/products?${params}`,
+				{
+					cache: 'no-store'
+				}
+			);
 			if (!res.ok) throw new Error(await res.text());
 			productsData = (await res.json()) as { data: TagProduct[]; pagination: Pagination };
 		} catch (e) {
@@ -94,108 +92,6 @@
 	const end = $derived(
 		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
 	);
-
-	const metadataKeys = $derived(
-		tag?.metadata && typeof tag.metadata === 'object'
-			? Object.keys(tag.metadata as object).length
-			: 0
-	);
-	const jsonKeys = $derived(tag ? Object.keys(tag).length : 0);
-
-	let metadataOpen = $state(false);
-	let jsonOpen = $state(false);
-	let metadataRows = $state<Array<{ key: string; value: string }>>([{ key: '', value: '' }]);
-	let metadataError = $state<string | null>(null);
-	let metadataSubmitting = $state(false);
-	let editTagSheetOpen = $state(false);
-	let editTagValue = $state('');
-	let editTagError = $state<string | null>(null);
-	let editTagSaving = $state(false);
-
-	function openEditTagSheet() {
-		if (!tag) return;
-		editTagSheetOpen = true;
-		editTagValue = tag.value;
-		editTagError = null;
-	}
-
-	async function saveTagEdit() {
-		if (!tagId || !tag) return;
-		editTagError = null;
-		editTagSaving = true;
-		try {
-			const res = await fetch(`${API_BASE}/product-tags/${tagId}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ value: editTagValue.trim() })
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			editTagSheetOpen = false;
-			await loadTag();
-		} catch (e) {
-			editTagError = e instanceof Error ? e.message : String(e);
-		} finally {
-			editTagSaving = false;
-		}
-	}
-
-	function openMetadataSheet() {
-		if (!tag) return;
-		const meta =
-			tag.metadata && typeof tag.metadata === 'object'
-				? (tag.metadata as Record<string, unknown>)
-				: {};
-		metadataRows = Object.entries(meta).map(([k, v]) => ({ key: k, value: String(v ?? '') }));
-		if (metadataRows.length === 0) metadataRows = [{ key: '', value: '' }];
-		metadataOpen = true;
-		metadataError = null;
-	}
-
-	function closeMetadataSheet() {
-		metadataOpen = false;
-		metadataError = null;
-	}
-
-	function addMetadataRow() {
-		metadataRows = [...metadataRows, { key: '', value: '' }];
-	}
-
-	function removeMetadataRow(index: number) {
-		metadataRows = metadataRows.filter((_, i) => i !== index);
-	}
-
-	async function submitTagMetadata() {
-		if (!tagId || !tag) return;
-		metadataError = null;
-		metadataSubmitting = true;
-		try {
-			const meta: Record<string, string | number> = {};
-			for (const row of metadataRows) {
-				const k = row.key.trim();
-				if (!k) continue;
-				const num = Number(row.value);
-				meta[k] = Number.isNaN(num) ? row.value : num;
-			}
-			const res = await fetch(`${API_BASE}/product-tags/${tagId}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ metadata: meta })
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			closeMetadataSheet();
-			loadTag();
-		} catch (e) {
-			metadataError = e instanceof Error ? e.message : String(e);
-		} finally {
-			metadataSubmitting = false;
-		}
-	}
 </script>
 
 <svelte:head>
@@ -241,315 +137,24 @@
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="flex flex-col gap-8 p-6">
 				<div class="flex gap-6">
-					<div class="flex-1 rounded-lg border bg-card p-6 shadow-sm">
-						<!-- Tag header -->
-						<section class="flex flex-col gap-6 pb-8">
-							<div class="flex items-center justify-between gap-4">
-								<h1 class="text-2xl font-semibold tracking-tight"># {tag.value}</h1>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									onclick={openEditTagSheet}
-									aria-label="Edit tag"
-								>
-									<Pencil class="size-4" />
-								</Button>
-							</div>
-						</section>
-					</div>
+					<TagHeroCard tag={tag} onUpdated={loadTag} />
 				</div>
 
-				<!-- Products section -->
-				<section class="rounded-lg border bg-card shadow-sm overflow-hidden">
-					<div class="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4 rounded-t-lg">
-						<h2 class="text-base font-semibold">Products</h2>
-						<div class="flex items-center gap-2">
-							<Button variant="outline" size="sm" class="rounded-md">
-								<SlidersHorizontal class="mr-1.5 size-4" />
-								Add filter
-							</Button>
-							<div class="relative w-48">
-								<Search
-									class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-								/>
-								<Input
-									type="search"
-									placeholder="Search"
-									bind:value={productSearch}
-									class="h-9 rounded-md pl-9"
-								/>
-							</div>
-						</div>
-					</div>
-					<div class="overflow-x-auto">
-						<table class="w-full text-sm">
-							<thead class="border-b bg-muted/50">
-								<tr>
-									<th class="px-4 py-3 text-left font-medium">Product</th>
-									<th class="px-4 py-3 text-left font-medium">Collection</th>
-									<th class="px-4 py-3 text-left font-medium">Sales Channels</th>
-									<th class="px-4 py-3 text-left font-medium">Variants</th>
-									<th class="px-4 py-3 text-left font-medium">Status</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#if products.length === 0}
-									<tr>
-										<td colspan="5" class="px-4 py-8 text-center text-muted-foreground">
-											No products with this tag.
-										</td>
-									</tr>
-								{:else}
-									{#each products as product (product.id)}
-										<tr class="border-b last:border-0">
-											<td class="px-4 py-3">
-												<a
-													href="/products/{product.id}"
-													class="flex items-center gap-3 hover:opacity-80"
-												>
-													{#if product.thumbnail}
-														<img
-															src={product.thumbnail}
-															alt=""
-															class="size-10 shrink-0 rounded-md object-cover"
-														/>
-													{:else}
-														<div
-															class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
-														>
-															<ImageIcon class="size-5" />
-														</div>
-													{/if}
-													<span class="font-medium">{product.title}</span>
-												</a>
-											</td>
-											<td class="px-4 py-3 font-medium">
-												{#if product.collection}
-													<a
-														href="/products/collections/{product.collection.id}"
-														class="text-primary hover:underline"
-													>
-														{product.collection.title}
-													</a>
-												{:else}
-													<span class="text-muted-foreground">—</span>
-												{/if}
-											</td>
-											<td class="px-4 py-3 text-muted-foreground">—</td>
-											<td class="px-4 py-3 text-muted-foreground">
-												{product.variants?.length ?? 0} variant{product.variants?.length === 1
-													? ''
-													: 's'}
-											</td>
-											<td class="px-4 py-3">
-												<span
-													class={cn(
-														'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-														product.status === 'published' &&
-															'bg-green-500/10 text-green-700 dark:text-green-400',
-														product.status === 'draft' && 'bg-muted text-muted-foreground',
-														product.status === 'proposed' &&
-															'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-														product.status === 'rejected' && 'bg-destructive/10 text-destructive'
-													)}
-												>
-													<span
-														class={cn(
-															'size-1.5 rounded-full',
-															product.status === 'published' && 'bg-green-600',
-															product.status === 'draft' && 'bg-muted-foreground/60',
-															product.status === 'proposed' && 'bg-amber-600',
-															product.status === 'rejected' && 'bg-destructive'
-														)}
-													></span>
-													{product.status}
-												</span>
-											</td>
-										</tr>
-									{/each}
-								{/if}
-							</tbody>
-						</table>
-					</div>
-					{#if pagination && pagination.total > 0}
-						<div class="mt-4 flex items-center justify-between border-t p-[5px]">
-							<p class="text-sm text-muted-foreground">
-								{start} – {end} of {pagination.total} results
-							</p>
-							<div class="flex items-center gap-2">
-								<Button
-									variant="outline"
-									size="sm"
-									disabled={!pagination.has_previous_page}
-									onclick={() => (productPage = Math.max(1, productPage - 1))}
-								>
-									Prev
-								</Button>
-								<span class="text-sm text-muted-foreground">
-									{pagination.page} of {pagination.total_pages} pages
-								</span>
-								<Button
-									variant="outline"
-									size="sm"
-									disabled={!pagination.has_next_page}
-									onclick={() => (productPage = Math.min(pagination.total_pages, productPage + 1))}
-								>
-									Next
-								</Button>
-							</div>
-						</div>
-					{/if}
-				</section>
+				<TagProductsCard
+					tagId={tagId ?? null}
+					products={products}
+					{pagination}
+					{start}
+					{end}
+					onPageChange={(pageNum) => (productPage = Math.max(1, pageNum))}
+					onProductsUpdated={loadProducts}
+				/>
 
-				<!-- Metadata & JSON -->
 				<div class="grid gap-4 sm:grid-cols-2">
-					<div class="rounded-lg border bg-card p-4 shadow-sm">
-						<div class="flex items-center justify-between gap-2">
-							<h3 class="font-medium">Metadata</h3>
-							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{metadataKeys} keys</span>
-							<Button variant="ghost" size="icon" class="size-8 shrink-0" onclick={openMetadataSheet}>
-								<ExternalLink class="size-4" />
-								<span class="sr-only">Open</span>
-							</Button>
-						</div>
-					</div>
-					<div class="rounded-lg border bg-card p-4 shadow-sm">
-						<div class="flex items-center justify-between gap-2">
-							<h3 class="font-medium">JSON</h3>
-							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{jsonKeys} keys</span>
-							<Button variant="ghost" size="icon" class="size-8 shrink-0" onclick={() => (jsonOpen = true)}>
-								<ExternalLink class="size-4" />
-								<span class="sr-only">Open</span>
-							</Button>
-						</div>
-					</div>
+					<MetadataComponent productId={tag?.id ?? null} metadata={tag?.metadata as Record<string, unknown> | null} onSaved={loadTag} />
+					<JSONComponent product={tag as Record<string, unknown> | null} options={[]} variants={[]} category={null} />
 				</div>
 			</div>
 		</div>
 	{/if}
 </div>
-
-<!-- Edit Metadata sheet -->
-<Sheet.Root bind:open={metadataOpen}>
-	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
-		<div class="flex h-full flex-col">
-			<div class="min-h-0 flex-1 overflow-auto p-6 pt-12">
-				<div class="flex flex-col gap-6">
-					<h2 class="text-lg font-semibold">Edit Metadata</h2>
-
-					{#if metadataError}
-						<div
-							class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-						>
-							{metadataError}
-						</div>
-					{/if}
-
-					<div class="overflow-hidden rounded-md border">
-						<table class="w-full text-sm">
-							<thead class="border-b bg-muted/50">
-								<tr>
-									<th class="px-4 py-3 text-left font-medium">Key</th>
-									<th class="px-4 py-3 text-left font-medium">Value</th>
-									<th class="w-10 px-4 py-3"></th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each metadataRows as row, i}
-									<tr class="border-b last:border-0">
-										<td class="px-4 py-2">
-											<Input bind:value={row.key} placeholder="Key" class="h-9 w-full" />
-										</td>
-										<td class="px-4 py-2">
-											<Input bind:value={row.value} placeholder="Value" class="h-9 w-full" />
-										</td>
-										<td class="px-4 py-2">
-											<Button
-												variant="ghost"
-												size="icon"
-												class="size-8 shrink-0 text-destructive hover:bg-destructive/10"
-												onclick={() => removeMetadataRow(i)}
-												aria-label="Remove row"
-											>
-												<Trash2 class="size-4" />
-											</Button>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-					<Button variant="outline" size="sm" onclick={addMetadataRow}>Add row</Button>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeMetadataSheet}>Cancel</Button>
-				<Button onclick={submitTagMetadata} disabled={metadataSubmitting}>
-					{metadataSubmitting ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
-
-<!-- Edit tag sheet -->
-<Sheet.Root bind:open={editTagSheetOpen}>
-	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-		<div class="flex h-full flex-col">
-			<Sheet.Header class="flex flex-col gap-1.5 border-b px-6 py-4">
-				<Sheet.Title>Edit tag</Sheet.Title>
-				<Sheet.Description class="text-sm text-muted-foreground">
-					Update the tag value.
-				</Sheet.Description>
-			</Sheet.Header>
-			<div class="min-h-0 flex-1 overflow-auto p-6">
-				{#if editTagError}
-					<div class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-						{editTagError}
-					</div>
-				{/if}
-				<div class="flex flex-col gap-6">
-					<div class="flex flex-col gap-2">
-						<label for="edit-tag-value" class="text-sm font-medium">Tag value</label>
-						<Input
-							id="edit-tag-value"
-							bind:value={editTagValue}
-							placeholder="e.g. sale"
-							class="h-9"
-						/>
-					</div>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={() => (editTagSheetOpen = false)} disabled={editTagSaving}>
-					Cancel
-				</Button>
-				<Button onclick={saveTagEdit} disabled={editTagSaving || !editTagValue.trim()}>
-					{editTagSaving ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
-
-<!-- JSON view sheet -->
-<Sheet.Root bind:open={jsonOpen}>
-	<Sheet.Content side="right" class="w-full max-w-2xl sm:max-w-2xl">
-		<div class="flex h-full flex-col">
-			<div class="shrink-0 border-b px-6 py-4">
-				<h2 class="text-lg font-semibold">JSON {jsonKeys} keys</h2>
-			</div>
-			<div class="min-h-0 flex-1 overflow-auto p-6">
-				{#if tag}
-					<pre
-						class="rounded-md border bg-zinc-900 p-4 font-mono text-sm break-all whitespace-pre-wrap text-zinc-300"><code
-							>{JSON.stringify(tag, null, 2)}</code
-						></pre>
-				{:else}
-					<p class="text-sm text-muted-foreground">No data</p>
-				{/if}
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>

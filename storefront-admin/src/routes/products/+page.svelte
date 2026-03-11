@@ -14,13 +14,10 @@
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import type { Product, ProductsListResponse } from '$lib/products/types.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
-	import { client } from '$lib/client.js';
-	import CreateProductModal from '$lib/products/CreateProductModal.svelte';
-	import { SvelteURLSearchParams,  } from 'svelte/reactivity';
-	import {untrack} from "svelte"
-	import { resolve } from '$app/paths';
-
-	
+import { client } from '$lib/client.js';
+import CreateProductModal from '$lib/products/CreateProductModal.svelte';
+import { SvelteURLSearchParams,  } from 'svelte/reactivity';
+import {untrack} from "svelte"
 	let createOpen = $state(false);
 
 	const paginationQuery = createPaginationQuery(page.url.searchParams);
@@ -95,7 +92,7 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => goto(resolve(`/products/${item.id}`))
+					onClick: (item) => goto(`/products/${item.id}`)
 				},
 				{
 					label: 'Delete',

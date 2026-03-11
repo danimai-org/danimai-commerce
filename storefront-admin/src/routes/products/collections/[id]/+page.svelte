@@ -1,211 +1,71 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import Search from '@lucide/svelte/icons/search';
-	import ImageIcon from '@lucide/svelte/icons/image';
-	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
-	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import FileText from '@lucide/svelte/icons/file-text';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-	import {
-		DeleteConfirmationModal,
-		PaginationTable,
-		TableHead,
-		TableBody,
-		TablePagination,
-		type TableColumn
-	} from '$lib/components/organs/index.js';
-	import Pencil from '@lucide/svelte/icons/pencil';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import Info from '@lucide/svelte/icons/info';
-	import { cn } from '$lib/utils.js';
-
-	const API_BASE = 'http://localhost:8000/admin';
-
-	type ProductCollection = {
-		id: string;
-		title: string;
-		handle: string;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	type SalesChannel = {
-		id: string;
-		name: string;
-		description: string | null;
-		is_default: boolean;
-		metadata: unknown;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	type Product = {
-		id: string;
-		title: string;
-		handle: string;
-		status: string;
-		thumbnail: string | null;
-		variants: Array<{ id: string }>;
-		collection: { id: string; title: string; handle: string } | null;
-		sales_channels: SalesChannel[];
-	};
-
-	type ProductsResponse = {
-		products: Product[];
-		count: number;
-		offset: number;
-		limit: number;
-	};
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { client } from '$lib/client.js';
+	import { createQuery } from '@tanstack/svelte-query';
+	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
+	import type { ProductCollection } from '$lib/product-collection/types.js';
+	import type { Product } from '$lib/products/types.js';
+	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
+import { CollectionHeroCard, CollectionProductsCard } from '$lib/components/organs/index.js';
+import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
+import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 
 	const collectionId = $derived($page.params.id);
 
 	let collection = $state<ProductCollection | null>(null);
-	let productsData = $state<ProductsResponse | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let productPage = $state(1);
-	let productLimit = $state(20);
-	let productSearch = $state('');
 
-	let editOpen = $state(false);
-	let editTitle = $state('');
-	let editHandle = $state('');
-	let editError = $state<string | null>(null);
-	let editSubmitting = $state(false);
+	const paginationQuery = $derived.by(() => createPaginationQuery($page.url.searchParams));
 
-	let metadataOpen = $state(false);
-	let metadataRows = $state<Array<{ key: string; value: string }>>([]);
-	let metadataError = $state<string | null>(null);
-	let metadataSubmitting = $state(false);
+	const productsQuery = createQuery(() => ({
+		queryKey: ['collection-products', collectionId, paginationQuery],
+		queryFn: async () => {
+			const query = {
+				...paginationQuery,
+				collection_id: collectionId
+			} as Record<string, string | number | undefined>;
+			const res = await client.products.get({ query });
+			return res.data as { data?: { rows: Product[]; pagination: PaginationMeta } };
+		},
+		enabled: !!collectionId,
+		refetchOnWindowFocus: false
+	}));
 
-	let jsonOpen = $state(false);
-
-	// Add products sheet
-	let addProductsSheetOpen = $state(false);
-	let addProductsData = $state<ProductsResponse | null>(null);
-	let addProductsPage = $state(1);
-	let addProductsLimit = $state(20);
-	let addProductsSearch = $state('');
-	let addProductsSelectedIds = $state<Set<string>>(new Set());
-	let addProductsSubmitting = $state(false);
-	let addProductsError = $state<string | null>(null);
-	const addProductsList = $derived(addProductsData?.products ?? []);
-	const addProductsCount = $derived(addProductsData?.count ?? 0);
-	const addProductsOffset = $derived(addProductsData?.offset ?? 0);
-	const addProductsTotalPages = $derived(
-		addProductsLimit > 0 ? Math.ceil(addProductsCount / addProductsLimit) : 1
+	const productsData = $derived(
+		productsQuery.data as { data?: { rows: Product[]; pagination: PaginationMeta } } | null
 	);
-	const addProductsStart = $derived(addProductsOffset + 1);
-	const addProductsEnd = $derived(
-		Math.min(addProductsOffset + addProductsList.length, addProductsCount)
+	const products = $derived(productsData?.data?.rows ?? ([] as Product[]));
+	const pagination = $derived(productsData?.data?.pagination ?? null);
+	const count = $derived(pagination?.total ?? 0);
+	const start = $derived(
+		pagination ? (pagination.page - 1) * pagination.limit + 1 : 0
 	);
-	const addProductsFiltered = $derived(
-		addProductsSearch.trim()
-			? addProductsList.filter((p) =>
-					p.title.toLowerCase().includes(addProductsSearch.trim().toLowerCase())
-				)
-			: addProductsList
+	const end = $derived(
+		pagination ? Math.min(pagination.page * pagination.limit, count) : 0
 	);
-
-	async function loadAddProductsList() {
-		try {
-			const params = new URLSearchParams({
-				page: String(addProductsPage),
-				limit: String(addProductsLimit),
-				sorting_field: 'created_at',
-				sorting_direction: 'desc'
-			});
-			const res = await fetch(`${API_BASE}/products?${params}`, { cache: 'no-store' });
-			if (!res.ok) throw new Error(await res.text());
-			addProductsData = (await res.json()) as ProductsResponse;
-		} catch (e) {
-			addProductsData = null;
-		}
-	}
-
-	$effect(() => {
-		if (addProductsSheetOpen) {
-			addProductsPage;
-			addProductsLimit;
-			loadAddProductsList();
-		}
-	});
-
-	function openAddProductsSheet() {
-		addProductsSheetOpen = true;
-		addProductsSelectedIds = new Set();
-		addProductsPage = 1;
-		addProductsSearch = '';
-		addProductsError = null;
-	}
-
-	function closeAddProductsSheet() {
-		addProductsSheetOpen = false;
-		addProductsError = null;
-	}
-
-	function toggleAddProductSelection(id: string) {
-		addProductsSelectedIds = new Set(addProductsSelectedIds);
-		if (addProductsSelectedIds.has(id)) addProductsSelectedIds.delete(id);
-		else addProductsSelectedIds.add(id);
-		addProductsSelectedIds = new Set(addProductsSelectedIds);
-	}
-
-	function toggleAddProductsSelectAll() {
-		if (addProductsSelectedIds.size === addProductsFiltered.length) {
-			addProductsSelectedIds = new Set();
-		} else {
-			addProductsSelectedIds = new Set(addProductsFiltered.map((p) => p.id));
-		}
-	}
-
-	async function submitAddProducts() {
-		if (!collectionId || !collection) return;
-		const ids = Array.from(addProductsSelectedIds);
-		if (ids.length === 0) {
-			addProductsError = 'Select at least one product';
-			return;
-		}
-		addProductsError = null;
-		addProductsSubmitting = true;
-		try {
-			const res = await fetch(`${API_BASE}/collections/${collectionId}/products`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ product_ids: ids })
-			});
-			if (!res.ok) throw new Error(await res.text());
-			closeAddProductsSheet();
-			loadProducts();
-		} catch (e) {
-			addProductsError = e instanceof Error ? e.message : String(e);
-		} finally {
-			addProductsSubmitting = false;
-		}
-	}
-
+	
 	async function loadCollection() {
 		if (!collectionId) return;
 		loading = true;
 		error = null;
 		try {
-			const res = await fetch(`${API_BASE}/collections/${collectionId}`, { cache: 'no-store' });
-			if (!res.ok) {
-				if (res.status === 404) {
+			const res = await client['collections']({ id: collectionId }).get();
+			if (res.error) {
+				const err = res.error as { status?: number; value?: { message?: string } };
+				if (err?.status === 404) {
 					error = 'Collection not found';
 					return;
 				}
-				throw new Error(await res.text());
+				error = err?.value?.message ?? String(res.error);
+				collection = null;
+				return;
 			}
-			collection = (await res.json()) as ProductCollection;
+			collection = (res.data ?? null) as ProductCollection | null;
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			collection = null;
@@ -214,290 +74,16 @@
 		}
 	}
 
-	async function loadProducts() {
-		if (!collectionId) return;
-		try {
-			const params = new URLSearchParams({
-				page: String(productPage),
-				limit: String(productLimit),
-				sorting_field: 'created_at',
-				sorting_direction: 'desc'
-			});
-			const res = await fetch(`${API_BASE}/collections/${collectionId}/products?${params}`, {
-				cache: 'no-store'
-			});
-			if (!res.ok) throw new Error(await res.text());
-			productsData = (await res.json()) as ProductsResponse;
-		} catch (e) {
-			productsData = null;
-		}
-	}
-
 	$effect(() => {
 		collectionId;
 		loadCollection();
 	});
 
-	$effect(() => {
-		if (collectionId) {
-			productPage;
-			productLimit;
-			loadProducts();
-		} else {
-			productsData = null;
-		}
-	});
-
-	const products = $derived(productsData?.products ?? []);
-	const count = $derived(productsData?.count ?? 0);
-	const limit = $derived(productsData?.limit ?? productLimit);
-	const offset = $derived(productsData?.offset ?? 0);
-	const totalPages = $derived(limit > 0 ? Math.ceil(count / limit) : 1);
-	const start = $derived(offset + 1);
-	const end = $derived(Math.min(offset + products.length, count));
-
-	const productPagination = $derived(
-		productsData
-			? {
-					total: count,
-					page: productPage,
-					limit,
-					total_pages: totalPages,
-					has_next_page: productPage < totalPages,
-					has_previous_page: productPage > 1
-				}
-			: null
-	);
-
-	const productRows = $derived(
-		products.map((p) => ({
-			...p,
-			collection_display: p.collection?.title ?? '—',
-			sales_channels_display: p.sales_channels?.map((sc) => sc.name).join(', ') ?? '—',
-			variants_count: p.variants?.length ?? 0
-		})) as Record<string, unknown>[]
-	);
-
-	const productTableColumns: TableColumn[] = [
-		{
-			label: 'Product',
-			key: 'title',
-			type: 'link',
-			cellHref: (row) => `/products/${row.id}`,
-			thumbnailKey: 'thumbnail',
-			textKey: 'title'
-		},
-		{ label: 'Collection', key: 'collection_display', type: 'text' },
-		{ label: 'Sales Channels', key: 'sales_channels_display', type: 'text' },
-		{ label: 'Variants', key: 'variants_count', type: 'text' },
-		{ label: 'Status', key: 'status', type: 'text' },
-		{
-			label: 'Actions',
-			key: 'actions',
-			type: 'actions',
-			actions: [
-				{
-					label: 'Remove from collection',
-					key: 'remove',
-					type: 'button',
-					onClick: (item) => openRemoveProductConfirm(item as unknown as Product)
-				}
-			]
-		}
-	];
-
-	function goToProductPage(pageNum: number) {
-		productPage = Math.max(1, Math.min(totalPages, pageNum));
+	function goToPage(pageNum: number) {
+		const params = new URLSearchParams($page.url.searchParams);
+		params.set('page', String(Math.max(1, pageNum)));
+		goto(`${$page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
-
-	function getHandle(c: ProductCollection | null): string {
-		if (!c) return '';
-		return c.handle.startsWith('/') ? c.handle : `/${c.handle}`;
-	}
-
-	function openEdit() {
-		if (!collection) return;
-		editOpen = true;
-		editTitle = collection.title;
-		editHandle = collection.handle.replace(/^\//, '') || '';
-		editError = null;
-	}
-
-	function closeEdit() {
-		editOpen = false;
-		editError = null;
-	}
-
-	async function submitEdit() {
-		if (!collection) return;
-		editError = null;
-		if (!editTitle.trim()) {
-			editError = 'Title is required';
-			return;
-		}
-		editSubmitting = true;
-		try {
-			const handle =
-				editHandle.trim() ||
-				editTitle
-					.toLowerCase()
-					.replace(/\s+/g, '-')
-					.replace(/[^a-z0-9-]/g, '');
-			const res = await fetch(`${API_BASE}/collections/${collection.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ title: editTitle.trim(), handle })
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			closeEdit();
-			loadCollection();
-		} catch (e) {
-			editError = e instanceof Error ? e.message : String(e);
-		} finally {
-			editSubmitting = false;
-		}
-	}
-
-	function openMetadataEdit() {
-		if (!collection) return;
-		const meta =
-			collection.metadata && typeof collection.metadata === 'object'
-				? (collection.metadata as Record<string, unknown>)
-				: {};
-		metadataRows = Object.entries(meta).map(([k, v]) => ({ key: k, value: String(v ?? '') }));
-		if (metadataRows.length === 0) metadataRows = [{ key: '', value: '' }];
-		metadataOpen = true;
-		metadataError = null;
-	}
-
-	function closeMetadataEdit() {
-		metadataOpen = false;
-		metadataError = null;
-	}
-
-	function addMetadataRow() {
-		metadataRows = [...metadataRows, { key: '', value: '' }];
-	}
-
-	function removeMetadataRow(index: number) {
-		metadataRows = metadataRows.filter((_, i) => i !== index);
-	}
-
-	async function submitMetadata() {
-		if (!collection) return;
-		metadataError = null;
-		metadataSubmitting = true;
-		try {
-			const meta: Record<string, string | number> = {};
-			for (const row of metadataRows) {
-				const k = row.key.trim();
-				if (!k) continue;
-				const num = Number(row.value);
-				meta[k] = Number.isNaN(num) ? row.value : num;
-			}
-			const res = await fetch(`${API_BASE}/collections/${collection.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ metadata: meta })
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			closeMetadataEdit();
-			loadCollection();
-		} catch (e) {
-			metadataError = e instanceof Error ? e.message : String(e);
-		} finally {
-			metadataSubmitting = false;
-		}
-	}
-
-	const metadataKeys = $derived(
-		collection?.metadata && typeof collection.metadata === 'object'
-			? Object.keys(collection.metadata as object).length
-			: 0
-	);
-	const jsonKeys = $derived(
-		collection ? ['id', 'title', 'handle', 'metadata', 'created_at', 'updated_at'].length : 0
-	);
-
-	function goToProductEdit(productId: string) {
-		goto(`/products/${productId}`);
-	}
-
-	let removeProductModalOpen = $state(false);
-	let productToRemove = $state<Product | null>(null);
-	let removeProductSubmitting = $state(false);
-	let removeProductError = $state<string | null>(null);
-
-	function openRemoveProductConfirm(product: Product) {
-		productToRemove = product;
-		removeProductError = null;
-		removeProductModalOpen = true;
-	}
-
-	function closeRemoveProductConfirm() {
-		if (!removeProductSubmitting) {
-			removeProductModalOpen = false;
-			productToRemove = null;
-			removeProductError = null;
-		}
-	}
-
-	async function confirmRemoveProduct() {
-		if (!collectionId || !collection || !productToRemove) return;
-		removeProductSubmitting = true;
-		removeProductError = null;
-		try {
-			const res = await fetch(`${API_BASE}/collections/${collectionId}/products`, {
-				method: 'DELETE',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ product_ids: [productToRemove.id] })
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				let message = text;
-				try {
-					const json = JSON.parse(text) as { message?: string };
-					if (json.message) message = json.message;
-				} catch {
-					// use text as-is
-				}
-				removeProductError = message;
-				return;
-			}
-			removeProductModalOpen = false;
-			productToRemove = null;
-			loadProducts();
-		} catch (e) {
-			removeProductError = e instanceof Error ? e.message : String(e);
-		} finally {
-			removeProductSubmitting = false;
-		}
-	}
-
-	async function removeProductDirectly(product: Product) {
-		if (!collectionId || !collection) return;
-		try {
-			const res = await fetch(`${API_BASE}/collections/${collectionId}/products`, {
-				method: 'DELETE',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ product_ids: [product.id] })
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text);
-			}
-			loadProducts();
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-		}
-	}
-
 </script>
 
 <svelte:head>
@@ -537,442 +123,32 @@
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="flex flex-col gap-8 p-6">
 				<div class="flex gap-6">
-					<div class="flex-1 rounded-lg border bg-card p-6 shadow-sm">
-						<!-- Collection header -->
-						<section class="flex flex-col gap-6 pb-8">
-							<div class="flex items-center justify-between gap-4">
-								<h1 class="text-2xl font-semibold tracking-tight">{collection.title}</h1>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									onclick={openEdit}
-									aria-label="Edit collection"
-								>
-									<Pencil class="size-4" />
-								</Button>
-							</div>
-							<div class="flex items-center gap-3">
-								<label
-									for="collection-handle"
-									class="shrink-0 text-sm font-medium text-muted-foreground">Handle</label
-								>
-								<Input
-									id="collection-handle"
-									type="text"
-									value={getHandle(collection)}
-									readonly
-									class="h-9 max-w-xs rounded-md border border-input bg-background px-3 font-mono text-sm"
-								/>
-							</div>
-						</section>
-					</div>
+					<CollectionHeroCard collection={collection} onUpdated={loadCollection} />
 				</div>
 
-				<!-- Products section -->
-				<section class="rounded-lg border bg-card shadow-sm overflow-hidden">
-					<div class="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4 rounded-t-lg">
-						<h2 class="text-base font-semibold">Products</h2>
-						<Button type="button" size="sm" class="rounded-md" onclick={openAddProductsSheet}>
-							Add product
-						</Button>
-					</div>
-					<div class="px-6 pb-6">
-						<PaginationTable
-							bind:searchQuery={productSearch}
-							searchPlaceholder="Search"
-							showFilter={false}
-						>
-							<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-								<table class="w-full text-sm">
-									<TableHead columns={productTableColumns} />
-									<TableBody
-										rows={productRows}
-										columns={productTableColumns}
-										emptyMessage="No products in this collection."
-									/>
-								</table>
-							</div>
-							<TablePagination
-								pagination={productPagination}
-								{start}
-								{end}
-								onPageChange={goToProductPage}
-							/>
-						</PaginationTable>
-					</div>
-				</section>
+				<CollectionProductsCard
+					collectionId={collectionId ?? null}
+					collection={collection}
+					paginationQuery={paginationQuery ?? {}}
+					onProductsUpdated={async () => {
+						await productsQuery.refetch();
+					}}
+				/>
 
-				<!-- Metadata & JSON -->
 				<div class="grid gap-4 sm:grid-cols-2">
-					<div class="rounded-lg border bg-card p-4 shadow-sm">
-						<div class="flex items-center justify-between gap-2">
-							<h3 class="font-medium">Metadata</h3>
-							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-								{metadataKeys} keys
-							</span>
-							<Button
-								variant="ghost"
-								size="icon"
-								class="size-8 shrink-0"
-								onclick={openMetadataEdit}
-							>
-								<ExternalLink class="size-4" />
-								<span class="sr-only">Open</span>
-							</Button>
-						</div>
-					</div>
-					<div class="rounded-lg border bg-card p-4 shadow-sm">
-						<div class="flex items-center justify-between gap-2">
-							<h3 class="font-medium">JSON</h3>
-							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-								{jsonKeys} keys
-							</span>
-							<Button
-								variant="ghost"
-								size="icon"
-								class="size-8 shrink-0"
-								onclick={() => (jsonOpen = true)}
-							>
-								<ExternalLink class="size-4" />
-								<span class="sr-only">Open</span>
-							</Button>
-						</div>
-					</div>
+					<MetadataComponent
+						productId={collection?.id ?? null}
+						metadata={collection?.metadata as Record<string, unknown> | null}
+						onSaved={loadCollection}
+					/>
+					<JSONComponent
+						product={collection}
+						options={[]}
+						variants={[]}
+						category={null}
+					/>
 				</div>
 			</div>
 		</div>
 	{/if}
 </div>
-
-<!-- Edit Collection modal -->
-<Sheet.Root bind:open={editOpen}>
-	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
-		<div class="flex h-full flex-col">
-			<div class="flex-1 overflow-auto p-6 pt-12">
-				<div class="flex flex-col gap-6">
-					<div>
-						<h2 class="text-lg font-semibold">Edit Collection</h2>
-						<p class="mt-1 text-sm text-muted-foreground">Update collection details.</p>
-					</div>
-
-					{#if editError}
-						<div
-							class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-						>
-							{editError}
-						</div>
-					{/if}
-					<div class="grid grid-cols-2 gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="edit-title" class="text-sm font-medium">Title</label>
-							<Input
-								id="edit-title"
-								bind:value={editTitle}
-								placeholder="Enter collection title"
-								class={cn('h-9', editError && !editTitle.trim() && 'border-destructive')}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<div class="flex items-center gap-1.5">
-								<label for="edit-handle" class="text-sm font-medium">Handle</label>
-								<Tooltip.Root>
-									<Tooltip.Trigger
-										class="rounded-full text-muted-foreground hover:text-foreground"
-										aria-label="Handle info"
-									>
-										<Info class="size-3.5" />
-									</Tooltip.Trigger>
-									<Tooltip.Content>Leave empty to auto-generate from title.</Tooltip.Content>
-								</Tooltip.Root>
-							</div>
-							<div class="relative">
-								<span class="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground">/</span
-								>
-								<Input
-									id="edit-handle"
-									bind:value={editHandle}
-									placeholder="handle"
-									class="h-9 pl-6"
-								/>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeEdit}>Cancel</Button>
-				<Button onclick={submitEdit} disabled={editSubmitting}>
-					{editSubmitting ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
-
-<!-- Edit Metadata modal -->
-<Sheet.Root bind:open={metadataOpen}>
-	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
-		<div class="flex h-full flex-col">
-			<div class="flex-1 overflow-auto p-6 pt-12">
-				<div class="flex flex-col gap-6">
-					<h2 class="text-lg font-semibold">Edit Metadata</h2>
-
-					{#if metadataError}
-						<div
-							class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-						>
-							{metadataError}
-						</div>
-					{/if}
-
-					<div class="overflow-hidden rounded-md border">
-						<table class="w-full text-sm">
-							<thead class="border-b bg-muted/50">
-								<tr>
-									<th class="px-4 py-3 text-left font-medium">Key</th>
-									<th class="px-4 py-3 text-left font-medium">Value</th>
-									<th class="w-10 px-4 py-3"></th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each metadataRows as row, i}
-									<tr class="border-b last:border-0">
-										<td class="px-4 py-2">
-											<Input bind:value={row.key} placeholder="Key" class="h-9 w-full" />
-										</td>
-										<td class="px-4 py-2">
-											<Input bind:value={row.value} placeholder="Value" class="h-9 w-full" />
-										</td>
-										<td class="px-4 py-2">
-											<Button
-												variant="ghost"
-												size="icon"
-												class="size-8 shrink-0 text-destructive hover:bg-destructive/10"
-												onclick={() => removeMetadataRow(i)}
-												aria-label="Remove row"
-											>
-												<Trash2 class="size-4" />
-											</Button>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-					<Button variant="outline" size="sm" onclick={addMetadataRow}>Add row</Button>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeMetadataEdit}>Cancel</Button>
-				<Button onclick={submitMetadata} disabled={metadataSubmitting}>
-					{metadataSubmitting ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
-
-<!-- JSON view sheet -->
-<Sheet.Root bind:open={jsonOpen}>
-	<Sheet.Content side="right" class="w-full max-w-2xl sm:max-w-2xl">
-		<div class="flex h-full flex-col">
-			<div class="shrink-0 border-b px-6 py-4">
-				<h2 class="text-lg font-semibold">JSON {jsonKeys} keys</h2>
-			</div>
-			<div class="min-h-0 flex-1 overflow-auto p-6">
-				{#if collection}
-					<pre
-						class="rounded-md border bg-zinc-900 p-4 font-mono text-sm break-all whitespace-pre-wrap text-zinc-300"><code
-							>{JSON.stringify(collection, null, 2)}</code
-						></pre>
-				{:else}
-					<p class="text-sm text-muted-foreground">No data</p>
-				{/if}
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
-
-<!-- Add products sheet -->
-<Sheet.Root bind:open={addProductsSheetOpen}>
-	<Sheet.Content side="right" class="w-full max-w-4xl sm:max-w-4xl">
-		<div class="flex h-full flex-col">
-			<div class="shrink-0 border-b px-6 py-4">
-				<h2 class="text-lg font-semibold">Add products</h2>
-				<p class="mt-1 text-sm text-muted-foreground">Select products to add to this collection.</p>
-			</div>
-			<div class="flex min-h-0 flex-1 flex-col">
-				<div class="flex flex-wrap items-center justify-between gap-4 border-b px-6 py-4">
-					<div class="flex items-center gap-2">
-						<div class="relative w-48">
-							<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-							<Input
-								type="search"
-								placeholder="Search"
-								bind:value={addProductsSearch}
-								class="h-9 rounded-md pl-9"
-							/>
-						</div>
-						<button
-							type="button"
-							class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-						>
-							<ArrowUpDown class="size-4" />
-							<span class="sr-only">Sort</span>
-						</button>
-					</div>
-				</div>
-				<div class="min-h-0 flex-1 overflow-auto px-6">
-					<table class="w-full text-sm">
-						<thead class="sticky top-0 z-10 border-b bg-muted/50">
-							<tr>
-								<th class="w-10 px-4 py-3 text-left font-medium">
-									<input
-										type="checkbox"
-										class="rounded border-muted-foreground/50"
-										aria-label="Select all"
-										checked={addProductsFiltered.length > 0 &&
-											addProductsSelectedIds.size === addProductsFiltered.length}
-										onchange={toggleAddProductsSelectAll}
-									/>
-								</th>
-								<th class="px-4 py-3 text-left font-medium">Product</th>
-								<th class="px-4 py-3 text-left font-medium">Collection</th>
-								<th class="px-4 py-3 text-left font-medium">Sales Channels</th>
-								<th class="px-4 py-3 text-left font-medium">Variants</th>
-								<th class="px-4 py-3 text-left font-medium">Status</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#if addProductsFiltered.length === 0}
-								<tr>
-									<td colspan="6" class="px-4 py-8 text-center text-muted-foreground">
-										No products to show.
-									</td>
-								</tr>
-							{:else}
-								{#each addProductsFiltered as p (p.id)}
-									<tr class="border-b last:border-0">
-										<td class="px-4 py-3">
-											<input
-												type="checkbox"
-												class="rounded border-muted-foreground/50"
-												aria-label="Select row"
-												checked={addProductsSelectedIds.has(p.id)}
-												onchange={() => toggleAddProductSelection(p.id)}
-											/>
-										</td>
-										<td class="px-4 py-3">
-											<div class="flex items-center gap-3">
-												{#if p.thumbnail}
-													<img
-														src={p.thumbnail}
-														alt=""
-														class="size-10 shrink-0 rounded-md object-cover"
-													/>
-												{:else}
-													<div
-														class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
-													>
-														<ImageIcon class="size-5" />
-													</div>
-												{/if}
-												<span class="font-medium">{p.title}</span>
-											</div>
-										</td>
-										<td class="px-4 py-3 text-muted-foreground">
-											{p.collection?.title ?? '—'}
-										</td>
-										<td class="px-4 py-3 text-muted-foreground">
-											{p.sales_channels?.length
-												? p.sales_channels.map((sc) => sc.name).join(', ')
-												: '—'}
-										</td>
-										<td class="px-4 py-3 text-muted-foreground">
-											{p.variants?.length ?? 0} variant{(p.variants?.length ?? 0) === 1 ? '' : 's'}
-										</td>
-										<td class="px-4 py-3">
-											<span
-												class={cn(
-													'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-													p.status === 'published' &&
-														'bg-green-500/10 text-green-700 dark:text-green-400',
-													p.status === 'draft' && 'bg-muted text-muted-foreground',
-													p.status === 'proposed' &&
-														'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-													p.status === 'rejected' && 'bg-destructive/10 text-destructive'
-												)}
-											>
-												<span
-													class={cn(
-														'size-1.5 rounded-full',
-														p.status === 'published' && 'bg-green-600',
-														p.status === 'draft' && 'bg-muted-foreground/60',
-														p.status === 'proposed' && 'bg-amber-600',
-														p.status === 'rejected' && 'bg-destructive'
-													)}
-												></span>
-												{p.status}
-											</span>
-										</td>
-									</tr>
-								{/each}
-							{/if}
-						</tbody>
-					</table>
-				</div>
-				{#if addProductsCount > 0}
-					<div class="flex items-center justify-between gap-4 border-t px-6 py-4">
-						<p class="text-sm text-muted-foreground">
-							{addProductsStart} – {addProductsEnd} of {addProductsCount} results
-						</p>
-						<div class="flex items-center gap-2">
-							<Button
-								variant="outline"
-								size="sm"
-								disabled={addProductsPage <= 1}
-								onclick={() => (addProductsPage = Math.max(1, addProductsPage - 1))}
-							>
-								Prev
-							</Button>
-							<span class="text-sm text-muted-foreground">
-								{addProductsPage} of {addProductsTotalPages} pages
-							</span>
-							<Button
-								variant="outline"
-								size="sm"
-								disabled={addProductsPage >= addProductsTotalPages}
-								onclick={() =>
-									(addProductsPage = Math.min(addProductsTotalPages, addProductsPage + 1))}
-							>
-								Next
-							</Button>
-						</div>
-					</div>
-				{/if}
-			</div>
-			{#if addProductsError}
-				<p class="px-6 pb-2 text-sm text-destructive">{addProductsError}</p>
-			{/if}
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeAddProductsSheet}>Cancel</Button>
-				<Button onclick={submitAddProducts} disabled={addProductsSubmitting}>
-					{addProductsSubmitting ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
-
-<!-- Remove product from collection confirmation -->
-<DeleteConfirmationModal
-	bind:open={removeProductModalOpen}
-	entityName="product"
-	entityTitle={productToRemove?.title ?? productToRemove?.id ?? ''}
-	customMessage="Remove this product from the collection? The product will remain but will no longer be associated with this collection."
-	onConfirm={confirmRemoveProduct}
-	onCancel={closeRemoveProductConfirm}
-	submitting={removeProductSubmitting}
-	error={removeProductError}
-/>

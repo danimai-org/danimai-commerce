@@ -19,19 +19,13 @@
 	import { client } from '$lib/client';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
-
 	const paginateState = createPagination(
 		async () => {
 			return client['product-tags'].get({ query: paginationQuery });
 		},
 		['product-tags']
 	);
-
-	$effect(() => {
-		page.url.searchParams.toString();
-		paginateState.refetch();
-	});
-
+	
 	function goToPage(pageNum: number) {
 		const params = new URLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
@@ -148,3 +142,5 @@
 		{deleteError}
 	</div>
 {/if}
+
+

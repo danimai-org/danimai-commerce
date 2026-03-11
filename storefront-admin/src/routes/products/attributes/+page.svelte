@@ -34,18 +34,13 @@
 
 	
 
-	$effect(() => {
-		$page.url.searchParams.toString();
-		paginateState?.refetch();
-	});
-
 	function openCreate() {
 		paginateState.openCreate();
 		formTitle = '';
 		formType = 'string';
 	}
 	function openEdit(attr: AttributesResponse['data']['rows'][number]) {
-		(paginateState.openEdit as unknown as (item: ProductAttribute) => void)(attr);
+		(paginateState.openEdit as unknown as (item: any) => void)(attr);
 		formTitle = attr.title;
 		formType = attr.type;
 	}
@@ -63,15 +58,15 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (row) => openEdit(row as ProductAttribute | null)
+					onClick: (row) => openEdit(row as any | null)
 				},
 				{
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
 					onClick: (row) =>
-					(paginateState.openDeleteConfirm as unknown as (item: ProductAttribute) => void)(
-						row as ProductAttribute
+					(paginateState.openDeleteConfirm as unknown as (item: any) => void)(
+						row as any
 					)
 				}
 			]
@@ -82,18 +77,14 @@
 	let formType = $state('string');
 
 	const paginationQuery = $derived.by(() => createPaginationQuery($page.url.searchParams));
-	const paginateState = $state(createPagination(
+	const paginateState = createPagination(
 		async () => {
 			
 			return client['product-attributes'].get({ query: paginationQuery });
 		},
 		['product-attributes']
-	));
+	);
 
-	$effect(() => {
-		$page.url.searchParams.toString();
-		paginateState?.refetch();
-	});
 
 	function goToPage(pageNum: number) {
 		const params = new URLSearchParams($page.url.searchParams);
@@ -114,7 +105,7 @@
 
 	function confirmDeleteAttribute() {
 		paginateState.confirmDelete((item) => {
-			return deleteAttribute((item as unknown as ProductAttribute).id);
+			return deleteAttribute((item as unknown as any).id);
 		});
 	}
 
@@ -145,7 +136,7 @@
 
 	async function submitEdit() {
 		formError = null;
-		const item = paginateState.formItem as ProductAttribute | null;
+		const item = paginateState.formItem as any | null;
 		if (!item?.id) return;
 		if (!formTitle.trim()) {
 			formError = 'Title is required';
@@ -283,7 +274,7 @@
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="attribute"
-	entityTitle={(paginateState.deleteItem as ProductAttribute | null)?.title || (paginateState.deleteItem as ProductAttribute | null)?.id || ''}
+	entityTitle={(paginateState.deleteItem as any | null)?.title || (paginateState.deleteItem as any | null)?.id || ''}
 	onConfirm={confirmDeleteAttribute}
 	onCancel={closeDeleteConfirm}
 	submitting={paginateState.deleteSubmitting}

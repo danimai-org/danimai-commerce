@@ -1,4 +1,13 @@
 {
+	"include": [
+		"src/**/*.svelte",
+		"src/**/*.ts",
+		"src/**/*.js",
+		"src/**/*.json",
+		"src/**/*.css",
+		"src/**/*.html",
+		"src/**/*.md"
+	],
 	"extends": "./.svelte-kit/tsconfig.json",
 	"compilerOptions": {
 		"rewriteRelativeImportExtensions": true,

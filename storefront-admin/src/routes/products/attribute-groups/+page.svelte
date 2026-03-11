@@ -31,10 +31,7 @@
 		['product-attribute-groups']
 	);
 
-	$effect(() => {
-		page.url.searchParams.toString();
-		paginateState.refetch();
-	});
+	
 
 	function goToPage(pageNum: number) {
 		const params = new URLSearchParams(page.url.searchParams);
@@ -78,7 +75,7 @@
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => paginateState.openDeleteConfirm(item as unknown as AttributeGroupsResponse)
+					onClick: (item) => paginateState.openDeleteConfirm(item as unknown as any)
 				}
 			]
 		}
@@ -106,28 +103,18 @@
 		editGroup = null;
 	}
 
-	async function submitEdit() {
-		if (!editGroup) return;
-		editError = null;
-		if (!editTitle.trim()) {
-			editError = 'Title is required';
-			return;
-		}
-		editSubmitting = true;
-		try {
-			const res = await client['product-attribute-groups'].update({ id: editGroup.id, data: { title: editTitle.trim() } });
-			if (!res.ok) {
-				throw new Error(res.data?.error?.message || `HTTP ${res.status}`);
-			}
-			closeEdit();
-			paginateState.refetch();
-		} catch (e) {
-			editError = e instanceof Error ? e.message : String(e);
-		} finally {
-			editSubmitting = false;
-		}
-	}
-
+	// async function submitEdit() {
+	// 	if (!editGroup) return;
+	// 	editError = null;
+	// 	if (!editTitle.trim()) {
+	// 		editError = 'Title is required';
+	// 		return;
+	// 	}
+	// 	editSubmitting = true;
+	// 	await client['product-attribute-groups'].put(editGroup.id, { title: editTitle.trim() });
+	// 	closeEdit();
+		
+	// }
 </script>
 
 
@@ -208,7 +195,7 @@
 			</div>
 			<div class="flex justify-end gap-2 border-t p-4">
 				<Button variant="outline" onclick={closeEdit}>Cancel</Button>
-				<Button onclick={submitEdit} disabled={editSubmitting}>
+				<Button onclick={() => paginateState.openEdit(editGroup as any)} disabled={editSubmitting}>
 					{editSubmitting ? 'Saving…' : 'Save'}
 				</Button>
 			</div>

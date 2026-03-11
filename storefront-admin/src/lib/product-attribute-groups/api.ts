@@ -5,56 +5,50 @@ import type {
 	ListAttributeGroupsParams,
 	PaginationMeta
 } from './types.js';
-
-const getApiBase = () => import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
+import { client } from '$lib/client.js';
 
 export async function getAttributeGroup(id: string): Promise<ProductAttributeGroupDetail | null> {
-	const res = await fetch(`${getApiBase()}/product-attribute-groups/${id}`, {
-		cache: 'no-store'
-	});
-	if (res.status === 404) return null;
-	if (!res.ok) {
-		const text = await res.text();
-		throw new Error(text || `HTTP ${res.status}`);
+	const res = await client['product-attribute-groups']({ id }).get();
+	if (res.error) {
+		// Treat 404-like errors as null when possible; otherwise, surface the error.
+		const message = String(res.error);
+		if (message.toLowerCase().includes('not found') || message.includes('404')) {
+			return null;
+		}
+		throw new Error(message);
 	}
-	return res.json() as Promise<ProductAttributeGroupDetail>;
+	if (!res.data) return null;
+	return res.data as ProductAttributeGroupDetail;
 }
 
 export async function updateAttributeGroup(
 	id: string,
 	body: { title?: string; attribute_ids?: string[] }
 ): Promise<ProductAttributeGroupDetail> {
-	const res = await fetch(`${getApiBase()}/product-attribute-groups/${id}`, {
-		method: 'PUT',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(body)
-	});
-	if (!res.ok) {
-		const text = await res.text();
-		throw new Error(text || `HTTP ${res.status}`);
+	const res = await client['product-attribute-groups']({ id }).put(body);
+	if (res.error) {
+		throw new Error(String(res.error));
 	}
-	return res.json() as Promise<ProductAttributeGroupDetail>;
+	return res.data as ProductAttributeGroupDetail;
 }
 
 export async function listAttributeGroups(
 	params: ListAttributeGroupsParams
 ): Promise<AttributeGroupsResponse> {
-	const searchParams = new URLSearchParams();
-	if (params.page != null) searchParams.set('page', String(params.page));
-	if (params.limit != null) searchParams.set('limit', String(params.limit));
-	if (params.sorting_field) searchParams.set('sorting_field', params.sorting_field);
-	if (params.sorting_direction) searchParams.set('sorting_direction', params.sorting_direction);
-
-	const res = await fetch(`${getApiBase()}/product-attribute-groups?${searchParams}`, {
-		cache: 'no-store'
+	const res = await client['product-attribute-groups']().get({
+		query: {
+			page: params.page,
+			limit: params.limit,
+			sorting_field: params.sorting_field,
+			sorting_direction: params.sorting_direction
+		}
 	});
-	if (!res.ok) {
-		const text = await res.text();
-		throw new Error(text || `HTTP ${res.status}`);
+	if (res.error) {
+		throw new Error(String(res.error));
 	}
-	const raw = (await res.json()) as { rows?: ProductAttributeGroup[]; pagination?: PaginationMeta };
-	const rows = raw.rows ?? [];
-	const pagination: PaginationMeta = raw.pagination ?? {
+
+	const rows = (res.data?.rows ?? []) as ProductAttributeGroup[];
+	const pagination: PaginationMeta = (res.data?.pagination as PaginationMeta | undefined) ?? {
 		total: rows.length,
 		page: 1,
 		limit: 10,
@@ -62,6 +56,7 @@ export async function listAttributeGroups(
 		has_next_page: false,
 		has_previous_page: false
 	};
+
 	return {
 		data: { rows, pagination },
 		pagination
@@ -69,13 +64,10 @@ export async function listAttributeGroups(
 }
 
 export async function deleteAttributeGroups(ids: string[]): Promise<void> {
-	const res = await fetch(`${getApiBase()}/product-attribute-groups`, {
-		method: 'DELETE',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ attribute_group_ids: ids })
+	const res = await (client as any)['product-attribute-groups']().delete({
+		attribute_group_ids: ids
 	});
-	if (!res.ok) {
-		const text = await res.text();
-		throw new Error(text || `HTTP ${res.status}`);
+	if (res?.error) {
+		throw new Error(String(res.error));
 	}
 }

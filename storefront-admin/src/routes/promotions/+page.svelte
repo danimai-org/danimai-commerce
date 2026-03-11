@@ -79,11 +79,7 @@
 		['promotions']
 	);
 
-	$effect(() => {
-		searchQuery;
-		page.url.searchParams.toString();
-		paginateState.refetch();
-	});
+	
 
 	function goToPage(pageNum: number) {
 		const params = new URLSearchParams(page.url.searchParams);

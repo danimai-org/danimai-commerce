@@ -100,7 +100,7 @@
 						<Input
 							id="category-name"
 							bind:value={name}
-							placeholder="e.g. Summer Category"
+							placeholder="e.g. Category Name"
 							class={cn('h-9', error === 'Name is required' && 'border-destructive')}
 						/>
 					</div>
@@ -109,7 +109,7 @@
 						<Input
 							id="category-handle"
 							bind:value={handle}
-							placeholder="e.g. summer-category"
+							placeholder="e.g. category-name"
 							class={cn('h-9', error === 'Handle is required' && 'border-destructive')}
 						/>
 						<p class="text-xs text-muted-foreground">

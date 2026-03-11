@@ -16,9 +16,9 @@
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import { deleteCategories } from '$lib/product-categories/api.js';
 	import type { ProductCategory } from '$lib/product-categories/types.js';
+
 	import { client } from '$lib/client';
 
-	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
@@ -163,7 +163,7 @@
 	entityName="category"
 	entityTitle={(deleteItem as unknown as ProductCategory)?.value ?? (deleteItem as unknown as ProductCategory)?.id ?? ''}
 	customMessage="Delete this category? This action cannot be undone."
-	onConfirm={() => confirmDelete((item) => deleteCategories([(item as unknown as ProductCategory).id]))}
+	onConfirm={() => confirmDelete((item) => deleteCategories([(item as any).id]))}
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}
 />

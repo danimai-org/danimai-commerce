@@ -55,7 +55,7 @@ export const createPagination = <T>(
 		refetchOnWindowFocus: false,
 	}));
 
-	const pagination = $derived(query.data?.pagination ?? null);
+	const pagination = $derived((query.data as unknown as { pagination?: PaginationMeta })?.pagination ?? null);
 	const loading = $derived(query.isPending);
 	const error = $derived(
 		query.error != null ? (query.error instanceof Error ? query.error.message : String(query.error)) : null
