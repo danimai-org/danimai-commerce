@@ -6,13 +6,13 @@
 		type TableColumn
 	} from '$lib/components/organs/index.js';
 	import List from '@lucide/svelte/icons/list';
-	import type { ProductAttributeGroupDetail } from '$lib/product-attribute-groups/types.js';
 
 	interface Props {
-		group: ProductAttributeGroupDetail | null;
+		group: any | null;
+		attributes: any | null;
 	}
 
-	let { group }: Props = $props();
+	let { group, attributes }: Props = $props();
 
 	let attributesSearchQuery = $state('');
 
@@ -22,15 +22,15 @@
 	];
 
 	const attributeRows = $derived(
-		(group?.attributes ?? [])
-			.filter((attr) => {
+		(attributes ?? [])
+			.filter((attribute: any) => {
 				const q = attributesSearchQuery.trim().toLowerCase();
 				if (!q) return true;
 				return (
-					attr.title.toLowerCase().includes(q) || attr.type.toLowerCase().includes(q)
+					attribute.title.toLowerCase().includes(q) || attribute.type.toLowerCase().includes(q)
 				);
 			})
-			.map((attr) => ({ id: attr.id, title: attr.title, type: attr.type })) as Record<
+			.map((attribute: any) => ({ id: attribute.id, title: attribute.title, type: attribute.type })) as Record<
 			string,
 			unknown
 		>[]

@@ -14,8 +14,6 @@
 	import GripVertical from '@lucide/svelte/icons/grip-vertical';
 	import FolderTree from '@lucide/svelte/icons/folder-tree';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
-	import { deleteCategories } from '$lib/product-categories/api.js';
-	import type { ProductCategory } from '$lib/product-categories/types.js';
 
 	import { client } from '$lib/client';
 
@@ -29,6 +27,10 @@
 		['product-categories']
 	);
 
+	async function deleteCategories(ids: string[]): Promise<void> {
+		await client['product-categories'].delete({ category_ids: ids });
+	}
+
 	function goToPage(pageNum: number) {
 		const params = new URLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
@@ -36,13 +38,13 @@
 	}
 
 	const rows = $derived(
-		(paginateState.query.data?.data?.rows as ProductCategory[] | undefined)?.map((c) => ({
+		(paginateState.query.data?.data?.rows as any[] | undefined)?.map((c) => ({
 			...c,
 			handle_display: getHandle(c)
 		})) ?? []
 	);
 	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
-	function getHandle(category: ProductCategory): string {
+	function getHandle(category: any): string {
 		const h = category.handle;
 		if (h) return h.startsWith('/') ? h : `/${h}`;
 		return `/${category.value.toLowerCase().replace(/\s+/g, '-')}`;
@@ -83,13 +85,13 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => openEdit(item as Parameters<typeof openEdit>[0])
+					onClick: (item) => (paginateState.openEdit as unknown as (item: any) => void)(item as any)
 				},
 				{
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => openDeleteConfirm(item as Parameters<typeof openDeleteConfirm>[0])
+					onClick: (item) => (paginateState.openDeleteConfirm as unknown as (item: any) => void)(item as any)
 				}
 			]
 		}
@@ -153,7 +155,7 @@
 <CategoryFormSheet
 	bind:open={paginateState.formSheetOpen}
 	mode={formMode}
-	category={formItem as ProductCategory | null}
+	category={formItem as any | null}
 	onSuccess={refetch}
 />
 
@@ -161,9 +163,11 @@
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="category"
-	entityTitle={(deleteItem as unknown as ProductCategory)?.value ?? (deleteItem as unknown as ProductCategory)?.id ?? ''}
+	entityTitle={(deleteItem as any | null)?.value ?? (deleteItem as any | null)?.id ?? ''}
 	customMessage="Delete this category? This action cannot be undone."
-	onConfirm={() => confirmDelete((item) => deleteCategories([(item as any).id]))}
+	onConfirm={() => confirmDelete(async (item: any) => {
+			await deleteCategories([item.id]);
+	})}
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}
 />

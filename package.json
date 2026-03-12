@@ -9,5 +9,9 @@
   "bin": {
     "danimai": "./packages/cli/danimai.ts",
     "install-packages": "./install-packages.sh"
+  },
+  "devDependencies": {
+    "sveltekit-superforms": "^2.30.0",
+    "zod": "^4.3.6"
   }
 }

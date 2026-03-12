@@ -2,51 +2,34 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import {
 		DeleteConfirmationModal,
 		PaginationTable,
 		TableHead,
 		TableBody,
 		TablePagination,
-		type TableColumn
+		type TableColumn,
+		AttributeFormSheet
 	} from '$lib/components/organs/index.js';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
-	import { cn } from '$lib/utils.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
-	import {
-		deleteAttributes,
-		createAttribute,
-		updateAttribute
-	} from '$lib/product-attributes/api.js';
-	import type { AttributesResponse } from '$lib/product-attributes/types.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import { client } from '$lib/client';
 
-
-	const ATTRIBUTE_TYPES = [
-		{ value: 'string', label: 'String' },
-		{ value: 'number', label: 'Number' },
-		{ value: 'boolean', label: 'Boolean' },
-		{ value: 'date', label: 'Date' }
-	] as const;
-
-	
-
 	function openCreate() {
 		paginateState.openCreate();
-		formTitle = '';
-		formType = 'string';
 	}
-	function openEdit(attr: AttributesResponse['data']['rows'][number]) {
+	function openEdit(attr: any) {
 		(paginateState.openEdit as unknown as (item: any) => void)(attr);
-		formTitle = attr.title;
-		formType = attr.type;
 	}
 
 	const tableColumns: TableColumn[] = [
-		{ label: 'Title', key: 'title' },
+	{
+		label: 'Title',
+		key: 'title',
+		type: 'link',
+		cellHref: (row) => `/products/attributes/${row.id}`
+	},
 		{ label: 'Type', key: 'type' },
 		{ label: 'Updated', key: 'updated_at', type: 'date' },
 		{
@@ -73,9 +56,6 @@
 		}
 	];
 
-	let formTitle = $state('');
-	let formType = $state('string');
-
 	const paginationQuery = $derived.by(() => createPaginationQuery($page.url.searchParams));
 	const paginateState = createPagination(
 		async () => {
@@ -92,74 +72,29 @@
 		goto(`${$page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	const queryData = $derived(paginateState.query.data as AttributesResponse | undefined);
+	const queryData = $derived(paginateState.query.data as any | undefined);
 	const rawRows = $derived(queryData?.data?.rows ?? []);
 	const rows = $derived(rawRows as Record<string, unknown>[]);
 	const pagination = $derived((queryData?.data?.pagination ?? null) as PaginationMeta | null);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
 
-	function deleteAttribute(id: string) {
-		return deleteAttributes([id]);
-	}
-
-	function confirmDeleteAttribute() {
-		paginateState.confirmDelete((item) => {
-			return deleteAttribute((item as unknown as any).id);
-		});
-	}
-
+	
 	function closeDeleteConfirm() {
 		paginateState.closeDeleteConfirm();
 	}
-
-	let formError = $state<string | null>(null);
-	let formSubmitting = $state(false);
-
-	async function submitCreate() {
-		formError = null;
-		if (!formTitle.trim()) {
-			formError = 'Title is required';
-			return;
-		}
-		formSubmitting = true;
-		try {
-			await createAttribute({ title: formTitle.trim(), type: formType });
-			paginateState.closeForm();
-			paginateState.refetch();
-		} catch (e) {
-			formError = e instanceof Error ? e.message : String(e);
-		} finally {
-			formSubmitting = false;
-		}
+	async function deleteAttributes(ids: string[]): Promise<void> {
+		await client['product-attributes'].delete({  attribute_ids: ids });
 	}
 
-	async function submitEdit() {
-		formError = null;
-		const item = paginateState.formItem as any | null;
-		if (!item?.id) return;
-		if (!formTitle.trim()) {
-			formError = 'Title is required';
-			return;
-		}
-		formSubmitting = true;
-		try {
-			await updateAttribute(item.id, { title: formTitle.trim(), type: formType });
-			paginateState.closeForm();
-			paginateState.refetch();
-		} catch (e) {
-			formError = e instanceof Error ? e.message : String(e);
-		} finally {
-			formSubmitting = false;
-		}
+
+	async function handleFormSaved() {
+		paginateState.closeForm();
+		await paginateState.refetch();
 	}
 
-	function submitForm() {
-		if (paginateState.formMode === 'create') {
-			submitCreate();
-		} else {
-			submitEdit();
-		}
+	function handleFormCancel() {
+		paginateState.closeForm();
 	}
 
 </script>
@@ -211,71 +146,23 @@
 	</div>
 </div>
 
-<!-- Create / Edit Attribute Sheet -->
-<Sheet.Root bind:open={paginateState.formSheetOpen}>
-	{#if paginateState.formItem}
-		<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-			<div class="flex h-full flex-col">
-				<div class="flex-1 overflow-auto p-6 pt-12">
-					<h2 class="text-lg font-semibold">
-						{paginateState.formMode === 'create' ? 'Create' : 'Edit'} Attribute
-					</h2>
-					<p class="mt-1 text-sm text-muted-foreground">
-						{paginateState.formMode === 'create'
-							? 'Add a new product attribute (e.g. Color, Size).'
-							: 'Update the attribute title and type.'}
-					</p>
-					{#if formError && !formSubmitting}
-						<div
-							class="mt-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-						>
-							{formError}
-						</div>
-					{/if}
-					<div class="mt-6 flex flex-col gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="form-title" class="text-sm font-medium">Title</label>
-							<Input
-								id="form-title"
-								bind:value={formTitle}
-								placeholder="e.g. Color, Size"
-								class={cn('h-9', formError === 'Title is required' && 'border-destructive')}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="form-type" class="text-sm font-medium">Type</label>
-							<select
-								id="form-type"
-								bind:value={formType}
-								class="flex h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs ring-offset-background outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-							>
-								{#if formType && !ATTRIBUTE_TYPES.some((t) => t.value === formType)}
-									<option value={formType}>{formType}</option>
-								{/if}
-								{#each ATTRIBUTE_TYPES as opt}
-									<option value={opt.value}>{opt.label}</option>
-								{/each}
-							</select>
-						</div>
-					</div>
-				</div>
-				<div class="flex justify-end gap-2 border-t p-4">
-					<Button variant="outline" onclick={() => paginateState.closeForm()}>Cancel</Button>
-					<Button onclick={submitForm} disabled={formSubmitting}>
-						{formSubmitting ? 'Saving…' : 'Save'}
-					</Button>
-				</div>
-			</div>
-		</Sheet.Content>
-	{/if}
-</Sheet.Root>
+<AttributeFormSheet
+	bind:open={paginateState.formSheetOpen}
+	mode={paginateState.formMode}
+	item={(paginateState.formItem as any) ?? null}
+	onSaved={handleFormSaved}
+	onCancel={handleFormCancel}
+/>
 
 <!-- Delete attribute confirmation -->
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="attribute"
 	entityTitle={(paginateState.deleteItem as any | null)?.title || (paginateState.deleteItem as any | null)?.id || ''}
-	onConfirm={confirmDeleteAttribute}
+	onConfirm={() => paginateState.confirmDelete(async (item: any) => {
+		await deleteAttributes([item.id]);
+		paginateState.refetch();
+	})}
 	onCancel={closeDeleteConfirm}
 	submitting={paginateState.deleteSubmitting}
 />

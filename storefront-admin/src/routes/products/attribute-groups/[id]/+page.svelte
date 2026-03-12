@@ -2,52 +2,50 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import {
-		AttributeGroupHeroCard,
-		AttributeGroupAttributesCard
-	} from '$lib/components/organs/index.js';
+	
 	import ListFilter from '@lucide/svelte/icons/list-filter';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
-	import { getAttributeGroup } from '$lib/product-attribute-groups/api.js';
-	import type { ProductAttributeGroupDetail } from '$lib/product-attribute-groups/types.js';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
+	import { client } from '$lib/client';
+	import { createQuery } from '@tanstack/svelte-query';
+	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
+	import AttributeGroupHeroCard from '$lib/components/organs/attribute-group/detail/AttributeGroupHeroCard.svelte';
+	import AttributeGroupAttributesCard from '$lib/components/organs/attribute-group/detail/AttributeGroupAttributesCard.svelte';
 
 	const groupId = $derived(page.params.id);
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
-	let group = $state<ProductAttributeGroupDetail | null>(null);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
-
-	async function loadGroup() {
-		if (!groupId) return;
-		loading = true;
-		error = null;
-		try {
-			const data = await getAttributeGroup(groupId);
-			if (data === null) {
-				error = 'Attribute group not found';
-				group = null;
-			} else {
-				group = data;
-			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			group = null;
-		} finally {
-			loading = false;
+	const attributeQuery = $derived(createQuery(() => ({
+		queryKey: ['product-attributes', paginationQuery],
+		queryFn: async () => {
+			const res = await client['product-attributes'].get({ query: paginationQuery });
+			return res;
 		}
-	}
+	})));
 
-	$effect(() => {
-		groupId;
-		loadGroup();
-	});
+	const groupQuery = $derived(createQuery(() => ({
+		queryKey: ['product-attribute-groups', groupId],
+		queryFn: async () => {
+			const res = await client['product-attribute-groups']({ id: groupId }).get();
+			return res;
+		}
+	})));
 
+	const group = $derived((groupQuery.data?.data ?? null) as any | null);
+	const attributes = $derived(
+		(attributeQuery.data?.data?.rows ?? []) as any[]
+	);
+	const isPending = $derived(groupQuery.isPending || attributeQuery.isPending);
+	const error = $derived(groupQuery.error || attributeQuery.error);
+
+	const refetchGroupData = async () => {
+		await Promise.all([groupQuery.refetch(), attributeQuery.refetch()]);
+	};
 </script>
 
 <svelte:head>
-	<title>{group ? group.title : 'Attribute Group'} | Attribute Groups | Danimai Store</title>
+	<title>{group?.title ?? groupId ?? '…'} | Attribute Group</title>
 	<meta name="description" content="Manage product attribute groups." />
 </svelte:head>
 
@@ -67,11 +65,11 @@
 		</nav>
 	</div>
 
-	{#if loading}
+	{#if isPending}
 		<div class="flex flex-1 items-center justify-center p-6">
 			<p class="text-muted-foreground">Loading…</p>
 		</div>
-	{:else if error || !group}
+	{:else if error || group === null}
 		<div class="flex flex-1 flex-col items-center justify-center gap-4 p-6">
 			<p class="text-destructive">{error ?? 'Attribute group not found'}</p>
 			<Button variant="outline" onclick={() => goto('/products/attribute-groups')}>
@@ -84,17 +82,17 @@
 				<div class="rounded-lg">
 					<AttributeGroupHeroCard
 						{group}
-						onUpdated={loadGroup}
+						onRefetch={refetchGroupData}
 						onDeleted={() => goto('/products/attribute-groups')}
 					/>
 				</div>
 
-				<AttributeGroupAttributesCard {group} />
+				<AttributeGroupAttributesCard group={group} attributes={attributes} />
 				<div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
 					<MetadataComponent
 						productId={group?.id ?? null}
 						metadata={group?.metadata as Record<string, unknown> | null}
-						onSaved={loadGroup}
+						onSaved={refetchGroupData}
 					/>
 
 					<JSONComponent product={group} options={[]} variants={[]} category={null} />

@@ -14,7 +14,6 @@
 	import FileText from '@lucide/svelte/icons/file-text';
 	import GripVertical from '@lucide/svelte/icons/grip-vertical';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
-	import { deleteCollections } from '$lib/product-collection/api.js';
 	import type { ProductCollection } from '$lib/product-collection/types.js';
 	import { client } from '$lib/client';
 
@@ -143,7 +142,7 @@
 <CollectionFormSheet
 	bind:open={paginateState.formSheetOpen}
 	mode={formMode}
-	collection={formItem as ProductCollection | null}
+	collection={formItem as any | null}
 	onSuccess={refetch}
 />
 
@@ -152,7 +151,10 @@
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="collection"
 	entityTitle={(deleteItem as unknown as ProductCollection)?.title ?? (deleteItem as unknown as ProductCollection)?.handle ?? (deleteItem as unknown as ProductCollection)?.id ?? ''}
-	onConfirm={() => confirmDelete((item) => deleteCollections([(item as unknown as ProductCollection).id]))}
+	onConfirm={() => confirmDelete(async (item: any) => {
+		await client['collections']({ id: item.id });
+		paginateState.refetch();
+	})}
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}
 />

@@ -1,4 +1,5 @@
-<script lang="ts">
+
+ <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -14,8 +15,6 @@
 	import Tag from '@lucide/svelte/icons/tag';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
-	import { deleteTags } from '$lib/product-tags/api.js';
-	import type { TagsResponse } from '$lib/product-tags/types.js';
 	import { client } from '$lib/client';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
@@ -25,15 +24,19 @@
 		},
 		['product-tags']
 	);
-	
+
+	async function deleteTags(ids: string[]): Promise<void> {
+		await client['product-tags'].delete({ tag_ids: ids });
+	}
+
 	function goToPage(pageNum: number) {
 		const params = new URLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
 		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	const queryData = $derived(paginateState.query.data as TagsResponse | undefined);
-	const rows = $derived((queryData?.data?.rows ?? []) as Record<string, unknown>[]);
+	const queryData = $derived(paginateState.query.data as any | undefined);
+	const rows = $derived((queryData?.data?.rows ?? []) as any[]);
 	const pagination = $derived((queryData?.data?.pagination ?? null) as PaginationMeta | null);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
@@ -131,7 +134,9 @@
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="tag"
 	entityTitle={(deleteItem as any)?.value ?? (deleteItem as any)?.id ?? ''}
-	onConfirm={() => confirmDelete((ch: any) => deleteTags([ch.id]))}
+	onConfirm={() => confirmDelete(async (item: any) => {
+		await deleteTags([item.id]);
+	})}
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}
 />
@@ -142,5 +147,3 @@
 		{deleteError}
 	</div>
 {/if}
-
-

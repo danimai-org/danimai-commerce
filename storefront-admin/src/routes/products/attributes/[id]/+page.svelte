@@ -1,32 +1,20 @@
 <script lang="ts">
-	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import Pencil from '@lucide/svelte/icons/pencil';
+	import { page } from '$app/state';
+	import { createQuery } from '@tanstack/svelte-query';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
-	import ExternalLink from '@lucide/svelte/icons/external-link';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import ListFilter from '@lucide/svelte/icons/list-filter';
-	import Search from '@lucide/svelte/icons/search';
-	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
-	import ImageIcon from '@lucide/svelte/icons/image';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import { cn } from '$lib/utils.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { createPaginationQuery } from '$lib/api/pagination.svelte';
+	import { client } from '$lib/client';
+	import {
+		AttributeHeroCard,
+		AttributeProductsCard,
+	} from '$lib/components/organs/attribute/detail/index.js';
+	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
+	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
+	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 
-	const API_BASE = 'http://localhost:8000/admin';
-
-	type ProductAttribute = {
-		id: string;
-		title: string;
-		type: string;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	type Product = {
+	type AttributeProduct = {
 		id: string;
 		title: string;
 		handle: string;
@@ -39,193 +27,72 @@
 		variants: Array<{ id: string }>;
 	};
 
-	type Pagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
-
-	const attributeId = $derived($page.params.id);
-
-	let attribute = $state<ProductAttribute | null>(null);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
-
-	let productsData = $state<{ data: Product[]; pagination: Pagination } | null>(null);
-	let productPage = $state(1);
-	let productLimit = $state(10);
-	let productSearch = $state('');
-
-	async function loadAttribute() {
-		if (!attributeId) return;
-		loading = true;
-		error = null;
-		try {
-			const res = await fetch(`${API_BASE}/product-attributes/${attributeId}`, {
-				cache: 'no-store'
-			});
-			if (!res.ok) {
-				if (res.status === 404) {
-					error = 'Attribute not found';
-					return;
-				}
-				throw new Error(await res.text());
-			}
-			attribute = (await res.json()) as ProductAttribute;
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			attribute = null;
-		} finally {
-			loading = false;
-		}
-	}
-
-	$effect(() => {
-		if (!attributeId) return;
-		productPage;
-		productLimit;
-		loadProducts();
+	
+	const attributeId = $derived(page.params.id);
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+	const productLimit = $derived.by(() => {
+		const value = Number(paginationQuery.limit ?? 10);
+		return Number.isFinite(value) && value > 0 ? value : 10;
 	});
 
-	async function loadProducts() {
-		if (!attributeId) return;
-		try {
-			const params = new URLSearchParams({
-				page: String(productPage),
+	async function fetchAttributeProducts(
+		id: string
+	): Promise<{ data: AttributeProduct[]; pagination: PaginationMeta | null }> {
+		const res = await (client as any)['product-attributes']({ id })['products'].get({
+			query: {
+				...paginationQuery,
 				limit: String(productLimit),
 				sorting_field: 'created_at',
 				sorting_direction: 'desc'
-			});
-			const res = await fetch(`${API_BASE}/product-attributes/${attributeId}/products?${params}`, {
-				cache: 'no-store'
-			});
-			if (!res.ok) throw new Error(await res.text());
-			productsData = (await res.json()) as { data: Product[]; pagination: Pagination };
-		} catch (e) {
-			productsData = null;
-		}
+			}
+		});
+		const typedRes = res as { data: AttributeProduct[] | null; pagination: PaginationMeta | null } | undefined;
+		return {
+			data: typedRes?.data ?? [],
+			pagination: typedRes?.pagination ?? null
+		};
 	}
 
-	$effect(() => {
-		attributeId;
-		loadAttribute();
-	});
-
-	const metadataKeys = $derived(
-		attribute?.metadata && typeof attribute.metadata === 'object'
-			? Object.keys(attribute.metadata as object).length
-			: 0
-	);
-	const jsonKeys = $derived(attribute ? Object.keys(attribute).length : 0);
-
-	const products = $derived(productsData?.data ?? []);
-	const pagination = $derived(productsData?.pagination ?? null);
-	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	const attributeQuery = $derived(
+		createQuery(() => ({
+			queryKey: ['product-attributes', attributeId],
+			queryFn: async () => {
+				return client['product-attributes']({ id: attributeId }).get();
+			}
+		}))
 	);
 
-	let metadataOpen = $state(false);
-	let jsonOpen = $state(false);
-	let metadataRows = $state<Array<{ key: string; value: string }>>([{ key: '', value: '' }]);
-	let metadataError = $state<string | null>(null);
-	let metadataSubmitting = $state(false);
-	let editAttributeSheetOpen = $state(false);
-	let editAttributeTitle = $state('');
-	let editAttributeType = $state('');
-	let editAttributeError = $state<string | null>(null);
-	let editAttributeSaving = $state(false);
+	const productsQuery = $derived(
+		createQuery(() => ({
+			queryKey: ['product-attribute-products', attributeId, paginationQuery],
+			queryFn: async () => fetchAttributeProducts(attributeId)
+		}))
+	);
 
-	function openEditAttributeSheet() {
-		if (!attribute) return;
-		editAttributeSheetOpen = true;
-		editAttributeTitle = attribute.title;
-		editAttributeType = attribute.type;
-		editAttributeError = null;
-	}
+	const attribute = $derived((attributeQuery.data?.data ?? null) as any | null);
+	const productsData = $derived(productsQuery.data ?? null);
+	const loading = $derived(attributeQuery.isPending);
+	const error = $derived(
+		attributeQuery.error != null
+			? attributeQuery.error instanceof Error
+				? attributeQuery.error.message
+				: String(attributeQuery.error)
+			: null
+	);
+	const products = $derived((productsData?.data ?? []) as AttributeProduct[]);
+	const pagination = $derived((productsData?.pagination ?? null) as PaginationMeta | null);
 
-	async function saveAttributeEdit() {
-		if (!attributeId || !attribute) return;
-		editAttributeError = null;
-		editAttributeSaving = true;
-		try {
-			const res = await fetch(`${API_BASE}/product-attributes/${attributeId}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ 
-					title: editAttributeTitle.trim(),
-					type: editAttributeType
-				})
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			editAttributeSheetOpen = false;
-			await loadAttribute();
-		} catch (e) {
-			editAttributeError = e instanceof Error ? e.message : String(e);
-		} finally {
-			editAttributeSaving = false;
+	function goToProductPage(pageNumber: number) {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.set('page', String(Math.max(1, pageNumber)));
+		if (!params.get('limit')) {
+			params.set('limit', String(productLimit));
 		}
+		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	function openMetadataSheet() {
-		if (!attribute) return;
-		const meta =
-			attribute.metadata && typeof attribute.metadata === 'object'
-				? (attribute.metadata as Record<string, unknown>)
-				: {};
-		metadataRows = Object.entries(meta).map(([k, v]) => ({ key: k, value: String(v ?? '') }));
-		if (metadataRows.length === 0) metadataRows = [{ key: '', value: '' }];
-		metadataOpen = true;
-		metadataError = null;
-	}
-
-	function closeMetadataSheet() {
-		metadataOpen = false;
-		metadataError = null;
-	}
-
-	function addMetadataRow() {
-		metadataRows = [...metadataRows, { key: '', value: '' }];
-	}
-
-	function removeMetadataRow(index: number) {
-		metadataRows = metadataRows.filter((_, i) => i !== index);
-	}
-
-	async function submitAttributeMetadata() {
-		if (!attributeId || !attribute) return;
-		metadataError = null;
-		metadataSubmitting = true;
-		try {
-			const meta: Record<string, string | number> = {};
-			for (const row of metadataRows) {
-				const k = row.key.trim();
-				if (!k) continue;
-				const num = Number(row.value);
-				meta[k] = Number.isNaN(num) ? row.value : num;
-			}
-			const res = await fetch(`${API_BASE}/product-attributes/${attributeId}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ metadata: meta })
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			closeMetadataSheet();
-			loadAttribute();
-		} catch (e) {
-			metadataError = e instanceof Error ? e.message : String(e);
-		} finally {
-			metadataSubmitting = false;
-		}
+	async function refetchAttributeData() {
+		await Promise.all([attributeQuery.refetch(), productsQuery.refetch()]);
 	}
 </script>
 
@@ -273,339 +140,23 @@
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="flex flex-col gap-8 p-6">
 				<div class="flex gap-6">
-					<div class="flex-1 rounded-lg border bg-card p-6 shadow-sm">
-						<!-- Attribute header -->
-						<section class="flex flex-col gap-6 pb-8">
-							<div class="flex items-center justify-between gap-4">
-								<div class="flex items-center gap-2">
-									<ListFilter class="size-5 text-muted-foreground" />
-									<h1 class="text-2xl font-semibold tracking-tight">{attribute.title}</h1>
-								</div>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									onclick={openEditAttributeSheet}
-									aria-label="Edit attribute"
-								>
-									<Pencil class="size-4" />
-								</Button>
-							</div>
-						</section>
-						<!-- Details -->
-						<div class="rounded-lg bg-card">
-							<dl class="grid gap-3 text-sm sm:grid-cols-2">
-								<div>
-									<dt class="font-medium text-muted-foreground">Type</dt>
-									<dd class="mt-1 font-medium">{attribute.type}</dd>
-								</div>
-							</dl>
-						</div>
-					</div>
+					<AttributeHeroCard {attribute} onUpdated={refetchAttributeData} />
 				</div>
 
-				<section class="rounded-lg border bg-card shadow-sm overflow-hidden">
-					<div class="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4 rounded-t-lg">
-						<h2 class="text-base font-semibold">Products</h2>
-						<div class="flex items-center gap-2">
-							<Button variant="outline" size="sm" class="rounded-md">
-								<SlidersHorizontal class="mr-1.5 size-4" />
-								Add filter
-							</Button>
-							<div class="relative w-48">
-								<Search
-									class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-								/>
-								<Input
-									type="search"
-									placeholder="Search"
-									bind:value={productSearch}
-									class="h-9 rounded-md pl-9"
-								/>
-							</div>
-						</div>
-					</div>
-					<div class="overflow-x-auto">
-						<table class="w-full text-sm">
-							<thead class="border-b bg-muted/50">
-								<tr>
-									<th class="px-4 py-3 text-left font-medium">Product</th>
-									<th class="px-4 py-3 text-left font-medium">Collection</th>
-									<th class="px-4 py-3 text-left font-medium">Sales Channels</th>
-									<th class="px-4 py-3 text-left font-medium">Variants</th>
-									<th class="px-4 py-3 text-left font-medium">Status</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#if products.length === 0}
-									<tr>
-										<td colspan="5" class="px-4 py-8 text-center text-muted-foreground">
-											No products with this attribute.
-										</td>
-									</tr>
-								{:else}
-									{#each products as product (product.id)}
-										<tr class="border-b last:border-0">
-											<td class="px-4 py-3">
-												<a
-													href="/products/{product.id}"
-													class="flex items-center gap-3 hover:opacity-80"
-												>
-													{#if product.thumbnail}
-														<img
-															src={product.thumbnail}
-															alt=""
-															class="size-10 shrink-0 rounded-md object-cover"
-														/>
-													{:else}
-														<div
-															class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
-														>
-															<ImageIcon class="size-5" />
-														</div>
-													{/if}
-													<span class="font-medium">{product.title}</span>
-												</a>
-											</td>
-											<td class="px-4 py-3 font-medium">
-												{#if product.collection}
-													<a
-														href="/products/collections/{product.collection.id}"
-														class="text-primary hover:underline"
-													>
-														{product.collection.title}
-													</a>
-												{:else}
-													<span class="text-muted-foreground">—</span>
-												{/if}
-											</td>
-											<td class="px-4 py-3 text-muted-foreground">—</td>
-											<td class="px-4 py-3 text-muted-foreground">
-												{product.variants?.length ?? 0} variant{product.variants?.length === 1
-													? ''
-													: 's'}
-											</td>
-											<td class="px-4 py-3">
-												<span
-													class={cn(
-														'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-														product.status === 'published' &&
-															'bg-green-500/10 text-green-700 dark:text-green-400',
-														product.status === 'draft' && 'bg-muted text-muted-foreground',
-														product.status === 'proposed' &&
-															'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-														product.status === 'rejected' && 'bg-destructive/10 text-destructive'
-													)}
-												>
-													<span
-														class={cn(
-															'size-1.5 rounded-full',
-															product.status === 'published' && 'bg-green-600',
-															product.status === 'draft' && 'bg-muted-foreground/60',
-															product.status === 'proposed' && 'bg-amber-600',
-															product.status === 'rejected' && 'bg-destructive'
-														)}
-													></span>
-													{product.status}
-												</span>
-											</td>
-										</tr>
-									{/each}
-								{/if}
-							</tbody>
-						</table>
-					</div>
-					{#if pagination && pagination.total > 0}
-						<div class="mt-4 flex items-center justify-between border-t pt-[5px] px-[5px] pb-[5px]">
-							<p class="text-sm text-muted-foreground">
-								{start} – {end} of {pagination.total} results
-							</p>
-							<div class="flex items-center gap-2">
-								<Button
-									variant="outline"
-									size="sm"
-									disabled={!pagination.has_previous_page}
-									onclick={() => (productPage = Math.max(1, productPage - 1))}
-								>
-									Prev
-								</Button>
-								<span class="text-sm text-muted-foreground">
-									{pagination.page} of {pagination.total_pages} pages
-								</span>
-								<Button
-									variant="outline"
-									size="sm"
-									disabled={!pagination.has_next_page}
-									onclick={() => (productPage = Math.min(pagination.total_pages, productPage + 1))}
-								>
-									Next
-								</Button>
-							</div>
-						</div>
-					{/if}
-				</section>
+				
+				<AttributeProductsCard
+					{products}
+					pagination={pagination}
+					loading={productsQuery.isPending}
+					onPageChange={goToProductPage}
+				/>
 
 				<div class="grid gap-4 sm:grid-cols-2">
-					<div class="rounded-lg border bg-card p-4 shadow-sm">
-						<div class="flex items-center justify-between gap-2">
-							<h3 class="font-medium">Metadata</h3>
-							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{metadataKeys} keys</span>
-							<Button variant="ghost" size="icon" class="size-8 shrink-0" onclick={openMetadataSheet}>
-								<ExternalLink class="size-4" />
-								<span class="sr-only">Open</span>
-							</Button>
-						</div>
-					</div>
-					<div class="rounded-lg border bg-card p-4 shadow-sm">
-						<div class="flex items-center justify-between gap-2">
-							<h3 class="font-medium">JSON</h3>
-							<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{jsonKeys} keys</span>
-							<Button variant="ghost" size="icon" class="size-8 shrink-0" onclick={() => (jsonOpen = true)}>
-								<ExternalLink class="size-4" />
-								<span class="sr-only">Open</span>
-							</Button>
-						</div>
-					</div>
+					<MetadataComponent productId={attribute?.id ?? null} metadata={attribute?.metadata ?? {}} onSaved={refetchAttributeData} />
+					<JSONComponent product={attribute} options={[]} variants={[]} category={null} />
+
 				</div>
 			</div>
 		</div>
 	{/if}
 </div>
-
-<!-- Edit Metadata sheet -->
-<Sheet.Root bind:open={metadataOpen}>
-	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
-		<div class="flex h-full flex-col">
-			<div class="min-h-0 flex-1 overflow-auto p-6 pt-12">
-				<div class="flex flex-col gap-6">
-					<h2 class="text-lg font-semibold">Edit Metadata</h2>
-
-					{#if metadataError}
-						<div
-							class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-						>
-							{metadataError}
-						</div>
-					{/if}
-
-					<div class="overflow-hidden rounded-md border">
-						<table class="w-full text-sm">
-							<thead class="border-b bg-muted/50">
-								<tr>
-									<th class="px-4 py-3 text-left font-medium">Key</th>
-									<th class="px-4 py-3 text-left font-medium">Value</th>
-									<th class="w-10 px-4 py-3"></th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each metadataRows as row, i}
-									<tr class="border-b last:border-0">
-										<td class="px-4 py-2">
-											<Input bind:value={row.key} placeholder="Key" class="h-9 w-full" />
-										</td>
-										<td class="px-4 py-2">
-											<Input bind:value={row.value} placeholder="Value" class="h-9 w-full" />
-										</td>
-										<td class="px-4 py-2">
-											<Button
-												variant="ghost"
-												size="icon"
-												class="size-8 shrink-0 text-destructive hover:bg-destructive/10"
-												onclick={() => removeMetadataRow(i)}
-												aria-label="Remove row"
-											>
-												<Trash2 class="size-4" />
-											</Button>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-					<Button variant="outline" size="sm" onclick={addMetadataRow}>Add row</Button>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeMetadataSheet}>Cancel</Button>
-				<Button onclick={submitAttributeMetadata} disabled={metadataSubmitting}>
-					{metadataSubmitting ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
-
-<!-- Edit attribute sheet -->
-<Sheet.Root bind:open={editAttributeSheetOpen}>
-	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-		<div class="flex h-full flex-col">
-			<Sheet.Header class="flex flex-col gap-1.5 border-b px-6 py-4">
-				<Sheet.Title>Edit attribute</Sheet.Title>
-				<Sheet.Description class="text-sm text-muted-foreground">
-					Update the attribute title and type.
-				</Sheet.Description>
-			</Sheet.Header>
-			<div class="min-h-0 flex-1 overflow-auto p-6">
-				{#if editAttributeError}
-					<div class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-						{editAttributeError}
-					</div>
-				{/if}
-				<div class="flex flex-col gap-6">
-					<div class="flex flex-col gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="edit-attribute-title" class="text-sm font-medium">Title</label>
-							<Input
-								id="edit-attribute-title"
-								bind:value={editAttributeTitle}
-								placeholder="e.g. Color"
-								class="h-9"
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="edit-attribute-type" class="text-sm font-medium">Type</label>
-							<select
-								id="edit-attribute-type"
-								bind:value={editAttributeType}
-								class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<option value="string">String</option>
-								<option value="number">Number</option>
-								<option value="boolean">Boolean</option>
-							</select>
-						</div>
-					</div>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={() => (editAttributeSheetOpen = false)} disabled={editAttributeSaving}>
-					Cancel
-				</Button>
-				<Button onclick={saveAttributeEdit} disabled={editAttributeSaving || !editAttributeTitle.trim()}>
-					{editAttributeSaving ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
-
-<!-- JSON view sheet -->
-<Sheet.Root bind:open={jsonOpen}>
-	<Sheet.Content side="right" class="w-full max-w-2xl sm:max-w-2xl">
-		<div class="flex h-full flex-col">
-			<div class="shrink-0 border-b px-6 py-4">
-				<h2 class="text-lg font-semibold">JSON {jsonKeys} keys</h2>
-			</div>
-			<div class="min-h-0 flex-1 overflow-auto p-6">
-				{#if attribute}
-					<pre
-						class="rounded-md border bg-zinc-900 p-4 font-mono text-sm break-all whitespace-pre-wrap text-zinc-300"><code
-							>{JSON.stringify(attribute, null, 2)}</code
-						></pre>
-				{:else}
-					<p class="text-sm text-muted-foreground">No data</p>
-				{/if}
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>

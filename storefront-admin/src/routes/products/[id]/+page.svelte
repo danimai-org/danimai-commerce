@@ -44,7 +44,7 @@
 			<button
 				type="button"
 				class="text-muted-foreground hover:text-foreground"
-				onclick={() => goto(resolve('/products'))}
+				onclick={() => goto(('/products'))}
 			>
 				Products
 			</button>
@@ -60,7 +60,7 @@
 	{:else if error || !data}
 		<div class="flex flex-1 flex-col items-center justify-center gap-4 p-6">
 			<p class="text-destructive">{error ?? 'Product not found'}</p>
-			<Button variant="outline" onclick={() => goto(resolve('/products'))}>Back to products</Button>
+			<Button variant="outline" onclick={() => goto(('/products'))}>Back to products</Button>
 		</div>
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">

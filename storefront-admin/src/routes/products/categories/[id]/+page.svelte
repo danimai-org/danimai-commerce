@@ -7,31 +7,30 @@
 	import FolderTree from '@lucide/svelte/icons/folder-tree';
 	import { client } from '$lib/client.js';
 	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
-	import type { ProductCategory } from '$lib/product-categories/types.js';
-	import type { Product } from '$lib/products/types.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
-import {
+	import {
 		CategoryHeroCard,
 		CategoryStatusCard,
 		CategoryProductsCard
 	} from '$lib/components/organs/category/detail/index.js';
-import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
-import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
+	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
+	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 
 	const categoryId = $derived($page.params.id);
 
-	let category = $state<ProductCategory | null>(null);
+	let category = $state<any | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
-	const paginationQuery = $derived.by(() =>
-		createPaginationQuery($page.url.searchParams)
-	);
+	const paginationQuery = $derived.by(() => createPaginationQuery($page.url.searchParams));
 
 	const productsQuery = createQuery(() => ({
 		queryKey: ['category-products', categoryId, paginationQuery],
 		queryFn: async () => {
-			const query = { ...paginationQuery, category_id: categoryId } as Record<string, string | number | undefined>;
+			const query = { ...paginationQuery, category_id: categoryId } as Record<
+				string,
+				string | number | undefined
+			>;
 			const res = await client.products.get({ query });
 			return res.data;
 		},
@@ -39,16 +38,16 @@ import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 		refetchOnWindowFocus: false
 	}));
 
-	const productsData = $derived(productsQuery.data as { data?: { rows: Product[]; pagination: PaginationMeta }; pagination?: PaginationMeta } | undefined);
-	const products = $derived(productsData?.data?.rows ?? ([] as Product[]));
+	const productsData = $derived(
+		productsQuery.data as
+			| { data?: { rows: any[]; pagination: PaginationMeta }; pagination?: PaginationMeta }
+			| undefined
+	);
+	const products = $derived(productsData?.data?.rows ?? ([] as any[]));
 	const pagination = $derived(productsData?.data?.pagination ?? productsData?.pagination ?? null);
 	const count = $derived(pagination?.total ?? 0);
-	const start = $derived(
-		pagination ? (pagination.page - 1) * pagination.limit + 1 : 0
-	);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, count) : 0
-	);
+	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
+	const end = $derived(pagination ? Math.min(pagination.page * pagination.limit, count) : 0);
 	const totalPages = $derived(pagination?.total_pages ?? 1);
 	const currentPage = $derived(pagination?.page ?? 1);
 	const productsLoading = $derived(productsQuery.isPending);
@@ -69,7 +68,7 @@ import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 				category = null;
 				return;
 			}
-			category = (res.data ?? null) as ProductCategory | null;
+			category = (res.data ?? null) as any | null;
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			category = null;
@@ -97,7 +96,7 @@ import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 
 <div class="flex h-full flex-col">
 	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
-		<nav class="flex items-center gap-[5px] text-sm pl-[10px]">
+		<nav class="flex items-center gap-[5px] pl-[10px] text-sm">
 			<button
 				type="button"
 				class="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
@@ -126,25 +125,25 @@ import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="flex flex-col gap-8 p-6">
 				<div class="flex gap-6">
-					<CategoryHeroCard categoryId={categoryId ?? null} onUpdated={loadCategory} />
-					<CategoryStatusCard category={category as ProductCategory | null} onUpdated={loadCategory} />
+					<CategoryHeroCard category={category as any | null} onUpdated={loadCategory} />
+					<CategoryStatusCard category={category as any | null} onUpdated={loadCategory} />
 				</div>
 
 				<CategoryProductsCard
 					categoryId={categoryId ?? null}
-					category={category}
-					products={products}
-					count={count}
-					start={start}
-					end={end}
-					totalPages={totalPages}
-					currentPage={currentPage}
+					{category}
+					{products}
+					{count}
+					{start}
+					{end}
+					{totalPages}
+					{currentPage}
 					loading={productsLoading}
 					paginationQuery={paginationQuery ?? {}}
 					onProductsUpdated={async () => {
 						await productsQuery.refetch();
 					}}
-					goToPage={goToPage}
+					{goToPage}
 				/>
 
 				<div class="grid gap-4 sm:grid-cols-2">
@@ -153,12 +152,7 @@ import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 						metadata={category?.metadata as Record<string, unknown> | null}
 						onSaved={loadCategory}
 					/>
-					<JSONComponent
-						product={category}
-						options={[]}
-						variants={[]}
-						category={null}
-					/>
+					<JSONComponent product={category} options={[]} variants={[]} category={null} />
 				</div>
 			</div>
 		</div>

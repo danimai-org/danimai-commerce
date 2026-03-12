@@ -2,23 +2,19 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import {
 		DeleteConfirmationModal,
 		PaginationTable,
 		TableHead,
 		TableBody,
 		TablePagination,
+		CreateAttributeGroupSheet,
+		EditAttributeGroupSheet,
 		type TableColumn
 	} from '$lib/components/organs/index.js';
 	import ListFilter from '@lucide/svelte/icons/list-filter';
-	import { cn } from '$lib/utils.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
-	import { deleteAttributeGroups } from '$lib/product-attribute-groups/api.js';
-	import type { AttributeGroupsResponse, ProductAttributeGroup } from '$lib/product-attribute-groups/types.js';
-	import CreateAttributeGroupSheet from '$lib/components/organs/attribute-groups/CreateAttributeGroupSheet.svelte';
 	import { client } from '$lib/client';
 
 
@@ -30,8 +26,6 @@
 		},
 		['product-attribute-groups']
 	);
-
-	
 
 	function goToPage(pageNum: number) {
 		const params = new URLSearchParams(page.url.searchParams);
@@ -45,12 +39,7 @@
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
 
-	function confirmDeleteAttributeGroup() {
-		paginateState.confirmDelete((item) =>
-			deleteAttributeGroups([(item as unknown as ProductAttributeGroup).id])
-		);
-	}
-
+	
 	const tableColumns: TableColumn[] = [
 		{
 			label: 'Title',
@@ -69,7 +58,7 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => openEdit(item as unknown as ProductAttributeGroup)
+					onClick: (item) => openEdit(item as any)
 				},
 				{
 					label: 'Delete',
@@ -84,37 +73,11 @@
 	// Create sheet (local state)
 	let createOpen = $state(false);
 
-	// Edit sheet (local state)
-	let editOpen = $state(false);
-	let editGroup = $state<ProductAttributeGroup | null>(null);
-	let editTitle = $state('');
-	let editError = $state<string | null>(null);
-	let editSubmitting = $state(false);
+	let editGroup = $state<any | null>(null);
 
-	function openEdit(grp: ProductAttributeGroup) {
+	function openEdit(grp: any) {
 		editGroup = grp;
-		editOpen = true;
-		editTitle = grp.title;
-		editError = null;
 	}
-
-	function closeEdit() {
-		editOpen = false;
-		editGroup = null;
-	}
-
-	// async function submitEdit() {
-	// 	if (!editGroup) return;
-	// 	editError = null;
-	// 	if (!editTitle.trim()) {
-	// 		editError = 'Title is required';
-	// 		return;
-	// 	}
-	// 	editSubmitting = true;
-	// 	await client['product-attribute-groups'].put(editGroup.id, { title: editTitle.trim() });
-	// 	closeEdit();
-		
-	// }
 </script>
 
 
@@ -167,47 +130,25 @@
 	on:created={() => paginateState.refetch()}
 />
 
-<!-- Edit Attribute Group Sheet -->
-<Sheet.Root bind:open={editOpen}>
-	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-		<div class="flex h-full flex-col">
-			<div class="flex-1 overflow-auto p-6 pt-12">
-				<h2 class="text-lg font-semibold">Edit Attribute Group</h2>
-				<p class="mt-1 text-sm text-muted-foreground">Update the attribute group title.</p>
-				{#if editError && !editSubmitting}
-					<div
-						class="mt-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-					>
-						{editError}
-					</div>
-				{/if}
-				<div class="mt-6 flex flex-col gap-4">
-					<div class="flex flex-col gap-2">
-						<label for="edit-title" class="text-sm font-medium">Title</label>
-						<Input
-							id="edit-title"
-							bind:value={editTitle}
-							placeholder="e.g. Specifications"
-							class={cn('h-9', editError === 'Title is required' && 'border-destructive')}
-						/>
-					</div>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeEdit}>Cancel</Button>
-				<Button onclick={() => paginateState.openEdit(editGroup as any)} disabled={editSubmitting}>
-					{editSubmitting ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
+<EditAttributeGroupSheet
+	group={editGroup}
+	onSaved={async () => {
+		editGroup = null;
+		await paginateState.refetch();
+	}}
+	onClosed={() => {
+		editGroup = null;
+	}}
+/>
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="attribute group"
-	entityTitle={(paginateState.deleteItem as unknown as ProductAttributeGroup)?.title || (paginateState.deleteItem as unknown as ProductAttributeGroup)?.id || ''}
-	onConfirm={confirmDeleteAttributeGroup}
+	entityTitle={(paginateState.deleteItem as unknown as any)?.title || (paginateState.deleteItem as unknown as any)?.id || ''}
+	onConfirm={() => paginateState.confirmDelete(async (item: any) => {
+		await client['product-attribute-groups'].delete({ attribute_group_ids: [item.id] });
+		paginateState.refetch();
+	})}
 	onCancel={paginateState.closeDeleteConfirm}
 	submitting={paginateState.deleteSubmitting}
 />

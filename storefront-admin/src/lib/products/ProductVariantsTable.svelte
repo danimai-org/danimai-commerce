@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Input } from '$lib/components/ui/input/index.js';
 
-	export type ProductVariantsTableRow = {
+	interface ProductVariantsTableRow {
 		key: string;
 		optionTitle: string;
 		title: string;
@@ -9,11 +9,10 @@
 		manage_inventory: boolean;
 		allow_backorder: boolean;
 		priceAmount: string;
-	};
+	}
 
 
-	export let rows: ProductVariantsTableRow[] = [];
-	export let updateRow: (key: string, updates: Partial<ProductVariantsTableRow>) => void;
+	let { rows = $bindable([]), updateRow = $bindable((key: string, updates: Partial<ProductVariantsTableRow>) => {}) }: { rows: ProductVariantsTableRow[]; updateRow: (key: string, updates: Partial<ProductVariantsTableRow>) => void } = $props();
 </script>
 
 <div class="mt-6">

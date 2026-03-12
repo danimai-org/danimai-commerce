@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
@@ -10,51 +10,47 @@
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import { DropdownMenu } from 'bits-ui';
 	import { cn } from '$lib/utils.js';
-	import type {
-		ProductAttributeGroupDetail,
-		ProductAttributeGroupAttribute
-	} from '$lib/product-attribute-groups/types.js';
-	import { updateAttributeGroup, deleteAttributeGroups } from '$lib/product-attribute-groups/api.js';
-	import { listAttributes } from '$lib/product-attributes/api.js';
-	import type { ProductAttribute } from '$lib/product-attributes/types.js';
+	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
+	import { client } from '$lib/client';
 
 	interface Props {
-		group: ProductAttributeGroupDetail | null;
+		group: any | null;
+		onRefetch?: () => void | Promise<void>;
 		onUpdated?: () => void | Promise<void>;
 		onDeleted?: () => void | Promise<void>;
 	}
 
-	let { group, onUpdated = () => {}, onDeleted = () => {} }: Props = $props();
+	let { group, onRefetch = () => {}, onUpdated = () => {}, onDeleted = () => {} }: Props = $props();
 
 	let editOpen = $state(false);
 	let editTitle = $state('');
 	let editError = $state<string | null>(null);
 	let editSubmitting = $state(false);
-	let allAttributes = $state<ProductAttribute[]>([]);
+	let allAttributes = $state<Array<{ id: string; title: string }>>([]);
 	let allAttributesLoading = $state(false);
 	let editSelectedAttributeIds = $state<string[]>([]);
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
 	let deleteConfirmOpen = $state(false);
 	let deleteSubmitting = $state(false);
+	let deleteError = $state<string | null>(null);
 
 	$effect(() => {
 		if (!editOpen || !group) return;
 		editTitle = group.title;
 		editError = null;
-		editSelectedAttributeIds = (group.attributes ?? []).map((a: ProductAttributeGroupAttribute) => a.id);
+		editSelectedAttributeIds = (group.attribute_ids ?? []).map((a: string) => a);
 		loadAllAttributes();
 	});
 
 	async function loadAllAttributes() {
 		allAttributesLoading = true;
 		try {
-			const res = await listAttributes({
-				page: 1,
-				limit: 100,
-				sorting_field: 'title',
-				sorting_direction: 'asc'
-			});
-			allAttributes = res.data?.rows ?? [];
+			const res = await client['product-attributes'].get({ query: paginationQuery });
+			allAttributes = (res.data?.rows ?? []).map((attribute) => ({
+				id: attribute.id,
+				title: attribute.title
+			}));
 		} catch {
 			allAttributes = [];
 		} finally {
@@ -81,11 +77,12 @@
 		}
 		editSubmitting = true;
 		try {
-			const updated = await updateAttributeGroup(group.id, {
+			await client['product-attribute-groups']({ id: group.id }).put({
+				id: group.id,
 				title: editTitle.trim(),
-				attribute_ids: editSelectedAttributeIds
+				attributes: editSelectedAttributeIds.map((attributeId) => ({ attribute_id: attributeId }))
 			});
-			group = updated;
+			await onRefetch();
 			closeEdit();
 			await onUpdated();
 		} catch (e) {
@@ -108,11 +105,12 @@
 		if (!group) return;
 		deleteSubmitting = true;
 		try {
-			await deleteAttributeGroups([group.id]);
+			await client['product-attribute-groups'].delete({ attribute_group_ids: [group.id] });
+			await onRefetch();
 			deleteConfirmOpen = false;
 			await onDeleted();
 		} catch (e) {
-			editError = e instanceof Error ? e.message : String(e);
+			deleteError = e instanceof Error ? e.message : String(e);
 		} finally {
 			deleteSubmitting = false;
 		}

@@ -4,45 +4,40 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import { cn } from '$lib/utils.js';
-	import type { ProductTag } from '$lib/product-tags/types.js';
-	import type { Product } from '$lib/products/types.js';
-	import type { PaginationMeta } from '$lib/product-tags/types.js';
+	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import { TagHeroCard, TagProductsCard } from '$lib/components/organs/index.js';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
+	import { client } from '$lib/client';
 	
 
-	type TagProduct = Product & { collection?: { id: string; title: string; handle: string } | null };
-	type Pagination = PaginationMeta;
+	type TagProduct = any & { collection?: { id: string; title: string; handle: string } | null };
 
 	const tagId = $derived($page.params.id);
 
-	let tag = $state<ProductTag | null>(null);
-	let productsData = $state<{ data: TagProduct[]; pagination: Pagination } | null>(null);
+	let tag = $state< Record<string, unknown> | null | undefined>(null);
+	let productsData = $state<{ data: Record<string, unknown>[]; pagination: PaginationMeta } | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let productPage = $state(1);
 	let productLimit = $state(10);
-	let productSearch = $state('');
+	
 
 	async function loadTag() {
 		if (!tagId) return;
 		loading = true;
 		error = null;
 		try {
-			const res = await fetch(`http://localhost:8000/admin/product-tags/${tagId}`, {
-				cache: 'no-store'
-			});
-			if (!res.ok) {
-				if (res.status === 404) {
-					error = 'Tag not found';
-					return;
-				}
-				throw new Error(await res.text());
-			}
-			tag = (await res.json()) as ProductTag;
+		const result = await (client as any)['product-tags']({ id: tagId }).get();
+		const payload = (result as any)?.data ?? result;
+		tag = payload?.product_tag ?? payload ?? null;
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			const err = e as any;
+			if (err?.status === 404) {
+				error = 'Tag not found';
+			} else {
+				error = err instanceof Error ? err.message : String(err);
+			}
 			tag = null;
 		} finally {
 			loading = false;
@@ -52,20 +47,19 @@
 	async function loadProducts() {
 		if (!tagId) return;
 		try {
-			const params = new URLSearchParams({
-				page: String(productPage),
-				limit: String(productLimit),
-				sorting_field: 'created_at',
-				sorting_direction: 'desc'
-			});
-			const res = await fetch(
-				`http://localhost:8000/admin/product-tags/${tagId}/products?${params}`,
-				{
-					cache: 'no-store'
+			const result = (await (client as any)['product-tags-products']({ id: tagId }).get({
+				query: {
+					page: productPage,
+					limit: productLimit,
+					sorting_field: 'created_at',
+					sorting_direction: 'desc'
 				}
-			);
-			if (!res.ok) throw new Error(await res.text());
-			productsData = (await res.json()) as { data: TagProduct[]; pagination: Pagination };
+			})) as { products: any[]; pagination: PaginationMeta } | { data: any[]; pagination: PaginationMeta };
+
+			productsData =
+				'products' in result
+					? { data: result.products, pagination: result.pagination }
+					: { data: result.data, pagination: result.pagination };
 		} catch (e) {
 			productsData = null;
 		}
@@ -100,7 +94,7 @@
 </svelte:head>
 
 <div class="flex h-full flex-col">
-	<!-- Breadcrumb + actions -->
+	
 	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
 		<nav class="flex items-center gap-[5px] text-sm pl-[10px]">
 			<button
@@ -137,7 +131,7 @@
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="flex flex-col gap-8 p-6">
 				<div class="flex gap-6">
-					<TagHeroCard tag={tag} onUpdated={loadTag} />
+					<TagHeroCard tag={tag as any} onUpdated={loadTag} />
 				</div>
 
 				<TagProductsCard
@@ -151,8 +145,8 @@
 				/>
 
 				<div class="grid gap-4 sm:grid-cols-2">
-					<MetadataComponent productId={tag?.id ?? null} metadata={tag?.metadata as Record<string, unknown> | null} onSaved={loadTag} />
-					<JSONComponent product={tag as Record<string, unknown> | null} options={[]} variants={[]} category={null} />
+					<MetadataComponent productId={(tag?.id as string | undefined) ?? null} metadata={tag?.metadata as Record<string, unknown> | null} onSaved={() => void loadTag()} />
+					<JSONComponent product={tag as any} options={[]} variants={[]} category={null} />
 				</div>
 			</div>
 		</div>

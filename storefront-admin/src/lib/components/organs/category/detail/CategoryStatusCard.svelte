@@ -1,11 +1,10 @@
 <script lang="ts">
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { client } from '$lib/client.js';
-	import type { ProductCategory } from '$lib/product-categories/types.js';
 	import { cn } from '$lib/utils.js';
 
 	interface Props {
-		category: ProductCategory | null;
+		category: any | null;
 		onUpdated?: () => void | Promise<void>;
 	}
 
@@ -24,8 +23,8 @@
 		statusUpdating = true;
 		try {
 			const res = await client['product-categories']({ id: category.id }).put({
-				status: newStatus
-			});
+				status: newStatus as any
+			} as any);
 			if (!res.error) {
 				await onUpdated();
 			}

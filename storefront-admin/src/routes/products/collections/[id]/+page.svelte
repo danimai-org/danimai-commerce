@@ -7,8 +7,6 @@
 	import { client } from '$lib/client.js';
 	import { createQuery } from '@tanstack/svelte-query';
 	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
-	import type { ProductCollection } from '$lib/product-collection/types.js';
-	import type { Product } from '$lib/products/types.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 import { CollectionHeroCard, CollectionProductsCard } from '$lib/components/organs/index.js';
 import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
@@ -16,7 +14,7 @@ import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 
 	const collectionId = $derived($page.params.id);
 
-	let collection = $state<ProductCollection | null>(null);
+	let collection = $state<any | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
@@ -30,16 +28,16 @@ import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 				collection_id: collectionId
 			} as Record<string, string | number | undefined>;
 			const res = await client.products.get({ query });
-			return res.data as { data?: { rows: Product[]; pagination: PaginationMeta } };
+			return res.data as { data?: { rows: any[]; pagination: PaginationMeta } };
 		},
 		enabled: !!collectionId,
 		refetchOnWindowFocus: false
 	}));
 
 	const productsData = $derived(
-		productsQuery.data as { data?: { rows: Product[]; pagination: PaginationMeta } } | null
+		productsQuery.data as { data?: { rows: any[]; pagination: PaginationMeta } } | null
 	);
-	const products = $derived(productsData?.data?.rows ?? ([] as Product[]));
+	const products = $derived(productsData?.data?.rows ?? ([] as any[]));
 	const pagination = $derived(productsData?.data?.pagination ?? null);
 	const count = $derived(pagination?.total ?? 0);
 	const start = $derived(
@@ -65,7 +63,7 @@ import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 				collection = null;
 				return;
 			}
-			collection = (res.data ?? null) as ProductCollection | null;
+			collection = (res.data ?? null) as any | null;
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			collection = null;

@@ -7,7 +7,7 @@ export { default as CustomerAddressFormSheet } from './customer-address-form-she
 export { default as LocationFormSheet } from './location-form-sheet/location-form-sheet.svelte';
 export { default as CategoryFormSheet } from './category-Create-form/categoryCreate.svelte';
 export { default as CollectionFormSheet } from './collection-Create-form/collectionCreate.svelte';
-export { default as TagFormSheet } from './tag-form-sheet/tag-form-sheet.svelte';
+export { default as TagFormSheet } from './tag/create/tag-form-sheet.svelte';
 export { default as PriceListFormSheet } from './price-list-form-sheet/price-list-form-sheet.svelte';
 export { default as TaxRegionFormSheet } from './tax-region-form-sheet/tax-region-form-sheet.svelte';
 export { default as CurrencyFormSheet } from './currency-form-sheet/currency-form-sheet.svelte';
@@ -32,4 +32,7 @@ export * from './category/detail/index.js';
 export * from './collection/detail/index.js';
 export * from './tag/detail/index.js';
 export * from './attribute-group/detail/index.js';
+export * from './attribute-groups/index.js';
+export * from './attribute/detail/index.js';
+export * from './attributes/index.js';
 export * from './product/variant/index.js';

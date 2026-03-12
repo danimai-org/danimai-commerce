@@ -5,6 +5,10 @@ import { sveltekit } from '@sveltejs/kit/vite';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
+	ssr: {
+		// This tells Vite: "Don't let Node handle these, compile them first"
+		noExternal: ['sveltekit-superforms']
+	},
 	server: {
 		proxy: {
 			'/api': {

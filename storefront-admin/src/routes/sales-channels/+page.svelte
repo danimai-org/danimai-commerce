@@ -4,7 +4,6 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { DeleteConfirmationModal, PaginationTable, SalesChannelFormSheet, TableHead, TableBody, TablePagination, type TableColumn } from '$lib/components/organs/index.js';
 	import Share2 from '@lucide/svelte/icons/share-2';
-	import { deleteSalesChannels } from '$lib/sales-channels/api.js';
 	import { client } from '$lib/client.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 
@@ -119,7 +118,10 @@ const tableColumns: TableColumn[] = [
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="sales channel"
 	entityTitle={(deleteItem as any)?.name ?? (deleteItem as any)?.id ?? ''}
-	onConfirm={() => confirmDelete((ch: any) => deleteSalesChannels([ch.id]))}
+	onConfirm={() => confirmDelete(async (ch: any) => {
+		await client['sales-channels'].delete({ sales_channel_ids: [ch.id] });
+		refetch();
+	})}
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}
 />

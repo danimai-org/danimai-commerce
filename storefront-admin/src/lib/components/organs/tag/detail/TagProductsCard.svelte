@@ -6,17 +6,16 @@
 	import Search from '@lucide/svelte/icons/search';
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import { client } from '$lib/client.js';
-	import type { Product } from '$lib/products/types.js';
-	import type { PaginationMeta } from '$lib/product-tags/types.js';
+	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 
-	type TagProduct = Product & {
+	type TagProduct = any & {
 		collection?: { id: string; title: string; handle: string } | null;
 	};
 
 	interface Props {
 		tagId: string | null;
-		products: TagProduct[];
-		pagination: PaginationMeta | null;
+		products: any[];
+		pagination: any | null;
 		start: number;
 		end: number;
 		onPageChange: (page: number) => void;
@@ -56,14 +55,14 @@
 				...withCollection,
 				collection_display: withCollection.collection?.title ?? '—',
 				sales_channels_display:
-					withCollection.sales_channels?.map((sc) => sc.name).join(', ') ?? '—',
+					withCollection.sales_channels?.map((sc: any) => sc.name).join(', ') ?? '—',
 				variants_display: `${variantsCount} variant${variantsCount === 1 ? '' : 's'}`
 			} as Record<string, unknown>;
 		})
 	);
 
 	let addSheetOpen = $state(false);
-	let addListData = $state<{ rows: Product[]; pagination: PaginationMeta } | null>(null);
+	let addListData = $state<{ rows: any[]; pagination: PaginationMeta } | null>(null);
 	let addPage = $state(1);
 	let addLimit = $state(20);
 	let addSearch = $state('');
@@ -93,24 +92,27 @@
 					limit: addLimit
 				}
 			});
-			const data = res.data as { data?: { rows: Product[]; pagination: PaginationMeta } };
+			const data = res.data as { data?: { rows: any[]; pagination: PaginationMeta } };
 			addListData = data?.data ?? null;
 		} catch {
 			addListData = null;
 		}
 	}
 
-	$effect(() => {
-		if (addSheetOpen) {
-			addSelectedIds = new Set();
-			addPage = 1;
-			addSearch = '';
-			addError = null;
-			addPage;
-			addLimit;
-			loadAddList();
-		}
-	});
+$effect(() => {
+	if (!addSheetOpen) return;
+	addSelectedIds = new Set();
+	addPage = 1;
+	addSearch = '';
+	addError = null;
+});
+
+$effect(() => {
+	if (!addSheetOpen) return;
+	addPage;
+	addLimit;
+	loadAddList();
+});
 
 	function toggleAddSelection(id: string) {
 		addSelectedIds = new Set(addSelectedIds);
@@ -138,13 +140,12 @@
 		addError = null;
 		addSubmitting = true;
 		try {
-			const res = await fetch(`http://localhost:8000/admin/product-tags/${tagId}/products`, {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ product_ids: ids })
+			const res = await (client as any)['product-tags']({ id: tagId }).products.post({
+				product_ids: ids
 			});
-			if (!res.ok) {
-				addError = await res.text();
+			if (res.error) {
+				const err = res.error as { value?: { message?: string } };
+				addError = err?.value?.message ?? String(res.error);
 				return;
 			}
 			addSheetOpen = false;
@@ -249,12 +250,12 @@
 											</div>
 										</td>
 										<td class="px-4 py-3 text-muted-foreground">
-											{(p as Product & { collection?: { title?: string | null } | null }).collection
+											{(p as any & { collection?: { title?: string | null } | null }).collection
 												?.title ?? '—'}
 										</td>
 										<td class="px-4 py-3 text-muted-foreground">
 											{p.sales_channels?.length
-												? p.sales_channels.map((sc) => sc.name).join(', ')
+												? p.sales_channels.map((sc: any) => sc.name).join(', ')
 												: '—'}
 										</td>
 										<td class="px-4 py-3 text-muted-foreground">
