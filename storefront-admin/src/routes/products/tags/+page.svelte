@@ -12,6 +12,7 @@
 		TablePagination,
 		type TableColumn
 	} from '$lib/components/organs/index.js';
+	import EditTag from '$lib/components/organs/tag/update/EditTag.svelte';
 	import Tag from '@lucide/svelte/icons/tag';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
@@ -27,6 +28,15 @@
 
 	async function deleteTags(ids: string[]): Promise<void> {
 		await client['product-tags'].delete({ tag_ids: ids });
+	}
+
+	async function handleFormSaved() {
+		paginateState.closeForm();
+		await paginateState.refetch();
+	}
+
+	function handleEditClosed() {
+		paginateState.closeForm();
 	}
 
 	function goToPage(pageNum: number) {
@@ -125,9 +135,13 @@
 
 <TagFormSheet
 	bind:open={paginateState.formSheetOpen}
-	mode={formMode}
-	tag={formItem as any}
-	onSuccess={refetch}
+	mode="create"
+	onSuccess={handleFormSaved}
+/>
+<EditTag
+	tag={paginateState.formMode === 'edit' ? ((paginateState.formItem as any) ?? null) : null}
+	onSaved={handleFormSaved}
+	onClosed={handleEditClosed}
 />
 
 <DeleteConfirmationModal

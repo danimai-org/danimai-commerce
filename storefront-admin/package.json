@@ -64,6 +64,11 @@
 	"dependencies": {
 		"@danimai/backend": "../backend",
 		"@tanstack/svelte-query": "^6.0.18",
-		"@tanstack/svelte-table": "^8.21.3"
+		"@tanstack/svelte-table": "^8.21.3",
+		"highlight.js": "^11.11.1",
+		"slugify": "^1.6.6",
+		"svelte-sonner": "^1.1.0",
+		"sveltekit-superforms": "^2.30.0",
+		"zod": "^4.3.6"
 	}
 }

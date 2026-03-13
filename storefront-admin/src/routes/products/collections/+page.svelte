@@ -10,12 +10,12 @@
 		TablePagination,
 		type TableColumn,
 		CollectionFormSheet
+
 	} from '$lib/components/organs/index.js';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import GripVertical from '@lucide/svelte/icons/grip-vertical';
-	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
-	import type { ProductCollection } from '$lib/product-collection/types.js';
 	import { client } from '$lib/client';
+	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
@@ -26,6 +26,10 @@
 		['collections']
 	);
 
+async function deleteCollections(ids: string[]): Promise<void> {
+	await client['collections'].delete({ collection_ids: ids });
+}
+
 	function goToPage(pageNum: number) {
 		const params = new URLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
@@ -33,7 +37,7 @@
 	}
 
 	const rows = $derived(
-		(paginateState.query.data?.data?.rows as ProductCollection[] | undefined)?.map((c) => ({
+		(paginateState.query.data?.data?.rows as any[] | undefined)?.map((c) => ({
 			...c,
 			handle_display: c.handle.startsWith('/') ? c.handle : `/${c.handle}`
 		})) ?? []
@@ -139,21 +143,22 @@
 	</div>
 </div>
 
+
 <CollectionFormSheet
 	bind:open={paginateState.formSheetOpen}
-	mode={formMode}
-	collection={formItem as any | null}
-	onSuccess={refetch}
+	onSuccess={() => refetch().then(() => {
+		paginateState.formSheetOpen = false;
+	})}
+	
 />
 
 <!-- Delete collection confirmation -->
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="collection"
-	entityTitle={(deleteItem as unknown as ProductCollection)?.title ?? (deleteItem as unknown as ProductCollection)?.handle ?? (deleteItem as unknown as ProductCollection)?.id ?? ''}
+	entityTitle={(deleteItem as unknown as any)?.title ?? (deleteItem as unknown as any)?.handle ?? (deleteItem as unknown as any)?.id ?? ''}
 	onConfirm={() => confirmDelete(async (item: any) => {
-		await client['collections']({ id: item.id });
-		paginateState.refetch();
+		await deleteCollections([item.id]);
 	})}
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}

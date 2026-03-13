@@ -2,7 +2,9 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import ProductJsonSheet from '$lib/components/organs/product/detail/ProductJsonSheet.svelte';
-
+	import hljs from 'highlight.js';
+	import 'highlight.js/styles/github-dark.css';
+	import { onMount } from 'svelte';
 	interface Props {
 		product: Record<string, unknown> | null;
 		options: unknown[];
@@ -11,6 +13,14 @@
 	}
 
 	let { product, options = [], variants = [], category }: Props = $props();
+
+	$effect(() => {
+		onMount(() => {
+			if (productJsonForView) {
+				hljs.highlightAll();
+			}
+		});
+	});
 
 	let jsonSheetOpen = $state(false);
 
@@ -25,6 +35,11 @@
 			: null
 	);
 	const jsonKeysCount = $derived(productJsonForView ? Object.keys(productJsonForView).length : 0);
+	const highlightedJson = $derived.by(() => {
+        if (!productJsonForView) return '';
+        const jsonString = JSON.stringify(productJsonForView, null, 2);
+		return hljs.highlight(jsonString, { language: 'json' }).value;
+	});
 </script>
 
 <div class="rounded-lg border bg-card p-4 shadow-sm">
@@ -45,8 +60,4 @@
 	</div>
 </div>
 
-<ProductJsonSheet
-	bind:open={jsonSheetOpen}
-	productJsonForView={productJsonForView}
-	{jsonKeysCount}
-/>
+<ProductJsonSheet bind:open={jsonSheetOpen} {productJsonForView} {jsonKeysCount} highlightedJson={highlightedJson} />

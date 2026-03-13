@@ -3,7 +3,6 @@
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
-	import { cn } from '$lib/utils.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import { TagHeroCard, TagProductsCard } from '$lib/components/organs/index.js';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';

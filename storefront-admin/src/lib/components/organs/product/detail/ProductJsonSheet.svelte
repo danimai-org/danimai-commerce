@@ -4,6 +4,8 @@
 	export let open: boolean;
 	export let productJsonForView: Record<string, unknown> | null;
 	export let jsonKeysCount: number;
+	export let highlightedJson: string;
+
 </script>
 
 <Sheet.Root bind:open>
@@ -14,10 +16,12 @@
 			</div>
 			<div class="min-h-0 flex-1 overflow-auto p-6">
 				{#if productJsonForView}
-					<pre
-						class="rounded-md border bg-zinc-900 p-4 font-mono text-sm break-all whitespace-pre-wrap text-zinc-300"><code
-							>{JSON.stringify(productJsonForView, null, 2)}</code
-						></pre>
+				<div class="mt-4 rounded-md bg-[#0d1117] p-4 overflow-hidden">
+					<pre class="overflow-x-auto text-sm">
+						<code class="hljs">{@html highlightedJson}</code>
+					</pre>
+				</div>
+					
 				{:else}
 					<p class="text-sm text-muted-foreground">No data</p>
 				{/if}

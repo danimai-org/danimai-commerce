@@ -14,7 +14,6 @@
 	import GripVertical from '@lucide/svelte/icons/grip-vertical';
 	import FolderTree from '@lucide/svelte/icons/folder-tree';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
-
 	import { client } from '$lib/client';
 
 
@@ -52,8 +51,6 @@
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
 	const categories = $derived(rows);
-	const formMode = $derived(paginateState.formMode);
-	const formItem = $derived(paginateState.formItem);
 	const openCreate = $derived(paginateState.openCreate);
 	const openEdit = $derived(paginateState.openEdit);
 	const formSheetOpen = $derived(paginateState.formSheetOpen);
@@ -154,9 +151,10 @@
 
 <CategoryFormSheet
 	bind:open={paginateState.formSheetOpen}
-	mode={formMode}
-	category={formItem as any | null}
-	onSuccess={refetch}
+	onSuccess={() => refetch().then(() => {
+		paginateState.formSheetOpen = false;
+	})}
+
 />
 
 <!-- Delete Confirmation Modal -->

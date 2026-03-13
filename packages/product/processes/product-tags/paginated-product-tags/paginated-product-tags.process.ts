@@ -53,12 +53,11 @@ export class PaginatedProductTagsProcess
 
     const total = Number(countResult?.count || 0);
 
-    query = query.orderBy(sql.ref(`${sorting_field}`), sorting_direction);
-
     const tags = await query
       .selectAll()
       .limit(limit)
       .offset((page - 1) * limit)
+      .orderBy(sql.ref(`${sorting_field}`), sorting_direction)
       .execute();
 
     return paginationResponse(tags, total, input);

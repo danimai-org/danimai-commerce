@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page} from '$app/state';
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
 		DeleteConfirmationModal,
@@ -14,10 +14,10 @@
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import type { Product, ProductsListResponse } from '$lib/products/types.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
-import { client } from '$lib/client.js';
-import CreateProductModal from '$lib/products/CreateProductModal.svelte';
-import { SvelteURLSearchParams,  } from 'svelte/reactivity';
-import {untrack} from "svelte"
+	import { client } from '$lib/client.js';
+	import CreateProductModal from '$lib/products/CreateProductModal.svelte';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
+	import { untrack } from 'svelte';
 	let createOpen = $state(false);
 
 	const paginationQuery = createPaginationQuery(page.url.searchParams);
@@ -30,9 +30,8 @@ import {untrack} from "svelte"
 		paginationQuery
 	);
 
-
 	async function deleteProducts(ids: string[]): Promise<void> {
-		await client.products.delete({  product_ids: ids });
+		await client.products.delete({ product_ids: ids });
 	}
 
 	const queryData = $derived(paginateState.query.data as ProductsListResponse | undefined);
@@ -60,7 +59,7 @@ import {untrack} from "svelte"
 		});
 
 		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		goto(`?${searchParams.toString()}`, { replaceState: true, keepFocus: true});
+		goto(`?${searchParams.toString()}`, { replaceState: true, keepFocus: true });
 	}
 
 	const tableColumns: TableColumn[] = [
@@ -98,7 +97,8 @@ import {untrack} from "svelte"
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => (openDeleteConfirm as unknown as (item: Product) => void)(item as Product)
+					onClick: (item) =>
+						(openDeleteConfirm as unknown as (item: Product) => void)(item as Product)
 				}
 			]
 		}
@@ -113,7 +113,6 @@ import {untrack} from "svelte"
 		console.log('searchText', searchText);
 		handleSearchChange(paginateState.searchText);
 	});
-
 </script>
 
 <svelte:head>
@@ -130,9 +129,9 @@ import {untrack} from "svelte"
 			</div>
 			<Button size="sm" onclick={() => (createOpen = true)}>Create</Button>
 		</div>
-		<PaginationTable 
-		bind:searchQuery={paginateState.searchText} 
-		searchPlaceholder="Search products"
+		<PaginationTable
+			bind:searchQuery={paginateState.searchText}
+			searchPlaceholder="Search products"
 		>
 			{#if paginateState.error}
 				<div
@@ -152,7 +151,12 @@ import {untrack} from "svelte"
 					</table>
 				</div>
 
-				<TablePagination {pagination} {start} {end} onPageChange={(page) => goWithParams({ page: String(page) })} />
+				<TablePagination
+					{pagination}
+					{start}
+					{end}
+					onPageChange={(page) => goWithParams({ page: String(page) })}
+				/>
 			{/if}
 		</PaginationTable>
 	</div>
@@ -167,7 +171,8 @@ import {untrack} from "svelte"
 		(deleteItem as unknown as Product | null)?.handle ??
 		(deleteItem as unknown as Product | null)?.id ??
 		''}
-	onConfirm={() => paginateState.confirmDelete((p) => deleteProducts([(p as unknown as Product).id]))}
+	onConfirm={() =>
+		paginateState.confirmDelete((p) => deleteProducts([(p as unknown as Product).id]))}
 	onCancel={paginateState.closeDeleteConfirm}
 	submitting={paginateState.deleteSubmitting}
 />

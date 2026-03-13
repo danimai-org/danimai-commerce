@@ -11,6 +11,7 @@
 		type TableColumn,
 		AttributeFormSheet
 	} from '$lib/components/organs/index.js';
+	import EditAttribute from '$lib/components/organs/attribute/update/EditAttribute.svelte';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
@@ -64,7 +65,9 @@
 		},
 		['product-attributes']
 	);
-
+	async function refetchAttributes() {
+		await paginateState.refetch();
+	}
 
 	function goToPage(pageNum: number) {
 		const params = new URLSearchParams($page.url.searchParams);
@@ -93,10 +96,11 @@
 		await paginateState.refetch();
 	}
 
-	function handleFormCancel() {
+	function handleEditClosed() {
 		paginateState.closeForm();
 	}
 
+	
 </script>
 
 <svelte:head>
@@ -148,10 +152,14 @@
 
 <AttributeFormSheet
 	bind:open={paginateState.formSheetOpen}
-	mode={paginateState.formMode}
-	item={(paginateState.formItem as any) ?? null}
+	mode={paginateState.formMode as 'create' | undefined}
+	attribute={(paginateState.formItem as any) ?? null}
+	onSuccess={handleFormSaved}
+/>
+<EditAttribute
+	attribute={paginateState.formMode === 'edit' ? ((paginateState.formItem as any) ?? null) : null}
 	onSaved={handleFormSaved}
-	onCancel={handleFormCancel}
+	onClosed={handleEditClosed}
 />
 
 <!-- Delete attribute confirmation -->
@@ -161,7 +169,7 @@
 	entityTitle={(paginateState.deleteItem as any | null)?.title || (paginateState.deleteItem as any | null)?.id || ''}
 	onConfirm={() => paginateState.confirmDelete(async (item: any) => {
 		await deleteAttributes([item.id]);
-		paginateState.refetch();
+		await paginateState.refetch();	
 	})}
 	onCancel={closeDeleteConfirm}
 	submitting={paginateState.deleteSubmitting}

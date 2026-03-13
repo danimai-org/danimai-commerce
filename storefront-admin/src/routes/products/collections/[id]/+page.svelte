@@ -8,9 +8,9 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
-import { CollectionHeroCard, CollectionProductsCard } from '$lib/components/organs/index.js';
-import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
-import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
+	import { CollectionHeroCard, CollectionProductsCard } from '$lib/components/organs/index.js';
+	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
+	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 
 	const collectionId = $derived($page.params.id);
 
@@ -40,13 +40,9 @@ import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 	const products = $derived(productsData?.data?.rows ?? ([] as any[]));
 	const pagination = $derived(productsData?.data?.pagination ?? null);
 	const count = $derived(pagination?.total ?? 0);
-	const start = $derived(
-		pagination ? (pagination.page - 1) * pagination.limit + 1 : 0
-	);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, count) : 0
-	);
-	
+	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
+	const end = $derived(pagination ? Math.min(pagination.page * pagination.limit, count) : 0);
+
 	async function loadCollection() {
 		if (!collectionId) return;
 		loading = true;
@@ -92,7 +88,7 @@ import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 <div class="flex h-full flex-col">
 	<!-- Breadcrumb + actions -->
 	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
-		<nav class="flex items-center gap-[5px] text-sm pl-[10px]">
+		<nav class="flex items-center gap-[5px] pl-[10px] text-sm">
 			<button
 				type="button"
 				class="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
@@ -121,12 +117,12 @@ import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="flex flex-col gap-8 p-6">
 				<div class="flex gap-6">
-					<CollectionHeroCard collection={collection} onUpdated={loadCollection} />
+					<CollectionHeroCard {collection} onUpdated={loadCollection} />
 				</div>
 
 				<CollectionProductsCard
 					collectionId={collectionId ?? null}
-					collection={collection}
+					{collection}
 					paginationQuery={paginationQuery ?? {}}
 					onProductsUpdated={async () => {
 						await productsQuery.refetch();
@@ -139,12 +135,7 @@ import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 						metadata={collection?.metadata as Record<string, unknown> | null}
 						onSaved={loadCollection}
 					/>
-					<JSONComponent
-						product={collection}
-						options={[]}
-						variants={[]}
-						category={null}
-					/>
+					<JSONComponent product={collection} options={[]} variants={[]} category={null} />
 				</div>
 			</div>
 		</div>

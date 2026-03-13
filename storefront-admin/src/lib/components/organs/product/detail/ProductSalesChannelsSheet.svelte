@@ -6,9 +6,9 @@
 	import { cn } from '$lib/utils.js';
 	import { SvelteSet } from 'svelte/reactivity';
 
-	export type SalesChannel = { id: string; name: string; is_default?: boolean };
+	export type SalesChannel = { id: string; name: string; title?: string; is_default?: boolean };
 
-	interface Props {
+	type Props = {
 		open: boolean;
 		channels?: SalesChannel[];
 		selectedIds?: SvelteSet<string>;
@@ -16,7 +16,7 @@
 		onSave: () => void;
 		onCancel: () => void;
 		submitting: boolean;
-	}
+	};
 
 	let {
 		open = $bindable(false),
@@ -26,7 +26,7 @@
 		onSave,
 		onCancel,
 		submitting = false
-	}: Props = $props();
+		}: Props = $props();
 
 	let searchQuery = $state('');
 
@@ -76,7 +76,7 @@
 							{#each filteredChannels as channel (channel.id)}
 								<div class="flex items-center justify-between rounded-md border p-3">
 									<div class="flex flex-col gap-1">
-										<span class="text-sm font-medium">{channel.name}</span>
+										<span class="text-sm font-medium">{channel.title ?? channel.name}</span>
 										{#if channel.is_default}
 											<span class="text-xs text-muted-foreground">Default</span>
 										{/if}

@@ -4,10 +4,47 @@
 	import ProductSalesChannelsSheet from './ProductSalesChannelsSheet.svelte';
 	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
+	import { SvelteSet } from 'svelte/reactivity';
+	import { client } from '$lib/client.js';
+	import { createQuery } from '@tanstack/svelte-query';
+	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
 
 
 	const salesChannels = $derived(getProductDetail().data?.sales_channels ?? []);
+	const salesChannelsQuery = createQuery(() => ({
+		queryKey: ['sales-channels', 'product-detail-sheet'],
+		queryFn: async () =>
+			client['sales-channels'].get({
+				query: createPaginationQuery({
+					page: '1',
+					limit: '100',
+					sorting_field: 'created_at',
+					sorting_direction: 'desc'
+				})
+			}),
+		refetchOnWindowFocus: false
+	}));
+	const allSalesChannels = $derived.by(() => {
+		const payload = salesChannelsQuery.data?.data as { rows?: unknown[]; data?: unknown[] } | undefined;
+		const rows = (payload?.rows ?? payload?.data ?? []) as {
+			id: string;
+			name?: string;
+			title?: string;
+			is_default?: boolean;
+		}[];
+		return rows.map((channel) => ({
+			id: channel.id,
+			name: channel.name ?? '',
+			title: channel.title,
+			is_default: channel.is_default
+		}));
+	});
+	let selectedIds = $state(new SvelteSet<string>());
 	let sheetOpen = $state(false);
+
+	$effect(() => {
+		selectedIds = new SvelteSet((salesChannels ?? []).map((channel: { id: string }) => channel.id));
+	});
 </script>
 
 <div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
@@ -39,13 +76,15 @@
 		{/if}
 	</div>
 	<p class="mt-1 text-xs text-muted-foreground">
-		Available in {salesChannels.length} of {salesChannels.length} sales channels
+		Available in {salesChannels.length} of {allSalesChannels.length || salesChannels.length} sales channels
 	</p>
 </div>
 
 <ProductSalesChannelsSheet
 	bind:open={sheetOpen}
-	onSelectedIdsChange={() => {}}
+	channels={allSalesChannels.length ? allSalesChannels : salesChannels}
+	selectedIds={selectedIds}
+	onSelectedIdsChange={(set) => (selectedIds = set)}
 	onSave={() => {}}
 	onCancel={() => {}}
 	submitting={false}
