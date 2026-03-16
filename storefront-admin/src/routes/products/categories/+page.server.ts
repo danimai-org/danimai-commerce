@@ -7,7 +7,14 @@ import { client } from '$lib/client';
 
 const CategoryCreateSchema = z.object({
     name: z.string().min(3, "Name must be at least 3 characters").max(50, "Name is too long"),
+    handle: z
+        .string()
+        .max(100, 'Handle is too long')
+        .regex(/^[a-z0-9-]*$/, 'Use lowercase letters, numbers, and hyphens only')
+        .optional(),
 });
+
+
 
 
 export const load: PageServerLoad = async () => {
@@ -17,7 +24,6 @@ export const load: PageServerLoad = async () => {
 
 
 export const actions = {
-
     create: async ({ request }) => {
         const categoryCreateForm = await superValidate(request, zod4(CategoryCreateSchema));
 
@@ -25,17 +31,20 @@ export const actions = {
             return fail(400, { categoryCreateForm });
         }
         const name = categoryCreateForm.data.name.trim();
-        const handle = name
+        const rawHandle = (categoryCreateForm.data.handle ?? '').trim();
+        const handle = (rawHandle || name)
             .toLowerCase()
             .replace(/\s+/g, '-')
             .replace(/[^a-z0-9-]/g, '');
-        const category = await client['product-categories'].post({ value: name  });
-        if (!category) {
+        const category = await client['product-categories'].post({
+            value: name,
+            metadata: { handle } as Record<string, string>
+        });
+
+        if (!category || category.error) {
             return fail(400, { error: 'Failed to create category' });
         }
 
         return message(categoryCreateForm, 'Category created successfully');
-        
-    }
-   
+    },
 } satisfies Actions;

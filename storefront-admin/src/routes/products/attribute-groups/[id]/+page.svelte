@@ -12,7 +12,7 @@
 	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
 	import AttributeGroupHeroCard from '$lib/components/organs/attribute-group/detail/AttributeGroupHeroCard.svelte';
 	import AttributeGroupAttributesCard from '$lib/components/organs/attribute-group/detail/AttributeGroupAttributesCard.svelte';
-
+	
 	const groupId = $derived(page.params.id);
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
@@ -85,6 +85,7 @@
 						onRefetch={refetchGroupData}
 						onDeleted={() => goto('/products/attribute-groups')}
 					/>
+					
 				</div>
 
 				<AttributeGroupAttributesCard group={group} attributes={attributes} />

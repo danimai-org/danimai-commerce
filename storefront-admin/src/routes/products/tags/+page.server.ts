@@ -10,11 +10,11 @@ const TagCreateSchema = z.object({
 });
 
 
+
 export const load: PageServerLoad = async () => {
     const tagCreateForm = await superValidate(zod4(TagCreateSchema));
     return { tagCreateForm };
 };
-
 
 export const actions = {
 
@@ -30,5 +30,5 @@ export const actions = {
         }
         return message(tagCreateForm, 'Tag created successfully');
 
-    }
+    },
 } satisfies Actions;

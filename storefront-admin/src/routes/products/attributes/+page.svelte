@@ -11,7 +11,7 @@
 		type TableColumn,
 		AttributeFormSheet
 	} from '$lib/components/organs/index.js';
-	import EditAttribute from '$lib/components/organs/attribute/update/EditAttribute.svelte';
+	import EditAttribute from '$lib/components/organs/attribute/update/EditAttributeHero.svelte';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';

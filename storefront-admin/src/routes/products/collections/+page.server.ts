@@ -7,7 +7,12 @@ import { superValidate, message } from 'sveltekit-superforms';
 import { client } from '$lib/client';
 
 const CollectionCreateSchema = z.object({
-    value: z.string().min(3, "Value must be at least 3 characters").max(50, "Tag is too long"),
+    title: z.string().min(3, "Title must be at least 3 characters").max(50, "Title is too long"),
+    handle: z
+        .string()
+        .max(100, 'Handle is too long')
+        .regex(/^[a-z0-9-]*$/, 'Use lowercase letters, numbers, and hyphens only')
+        .optional(),
 });
 
 
@@ -25,16 +30,18 @@ export const actions = {
         if (!collectionCreateForm.valid) {
             return fail(400, { collectionCreateForm });
         }
-        const title = collectionCreateForm.data.value.trim();
-        const handle = title
+        const title = collectionCreateForm.data.title.trim();
+        const rawHandle = (collectionCreateForm.data.handle ?? '').trim();
+        const handle = (rawHandle || title)
             .toLowerCase()
             .replace(/\s+/g, '-')
             .replace(/[^a-z0-9-]/g, '');
         const collection = await client['collections'].post({ title, handle });
-        if (!collection) {
+        if (!collection || collection.error) {
             return fail(400, { error: 'Failed to create collection' });
         }
         return message(collectionCreateForm, 'Collection created successfully');
 
-    }
+    },
+   
 } satisfies Actions;

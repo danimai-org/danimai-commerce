@@ -140,7 +140,7 @@
 />
 <EditTag
 	tag={paginateState.formMode === 'edit' ? ((paginateState.formItem as any) ?? null) : null}
-	onSaved={handleFormSaved}
+	onSuccess={handleFormSaved}
 	onClosed={handleEditClosed}
 />
 

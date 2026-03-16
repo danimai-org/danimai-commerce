@@ -13,27 +13,13 @@ const AttributeGroupCreateSchema = z.object({
 	rank: z.number().default(0)
 });
 
-const AttributeGroupUpdateSchema = z.object({
-	id: z.string(),
-	title: z.string().min(3, 'Title must be at least 3 characters').max(50, 'Title is too long'),
-	attribute_ids: z.array(z.string()).default([]),
-	required: z.boolean().default(false),
-	rank: z.number().default(0)
-});
 
-const AttributeGroupDeleteSchema = z.object({
-	id: z.string(),
-	attribute_ids: z.array(z.string()).default([]),
-	required: z.boolean().default(false),
-	rank: z.number().default(0)
-});
+
 
 
 export const load: PageServerLoad = async () => {
 	const attributeGroupCreateForm = await superValidate(zod4(AttributeGroupCreateSchema));
-	const attributeGroupUpdateForm = await superValidate(zod4(AttributeGroupUpdateSchema));
-	const attributeGroupDeleteForm = await superValidate(zod4(AttributeGroupDeleteSchema));
-	return { attributeGroupCreateForm, attributeGroupUpdateForm, attributeGroupDeleteForm };
+	return { attributeGroupCreateForm };
 };
 
 export const actions = {
@@ -51,48 +37,11 @@ export const actions = {
 				rank: attributeGroupCreateForm.data.rank,
 			}
 		});	
-		if (!attributeGroup) {
+		if (!attributeGroup || attributeGroup.error) {
 			return fail(400, { error: 'Failed to create attribute group' });
 		}
 		return message(attributeGroupCreateForm, 'Attribute group created successfully');
 	},
 
-	update: async ({ request }) => {
-		const attributeGroupUpdateForm = await superValidate(request, zod4(AttributeGroupUpdateSchema));
-
-		if (!attributeGroupUpdateForm.valid) {
-			return fail(400, { attributeGroupUpdateForm });
-		}
-		const id = attributeGroupUpdateForm.data.id;
-		const attributeGroup = await client['product-attribute-groups']({ id }).put({
-			id,
-			title: attributeGroupUpdateForm.data.title.trim(),
-			metadata: {
-				required: attributeGroupUpdateForm.data.required,
-				rank: attributeGroupUpdateForm.data.rank,
-			} as Record<string, any>,
-			attributes: attributeGroupUpdateForm.data.attribute_ids.map((attribute_id) => ({ attribute_id })),
-		});
-		if (!attributeGroup) {
-			return fail(400, { error: 'Failed to update attribute group' });
-		}
-		return message(attributeGroupUpdateForm, 'Attribute group updated successfully');
-	},
 	
-	delete: async ({ request }) => {
-		const attributeGroupDeleteForm = await superValidate(request, zod4(AttributeGroupDeleteSchema));
-
-		if (!attributeGroupDeleteForm.valid) {
-			return fail(400, { attributeGroupDeleteForm });
-		}
-		
-		const attributeGroup = await client['product-attribute-groups'].delete({
-			attribute_group_ids: [attributeGroupDeleteForm.data.id]
-		});
-
-		if (!attributeGroup) {
-			return fail(400, { error: 'Failed to delete attribute group' });
-		}
-		return message(attributeGroupDeleteForm, 'Attribute group deleted successfully');
-	}	
 } satisfies Actions;

@@ -37,12 +37,10 @@
 	const productsData = $derived(
 		productsQuery.data as { data?: { rows: any[]; pagination: PaginationMeta } } | null
 	);
-	const products = $derived(productsData?.data?.rows ?? ([] as any[]));
+	
 	const pagination = $derived(productsData?.data?.pagination ?? null);
 	const count = $derived(pagination?.total ?? 0);
-	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(pagination ? Math.min(pagination.page * pagination.limit, count) : 0);
-
+	
 	async function loadCollection() {
 		if (!collectionId) return;
 		loading = true;

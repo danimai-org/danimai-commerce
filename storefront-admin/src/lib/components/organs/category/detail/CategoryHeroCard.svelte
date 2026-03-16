@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
-	import EditCategorySheet from './EditCategorySheet.svelte';
+	import EditCategorySheet from '../update/EditCategoryHero.svelte';
 	import { cn } from '$lib/utils.js';
 	import { client } from '$lib/client.js';
 
@@ -86,4 +86,10 @@
 	</div>
 </div>
 
-<EditCategorySheet bind:open={editSheetOpen} category={selectedCategory} onUpdated={onUpdated} />
+<EditCategorySheet
+	category={editSheetOpen ? (selectedCategory as any) : null}
+	onSaved={onUpdated}
+	onClosed={() => {
+		editSheetOpen = false;
+	}}
+/>
