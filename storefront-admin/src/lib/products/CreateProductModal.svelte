@@ -1,21 +1,18 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import {
-		PaginationTable,
-		TableHead,
-		TablePagination,
-		type TableColumn
-	} from '$lib/components/organs/index.js';
+	import type { TableColumn } from '$lib/components/organs/index.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
+	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
 	import Info from '@lucide/svelte/icons/info';
 	import Check from '@lucide/svelte/icons/check';
-	import Upload from '@lucide/svelte/icons/upload-cloud';
-	import X from '@lucide/svelte/icons/x';
 	import { cn } from '$lib/utils.js';
+	import { client } from '$lib/client.js';
 	import type { Product } from './types.js';
+	import CreateProductStepDetails from './create-product-modal/CreateProductStepDetails.svelte';
+	import CreateProductStepAttributes from './create-product-modal/CreateProductStepAttributes.svelte';
+	import CreateProductStepOrganize from './create-product-modal/CreateProductStepOrganize.svelte';
+	import CreateProductStepVariants from './create-product-modal/CreateProductStepVariants.svelte';
 
 	interface Props {
 		open: boolean;
@@ -191,7 +188,27 @@
 		);
 	}
 
-	function init() {
+	function extractRows<T>(response: unknown): T[] {
+		const payload = (response as { data?: { rows?: T[]; data?: T[] } | T[] } | null)?.data;
+		if (Array.isArray(payload)) return payload;
+		if (Array.isArray(payload?.rows)) return payload.rows;
+		if (Array.isArray(payload?.data)) return payload.data;
+		return [];
+	}
+
+	const listQuery = createPaginationQuery({
+		page: 1,
+		limit: 100,
+		search: '',
+		sorting_field: 'created_at'
+	}) as {
+		search?: string;
+		page?: string | number;
+		limit?: string | number;
+		sorting_field?: string;
+	};
+
+	async function init() {
 		createStep = 1;
 		createTitle = '';
 		createSubtitle = '';
@@ -213,65 +230,52 @@
 		variantSearch = '';
 		variantPage = 1;
 		syncVariantsFromOptions();
-		fetch(`${API_BASE}/collections?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
-			.then((j) => {
-				collectionsList = j.data ?? [];
-			})
-			.catch(() => {
-				collectionsList = [];
-			});
-		fetch(`${API_BASE}/product-categories?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
-			.then((j) => {
-				categoriesList = j.data ?? [];
-			})
-			.catch(() => {
-				categoriesList = [];
-			});
-		fetch(`${API_BASE}/product-tags?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
-			.then((j) => {
-				tagsList = j.data ?? [];
-			})
-			.catch(() => {
-				tagsList = [];
-			});
-		fetch(`${API_BASE}/product-attributes?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
-			.then((j) => {
-				attributesList = j.data ?? [];
-			})
-			.catch(() => {
-				attributesList = [];
-			});
-		fetch(`${API_BASE}/product-attribute-groups?limit=100`)
-			.then((r) => (r.ok ? r.json() : { rows: [] }))
-			.then((j) => {
-				attributeGroupsList = j.data ?? [];
-			})
-			.catch(() => {
-				attributeGroupsList = [];
-			});
-		fetch(`${API_BASE}/sales-channels?limit=100`)
-			.then((r) => (r.ok ? r.json() : { data: [] }))
-			.then((j) => {
-				const salesChannels = j.data ?? [];
-				salesChannelsList = salesChannels.map((ch: { id: string; name: string }) => ({
-					id: ch.id,
-					name: ch.name
-				}));
-				const defaultChannels = salesChannels.filter(
-					(ch: { is_default: boolean }) => ch.is_default
-				);
-				if (defaultChannels.length > 0) {
-					createSalesChannels = defaultChannels.map((ch: { id: string; name: string }) => ({
-						id: ch.id,
-						name: ch.name
-					}));
-				}
-			})
-			.catch(() => {});
+		const [
+			collectionsResponse,
+			categoriesResponse,
+			tagsResponse,
+			attributesResponse,
+			attributeGroupsResponse,
+			salesChannelsResponse
+		] = await Promise.allSettled([
+			client.collections.get({ query: listQuery }),
+			client['product-categories'].get({ query: listQuery }),
+			client['product-tags'].get({ query: listQuery }),
+			client['product-attributes'].get({ query: listQuery }),
+			client['product-attribute-groups'].get({ query: listQuery }),
+			client['sales-channels'].get({ query: listQuery })
+		]);
+
+		collectionsList =
+			collectionsResponse.status === 'fulfilled'
+				? extractRows<{ id: string; title: string; handle: string }>(collectionsResponse.value)
+				: [];
+		categoriesList =
+			categoriesResponse.status === 'fulfilled'
+				? extractRows<{ id: string; value: string; handle: string }>(categoriesResponse.value)
+				: [];
+		tagsList =
+			tagsResponse.status === 'fulfilled'
+				? extractRows<{ id: string; value: string }>(tagsResponse.value)
+				: [];
+		attributesList =
+			attributesResponse.status === 'fulfilled'
+				? extractRows<{ id: string; title: string; type: string }>(attributesResponse.value)
+				: [];
+		attributeGroupsList =
+			attributeGroupsResponse.status === 'fulfilled'
+				? extractRows<{ id: string; title: string }>(attributeGroupsResponse.value)
+				: [];
+
+		const fetchedSalesChannels =
+			salesChannelsResponse.status === 'fulfilled'
+				? extractRows<{ id: string; name: string; is_default?: boolean }>(salesChannelsResponse.value)
+				: [];
+		salesChannelsList = fetchedSalesChannels.map((ch) => ({ id: ch.id, name: ch.name }));
+		const defaultChannels = fetchedSalesChannels.filter((ch) => ch.is_default);
+		if (defaultChannels.length > 0) {
+			createSalesChannels = defaultChannels.map((ch) => ({ id: ch.id, name: ch.name }));
+		}
 	}
 
 	function closeCreate() {
@@ -509,7 +513,7 @@
 	$effect(() => {
 		if (open && !wasOpen) {
 			wasOpen = true;
-			init();
+			void init();
 		}
 		if (!open) wasOpen = false;
 	});
@@ -596,630 +600,76 @@
 			{/if}
 
 			{#if createStep === 1}
-				<div class="flex-1 overflow-auto p-6 pt-4">
-					<h2 class="text-lg font-semibold">Details</h2>
-					<p class="mt-1 text-sm text-muted-foreground">
-						Add the basic information for your product.
-					</p>
-					<div class="mt-6 flex flex-col gap-6">
-						<div class="flex flex-col gap-2">
-							<label for="create-title" class="text-sm font-medium">Title</label>
-							<Input
-								id="create-title"
-								bind:value={createTitle}
-								placeholder="e.g. Winter jacket"
-								class={cn('h-9', createError === 'Title is required' && 'border-destructive')}
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="create-subtitle" class="text-sm font-medium">
-								Subtitle <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<Input
-								id="create-subtitle"
-								bind:value={createSubtitle}
-								placeholder="e.g. Warm and cosy"
-								class="h-9"
-							/>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="create-handle" class="flex items-center gap-1.5 text-sm font-medium">
-								Handle <span class="font-normal text-muted-foreground">(Optional)</span>
-								<Info class="size-3.5 text-muted-foreground" />
-							</label>
-							<div class="relative">
-								<span class="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground">/</span>
-								<Input
-									id="create-handle"
-									bind:value={createHandle}
-									placeholder="handle"
-									class="h-9 pl-6"
-								/>
-							</div>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="create-description" class="text-sm font-medium">
-								Description <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<textarea
-								id="create-description"
-								bind:value={createDescription}
-								placeholder="e.g. A warm and cozy jacket"
-								rows="4"
-								class="flex w-full min-w-0 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-							></textarea>
-						</div>
-						<div class="flex flex-col gap-2">
-							<span class="text-sm font-medium">
-								Media <span class="font-normal text-muted-foreground">(Optional)</span>
-							</span>
-							<div
-								role="button"
-								tabindex="0"
-								aria-label="Media upload"
-								class="flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:bg-muted/50"
-								onclick={() => {
-									createMediaImageUrl = createMediaUrl;
-									createMediaChosenFile = createMediaFile;
-									createMediaModalOpen = true;
-								}}
-								onkeydown={(e) => e.key === 'Enter' && (createMediaModalOpen = true)}
-							>
-								<Upload class="size-8 text-muted-foreground" />
-								<p>Drag and drop images here or click to upload.</p>
-								{#if createMediaUrl || createMediaFile}
-									<p class="text-xs text-muted-foreground">
-										{createMediaUrl
-											? 'Image URL set'
-											: (createMediaFile?.name ?? '1 image selected')}
-									</p>
-								{/if}
-							</div>
-							<Dialog.Root bind:open={createMediaModalOpen}>
-								<Dialog.Content
-									class="mx-auto my-auto h-max max-h-[90dvh] w-full max-w-md overflow-auto rounded-lg border shadow-lg"
-								>
-									<Dialog.Header>
-										<Dialog.Title>Provide an image</Dialog.Title>
-									</Dialog.Header>
-									<div class="grid gap-4 p-[10px]">
-										<div class="flex flex-col gap-2">
-											<label for="create-media-url" class="text-sm font-medium">Image URL</label>
-											<Input
-												id="create-media-url"
-												type="url"
-												placeholder="https://..."
-												bind:value={createMediaImageUrl}
-												class="w-full"
-											/>
-										</div>
-										<p class="text-sm text-muted-foreground">Or choose file</p>
-										<div class="flex items-center gap-2">
-											<input
-												type="file"
-												accept="image/*"
-												class="hidden"
-												bind:this={createMediaFileInput}
-												onchange={(e) => {
-													const f = e.currentTarget.files?.[0];
-													if (f) createMediaChosenFile = f;
-													e.currentTarget.value = '';
-												}}
-											/>
-											<Button
-												type="button"
-												variant="outline"
-												onclick={() => createMediaFileInput?.click()}
-											>
-												Choose file
-											</Button>
-											<span class="text-sm text-muted-foreground">
-												{createMediaChosenFile?.name ?? 'No file chosen'}
-											</span>
-										</div>
-									</div>
-									<Dialog.Footer class="flex flex-row justify-end gap-2 border-t p-4">
-										<Button
-											type="button"
-											variant="outline"
-											onclick={() => (createMediaModalOpen = false)}
-										>
-											Cancel
-										</Button>
-										<Button
-											type="button"
-											onclick={() => {
-												if (createMediaImageUrl.trim()) {
-													createMediaUrl = createMediaImageUrl.trim();
-													createMediaFile = null;
-												}
-												if (createMediaChosenFile) {
-													createMediaFile = createMediaChosenFile;
-													createMediaUrl = '';
-												}
-												createMediaModalOpen = false;
-											}}
-										>
-											Save
-										</Button>
-									</Dialog.Footer>
-								</Dialog.Content>
-							</Dialog.Root>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="create-has-variants" class="text-sm font-medium">Variants</label>
-							<div class="flex items-center gap-2">
-								<button
-									id="create-has-variants"
-									type="button"
-									role="switch"
-									aria-checked={createHasVariants}
-									aria-label="Product has variants"
-									class={cn(
-										'relative inline-flex h-6 min-h-6 w-11 min-w-11 flex-none shrink-0 cursor-pointer items-center self-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-										createHasVariants ? 'bg-primary' : 'bg-input'
-									)}
-									onclick={() => {
-										createHasVariants = !createHasVariants;
-										if (createHasVariants) {
-											syncVariantsFromOptions();
-										}
-									}}
-								>
-									<span
-										class={cn(
-											'pointer-events-none block size-5 shrink-0 rounded-full border border-input bg-white shadow ring-0 transition-transform',
-											createHasVariants ? 'translate-x-5' : 'translate-x-px'
-										)}
-									></span>
-								</button>
-								<span class="text-sm">Yes, this is a product with variants</span>
-							</div>
-							<p class="text-xs text-muted-foreground">
-								When unchecked, we will create a default variant for you.
-							</p>
-						</div>
-					</div>
-				</div>
+				<CreateProductStepDetails
+					bind:createTitle
+					bind:createSubtitle
+					bind:createHandle
+					bind:createDescription
+					{createError}
+					bind:createHasVariants
+					bind:createMediaModalOpen
+					bind:createMediaImageUrl
+					bind:createMediaChosenFile
+					bind:createMediaFileInput
+					bind:createMediaUrl
+					bind:createMediaFile
+					onEnableVariants={syncVariantsFromOptions}
+				/>
 			{/if}
 
 			{#if createStep === 2}
-				<div class="flex-1 overflow-auto p-6 pt-4">
-					<h2 class="text-lg font-semibold">Attributes</h2>
-					<p class="mt-1 text-sm text-muted-foreground">
-						Assign product attributes and their values. You can manage attributes from the product
-						detail page after creation.
-					</p>
-					<div class="mt-6 flex flex-col gap-4">
-						<div class="flex flex-col gap-2">
-							<label for="create-attr-group-select" class="text-sm font-medium"
-								>Attribute group</label
-							>
-							<Select.Root
-								type="single"
-								value={createAttributeGroupId}
-								onValueChange={(v) => (createAttributeGroupId = v ?? '')}
-								allowDeselect
-							>
-								<Select.Trigger id="create-attr-group-select" class="w-full max-w-xs">
-									{attributeGroupsList.find((g) => g.id === createAttributeGroupId)?.title ??
-										'Select attribute group'}
-								</Select.Trigger>
-								<Select.Content>
-									<Select.Group>
-										<Select.Label>Attribute group</Select.Label>
-										<Select.Item value="" label="Select attribute group">
-											Select attribute group
-										</Select.Item>
-										{#each attributeGroupsList as ag (ag.id)}
-											<Select.Item value={ag.id} label={ag.title}>
-												{ag.title}
-											</Select.Item>
-										{/each}
-									</Select.Group>
-								</Select.Content>
-							</Select.Root>
-							<p class="text-xs text-muted-foreground">
-								Required when adding attributes. Attributes must belong to the selected group.
-							</p>
-						</div>
-						{#each createAttributeEntries as entry, entryIndex (entryIndex)}
-							<div class="rounded-lg border p-4">
-								<div class="flex items-start justify-between gap-2">
-									<div class="min-w-0 flex-1 space-y-3">
-										<div class="flex flex-col gap-2">
-											<label for="create-attr-select-{entryIndex}" class="text-sm font-medium"
-												>Attribute</label
-											>
-											<Select.Root
-												type="single"
-												value={entry.attributeId}
-												onValueChange={(v) => setAttributeEntryAttribute(entryIndex, v ?? '')}
-												allowDeselect
-											>
-												<Select.Trigger id="create-attr-select-{entryIndex}" class="w-full">
-													{entry.attributeTitle || 'Select attribute'}
-												</Select.Trigger>
-												<Select.Content>
-													<Select.Group>
-														<Select.Label>Attribute</Select.Label>
-														<Select.Item value="" label="Select attribute">
-															Select attribute
-														</Select.Item>
-														{#each attributesList.filter((a) => !createAttributeEntries.some((e2, i2) => i2 !== entryIndex && e2.attributeId === a.id)) as attr (attr.id)}
-															<Select.Item value={attr.id} label={attr.title}>
-																{attr.title}
-															</Select.Item>
-														{/each}
-													</Select.Group>
-												</Select.Content>
-											</Select.Root>
-										</div>
-										<div class="flex flex-col gap-2">
-											<label for="create-attr-value-{entryIndex}" class="text-sm font-medium"
-												>Value</label
-											>
-											<Input
-												id="create-attr-value-{entryIndex}"
-												class="h-9"
-												placeholder="Value"
-												value={entry.value}
-												oninput={(e) =>
-													setAttributeEntryValue(
-														entryIndex,
-														(e.currentTarget as HTMLInputElement).value
-													)}
-											/>
-										</div>
-									</div>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										class="size-8 shrink-0 text-destructive hover:bg-destructive/10"
-										onclick={() => removeAttributeEntry(entryIndex)}
-										aria-label="Remove attribute"
-									>
-										<X class="size-4" />
-									</Button>
-								</div>
-							</div>
-						{/each}
-						<Button type="button" variant="outline" class="w-fit" onclick={addAttributeEntry}>
-							Add attribute
-						</Button>
-					</div>
-				</div>
+				<CreateProductStepAttributes
+					bind:createAttributeGroupId
+					{attributeGroupsList}
+					{createAttributeEntries}
+					{attributesList}
+					{addAttributeEntry}
+					{removeAttributeEntry}
+					{setAttributeEntryAttribute}
+					{setAttributeEntryValue}
+				/>
 			{/if}
 
 			{#if createStep === 3}
-				<div class="flex-1 overflow-auto p-6 pt-4">
-					<h2 class="text-lg font-semibold">Organize</h2>
-					<p class="mt-1 text-sm text-muted-foreground">
-						Organize your product with collections, categories, and channels.
-					</p>
-					<div class="mt-6 flex flex-col gap-6">
-						<div class="flex flex-col gap-2">
-							<label for="create-discountable" class="text-sm font-medium">
-								Discountable <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<div class="flex items-center gap-2">
-								<button
-									id="create-discountable"
-									type="button"
-									role="switch"
-									aria-checked={createDiscountable}
-									aria-label="Product is discountable"
-									class={cn(
-										'relative inline-flex h-6 min-h-6 w-11 min-w-11 flex-none shrink-0 cursor-pointer items-center self-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-										createDiscountable ? 'bg-primary' : 'bg-input'
-									)}
-									onclick={() => (createDiscountable = !createDiscountable)}
-								>
-									<span
-										class={cn(
-											'pointer-events-none block size-5 shrink-0 rounded-full border border-input bg-white shadow ring-0 transition-transform',
-											createDiscountable ? 'translate-x-5' : 'translate-x-px'
-										)}
-									></span>
-								</button>
-								<span class="text-sm">Apply discounts to this product</span>
-							</div>
-							<p class="text-xs text-muted-foreground">
-								When unchecked, discounts will not be applied to this product.
-							</p>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="create-collection" class="text-sm font-medium">
-								Collection <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<select
-								id="create-collection"
-								bind:value={createCollectionId}
-								class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<option value="">None</option>
-								{#each collectionsList as col (col.id)}
-									<option value={col.id}>{col.title}</option>
-								{/each}
-							</select>
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="create-category" class="text-sm font-medium">
-								Categories <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<select
-								id="create-category"
-								bind:value={createCategoryId}
-								class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							>
-								<option value="">None</option>
-								{#each categoriesList as cat (cat.id)}
-									<option value={cat.id}>{cat.value}</option>
-								{/each}
-							</select>
-							{#if createCategoryId}
-								<p class="text-xs text-muted-foreground">1 selected</p>
-							{/if}
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="create-tags-select" class="text-sm font-medium">
-								Tags <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<div class="flex flex-wrap items-center gap-2">
-								{#each createTagIds as tagId (tagId)}
-									{@const tag = tagsList.find((t) => t.id === tagId)}
-									{#if tag}
-										<span
-											class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm"
-										>
-											{tag.value}
-											<button
-												type="button"
-												class="rounded p-0.5 hover:bg-muted"
-												onclick={() => removeTag(tagId)}
-												aria-label="Remove tag"
-											>
-												<X class="size-3.5" />
-											</button>
-										</span>
-									{/if}
-								{/each}
-								<select
-									id="create-tags-select"
-									class="flex h-8 min-w-[120px] rounded-md border border-input bg-background px-2 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-									onchange={(e) => {
-										const el = e.currentTarget;
-										const id = el.value;
-										if (id) {
-											addTag(id);
-											el.value = '';
-										}
-									}}
-								>
-									<option value="">Add tag</option>
-									{#each tagsList.filter((t) => !createTagIds.includes(t.id)) as tag (tag.id)}
-										<option value={tag.id}>{tag.value}</option>
-									{/each}
-								</select>
-							</div>
-							{#if createTagIds.length > 0}
-								<p class="text-xs text-muted-foreground">{createTagIds.length} selected</p>
-							{/if}
-						</div>
-						<div class="flex flex-col gap-2">
-							<label for="create-sales-channel-input" class="text-sm font-medium">
-								Sales channels <span class="font-normal text-muted-foreground">(Optional)</span>
-							</label>
-							<p class="text-xs text-muted-foreground">
-								This product will only be available in the default sales channel if left untouched.
-							</p>
-							<div class="flex flex-wrap items-center gap-2">
-								{#each createSalesChannels as ch (ch.id)}
-									<span
-										class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm"
-									>
-										{ch.name}
-										<button
-											type="button"
-											class="rounded p-0.5 hover:bg-muted"
-											onclick={() => removeSalesChannel(ch.id)}
-											aria-label="Remove"
-										>
-											<X class="size-3.5" />
-										</button>
-									</span>
-								{/each}
-								<div class="flex gap-1">
-									<select
-										id="create-sales-channel-input"
-										class="h-8 w-48 rounded-md border border-input bg-background px-3 py-1 text-sm"
-										bind:value={createSalesChannelInput}
-										onchange={() => {
-											if (createSalesChannelInput) {
-												addSalesChannel();
-												createSalesChannelInput = '';
-											}
-										}}
-									>
-										<option value="">Add sales channel</option>
-										{#each salesChannelsList.filter((ch) => !createSalesChannels.some((s) => s.id === ch.id)) as channel (channel.id)}
-											<option value={channel.id}>{channel.name}</option>
-										{/each}
-									</select>
-								</div>
-							</div>
-						</div>
-					</div>
-				</div>
+				<CreateProductStepOrganize
+					bind:createDiscountable
+					bind:createCollectionId
+					bind:createCategoryId
+					{createTagIds}
+					{createSalesChannels}
+					bind:createSalesChannelInput
+					{collectionsList}
+					{categoriesList}
+					{tagsList}
+					{salesChannelsList}
+					{addTag}
+					{removeTag}
+					{addSalesChannel}
+					{removeSalesChannel}
+				/>
 			{/if}
 
 			{#if createStep === 4}
-				<div class="flex-1 overflow-auto p-6 pt-4">
-					<h2 class="text-lg font-semibold">Variants</h2>
-					{#if createHasVariants}
-						<p class="mt-1 text-sm text-muted-foreground">
-							Define options and variant details. This ranking will affect the variants' order in
-							your storefront.
-						</p>
-						<div class="mt-6">
-							<div class="flex items-center justify-between">
-								<div>
-									<h3 class="text-sm font-medium">Product options</h3>
-									<p class="text-xs text-muted-foreground">
-										Define the options for the product, e.g. color, size, etc.
-									</p>
-								</div>
-								<Button type="button" variant="outline" size="sm" onclick={addOption}>Add</Button>
-							</div>
-							<div class="mt-4 flex flex-col gap-4">
-								{#each createOptions as opt, optIndex (optIndex)}
-									<div class="flex flex-col gap-2 rounded-md border p-3">
-										<div class="flex items-center gap-2">
-											<Input
-												placeholder="Title (e.g. Size)"
-												value={opt.title}
-												oninput={(e) =>
-													updateOptionTitle(optIndex, (e.target as HTMLInputElement).value)}
-												class="h-8 flex-1"
-											/>
-											<Button
-												type="button"
-												variant="ghost"
-												size="icon"
-												class="size-8 shrink-0"
-												onclick={() => removeOption(optIndex)}
-											>
-												<X class="size-4" />
-											</Button>
-										</div>
-										<div class="flex flex-wrap items-center gap-1.5">
-											{#each opt.values as val, valIndex (valIndex)}
-												<span
-													class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-0.5 text-sm"
-												>
-													{val}
-													<button
-														type="button"
-														class="rounded p-0.5 hover:bg-muted"
-														onclick={() => removeOptionValue(optIndex, valIndex)}
-													>
-														<X class="size-3" />
-													</button>
-												</span>
-											{/each}
-											<form
-												class="inline-flex gap-1"
-												onsubmit={(e) => {
-													e.preventDefault();
-													const input = e.currentTarget.querySelector('input') as HTMLInputElement;
-													addOptionValue(optIndex, input?.value ?? '');
-													if (input) input.value = '';
-												}}
-											>
-												<Input
-													placeholder="Add value"
-													class="h-7 w-24"
-													onkeydown={(e) => {
-														if (e.key === 'Enter') {
-															e.preventDefault();
-															const t = e.target as HTMLInputElement;
-															addOptionValue(optIndex, t.value);
-															t.value = '';
-														}
-													}}
-												/>
-											</form>
-										</div>
-									</div>
-								{/each}
-							</div>
-						</div>
-						<div class="mt-6">
-							<h3 class="text-sm font-medium">Product variants</h3>
-							<p class="text-xs text-muted-foreground">
-								Edit title, SKU, inventory, and price per variant.
-							</p>
-							<PaginationTable
-								bind:searchQuery={variantSearch}
-								searchPlaceholder="Search variants"
-								showFilter={false}
-								showSort={false}
-								showToolbar={true}
-							>
-								<div class="mt-2 min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-									<table class="w-full text-sm">
-										<TableHead columns={variantTableColumns} />
-										<tbody>
-											{#each displayedVariants as v (v.variant_rank)}
-												<tr class="border-b last:border-0">
-													<td class="px-3 py-2 text-muted-foreground">
-														{Object.values(v.options).join(' / ')}
-													</td>
-													<td class="px-3 py-2">
-														<Input bind:value={v.title} class="h-8 w-full min-w-[100px]" />
-													</td>
-													<td class="px-3 py-2">
-														<Input bind:value={v.sku} placeholder="SKU" class="h-8 w-24" />
-													</td>
-													<td class="px-3 py-2">
-														<Input
-															type="number"
-															bind:value={v.availableCount}
-															placeholder="0"
-															min="0"
-															class={cn(
-																'h-8 w-20',
-																String(v.availableCount || '').trim() &&
-																	!v.sku.trim() &&
-																	'border-destructive'
-															)}
-															disabled={!v.sku.trim()}
-														/>
-														{#if String(v.availableCount || '').trim() && !v.sku.trim()}
-															<p class="mt-0.5 text-xs text-destructive">SKU required</p>
-														{/if}
-													</td>
-													<td class="px-3 py-2">
-														<input
-															type="checkbox"
-															bind:checked={v.allow_backorder}
-															class="rounded border-input"
-														/>
-													</td>
-													<td class="px-3 py-2">
-														<div class="relative w-20">
-															<span
-																class="absolute top-1/2 left-2 -translate-y-1/2 text-xs text-muted-foreground"
-																>€</span
-															>
-															<Input
-																bind:value={v.priceAmount}
-																type="text"
-																placeholder="0"
-																class="h-8 pl-6"
-															/>
-														</div>
-													</td>
-												</tr>
-											{/each}
-										</tbody>
-									</table>
-								</div>
-								<TablePagination
-									pagination={variantPagination}
-									start={variantStart}
-									end={variantEnd}
-									onPageChange={(p) => (variantPage = p)}
-								/>
-							</PaginationTable>
-						</div>
-					{:else}
-						<p class="mt-2 text-sm text-muted-foreground">
-							A default variant will be created when you save.
-						</p>
-					{/if}
-				</div>
+				<CreateProductStepVariants
+					{createHasVariants}
+					bind:createOptions
+					{displayedVariants}
+					bind:variantSearch
+					variantPagination={variantPagination}
+					variantStart={variantStart}
+					variantEnd={variantEnd}
+					variantTableColumns={variantTableColumns}
+					{addOption}
+					{removeOption}
+					{updateOptionTitle}
+					{removeOptionValue}
+					{addOptionValue}
+					setVariantPage={(p) => (variantPage = p)}
+					onEnableVariants={() => {
+						createHasVariants = true;
+						syncVariantsFromOptions();
+					}}
+				/>
 			{/if}
 
 			<div class="flex justify-end gap-2 border-t p-4">
