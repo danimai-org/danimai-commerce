@@ -1,38 +1,28 @@
 import { Elysia } from "elysia";
 import { Type, type StaticDecode } from "@sinclair/typebox";
-import { getService, PaginationSchema } from "@danimai/core";
+import { getService } from "@danimai/core";
 import {
-  CREATE_COLLECTIONS_PROCESS,
-  UPDATE_COLLECTIONS_PROCESS,
+  CREATE_COLLECTION_PROCESS,
+  UPDATE_COLLECTION_PROCESS,
   DELETE_COLLECTIONS_PROCESS,
-  BATCH_LINK_PRODUCTS_TO_COLLECTION_PROCESS,
-  BATCH_REMOVE_PRODUCTS_FROM_COLLECTION_PROCESS,
+  UPDATE_COLLECTION_PRODUCTS_PROCESS,
   PAGINATED_COLLECTIONS_PROCESS,
-  PAGINATED_PRODUCTS_BY_COLLECTION_PROCESS,
-  CreateCollectionsProcess,
-  UpdateCollectionsProcess,
+  CreateCollectionProcess,
+  UpdateCollectionProcess,
   DeleteCollectionsProcess,
-  BatchLinkProductsToCollectionProcess,
-  BatchRemoveProductsFromCollectionProcess,
+  UpdateCollectionProductsProcess,
   PaginatedCollectionsProcess,
-  PaginatedProductsByCollectionProcess,
-  type PaginatedCollectionsProcessInput,
-  type PaginatedProductsByCollectionProcessInput,
   PaginatedCollectionsSchema,
   PaginatedCollectionsResponseSchema,
-  PaginatedProductsByCollectionResponseSchema,
   RETRIEVE_COLLECTION_PROCESS,
   RetrieveCollectionProcess,
   RetrieveCollectionResponseSchema,
   CreateCollectionSchema,
-  CreateCollectionsResponseSchema,
-  UpdateCollectionsResponseSchema,
+  CreateCollectionResponseSchema,
+  UpdateCollectionResponseSchema,
   DeleteCollectionsSchema,
+  UpdateCollectionProductsBodySchema,
 } from "@danimai/product";
-import {
-  LIST_SALES_CHANNELS_BY_IDS_PROCESS,
-  ListSalesChannelsByIdsProcess,
-} from "@danimai/sales-channel";
 import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
@@ -40,15 +30,6 @@ import {
   NotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
-
-const BatchLinkBodySchema = Type.Object({
-  product_ids: Type.Array(Type.String()),
-  metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
-});
-const BatchRemoveBodySchema = Type.Object({
-  product_ids: Type.Array(Type.String()),
-  metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
-});
 
 export const collectionRoutes = new Elysia({ prefix: "/collections" })
   .onError(({ error, set }) => handleProcessError(error, set))
@@ -98,13 +79,13 @@ export const collectionRoutes = new Elysia({ prefix: "/collections" })
   .post(
     "/",
     async ({ body: input }) => {
-      const process = getService<CreateCollectionsProcess>(CREATE_COLLECTIONS_PROCESS);
+      const process = getService<CreateCollectionProcess>(CREATE_COLLECTION_PROCESS);
       return process.runOperations({ input });
     },
     {
       body: CreateCollectionSchema,
       response: {
-        200: CreateCollectionsResponseSchema,
+        200: CreateCollectionResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -118,7 +99,7 @@ export const collectionRoutes = new Elysia({ prefix: "/collections" })
   .put(
     "/:id",
     async ({ params, body }) => {
-      const process = getService<UpdateCollectionsProcess>(UPDATE_COLLECTIONS_PROCESS);
+      const process = getService<UpdateCollectionProcess>(UPDATE_COLLECTION_PROCESS);
       return process.runOperations({
         input: { ...body, id: params.id },
       });
@@ -131,7 +112,7 @@ export const collectionRoutes = new Elysia({ prefix: "/collections" })
         metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
       }),
       response: {
-        200: UpdateCollectionsResponseSchema,
+        200: UpdateCollectionResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -165,11 +146,11 @@ export const collectionRoutes = new Elysia({ prefix: "/collections" })
       },
     }
   )
-  .post(
+  .put(
     "/:id/products",
     async ({ params, body, set }) => {
-      const process = getService<BatchLinkProductsToCollectionProcess>(
-        BATCH_LINK_PRODUCTS_TO_COLLECTION_PROCESS
+      const process = getService<UpdateCollectionProductsProcess>(
+        UPDATE_COLLECTION_PRODUCTS_PROCESS
       );
       await process.runOperations({
         input: { ...body, collection_id: params.id },
@@ -179,43 +160,17 @@ export const collectionRoutes = new Elysia({ prefix: "/collections" })
     },
     {
       params: Type.Object({ id: Type.String() }),
-      body: BatchLinkBodySchema,
+      body: UpdateCollectionProductsBodySchema,
       response: {
         204: NoContentResponseSchema,
+        404: NotFoundResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {
         tags: ["Collections"],
-        summary: "Link products to collection",
-        description: "Links multiple products to a collection in a batch operation",
-      },
-    }
-  )
-  .delete(
-    "/:id/products",
-    async ({ params, body, set }) => {
-      const process = getService<BatchRemoveProductsFromCollectionProcess>(
-        BATCH_REMOVE_PRODUCTS_FROM_COLLECTION_PROCESS
-      );
-      await process.runOperations({
-        input: { ...body, collection_id: params.id },
-      });
-      set.status = 204;
-      return undefined;
-    },
-    {
-      params: Type.Object({ id: Type.String() }),
-      body: BatchRemoveBodySchema,
-      response: {
-        204: NoContentResponseSchema,
-        400: ValidationErrorResponseSchema,
-        500: InternalErrorResponseSchema,
-      },
-      detail: {
-        tags: ["Collections"],
-        summary: "Remove products from collection",
-        description: "Removes the association between products and the collection",
+        summary: "Update collection products",
+        description: "Adds and removes products from a collection",
       },
     }
   );

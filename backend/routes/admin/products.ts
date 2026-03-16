@@ -12,7 +12,7 @@ import {
   PaginatedProductsProcess,
   PaginatedProductsResponseSchema,
   CreateProductSchema,
-  
+
   CreateProductResponseSchema,
   RETRIEVE_PRODUCT_PROCESS,
   RetrieveProductProcess,
@@ -118,9 +118,10 @@ export const productRoutes = new Elysia({ prefix: "/products" })
     "/:id",
     async ({ params, body }) => {
       const process = getService<UpdateProductProcess>(UPDATE_PRODUCT_PROCESS);
-      return process.runOperations({
-        input: { ...body , id: params.id },
+      await process.runOperations({
+        input: { ...body, id: params.id },
       });
+      return undefined;
     },
     {
       params: Type.Object({ id: Type.String() }),

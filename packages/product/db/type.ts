@@ -1,5 +1,6 @@
 import type { Generated, Selectable, Insertable, Updateable } from "kysely";
 import type { ProductSalesChannelTable, SalesChannelTable } from "@danimai/sales-channel/db";
+import type { PriceSetTable, PriceTable } from "@danimai/pricing";
 
 export enum ProductStatusEnum {
   DRAFT = "draft",
@@ -22,6 +23,7 @@ export interface Database {
 
   product_options: ProductOptionTable;
   product_option_values: ProductOptionValueTable;
+  product_variant_option_relations: ProductVariantOptionRelationTable;
 
   product_variants: ProductVariantTable;
   product_variant_image_relations: ProductVariantImageRelationTable;
@@ -31,6 +33,9 @@ export interface Database {
 
   sales_channels: SalesChannelTable;
   product_sales_channels: ProductSalesChannelTable;
+
+  price_sets: PriceSetTable;
+  prices: PriceTable;
 }
 
 // table products
@@ -251,8 +256,11 @@ export type ProductTagRelationUpdate = Updateable<ProductTagRelationTable>;
 
 // table product_variant_option_relations
 export interface ProductVariantOptionRelationTable {
+  id: Generated<string>;
   variant_id: string;
   option_value_id: string;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
 }
 export type ProductVariantOptionRelation =
   Selectable<ProductVariantOptionRelationTable>;

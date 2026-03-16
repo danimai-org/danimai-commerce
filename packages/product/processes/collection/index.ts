@@ -1,8 +1,7 @@
-export * from "./batch-link-products-to-collection";
-export * from "./batch-remove-products-from-collection";
-export * from "./create-collections";
+
+export * from "./update-collection-products";
+export * from "./create-collection";
 export * from "./delete-collections";
-export * from "./paginated-products-by-collection";
-export * from "./update-collections";
+export * from "./update-collection";
 export * from "./paginated-collections";
 export * from "./retrieve-collection";

@@ -12,10 +12,10 @@ export type UpdateCollectionProcessInput = Static<
   typeof UpdateCollectionSchema
 >;
 
-export const UpdateCollectionsResponseSchema = Type.Union([
+export const UpdateCollectionResponseSchema = Type.Union([
   ProductCollectionResponseSchema,
   Type.Undefined(),
 ]);
-export type UpdateCollectionsProcessOutput = Static<
-  typeof UpdateCollectionsResponseSchema
+export type UpdateCollectionProcessOutput = Static<
+  typeof UpdateCollectionResponseSchema
 >;

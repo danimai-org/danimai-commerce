@@ -39,8 +39,6 @@ import {
   type StockLocationWithAddress,
 } from "@danimai/stock-location";
 import {
-  LIST_PRODUCT_VARIANTS_BY_SKU_PROCESS,
-  ListProductVariantsBySkuProcess,
 } from "@danimai/product";
 import { handleProcessError } from "../../utils/error-handler";
 import {
@@ -104,14 +102,6 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
       let product_summaries: Record<string, { id: string; title: string | null; thumbnail: string | null }> = {};
       if (result.item.sku) {
         try {
-          const listVariants = getService<ListProductVariantsBySkuProcess>(
-            LIST_PRODUCT_VARIANTS_BY_SKU_PROCESS
-          );
-          const variantResult = await listVariants.runOperations({
-            input: { sku: result.item.sku },
-          });
-          associated_variants = variantResult.variants;
-          product_summaries = variantResult.product_summaries;
         } catch {
           // leave empty on error
         }
