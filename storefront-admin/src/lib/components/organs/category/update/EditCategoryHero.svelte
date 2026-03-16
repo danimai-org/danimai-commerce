@@ -4,25 +4,22 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { cn } from '$lib/utils.js';
-	import { client } from '$lib/client';
-	import { superForm, defaults } from 'sveltekit-superforms';
-	import { zod4 } from 'sveltekit-superforms/adapters';
-	import { z } from 'zod';
+	import { superForm } from 'sveltekit-superforms/client';
 	import { Toaster, toast } from 'svelte-sonner';
-	const CategoryUpdateSchema = z.object({
-		id: z.string(),
-		title: z.string().min(3, 'Title must be at least 3 characters').max(50, 'Title is too long'),
-		handle: z.string().min(3, 'Handle must be at least 3 characters').max(50, 'Handle is too long'),
-		description: z.string().min(3, 'Description must be at least 3 characters').max(200, 'Description is too long'),
-		visibility: z.enum(['public', 'private']),
-		status: z.enum(['active', 'inactive']),
-	});
-
-	type CategoryFormData = z.infer<typeof CategoryUpdateSchema>;
+	
 	type Mode = 'update' ;
 
 	interface Props {
-		category?: CategoryFormData | null;
+		category?: {
+			id: string;
+			title?: string;
+			value?: string;
+			handle?: string;
+			description?: string;
+			visibility?: 'public' | 'private';
+			status?: 'active' | 'inactive';
+			metadata?: { handle?: string; description?: string } | null;
+		} | null;
 		mode?: Mode;
 		onSaved?: () => void | Promise<void>;
 		onClosed?: () => void | Promise<void>;
@@ -34,30 +31,14 @@
 	let lastCategoryId = $state<string | null>(null);
 
 	const { form, errors, enhance, delayed, message, reset } = superForm(
-		defaults({ id: '', title: '', handle: '', description: '', visibility: 'public', status: 'active' }, zod4(CategoryUpdateSchema)),
+		{ id: '', title: '', handle: '', description: '', visibility: 'public', status: 'active' },
 		{
-			SPA: true,
-			validators: zod4(CategoryUpdateSchema),
-			async onUpdate({ form }) {
-				if (!form.valid) return;
-				try {
-					const id = form.data.id;
-					await client['product-categories']({ id }).put({
-						value: form.data.title.trim(),
-						metadata: {
-							description: form.data.description.trim(),
-							handle: form.data.handle.trim()
-						},
-						visibility: form.data.visibility as any,
-						status: form.data.status as any,
-					});
+			resetForm: true,
+			onResult: async ({ result }) => {
+				if (result.status === 200) {
 					toast.success('Category updated successfully');
-					open = false;
 					await onSaved();
-				} catch (e: any) {
-					const errorMessage = e?.message || 'Failed to update category';
-					message.set(errorMessage);
-					toast.error(errorMessage);
+					open = false;
 				}
 			}
 		}
@@ -124,6 +105,7 @@
 <Sheet.Root bind:open={open} onOpenChange={onOpenChange}>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
 		<form action="?/update" method="POST" use:enhance class="flex h-full flex-col">
+			<input type="hidden" name="id" bind:value={$form.id} />
 			<div class="flex-1 overflow-auto p-6 pt-12">
 				<h2 class="text-lg font-semibold">Edit Category</h2>
 				<p class="mt-1 text-sm text-muted-foreground">Update the category title.</p>

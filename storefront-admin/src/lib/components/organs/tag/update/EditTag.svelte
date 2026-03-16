@@ -12,19 +12,18 @@
 		open = $bindable(false),
 		mode = 'update',
 		tag = null,
-		onSuccess = () => {},
+		onSaved = async () => {},
 		onClosed = () => {}
 	}: {
 		open?: boolean;
 		mode?: Mode;
 		tag?: { id: string; value: string } | null;
-		onSuccess?: () => void | Promise<void>;
+		onSaved?: () => void | Promise<void>;
 		onClosed?: () => void;
 	} = $props();
 
 	const { form, errors, enhance, message, delayed, reset } = superForm(
 		{
-			id: '',
 			value: ''
 		},
 		{
@@ -32,7 +31,7 @@
 			onResult: async ({ result }) => {
 				if (result.status === 200) {
 					toast.success('Tag updated successfully');
-					await onSuccess();
+					await onSaved();
 					open = false;
 				}
 			}
@@ -54,7 +53,6 @@
 		message.set('');
 		reset({
 			data: {
-				id: '',
 				value: ''
 			}
 		});
@@ -64,7 +62,6 @@
 		if (tag) {
 			reset({
 				data: {
-					id: tag.id,
 					value: tag.value
 				}
 			});
@@ -82,8 +79,7 @@
 
 <Sheet.Root bind:open={open} onOpenChange={onOpenChange}>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-		<form action="?/update" method="POST" use:enhance class="flex h-full flex-col">
-			<input type="hidden" name="id" bind:value={$form.id} />
+		<form method="POST" action="?/update" use:enhance class="flex h-full flex-col">
 			<div class="flex-1 overflow-auto p-6 pt-12">
 				<h2 class="text-lg font-semibold">Edit Tag</h2>
 				<p class="mt-1 text-sm text-muted-foreground">Update the tag value.</p>

@@ -149,8 +149,6 @@
 
 <AttributeFormSheet
 	bind:open={paginateState.formSheetOpen}
-	mode={paginateState.formMode as 'create' | undefined}
-	attribute={(paginateState.formItem as any) ?? null}
 	onSuccess={handleFormSaved}
 />
 <EditAttribute

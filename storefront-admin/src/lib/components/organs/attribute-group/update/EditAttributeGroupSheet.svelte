@@ -3,20 +3,8 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { cn } from '$lib/utils.js';
-	import { client } from '$lib/client';
-	import { superForm, defaults } from 'sveltekit-superforms';
-	import { zod4 } from 'sveltekit-superforms/adapters';
-	import { z } from 'zod';
-
-	const AttributeGroupUpdateSchema = z.object({
-		id: z.string(),
-		title: z.string().min(3, 'Title must be at least 3 characters').max(50, 'Title is too long'),
-		attribute_ids: z.array(z.string()).default([]),
-		required: z.boolean().default(false),
-		rank: z.number().default(0)
-	});
-
-	type AttributeGroupFormData = z.infer<typeof AttributeGroupUpdateSchema>;
+	import { superForm } from 'sveltekit-superforms/client';
+	import { Toaster, toast } from 'svelte-sonner';
 	type AttributeGroupItem = { id: string; title: string; attribute_ids: string[]; required: boolean; rank: number };
 	type Mode = 'update' ;
 
@@ -33,27 +21,14 @@
 	let lastGroupId = $state<string | null>(null);
 
 	const { form, errors, enhance, delayed, message, reset } = superForm(
-		defaults({ id: '', title: '', attribute_ids: [], required: false, rank: 0 }, zod4(AttributeGroupUpdateSchema)),
+		{ id: '', title: '', attribute_ids: [], required: false, rank: 0 },
 		{
-			SPA: true,
-			validators: zod4(AttributeGroupUpdateSchema),
-			async onUpdate({ form }) {
-				if (!form.valid) return;
-				try {
-					const id = form.data.id;
-					await client['product-attribute-groups']({ id }).put({
-						id,
-						title: form.data.title.trim(),
-						metadata: {
-							required: form.data.required,
-							rank: form.data.rank
-						} as Record<string, any>,
-						attributes: form.data.attribute_ids.map((attribute_id) => ({ attribute_id }))
-					});
-					open = false;
+			resetForm: true,
+			onResult: async ({ result }) => {
+				if (result.status === 200) {
+					toast.success('Attribute group updated successfully');
 					await onSaved();
-				} catch (e: any) {
-					message.set(e?.message || 'Failed to update attribute group');
+					open = false;
 				}
 			}
 		}
@@ -67,9 +42,9 @@
 			data: {
 				id: group?.id ?? '',
 				title: group?.title ?? '',
-				attribute_ids: group?.attribute_ids ?? [] as unknown as string[],
-				required: group?.required ?? false as boolean,
-				rank: group?.rank ?? 0 as number
+				// attribute_ids: (group?.attribute_ids ?? []) as string[],
+				required: (group?.required ?? false) as boolean,
+				rank: (group?.rank ?? 0) as number
 			}
 		});
 		message.set('');
@@ -90,11 +65,26 @@
 		open = false;
 		message.set('');
 	}
+
+	function onOpenChange(isOpen: boolean) {
+		if (!isOpen) {
+			onClosed();
+			message.set('');
+		}
+	}
 </script>
 
-<Sheet.Root bind:open={open}>
+<Toaster richColors position="top-center" />
+
+<Sheet.Root bind:open={open} onOpenChange={onOpenChange}>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-		<form method="POST" use:enhance class="flex h-full flex-col">
+		<form method="POST" action="?/update" use:enhance class="flex h-full flex-col">
+			<input type="hidden" name="id" bind:value={$form.id} />
+			<input type="hidden" name="required" value={$form.required ? 'true' : 'false'} />
+			<input type="hidden" name="rank" value={String($form.rank)} />
+			{#each $form.attribute_ids as attributeId}
+				<input type="hidden" name="attribute_ids" value={attributeId} />
+			{/each}
 			<div class="flex-1 overflow-auto p-6 pt-12">
 				<h2 class="text-lg font-semibold">Edit Attribute Group</h2>
 				<p class="mt-1 text-sm text-muted-foreground">Update the attribute group title.</p>
@@ -123,7 +113,7 @@
 				</div>
 			</div>
 			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeSheet}>Cancel</Button>
+				<Button variant="outline" type="button" onclick={closeSheet}>Cancel</Button>
 				<Button type="submit" disabled={$delayed}>
 					{$delayed ? 'Saving...' : 'Save'}
 				</Button>

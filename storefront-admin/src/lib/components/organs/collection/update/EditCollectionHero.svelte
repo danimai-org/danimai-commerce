@@ -5,22 +5,17 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { cn } from '$lib/utils.js';
-	import { client } from '$lib/client';
-	import { superForm, defaults } from 'sveltekit-superforms';
-	import { zod4 } from 'sveltekit-superforms/adapters';
-	import { z } from 'zod';
+	import { superForm } from 'sveltekit-superforms/client';
 	import { Toaster, toast } from 'svelte-sonner';
-		const CollectionUpdateSchema = z.object({
-		id: z.string(),
-		title: z.string().min(3, 'Title must be at least 3 characters').max(50, 'Title is too long'),
-		handle: z.string().min(3, 'Handle must be at least 3 characters').max(50, 'Handle is too long'),
-		
-	});
-
-	type CollectionFormData = z.infer<typeof CollectionUpdateSchema>;
 
 	interface Props {
-		collection?: CollectionFormData | null;
+		collection?: {
+			id: string;
+			title?: string;
+			value?: string;
+			handle?: string;
+			metadata?: { handle?: string } | null;
+		} | null;
 		onSaved?: () => void | Promise<void>;
 		onClosed?: () => void | Promise<void>;
 	}
@@ -31,25 +26,14 @@
 	let lastCollectionId = $state<string | null>(null);
 
 	const { form, errors, enhance, delayed, message, reset } = superForm(
-		defaults({ id: '', title: '', handle: '' }, zod4(CollectionUpdateSchema)),
+		{ id: '', title: '', handle: '' },
 		{
-			SPA: true,
-			validators: zod4(CollectionUpdateSchema),
-			async onUpdate({ form }) {
-				if (!form.valid) return;
-				try {
-					const id = form.data.id;
-					await client['collections']({ id }).put({
-						title: form.data.title.trim(),
-						handle: form.data.handle.trim(),
-					});
+			resetForm: true,
+			onResult: async ({ result }) => {
+				if (result.status === 200) {
 					toast.success('Collection updated successfully');
-					open = false;
 					await onSaved();
-				} catch (e: any) {
-					const errorMessage = e?.message || 'Failed to update collection';
-					message.set(errorMessage);
-					toast.error(errorMessage);
+					open = false;
 				}
 			}
 		}
@@ -113,6 +97,7 @@
 <Sheet.Root bind:open={open} onOpenChange={onOpenChange}>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
 		<form method="POST" action="?/update" use:enhance class="flex h-full flex-col">
+			<input type="hidden" name="id" bind:value={$form.id} />
 			<div class="flex-1 overflow-auto p-6 pt-12">
 				<h2 class="text-lg font-semibold">Edit Collection</h2>
 				<p class="mt-1 text-sm text-muted-foreground">Update the collection title.</p>

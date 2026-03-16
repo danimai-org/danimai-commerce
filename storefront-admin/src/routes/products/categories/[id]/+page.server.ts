@@ -8,7 +8,7 @@ import { client } from '$lib/client';
 
 const CategoryUpdateSchema = z.object({
     id: z.string(),
-    name: z.string().min(3, "Name must be at least 3 characters").max(50, "Name is too long"),
+    title: z.string().min(3, "Title must be at least 3 characters").max(50, "Title is too long"),
     handle: z.string().min(3, "Handle must be at least 3 characters").max(50, "Handle is too long"),
     description: z.string().min(3, "Description must be at least 3 characters").max(200, "Description is too long"),
     visibility: z.enum(['public', 'private']),
@@ -31,7 +31,7 @@ export const actions = {
         if (!categoryUpdateForm.valid) {
             return fail(400, { categoryUpdateForm });
         }
-        const category = await client['product-categories']({ id: categoryUpdateForm.data.id }).put({ value: categoryUpdateForm.data.name });
+        const category = await client['product-categories']({ id: categoryUpdateForm.data.id }).put({ value: categoryUpdateForm.data.title });
         if (!category) {
             return fail(400, { error: 'Failed to update category' });
         }   
