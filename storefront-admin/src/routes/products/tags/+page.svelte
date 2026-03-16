@@ -77,7 +77,7 @@
 			key: 'actions',
 			type: 'actions',
 			actions: [
-				{ label: 'Edit', key: 'edit', type: 'button', onClick: (item) => openEdit(item as Parameters<typeof openEdit>[0]) },
+				{ label: 'Edit', key: 'edit', type: 'button', onClick: (item) => goto(`/products/tags/${(item as any).id}`) },
 				{ label: 'Delete', key: 'delete', type: 'button', onClick: (item) => openDeleteConfirm(item as Parameters<typeof openDeleteConfirm>[0]) }
 			]
 		}

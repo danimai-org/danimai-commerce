@@ -76,7 +76,7 @@ async function deleteCollections(ids: string[]): Promise<void> {
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => openEdit(item as Parameters<typeof openEdit>[0])
+					onClick: (item) => goto(`/products/collections/${(item as any).id}`)
 				},
 				{
 					label: 'Delete',

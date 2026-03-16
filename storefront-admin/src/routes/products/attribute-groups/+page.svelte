@@ -58,7 +58,7 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => openEdit(item as any)
+					onClick: (item) => goto(`/products/attribute-groups/${(item as any).id}`)
 				},
 				{
 					label: 'Delete',
@@ -127,7 +127,7 @@
 
 <CreateAttributeGroupSheet
 	bind:open={createOpen}
-	on:created={() => paginateState.refetch()}
+	onSuccess={() => paginateState.refetch()}
 />
 
 <EditAttributeGroupSheet

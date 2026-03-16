@@ -82,7 +82,7 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => (paginateState.openEdit as unknown as (item: any) => void)(item as any)
+					onClick: (item) => goto(`/products/categories/${(item as any).id}`)
 				},
 				{
 					label: 'Delete',

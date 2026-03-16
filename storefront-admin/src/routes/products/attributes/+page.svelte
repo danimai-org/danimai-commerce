@@ -20,9 +20,6 @@
 	function openCreate() {
 		paginateState.openCreate();
 	}
-	function openEdit(attr: any) {
-		(paginateState.openEdit as unknown as (item: any) => void)(attr);
-	}
 
 	const tableColumns: TableColumn[] = [
 	{
@@ -42,7 +39,7 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (row) => openEdit(row as any | null)
+					onClick: (item) => goto(`/products/attributes/${(item as any).id}`)
 				},
 				{
 					label: 'Delete',
