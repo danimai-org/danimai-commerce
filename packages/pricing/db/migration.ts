@@ -5,6 +5,7 @@ export async function up(db: Kysely<any>) {
   await db.schema
     .createTable("price_sets")
     .addColumn("id", "uuid", (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
+    .addColumn("variant_id", "uuid")
     .addColumn("metadata", "jsonb")
     .addColumn("created_at", "timestamptz", (col) =>
       col.notNull().defaultTo(sql`now()`)

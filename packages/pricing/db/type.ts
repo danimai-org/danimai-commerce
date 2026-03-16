@@ -12,6 +12,7 @@ export interface Database {
 // table price_sets
 export interface PriceSetTable {
   id: Generated<string>;
+  variant_id: string;
   metadata: unknown | null;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;

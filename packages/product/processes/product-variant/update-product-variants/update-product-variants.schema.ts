@@ -1,5 +1,4 @@
 import { Type, type Static } from "@sinclair/typebox";
-import { ListProductVariantsBySkuResponseSchema } from "../list-product-variants-by-sku/list-product-variants-by-sku.schema";
 
 const ProductVariantPriceSchema = Type.Object({
   amount: Type.Number(),
@@ -30,7 +29,6 @@ export type UpdateProductVariantProcessInput = Static<
 >;
 
 export const UpdateProductVariantsResponseSchema = Type.Union([
-  ListProductVariantsBySkuResponseSchema,
   Type.Undefined(),
 ]);
 export type UpdateProductVariantsProcessOutput = Static<

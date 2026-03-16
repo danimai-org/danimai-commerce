@@ -1,23 +1,27 @@
 import {
   InjectDB,
   InjectLogger,
+  InternalServerError,
   Process,
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
+  slugify,
   ValidationError,
 } from "@danimai/core";
-import { Kysely } from "kysely";
+import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type CreateProductProcessInput, type CreateProductProcessOutput, CreateProductSchema } from "./create-product.schema";
-import type { Database, Product } from "../../../db/type";
+import { type CreateProductProcessInput, type CreateProductProcessOutput, CreateProductSchema, ProductVariantPriceSchema } from "./create-product.schema";
+import type { Database, Product, ProductCategory, ProductOption } from "../../../db/type";
 import { randomUUID } from "crypto";
+import type { Price, PriceSet } from "@danimai/pricing";
+import type { Static } from "@sinclair/typebox";
 
 export const CREATE_PRODUCT_PROCESS = Symbol("CreateProduct");
 
 @Process(CREATE_PRODUCT_PROCESS)
 export class CreateProductProcess
-  implements ProcessContract<typeof CreateProductSchema,  CreateProductProcessOutput> {
+  implements ProcessContract<typeof CreateProductSchema, CreateProductProcessOutput> {
 
   constructor(
     @InjectDB()
@@ -31,32 +35,67 @@ export class CreateProductProcess
   }) context: ProcessContextType<typeof CreateProductSchema>) {
     const { input } = context;
 
-    return this.db.transaction().execute(async (trx) => {
+    const product = await this.db.transaction().execute(async (trx) => {
 
       // ── Validate category ──────────────────────────────────────────────
       // Ensure the referenced category exists before attaching it to the product
-      let category: { id: string } | null = null;
+
       if (input.category_id) {
-        const foundCategory = await trx
-          .selectFrom("product_categories")
+        const category = await trx.selectFrom("product_categories")
           .where("id", "=", input.category_id)
           .where("deleted_at", "is", null)
           .selectAll()
           .executeTakeFirst();
 
-        if (!foundCategory) {
+        if (!category) {
           throw new ValidationError("Category not found", [{
             type: "not_found",
             message: "Category not found",
             path: "category_id",
           }]);
         }
-        category = foundCategory;
       }
 
-      // ── Generate handle ────────────────────────────────────────────────
-      // Use the explicit handle (must be unique) or derive one from the title with a dedup suffix
+      if (input.attribute_group_id) {
+        const attributeGroup = await trx.selectFrom("product_attribute_groups")
+          .where("id", "=", input.attribute_group_id)
+          .where("deleted_at", "is", null)
+          .selectAll()
+          .executeTakeFirst();
+
+        if (!attributeGroup) {
+          throw new ValidationError("Attribute group not found", [{
+            type: "not_found",
+            message: "Attribute group not found",
+            path: "attribute_group_id",
+          }]);
+        }
+
+
+        if (input.attributes && input.attributes.length > 0) {
+          const attributes = await trx.selectFrom("product_attributes")
+            .innerJoin("product_attribute_group_relations",
+              (join) => join.onRef("product_attribute_group_relations.product_attribute_id", "=", "product_attributes.id")
+                .on("product_attribute_group_relations.attribute_group_id", "=", attributeGroup.id)
+            )
+            .where("product_attribute_group_relations.product_attribute_id", "in", input.attributes.map((a) => a.attribute_id))
+            .where("deleted_at", "is", null)
+            .selectAll()
+            .execute();
+
+          if (attributes.length !== input.attributes.length) {
+            throw new ValidationError("One or more attributes not found", [{
+              type: "not_found",
+              message: "One or more attributes not found",
+              path: "attributes",
+            }]);
+          }
+        }
+      }
+
+
       let handle: string;
+
       if (input.handle) {
         const existing = await trx
           .selectFrom("products")
@@ -74,10 +113,7 @@ export class CreateProductProcess
         }
         handle = input.handle;
       } else {
-        const baseHandle = input.title
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-+|-+$/g, "");
+        const baseHandle = slugify(input.title);
 
         handle = baseHandle;
         let counter = 1;
@@ -97,7 +133,6 @@ export class CreateProductProcess
       }
 
       // ── Insert the product record ──────────────────────────────────────
-      this.logger.info("Creating product", { input });
 
       const product = await trx
         .insertInto("products")
@@ -105,139 +140,61 @@ export class CreateProductProcess
           id: randomUUID(),
           title: input.title,
           handle,
-          subtitle: input.subtitle ?? null,
-          description: input.description ?? null,
-          is_giftcard: input.is_giftcard ?? false,
-          discountable: input.discountable ?? true,
-          status: input.status ?? "draft",
-          thumbnail: input.thumbnail ?? null,
-          external_id: input.external_id ?? null,
-          category_id: category?.id ?? null,
-          attribute_group_id: input.attribute_group_id ?? null,
-          metadata: input.metadata ?? null,
+          description: input.description,
+          is_giftcard: input.is_giftcard,
+          discountable: input.discountable,
+          status: input.status,
+          thumbnail: input.thumbnail,
+          external_id: input.external_id,
+          category_id: input.category_id,
+          attribute_group_id: input.attribute_group_id,
+          metadata: input.metadata,
         })
         .returningAll()
         .executeTakeFirst();
 
       if (!product) {
-        return product;
+        throw new InternalServerError("Failed to create product");
       }
 
       // ── Create product options & option values ─────────────────────────
       // Options are global: reuse existing option by title (case-insensitive).
       // Option values are scoped to (option + product).
       // Returns a map of option_title -> { option_id, values: { value -> option_value_id } }
-      const optionMap = new Map<string, { option_id: string; values: Map<string, string> }>();
-      const inputOptions = input.options || [];
 
-      if (inputOptions.length > 0) {
-        const allOptions = await trx
+      if (input.options && input.options.length > 0) {
+        let options: ProductOption[] = [];
+        const existingOptions = await trx
           .selectFrom("product_options")
+          .where(sql`lower(title)`, "in", input.options.map((o) => sql`lower(${o.title})`))
           .where("deleted_at", "is", null)
           .selectAll()
           .execute();
-
-        const existingByLowerTitle = new Map<string, { id: string; title: string }>();
-        for (const opt of allOptions) {
-          const key = opt.title.toLowerCase();
-          if (!existingByLowerTitle.has(key)) {
-            existingByLowerTitle.set(key, { id: opt.id, title: opt.title });
-          }
-        }
-
-        const optionsToCreate: Array<{ id: string; title: string }> = [];
-
-        for (const optionInput of inputOptions) {
-          const key = optionInput.title.toLowerCase();
-          const existingOption = existingByLowerTitle.get(key);
-          if (existingOption) {
-            optionMap.set(optionInput.title, {
-              option_id: existingOption.id,
-              values: new Map<string, string>(),
-            });
-          } else {
-            const newOptionId = randomUUID();
-            optionsToCreate.push({ id: newOptionId, title: optionInput.title });
-            existingByLowerTitle.set(key, { id: newOptionId, title: optionInput.title });
-            optionMap.set(optionInput.title, {
-              option_id: newOptionId,
-              values: new Map<string, string>(),
-            });
-          }
-        }
-
+        const optionsToCreate = input.options.filter((o) => !existingOptions.some((eo) => eo.title === o.title));
         if (optionsToCreate.length > 0) {
-          await trx
+          options = await trx
             .insertInto("product_options")
-            .values(
-              optionsToCreate.map((opt) => ({
-                id: opt.id,
-                title: opt.title,
-                metadata: null,
-              }))
-            )
+            .values(optionsToCreate.map((o) => ({ id: randomUUID(), title: o.title, metadata: null })))
+            .returningAll()
             .execute();
         }
+        options = [...existingOptions, ...options];
 
-        // Resolve or create option values for each option
-        const optionIdsForProduct = [...optionMap.values()].map((o) => o.option_id);
-        if (optionIdsForProduct.length > 0) {
-          const existingOptionValues = await trx
-            .selectFrom("product_option_values")
-            .where("option_id", "in", optionIdsForProduct)
-            .where("product_id", "=", product.id)
-            .where("deleted_at", "is", null)
-            .selectAll()
+        if (input.options && input.options.length > 0) {
+          await trx
+            .insertInto("product_option_values")
+            .values(input.options.map((o, rank) => ({
+              id: randomUUID(),
+              value: o.title,
+              option_id: options.find((option) => option.title === o.title)?.id ?? "",
+              product_id: product.id,
+              rank: rank,
+            })).filter((o) => o.option_id !== ""))
             .execute();
-
-          const existingValuesMap = new Map<string, Map<string, typeof existingOptionValues[0]>>();
-          for (const ov of existingOptionValues) {
-            const oid = ov.option_id ?? "";
-            if (!existingValuesMap.has(oid)) existingValuesMap.set(oid, new Map());
-            existingValuesMap.get(oid)!.set(ov.value, ov);
-          }
-
-          const optionValuesToCreate: Array<{ id: string; value: string; option_id: string }> = [];
-
-          for (const optionInput of inputOptions) {
-            const optionData = optionMap.get(optionInput.title);
-            if (!optionData) continue;
-            const optionValuesMap = existingValuesMap.get(optionData.option_id) ?? new Map();
-            const valueMap = new Map<string, string>();
-
-            for (const valueStr of optionInput.values) {
-              const existingValue = optionValuesMap.get(valueStr);
-              if (existingValue) {
-                valueMap.set(valueStr, existingValue.id);
-              } else {
-                const newValueId = randomUUID();
-                optionValuesToCreate.push({
-                  id: newValueId,
-                  value: valueStr,
-                  option_id: optionData.option_id,
-                });
-                valueMap.set(valueStr, newValueId);
-              }
-            }
-            optionData.values = valueMap;
-          }
-
-          if (optionValuesToCreate.length > 0) {
-            await trx
-              .insertInto("product_option_values")
-              .values(
-                optionValuesToCreate.map((ov) => ({
-                  id: ov.id,
-                  value: ov.value,
-                  option_id: ov.option_id,
-                  product_id: product.id,
-                  metadata: null,
-                }))
-              )
-              .execute();
-          }
         }
       }
+
+
 
       // ── Create product variants with option relations and prices ───────
       if (input.variants && input.variants.length > 0) {
@@ -245,15 +202,15 @@ export class CreateProductProcess
           id: randomUUID(),
           title: variantInput.title,
           product_id: product.id,
-          sku: variantInput.sku ?? null,
-          barcode: variantInput.barcode ?? null,
-          ean: variantInput.ean ?? null,
-          upc: variantInput.upc ?? null,
+          sku: variantInput.sku,
+          barcode: variantInput.barcode,
+          ean: variantInput.ean,
+          upc: variantInput.upc,
           allow_backorder: variantInput.allow_backorder ?? false,
           manage_inventory: variantInput.manage_inventory ?? true,
-          variant_rank: variantInput.variant_rank ?? null,
-          thumbnail: variantInput.thumbnail ?? null,
-          metadata: variantInput.metadata ?? null,
+          variant_rank: variantInput.variant_rank,
+          thumbnail: variantInput.thumbnail,
+          metadata: variantInput.metadata,
         }));
 
         const createdVariants = await trx
@@ -266,96 +223,37 @@ export class CreateProductProcess
         for (const variant of createdVariants) {
           variantMap.set(variant.title, variant);
         }
+        const priceSets = await trx
+          .insertInto("price_sets")
+          .values(createdVariants.map((v) => ({ id: randomUUID(), variant_id: v.id, metadata: null })))
+          .returningAll()
+          .execute();
 
-        // Collect all variant-option relations and prices for bulk processing
-        const variantOptionRelations: Array<{ variant_id: string; option_value_id: string }> = [];
-        const variantPricesMap = new Map<string, Array<{
-          amount: number;
-          currency_code: string;
-          min_quantity?: number;
-          max_quantity?: number;
-          price_list_id?: string;
-        }>>();
+        const priceSetsMap = new Map<string, PriceSet>(priceSets.map((ps) => [ps.variant_id, ps]));
 
-        for (const variantInput of input.variants) {
-          const variant = variantMap.get(variantInput.title);
-          if (!variant) {
-            this.logger.warn("Failed to create variant", { variantInput });
-            continue;
-          }
-
-          if (variantInput.options) {
-            for (const [optionTitle, optionValue] of Object.entries(variantInput.options)) {
-              const optionData = optionMap.get(optionTitle);
-              if (!optionData) {
-                throw new ValidationError(`Option not found: ${optionTitle}`, [{
-                  type: "not_found",
-                  message: `Option "${optionTitle}" was not defined in product options`,
-                  path: `variants.options.${optionTitle}`,
-                }]);
-              }
-
-              const optionValueId = optionData.values.get(optionValue);
-              if (!optionValueId) {
-                throw new ValidationError(`Option value not found: ${optionValue}`, [{
-                  type: "not_found",
-                  message: `Option value "${optionValue}" was not defined for option "${optionTitle}"`,
-                  path: `variants.options.${optionTitle}`,
-                }]);
-              }
-
-              variantOptionRelations.push({
-                variant_id: variant.id,
-                option_value_id: optionValueId,
-              });
-            }
-          }
-
-          if (variantInput.prices && variantInput.prices.length > 0) {
-            variantPricesMap.set(variant.id, variantInput.prices);
-          }
-        }
-
-        if (variantOptionRelations.length > 0) {
-          await trx
-            .insertInto("product_variant_option_relations")
-            .values(variantOptionRelations)
-            .onConflict((oc) => oc.doNothing())
-            .execute();
-        }
-
-        // Create a price_set per variant, then bulk-insert its prices
-        const pricingDb = trx as any;
-        for (const [variantId, prices] of variantPricesMap.entries()) {
-          if (prices.length === 0) continue;
-
-          const priceSet = await pricingDb
-            .insertInto("price_sets")
-            .values({
+        const inputPriceMap = new Map<string, Static<typeof ProductVariantPriceSchema>[]>(input.variants.map((v) => [
+          createdVariants.find((cv) => cv.title === v.title)?.id ?? "",
+          v.prices ?? []
+        ]));
+        const pricesToCreate = createdVariants
+          .flatMap((variant) => inputPriceMap
+            .get(variant.id)?.map((price) => ({
               id: randomUUID(),
-              metadata: { variant_id: variantId },
-            })
-            .returningAll()
-            .executeTakeFirst();
+              price_set_id: priceSetsMap.get(variant.id)?.id ?? "",
+              amount: price.amount.toString(),
+              currency_code: price.currency_code,
+              min_quantity: price.min_quantity ?? null,
+              max_quantity: price.max_quantity ?? null,
+              price_list_id: price.price_list_id ?? null,
+              metadata: null,
+            })) ?? [])
+          .filter(price => Boolean(price));
 
-          if (!priceSet) {
-            throw new Error("Failed to create price_set");
-          }
-
-          await pricingDb
+        if (pricesToCreate.length > 0) {
+          await trx
             .insertInto("prices")
-            .values(
-              prices.map((priceInput) => ({
-                id: randomUUID(),
-                price_set_id: priceSet.id,
-                amount: priceInput.amount.toString(),
-                currency_code: priceInput.currency_code,
-                min_quantity: priceInput.min_quantity ?? null,
-                max_quantity: priceInput.max_quantity ?? null,
-                price_list_id: priceInput.price_list_id ?? null,
-                metadata: null,
-              }))
-            )
+            .values(pricesToCreate)
+            .returningAll()
             .execute();
         }
       }
@@ -408,113 +306,24 @@ export class CreateProductProcess
           .onConflict((oc) => oc.doNothing())
           .execute();
       }
-
-      // ── Link product to attribute groups ───────────────────────────────
-      // Use the explicit list or derive from the attributes' group ids
-      const groupsToLink = input.attribute_groups && input.attribute_groups.length > 0
-        ? input.attribute_groups
-        : (input.attributes && input.attributes.length > 0
-          ? [...new Set(input.attributes.map((a) => a.attribute_group_id))].map((attribute_group_id) => ({ attribute_group_id, required: false, rank: 0 }))
-          : []);
-
-      if (groupsToLink.length > 0) {
-        const groupIds = [...new Set(groupsToLink.map((g) => g.attribute_group_id))];
-        const existingGroups = await trx
-          .selectFrom("product_attribute_groups")
-          .where("id", "in", groupIds)
-          .where("deleted_at", "is", null)
-          .select("id")
-          .execute();
-        const foundGroupIds = new Set(existingGroups.map((r) => r.id));
-        const missingGroups = groupIds.filter((id) => !foundGroupIds.has(id));
-        if (missingGroups.length > 0) {
-          throw new ValidationError("Product attribute group not found", [{
-            type: "not_found",
-            message: `Product attribute groups not found: ${missingGroups.join(", ")}`,
-            path: "attribute_groups",
-          }]);
-        }
-
-        await trx
-          .insertInto("product_attribute_group_relations")
-          .values(
-            groupsToLink.map((g, i) => ({
-              id: randomUUID(),
-              product_id: product.id,
-              attribute_group_id: g.attribute_group_id,
-              required: g.required ?? false,
-              rank: g.rank ?? i,
-            }))
-          )
-          .execute();
-      }
-
-      // ── Link product attribute values (group-scoped) ───────────────────
       if (input.attributes && input.attributes.length > 0) {
-        const linkedGroupIds = new Set(groupsToLink.map((g) => g.attribute_group_id));
-
-        // Every attribute must belong to a group that was just linked
-        for (const a of input.attributes) {
-          if (!linkedGroupIds.has(a.attribute_group_id)) {
-            throw new ValidationError("Product must be linked to attribute group before setting attribute values", [{
-              type: "invalid",
-              message: `Attribute group ${a.attribute_group_id} not in product's attribute_groups`,
-              path: "attributes",
-            }]);
-          }
-        }
-
-        // Verify each (group, attribute) pair is registered in the group's attribute list
-        const existingInGroup = await trx
-          .selectFrom("product_attribute_group_attributes")
-          .select(["attribute_group_id", "attribute_id"])
-          .execute();
-        const validPairSet = new Set(existingInGroup.map((r) => `${r.attribute_group_id}:${r.attribute_id}`));
-        for (const a of input.attributes) {
-          if (!validPairSet.has(`${a.attribute_group_id}:${a.attribute_id}`)) {
-            throw new ValidationError("Attribute not assigned to group", [{
-              type: "invalid",
-              message: `Attribute ${a.attribute_id} is not assigned to group ${a.attribute_group_id}`,
-              path: "attributes",
-            }]);
-          }
-        }
-
-        // Verify the attribute records themselves exist
-        const existingAttrs = await trx
-          .selectFrom("product_attributes")
-          .where("id", "in", [...new Set(input.attributes.map((a) => a.attribute_id))])
-          .where("deleted_at", "is", null)
-          .select("id")
-          .execute();
-        const attrIds = new Set(existingAttrs.map((r) => r.id));
-        for (const a of input.attributes) {
-          if (!attrIds.has(a.attribute_id)) {
-            throw new ValidationError("Product attribute not found", [{
-              type: "not_found",
-              message: `Product attribute not found: ${a.attribute_id}`,
-              path: "attributes",
-            }]);
-          }
-        }
-
         await trx
           .insertInto("product_attribute_values")
-          .values(
-            input.attributes.map((a) => ({
-              id: randomUUID(),
-              attribute_group_id: a.attribute_group_id,
-              attribute_id: a.attribute_id,
-              product_id: product.id,
-              value: typeof a.value === "string" ? a.value : JSON.stringify(a.value),
-              metadata: null,
-              deleted_at: null,
-            }))
-          )
+          .values(input.attributes.map((attribute) => ({
+            id: randomUUID(),
+            value: attribute.value,
+            attribute_group_id: attribute.attribute_group_id,
+            attribute_id: attribute.attribute_id,
+            product_id: product.id,
+            metadata: null,
+          })))
+          .onConflict((oc) => oc.doNothing())
           .execute();
       }
 
       return product;
     });
+
+    return undefined;
   }
 }
