@@ -24,23 +24,22 @@ export const load: PageServerLoad = async () => {
 
 export const actions = {
 	create: async ({ request }) => {
-		const attributeGroupCreateForm = await superValidate(request, zod4(AttributeGroupCreateSchema));
+		const form = await superValidate(request, zod4(AttributeGroupCreateSchema));
 
-		if (!attributeGroupCreateForm.valid) {
-			return fail(400, { attributeGroupCreateForm });
+		if (!form.valid) {
+			return fail(400, { form });
 		}
 		const attributeGroup = await client['product-attribute-groups'].post({
-			title: attributeGroupCreateForm.data.title.trim(),
-			attributes: attributeGroupCreateForm.data.attribute_ids.map((attribute_id) => ({ attribute_id })),
+			title: form.data.title.trim(),
+			attributes: form.data.attribute_ids.map((attribute_id) => ({ attribute_id })),
 			metadata: {
-				required: attributeGroupCreateForm.data.required,
-				rank: attributeGroupCreateForm.data.rank,
+				rank: form.data.rank,
 			}
 		});	
 		if (!attributeGroup || attributeGroup.error) {
-			return fail(400, { error: 'Failed to create attribute group' });
+			return fail(400, { form, error: 'Failed to create attribute group' });
 		}
-		return message(attributeGroupCreateForm, 'Attribute group created successfully');
+		return message(form, 'Attribute group created successfully');
 	},
 
 	

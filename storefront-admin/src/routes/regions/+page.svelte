@@ -15,7 +15,8 @@
 	import Globe from '@lucide/svelte/icons/globe';
 	import { client } from '$lib/client.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
-	import { deleteRegions } from '$lib/regions/api.js';
+
+	let { data }: { data: any } = $props();
 
 	type Region = {
 		id: string;
@@ -24,8 +25,6 @@
 		created_at: string;
 		updated_at: string;
 	};
-
-	const API_BASE = 'http://localhost:8000/admin';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
@@ -52,8 +51,6 @@
 		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
 	);
 
-	const openCreate = $derived(paginateState.openCreate);
-	const openEdit = $derived(paginateState.openEdit);
 	const closeForm = $derived(paginateState.closeForm);
 	const deleteConfirmOpen = $derived(paginateState.deleteConfirmOpen);
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
@@ -90,18 +87,11 @@
 		}
 	];
 
-	// Create sheet (local state; sync open with paginateState via handlers)
+	// Create sheet
 	let createOpen = $state(false);
-	let createName = $state('');
-	let createCurrencyCode = $state('');
-	let createError = $state<string | null>(null);
-	let createSubmitting = $state(false);
 
 	function handleOpenCreate() {
 		createOpen = true;
-		createName = '';
-		createCurrencyCode = '';
-		createError = null;
 	}
 
 	function closeCreate() {
@@ -109,57 +99,13 @@
 		closeForm();
 	}
 
-	async function submitCreate() {
-		createError = null;
-		if (!createName.trim()) {
-			createError = 'Name is required';
-			return;
-		}
-		if (!createCurrencyCode.trim()) {
-			createError = 'Currency code is required';
-			return;
-		}
-		createSubmitting = true;
-		try {
-			const res = await fetch(`${API_BASE}/regions`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					regions: [
-						{
-							name: createName.trim(),
-							currency_code: createCurrencyCode.trim().toUpperCase()
-						}
-					]
-				})
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			closeCreate();
-			refetch();
-		} catch (e) {
-			createError = e instanceof Error ? e.message : String(e);
-		} finally {
-			createSubmitting = false;
-		}
-	}
-
 	// Edit sheet
 	let editOpen = $state(false);
 	let editRegion = $state<Region | null>(null);
-	let editName = $state('');
-	let editCurrencyCode = $state('');
-	let editError = $state<string | null>(null);
-	let editSubmitting = $state(false);
 
 	function handleOpenEdit(region: Region) {
 		editRegion = region;
 		editOpen = true;
-		editName = region.name;
-		editCurrencyCode = region.currency_code;
-		editError = null;
 	}
 
 	function closeEdit() {
@@ -168,38 +114,22 @@
 		closeForm();
 	}
 
-	async function submitEdit() {
-		if (!editRegion) return;
-		editError = null;
-		if (!editName.trim()) {
-			editError = 'Name is required';
-			return;
+	function handleCreateSuccess() {
+		closeCreate();
+		refetch();
+	}
+
+	function handleEditSuccess() {
+		closeEdit();
+		refetch();
+	}
+
+	async function deleteRegions(ids: string[]) {
+		const res = await client['regions'].delete({ region_ids: ids });
+		if (res?.error) {
+			throw new Error(String(res.error.value?.message ?? 'Failed to delete region'));
 		}
-		if (!editCurrencyCode.trim()) {
-			editError = 'Currency code is required';
-			return;
-		}
-		editSubmitting = true;
-		try {
-			const res = await fetch(`${API_BASE}/regions/${editRegion.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					name: editName.trim(),
-					currency_code: editCurrencyCode.trim().toUpperCase()
-				})
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			closeEdit();
-			refetch();
-		} catch (e) {
-			editError = e instanceof Error ? e.message : String(e);
-		} finally {
-			editSubmitting = false;
-		}
+		refetch();
 	}
 </script>
 
@@ -248,22 +178,15 @@
 
 <CreateRegion
 	bind:open={createOpen}
-	bind:createName={createName}
-	bind:createCurrencyCode={createCurrencyCode}
-	createError={createError}
-	createSubmitting={createSubmitting}
-	closeCreate={closeCreate}
-	submitCreate={submitCreate}
+	formData={data.regionCreateForm}
+	onSuccess={handleCreateSuccess}
 />
 
 <EditRegion
 	bind:open={editOpen}
-	bind:editName={editName}
-	bind:editCurrencyCode={editCurrencyCode}
-	editError={editError}
-	editSubmitting={editSubmitting}
-	closeEdit={closeEdit}
-	submitEdit={submitEdit}
+	region={editRegion}
+	formData={data.regionUpdateForm}
+	onSuccess={handleEditSuccess}
 />
 
 <DeleteConfirmationModal

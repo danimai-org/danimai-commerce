@@ -22,6 +22,8 @@ import { inventoryRoutes } from "./inventory";
 import { orderRoutes } from "./orders";
 import { stockLocationRoutes } from "./stock-locations";
 import { uploadRoutes } from "./upload";
+import { promotionRoutes } from "./promotions";
+import { campaignRoutes } from "./campaigns";
 
 export const routes = new Elysia()
     .group('/admin', (app) => {
@@ -48,4 +50,6 @@ export const routes = new Elysia()
             .use(inventoryRoutes)
             .use(orderRoutes)
             .use(stockLocationRoutes)
+            .use(promotionRoutes)
+            .use(campaignRoutes)
     });

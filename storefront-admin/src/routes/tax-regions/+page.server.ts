@@ -45,12 +45,8 @@ export const actions = {
 		}
 
 		const taxRegion = await client['tax-regions'].post({
-			tax_regions: [
-				{
-					name: taxRegionCreateForm.data.name.trim(),
-					tax_provider_id: taxRegionCreateForm.data.tax_provider_id.trim() || null
-				}
-			]
+			name: taxRegionCreateForm.data.name.trim(),
+			tax_provider_id: taxRegionCreateForm.data.tax_provider_id.trim() || null
 		});
 
 		if (!taxRegion || taxRegion.error) {

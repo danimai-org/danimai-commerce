@@ -16,7 +16,7 @@ const product = $derived(getProductDetail()?.data?? null);
 			size="icon"
 			class="size-8 shrink-0"
 			onclick={() => {
-				console.log('clicked');
+				
 				orgSheetOpen = true;
 			}}
 			aria-label="Edit organisation"

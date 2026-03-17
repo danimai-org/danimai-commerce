@@ -4,7 +4,14 @@
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import Info from '@lucide/svelte/icons/info';
 	import { cn } from '$lib/utils.js';
-	import type { Promotion } from './types.js';
+
+	type Promotion = {
+		id: string;
+		code: string;
+		method: 'Manual' | 'Automatic';
+		status: 'Draft' | 'Active' | 'Inactive';
+		campaign_id?: string | null;
+	};
 
 	let {
 		open = $bindable(false),
