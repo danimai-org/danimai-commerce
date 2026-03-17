@@ -35,17 +35,6 @@ export async function up(db: Kysely<any>) {
     .addColumn("deleted_at", "timestamptz")
   );
 
-  // Product Collection Relations
-  await createTableIfNotExists(db, () =>
-    db.schema
-      .createTable("product_collection_relations")
-    .addColumn("product_id", "uuid", (col) => col.notNull().references("products.id"))
-    .addColumn("product_collection_id", "uuid", (col) => col.notNull().references("product_collections.id"))
-    .addColumn("created_at", "timestamptz", (col) => col.notNull().defaultTo(sql`now()`)
-    )
-    .addColumn("updated_at", "timestamptz", (col) => col.notNull().defaultTo(sql`now()`)
-    )
-  );
   // Product Categories
   await createTableIfNotExists(db, () =>
     db.schema
@@ -92,7 +81,6 @@ export async function up(db: Kysely<any>) {
     .addColumn("id", "uuid", (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
     .addColumn("title", "text", (col) => col.notNull())
     .addColumn("handle", "text", (col) => col.notNull().unique())
-    .addColumn("subtitle", "text")
     .addColumn("description", "text")
     .addColumn("is_giftcard", "boolean", (col) => col.notNull().defaultTo(false))
     .addColumn("status", "text", (col) => col.notNull())
@@ -166,7 +154,7 @@ export async function up(db: Kysely<any>) {
     .addColumn("variant_rank", "integer")
     .addColumn("thumbnail", "text")
     .addColumn("product_id", "uuid", (col) =>
-      col.references("products.id")
+      col.notNull().references("products.id")
     )
     .addColumn("created_at", "timestamptz", (col) =>
       col.notNull().defaultTo(sql`now()`)
@@ -223,47 +211,21 @@ export async function up(db: Kysely<any>) {
     db.schema
       .createTable("product_attribute_group_relations")
       .addColumn("id", "uuid", (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
-      .addColumn("product_id", "uuid", (col) =>
-        col.notNull().references("products.id").onDelete("cascade")
-      )
-      .addColumn("attribute_group_id", "uuid", (col) =>
-        col.notNull().references("product_attribute_groups.id").onDelete("cascade")
-      )
-      .addColumn("required", "boolean", (col) => col.notNull().defaultTo(false))
-      .addColumn("rank", "integer", (col) => col.notNull().defaultTo(0))
-      .addColumn("created_at", "timestamptz", (col) =>
-        col.notNull().defaultTo(sql`now()`)
-      )
-      .addColumn("updated_at", "timestamptz", (col) =>
-        col.notNull().defaultTo(sql`now()`)
-      )
-  );
-
-  // Product Attribute Group Attributes (which attributes are assigned to a group)
-  await createTableIfNotExists(db, () =>
-    db.schema
-      .createTable("product_attribute_group_attributes")
-      .addColumn("id", "uuid", (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
-      .addColumn("attribute_group_id", "uuid", (col) =>
-        col.notNull().references("product_attribute_groups.id").onDelete("cascade")
-      )
-      .addColumn("attribute_id", "uuid", (col) =>
+      .addColumn("product_attribute_id", "uuid", (col) =>
         col.notNull().references("product_attributes.id").onDelete("cascade")
       )
-      .addColumn("rank", "integer", (col) => col.notNull().defaultTo(0))
+      .addColumn("attribute_group_id", "uuid", (col) =>
+        col.notNull().references("product_attribute_groups.id").onDelete("cascade")
+      )
       .addColumn("required", "boolean", (col) => col.notNull().defaultTo(false))
+      .addColumn("rank", "integer", (col) => col.notNull().defaultTo(0))
       .addColumn("created_at", "timestamptz", (col) =>
         col.notNull().defaultTo(sql`now()`)
       )
       .addColumn("updated_at", "timestamptz", (col) =>
         col.notNull().defaultTo(sql`now()`)
       )
-      .addUniqueConstraint("product_attribute_group_attributes_group_attribute_unique", [
-        "attribute_group_id",
-        "attribute_id",
-      ])
   );
-  
 
   // Product Options (global; no product_id)
   await createTableIfNotExists(db, () =>
@@ -288,11 +250,12 @@ export async function up(db: Kysely<any>) {
     .addColumn("id", "uuid", (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
     .addColumn("value", "text", (col) => col.notNull())
     .addColumn("metadata", "jsonb")
+    .addColumn("rank", "integer", (col) => col.notNull().defaultTo(0))
     .addColumn("option_id", "uuid", (col) =>
-      col.references("product_options.id").onDelete("cascade")
+      col.notNull().references("product_options.id").onDelete("cascade")
     )
     .addColumn("product_id", "uuid", (col) =>
-      col.references("products.id").onDelete("cascade")
+      col.notNull().references("products.id").onDelete("cascade")
     )
     .addColumn("created_at", "timestamptz", (col) =>
       col.notNull().defaultTo(sql`now()`)
@@ -326,9 +289,6 @@ export async function up(db: Kysely<any>) {
     .addColumn("product_collection_id", "uuid", (col) =>
       col.notNull().references("product_collections.id").onDelete("cascade")
     )
-    .addColumn("created_at", "timestamptz", (col) =>
-      col.notNull().defaultTo(sql`now()`)
-    )
     .addPrimaryKeyConstraint("product_collection_relations_pk", [
       "product_id",
       "product_collection_id",
@@ -339,13 +299,20 @@ export async function up(db: Kysely<any>) {
   await createTableIfNotExists(db, () =>
     db.schema
       .createTable("product_variant_option_relations")
+    .addColumn("id", "uuid", (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
     .addColumn("variant_id", "uuid", (col) =>
       col.notNull().references("product_variants.id").onDelete("cascade")
     )
     .addColumn("option_value_id", "uuid", (col) =>
       col.notNull().references("product_option_values.id").onDelete("cascade")
     )
-    .addPrimaryKeyConstraint("product_variant_option_relations_pk", [
+    .addColumn("created_at", "timestamptz", (col) =>
+      col.notNull().defaultTo(sql`now()`)
+    )
+    .addColumn("updated_at", "timestamptz", (col) =>
+      col.notNull().defaultTo(sql`now()`)
+    )
+    .addUniqueConstraint("product_variant_option_relations_variant_option_unique", [
       "variant_id",
       "option_value_id",
     ])
@@ -373,14 +340,54 @@ export async function up(db: Kysely<any>) {
     ALTER TABLE product_option_values
     ADD COLUMN IF NOT EXISTS product_id uuid REFERENCES products(id) ON DELETE CASCADE
   `.execute(db);
+  await sql`ALTER TABLE product_option_values ADD COLUMN IF NOT EXISTS rank integer NOT NULL DEFAULT 0`.execute(db);
+  await sql`ALTER TABLE product_option_values ALTER COLUMN option_id SET NOT NULL`.execute(db).catch(() => {});
+  await sql`ALTER TABLE product_option_values ALTER COLUMN product_id SET NOT NULL`.execute(db).catch(() => {});
 
   // Attribute groups and product_attribute_values: add attribute_group_id, make product_id nullable
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS attribute_group_id uuid REFERENCES product_attribute_groups(id) ON DELETE SET NULL`.execute(db);
+  await sql`ALTER TABLE products DROP COLUMN IF EXISTS subtitle`.execute(db);
   await sql`
     ALTER TABLE product_attribute_values
     ADD COLUMN IF NOT EXISTS attribute_group_id uuid REFERENCES product_attribute_groups(id) ON DELETE CASCADE
   `.execute(db);
   await sql`ALTER TABLE product_attribute_values ALTER COLUMN product_id DROP NOT NULL`.execute(db).catch(() => {});
+  await sql`ALTER TABLE product_variants ALTER COLUMN product_id SET NOT NULL`.execute(db).catch(() => {});
+  await sql`ALTER TABLE product_attribute_group_relations ADD COLUMN IF NOT EXISTS product_attribute_id uuid REFERENCES product_attributes(id) ON DELETE CASCADE`.execute(db);
+  await sql`ALTER TABLE product_attribute_group_relations DROP COLUMN IF EXISTS product_id`.execute(db);
+  await sql`ALTER TABLE product_variant_option_relations ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid()`.execute(db);
+  await sql`ALTER TABLE product_variant_option_relations ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()`.execute(db);
+  await sql`ALTER TABLE product_variant_option_relations ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`.execute(db);
+  await sql`ALTER TABLE product_variant_option_relations DROP CONSTRAINT IF EXISTS product_variant_option_relations_pk`.execute(db);
+  await sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'product_variant_option_relations_pkey'
+      ) THEN
+        ALTER TABLE product_variant_option_relations
+        ADD CONSTRAINT product_variant_option_relations_pkey PRIMARY KEY (id);
+      END IF;
+    END
+    $$;
+  `.execute(db);
+  await sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'product_variant_option_relations_variant_option_unique'
+      ) THEN
+        ALTER TABLE product_variant_option_relations
+        ADD CONSTRAINT product_variant_option_relations_variant_option_unique UNIQUE (variant_id, option_value_id);
+      END IF;
+    END
+    $$;
+  `.execute(db);
+  await sql`DROP TABLE IF EXISTS product_attribute_group_attributes CASCADE`.execute(db);
   await sql`ALTER TABLE product_images ADD COLUMN IF NOT EXISTS variant_id uuid REFERENCES product_variants(id) ON DELETE SET NULL`.execute(db);
 
   // Remove variant attribute values (replaced by group-based product attributes only)
@@ -404,7 +411,6 @@ export async function down(db: Kysely<any>) {
     "product_options",
     "product_attribute_values",
     "product_attribute_group_relations",
-    "product_attribute_group_attributes",
     "product_variants",
     "product_attributes",
     "product_attribute_groups",

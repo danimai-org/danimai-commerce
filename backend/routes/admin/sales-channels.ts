@@ -2,25 +2,28 @@ import { Elysia } from "elysia";
 import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
-  CREATE_SALES_CHANNELS_PROCESS,
-  UPDATE_SALES_CHANNELS_PROCESS,
+  CREATE_SALES_CHANNEL_PROCESS,
+  UPDATE_SALES_CHANNEL_PROCESS,
   DELETE_SALES_CHANNELS_PROCESS,
   PAGINATED_SALES_CHANNELS_PROCESS,
-  SYNC_PRODUCT_SALES_CHANNELS_PROCESS,
-  GET_PRODUCT_SALES_CHANNELS_PROCESS,
-  CreateSalesChannelsProcess,
-  UpdateSalesChannelsProcess,
+  UPDATE_SALES_CHANNEL_PRODUCTS_PROCESS,
+  RETRIEVE_SALES_CHANNEL_PROCESS,
+  CreateSalesChannelProcess,
+  UpdateSalesChannelProcess,
   DeleteSalesChannelsProcess,
   PaginatedSalesChannelsProcess,
-  SyncProductSalesChannelsProcess,
-  GetProductSalesChannelsProcess,
+  UpdateSalesChannelProductsProcess,
+  RetrieveSalesChannelProcess,
   PaginatedSalesChannelsSchema,
   PaginatedSalesChannelsResponseSchema,
-  CreateSalesChannelsSchema,
-  CreateSalesChannelsResponseSchema,
-  UpdateSalesChannelsResponseSchema,
+  CreateSalesChannelSchema,
+  CreateSalesChannelResponseSchema,
+  UpdateSalesChannelSchema,
+  UpdateSalesChannelResponseSchema,
   DeleteSalesChannelsSchema,
-  GetProductSalesChannelsResponseSchema,
+  UpdateSalesChannelProductsSchema,
+  RetrieveSalesChannelSchema,
+  RetrieveSalesChannelResponseSchema,
 } from "@danimai/sales-channel";
 import { handleProcessError } from "../../utils/error-handler";
 import {
@@ -29,14 +32,7 @@ import {
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
-const UpdateSalesChannelBodySchema = Type.Object({
-  name: Type.Optional(Type.String()),
-  description: Type.Optional(Type.String()),
-});
-
-const SyncProductSalesChannelsBodySchema = Type.Object({
-  sales_channel_ids: Type.Array(Type.String()),
-});
+const UpdateSalesChannelBodySchema = Type.Omit(UpdateSalesChannelSchema, ["id"]);
 
 export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
   .onError(({ error, set }) => handleProcessError(error, set))
@@ -46,7 +42,9 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
       const process = getService<PaginatedSalesChannelsProcess>(
         PAGINATED_SALES_CHANNELS_PROCESS
       );
-      return process.runOperations({ input: query as StaticDecode<typeof PaginatedSalesChannelsSchema> & { page?: number; limit?: number } });
+      return process.runOperations({
+        input: query as StaticDecode<typeof PaginatedSalesChannelsSchema>,
+      });
     },
     {
       query: PaginatedSalesChannelsSchema,
@@ -64,14 +62,14 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
   )
   .post(
     "/",
-    async ({ body }: { body: StaticDecode<typeof CreateSalesChannelsSchema> }) => {
-      const process = getService<CreateSalesChannelsProcess>(CREATE_SALES_CHANNELS_PROCESS);
+    async ({ body }: { body: StaticDecode<typeof CreateSalesChannelSchema> }) => {
+      const process = getService<CreateSalesChannelProcess>(CREATE_SALES_CHANNEL_PROCESS);
       return process.runOperations({ input: body });
     },
     {
-      body: CreateSalesChannelsSchema,
+      body: CreateSalesChannelSchema,
       response: {
-        200: CreateSalesChannelsResponseSchema,
+        200: CreateSalesChannelResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -82,10 +80,32 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
       },
     }
   )
+  .get(
+    "/:id",
+    async ({ params }) => {
+      const process = getService<RetrieveSalesChannelProcess>(
+        RETRIEVE_SALES_CHANNEL_PROCESS
+      );
+      return process.runOperations({ input: { id: params.id } });
+    },
+    {
+      params: Type.Object({ id: RetrieveSalesChannelSchema.properties.id }),
+      response: {
+        200: RetrieveSalesChannelResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Sales Channels"],
+        summary: "Retrieve a sales channel",
+        description: "Gets a sales channel by ID",
+      },
+    }
+  )
   .put(
     "/:id",
     async ({ params, body }) => {
-      const process = getService<UpdateSalesChannelsProcess>(UPDATE_SALES_CHANNELS_PROCESS);
+      const process = getService<UpdateSalesChannelProcess>(UPDATE_SALES_CHANNEL_PROCESS);
       return process.runOperations({
         input: {
           ...body,
@@ -94,10 +114,10 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
       });
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      params: Type.Object({ id: UpdateSalesChannelSchema.properties.id }),
       body: UpdateSalesChannelBodySchema,
       response: {
-        200: UpdateSalesChannelsResponseSchema,
+        200: UpdateSalesChannelResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -131,23 +151,17 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
     }
   )
   .put(
-    "/products/:productId/sales-channels",
-    async ({ params, body, set }) => {
-      const process = getService<SyncProductSalesChannelsProcess>(
-        SYNC_PRODUCT_SALES_CHANNELS_PROCESS
+    "/products",
+    async ({ body, set }) => {
+      const process = getService<UpdateSalesChannelProductsProcess>(
+        UPDATE_SALES_CHANNEL_PRODUCTS_PROCESS
       );
-      await process.runOperations({
-        input: {
-          ...body,
-          product_id: params.productId,
-        }
-      });
+      await process.runOperations({ input: body });
       set.status = 204;
       return undefined;
     },
     {
-      params: Type.Object({ productId: Type.String() }),
-      body: SyncProductSalesChannelsBodySchema,
+      body: UpdateSalesChannelProductsSchema,
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -155,31 +169,8 @@ export const salesChannelRoutes = new Elysia({ prefix: "/sales-channels" })
       },
       detail: {
         tags: ["Sales Channels"],
-        summary: "Sync product sales channels",
-        description: "Updates the sales channels for a product",
-      },
-    }
-  )
-  .get(
-    "/products/:productId/sales-channels",
-    async ({ params }) => {
-      const process = getService<GetProductSalesChannelsProcess>(
-        GET_PRODUCT_SALES_CHANNELS_PROCESS
-      );
-      const input = { product_id: params.productId };
-      return process.runOperations({ input });
-    },
-    {
-      params: Type.Object({ productId: Type.String() }),
-      response: {
-        200: GetProductSalesChannelsResponseSchema,
-        400: ValidationErrorResponseSchema,
-        500: InternalErrorResponseSchema,
-      },
-      detail: {
-        tags: ["Sales Channels"],
-        summary: "Get product sales channels",
-        description: "Gets all sales channels for a product",
+        summary: "Update sales channel products",
+        description: "Updates product links for sales channels",
       },
     }
   );

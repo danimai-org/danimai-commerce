@@ -1,23 +1,21 @@
 import { Type, type Static } from "@sinclair/typebox";
 import {
-  createFilterableColumnsSchema,
+  createPaginationSchema,
   createPaginatedResponseSchema,
-  PaginationSchema,
 } from "@danimai/core";
-import type { SalesChannel } from "@danimai/sales-channel/db";
-import { SalesChannelResponseSchema } from "../update-sales-channels/update-sales-channels.schema";
+import { SalesChannelResponseSchema } from "../retrieve-sales-channel/retrieve-sales-channel.schema";
 
-export const PaginatedSalesChannelsSchema = Type.Object({
-  ...PaginationSchema.properties,
-  filters: Type.Optional(
-    createFilterableColumnsSchema<
-      keyof Pick<SalesChannel, "name" | "is_default">
-    >({
-      name: true,
-      is_default: true,
-    })
-  ),
-});
+export const PaginatedSalesChannelsSchema = createPaginationSchema(
+  Type.Object({
+    is_default: Type.Optional(Type.Boolean()),
+  }),
+  [
+    "sales_channels.created_at",
+    "sales_channels.updated_at",
+    "sales_channels.name",
+    "sales_channels.is_default",
+  ]
+);
 
 export type PaginatedSalesChannelsProcessInput = Static<
   typeof PaginatedSalesChannelsSchema

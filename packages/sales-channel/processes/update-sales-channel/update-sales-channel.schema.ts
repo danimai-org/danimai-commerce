@@ -1,4 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
+import { SalesChannelResponseSchema } from "../retrieve-sales-channel";
 
 export const UpdateSalesChannelSchema = Type.Object({
   id: Type.String(),
@@ -15,21 +16,10 @@ export const UpdateSalesChannelSchema = Type.Object({
 
 export type UpdateSalesChannelProcessInput = Static<typeof UpdateSalesChannelSchema>;
 
-export const SalesChannelResponseSchema = Type.Object({
-  id: Type.String(),
-  name: Type.String(),
-  description: Type.Union([Type.String(), Type.Null()]),
-  is_default: Type.Boolean(),
-  metadata: Type.Union([Type.Unknown(), Type.Null()]),
-  created_at: Type.Date(),
-  updated_at: Type.Date(),
-  deleted_at: Type.Union([Type.Date(), Type.Null()]),
-});
-
-export const UpdateSalesChannelsResponseSchema = Type.Union([
+export const UpdateSalesChannelResponseSchema = Type.Union([
   SalesChannelResponseSchema,
   Type.Undefined(),
 ]);
-export type UpdateSalesChannelsProcessOutput = Static<
-  typeof UpdateSalesChannelsResponseSchema
+export type UpdateSalesChannelProcessOutput = Static<
+  typeof UpdateSalesChannelResponseSchema
 >;

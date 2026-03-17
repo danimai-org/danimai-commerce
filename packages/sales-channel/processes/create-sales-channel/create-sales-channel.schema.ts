@@ -1,5 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
-import { SalesChannelResponseSchema } from "../update-sales-channels/update-sales-channels.schema";
+import { SalesChannelResponseSchema } from "../retrieve-sales-channel/retrieve-sales-channel.schema";
 
 const Metadata = Type.Optional(
   Type.Record(
@@ -15,14 +15,10 @@ export const CreateSalesChannelSchema = Type.Object({
   metadata: Metadata,
 });
 
-export const CreateSalesChannelsSchema = Type.Object({
-  sales_channels: Type.Array(CreateSalesChannelSchema),
-});
 
 export type CreateSalesChannelProcessInput = Static<typeof CreateSalesChannelSchema>;
-export type CreateSalesChannelsProcessInput = Static<typeof CreateSalesChannelsSchema>;
 
-export const CreateSalesChannelsResponseSchema = Type.Array(SalesChannelResponseSchema);
-export type CreateSalesChannelsProcessOutput = Static<
-  typeof CreateSalesChannelsResponseSchema
+export const CreateSalesChannelResponseSchema = Type.Union([SalesChannelResponseSchema, Type.Undefined()]);
+export type CreateSalesChannelProcessOutput = Static<
+  typeof CreateSalesChannelResponseSchema
 >;

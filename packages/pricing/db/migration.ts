@@ -120,10 +120,10 @@ export async function up(db: Kysely<any>) {
 }
 
 export async function down(db: Kysely<any>) {
-  await db.schema.dropTable("price_preferences").execute();
-  await db.schema.dropTable("prices").execute();
-  await db.schema.dropTable("price_list_rules").execute();
-  await db.schema.dropTable("price_rules").execute();
-  await db.schema.dropTable("price_lists").execute();
-  await db.schema.dropTable("price_sets").execute();
+  await db.schema.dropTable("price_preferences").ifExists().execute();
+  await db.schema.dropTable("price_rules").ifExists().execute();
+  await db.schema.dropTable("prices").ifExists().execute();
+  await db.schema.dropTable("price_list_rules").ifExists().execute();
+  await db.schema.dropTable("price_lists").ifExists().execute();
+  await db.schema.dropTable("price_sets").ifExists().execute();
 }
