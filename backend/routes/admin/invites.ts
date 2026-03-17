@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   ACCEPT_INVITE_PROCESS,
@@ -16,6 +16,7 @@ import {
   CreateInviteResponseSchema,
   AcceptInviteSchema,
   AcceptInviteResponseSchema,
+  ResendInviteSchema,
   ResendInviteResponseSchema,
 } from "@danimai/user";
 import { handleProcessError } from "../../utils/error-handler";
@@ -41,9 +42,11 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedInvitesProcess>(PAGINATED_INVITES_PROCESS);
-      const result = await process.runOperations({ input });
+      const result = await process.runOperations({
+        input: query as StaticDecode<typeof PaginatedInvitesSchema>,
+      });
       if (!result) {
         throw new Error("Failed to list invites");
       }
@@ -68,9 +71,9 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
   )
   .post(
     "/",
-    async ({ body: input }) => {
+    async ({ body }: { body: StaticDecode<typeof CreateInviteSchema> }) => {
       const process = getService<CreateInviteProcess>(CREATE_INVITE_PROCESS);
-      const result = await process.runOperations({ input });
+      const result = await process.runOperations({ input: body });
       if (result === undefined) throw new Error("Failed to create invite");
       return result;
     },
@@ -90,9 +93,9 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
   )
   .post(
     "/accept",
-    async ({ body: input }) => {
+    async ({ body }: { body: StaticDecode<typeof AcceptInviteSchema> }) => {
       const process = getService<AcceptInviteProcess>(ACCEPT_INVITE_PROCESS);
-      const result = await process.runOperations({ input });
+      const result = await process.runOperations({ input: body });
       if (!result) return result as any;
       const { password_hash: _p, ...user } = result;
       return user as any;
@@ -122,7 +125,7 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
       return invite as any;
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      params: Type.Object({ id: ResendInviteSchema.properties.id }),
       response: {
         200: ResendInviteResponseSchema,
         400: ValidationErrorResponseSchema,

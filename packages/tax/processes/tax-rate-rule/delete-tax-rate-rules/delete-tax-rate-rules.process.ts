@@ -11,6 +11,7 @@ import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type DeleteTaxRateRulesProcessInput,
+  type DeleteTaxRateRulesProcessOutput,
   DeleteTaxRateRulesSchema,
 } from "./delete-tax-rate-rules.schema";
 import type { Database } from "@danimai/tax/db";
@@ -18,7 +19,11 @@ import type { Database } from "@danimai/tax/db";
 export const DELETE_TAX_RATE_RULES_PROCESS = Symbol("DeleteTaxRateRules");
 
 @Process(DELETE_TAX_RATE_RULES_PROCESS)
-export class DeleteTaxRateRulesProcess implements ProcessContract<void> {
+export class DeleteTaxRateRulesProcess
+  implements ProcessContract<
+    typeof DeleteTaxRateRulesSchema,
+    DeleteTaxRateRulesProcessOutput
+  > {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -29,7 +34,7 @@ export class DeleteTaxRateRulesProcess implements ProcessContract<void> {
   async runOperations(
     @ProcessContext({ schema: DeleteTaxRateRulesSchema })
     context: ProcessContextType<typeof DeleteTaxRateRulesSchema>
-  ): Promise<void> {
+  ) {
     const { input } = context;
     await this.validateTaxRateRules(input);
     await this.deleteTaxRateRules(input);
@@ -65,7 +70,7 @@ export class DeleteTaxRateRulesProcess implements ProcessContract<void> {
     });
     await this.db
       .updateTable("tax_rate_rules")
-      .set({ deleted_at: new Date().toISOString() })
+      .set({ deleted_at: new Date() })
       .where("id", "in", input.tax_rate_rule_ids)
       .where("deleted_at", "is", null)
       .execute();

@@ -34,7 +34,8 @@ export interface LoginResult {
 export const LOGIN_PROCESS = Symbol("Login");
 
 @Process(LOGIN_PROCESS)
-export class LoginProcess implements ProcessContract<LoginResult> {
+export class LoginProcess
+  implements ProcessContract<typeof LoginSchema, LoginResult> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,

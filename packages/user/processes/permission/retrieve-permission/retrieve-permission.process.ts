@@ -9,14 +9,20 @@ import {
 } from "@danimai/core";
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type RetrievePermissionProcessInput, RetrievePermissionSchema } from "./retrieve-permission.schema";
-import type { Database, Permission } from "../../../db/type";
+import {
+  type RetrievePermissionProcessOutput,
+  RetrievePermissionSchema,
+} from "./retrieve-permission.schema";
+import type { Database } from "../../../db/type";
 
 export const RETRIEVE_PERMISSION_PROCESS = Symbol("RetrievePermission");
 
 @Process(RETRIEVE_PERMISSION_PROCESS)
 export class RetrievePermissionProcess
-  implements ProcessContract<Permission | undefined> {
+  implements ProcessContract<
+    typeof RetrievePermissionSchema,
+    RetrievePermissionProcessOutput
+  > {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,

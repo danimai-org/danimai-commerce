@@ -18,9 +18,9 @@ export const MeResponseSchema = Type.Object(
     last_name: Type.Union([Type.String(), Type.Null()]),
     avatar_url: Type.Union([Type.String(), Type.Null()]),
     metadata: Type.Union([Type.Unknown(), Type.Null()]),
-    created_at: Type.String(),
-    updated_at: Type.String(),
-    deleted_at: Type.Union([Type.String(), Type.Null()]),
+    created_at: Type.Date(),
+    updated_at: Type.Date(),
+    deleted_at: Type.Union([Type.Date(), Type.Null()]),
     role_id: Type.Union([Type.String(), Type.Null()]),
   },
   {
@@ -40,3 +40,11 @@ export const MeResponseSchema = Type.Object(
     ],
   }
 );
+
+export const RetrieveUserResponseSchema = Type.Union([
+  MeResponseSchema,
+  Type.Undefined(),
+]);
+export type RetrieveUserProcessOutput = Static<
+  typeof RetrieveUserResponseSchema
+>;

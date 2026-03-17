@@ -5,23 +5,25 @@ import {
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  type PaginationResponseType,
   paginationResponse,
   SortOrder,
 } from "@danimai/core";
 import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
-  type PaginatedTaxRateRulesProcessInput,
+  type PaginatedTaxRateRulesProcessOutput,
   PaginatedTaxRateRulesSchema,
 } from "./paginated-tax-rate-rules.schema";
-import type { Database, TaxRateRule } from "@danimai/tax/db";
+import type { Database } from "@danimai/tax/db";
 
 export const PAGINATED_TAX_RATE_RULES_PROCESS = Symbol("PaginatedTaxRateRules");
 
 @Process(PAGINATED_TAX_RATE_RULES_PROCESS)
 export class PaginatedTaxRateRulesProcess
-  implements ProcessContract<PaginationResponseType<TaxRateRule>> {
+  implements ProcessContract<
+    typeof PaginatedTaxRateRulesSchema,
+    PaginatedTaxRateRulesProcessOutput
+  > {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -37,7 +39,7 @@ export class PaginatedTaxRateRulesProcess
     const {
       page = 1,
       limit = 10,
-      sorting_field = "created_at",
+      sorting_field = "tax_rate_rules.created_at",
       sorting_direction = SortOrder.DESC,
     } = input;
 
@@ -50,26 +52,10 @@ export class PaginatedTaxRateRulesProcess
       .executeTakeFirst();
     const total = Number(countResult?.count ?? 0);
 
-    const sortOrder = sorting_direction === SortOrder.ASC ? "asc" : "desc";
-    const allowedSortFields = [
-      "id",
-      "tax_rate_id",
-      "rule_type",
-      "value",
-      "created_at",
-      "updated_at",
-      "deleted_at",
-    ];
-    const safeSortField = allowedSortFields.includes(sorting_field)
-      ? sorting_field
-      : "created_at";
-    query = query.orderBy(
-      sql.ref(`tax_rate_rules.${safeSortField}`),
-      sortOrder
-    );
+    query = query.orderBy(sql.ref(sorting_field), sorting_direction);
 
     const offset = (page - 1) * limit;
     const data = await query.selectAll().limit(limit).offset(offset).execute();
-    return paginationResponse<TaxRateRule>(data, total, input);
+    return paginationResponse(data, total, input);
   }
 }

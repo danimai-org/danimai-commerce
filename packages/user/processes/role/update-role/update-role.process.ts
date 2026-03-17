@@ -1,21 +1,26 @@
 import {
   InjectDB,
   InjectLogger,
+  NotFoundError,
   Process,
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
   ValidationError,
 } from "@danimai/core";
-import { Kysely } from "kysely";
+import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type UpdateRoleProcessInput, UpdateRoleSchema } from "./update-role.schema";
-import type { Database, Role } from "../../../db/type";
+import {
+  type UpdateRoleProcessOutput,
+  UpdateRoleSchema,
+} from "./update-role.schema";
+import type { Database } from "../../../db/type";
 
 export const UPDATE_ROLE_PROCESS = Symbol("UpdateRole");
 
 @Process(UPDATE_ROLE_PROCESS)
-export class UpdateRoleProcess implements ProcessContract<Role | undefined> {
+export class UpdateRoleProcess
+  implements ProcessContract<typeof UpdateRoleSchema, UpdateRoleProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -36,14 +41,10 @@ export class UpdateRoleProcess implements ProcessContract<Role | undefined> {
       .executeTakeFirst();
 
     if (!role) {
-      throw new ValidationError("Role not found", [{
-        type: "not_found",
-        message: "Role not found",
-        path: "id",
-      }]);
+      throw new NotFoundError("Role not found");
     }
 
-    if (input.name !== undefined) {
+    if (input.name) {
       const existing = await this.db
         .withSchema("public")
         .selectFrom("roles")
@@ -52,6 +53,7 @@ export class UpdateRoleProcess implements ProcessContract<Role | undefined> {
         .where("deleted_at", "is", null)
         .select("id")
         .executeTakeFirst();
+
       if (existing) {
         throw new ValidationError("Role with this name already exists", [{
           type: "not_found",
@@ -59,19 +61,17 @@ export class UpdateRoleProcess implements ProcessContract<Role | undefined> {
           path: "name",
         }]);
       }
+
     }
 
-    const updateData: { name?: string; description?: string } = {};
-    if (input.name !== undefined) updateData.name = input.name;
-    if (input.description !== undefined) updateData.description = input.description;
-
-    if (Object.keys(updateData).length === 0) {
-      return role;
-    }
 
     return this.db
       .updateTable("roles")
-      .set(updateData)
+      .set({
+        ...input,
+        updated_at: sql`now()`,
+        id: undefined
+      })
       .where("id", "=", input.id)
       .where("deleted_at", "is", null)
       .returningAll()

@@ -1,5 +1,6 @@
 import { Elysia } from "elysia";
 import { bearer } from "@elysiajs/bearer";
+import { StaticDecode } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   AuthTokensResponseSchema,
@@ -11,7 +12,6 @@ import {
   MeResponseSchema,
   REFRESH_TOKEN_PROCESS,
   RefreshTokenProcess,
-  type RefreshTokenProcessInput,
   RefreshTokenSchema,
   RETRIEVE_USER_PROCESS,
   RetrieveUserProcess,
@@ -31,9 +31,9 @@ const loginRoute = new Elysia()
   .use(loginRateLimitMacro)
   .post(
     "/login",
-    async ({ body: input }) => {
+    async ({ body }: { body: StaticDecode<typeof LoginSchema> }) => {
       const process = getService<LoginProcess>(LOGIN_PROCESS);
-      return process.runOperations({ input });
+      return process.runOperations({ input: body });
     },
     {
       body: LoginSchema,
@@ -56,10 +56,9 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
   .use(loginRoute)
   .post(
     "/refresh",
-    async ({ body }) => {
+    async ({ body }: { body: StaticDecode<typeof RefreshTokenSchema> }) => {
       const process = getService<RefreshTokenProcess>(REFRESH_TOKEN_PROCESS);
-      const input = body as RefreshTokenProcessInput;
-      return process.runOperations({ input });
+      return process.runOperations({ input: body });
     },
     {
       body: RefreshTokenSchema,

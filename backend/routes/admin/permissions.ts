@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   PAGINATED_PERMISSIONS_PROCESS,
@@ -10,6 +10,7 @@ import {
   UpdatePermissionProcess,
   PaginatedPermissionsSchema,
   PaginatedPermissionsResponseSchema,
+  RetrievePermissionSchema,
   RetrievePermissionResponseSchema,
   UpdatePermissionSchema,
   UpdatePermissionResponseSchema,
@@ -24,9 +25,11 @@ export const permissionRoutes = new Elysia({ prefix: "/permissions" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedPermissionsProcess>(PAGINATED_PERMISSIONS_PROCESS);
-      return process.runOperations({ input });
+      return process.runOperations({
+        input: query as StaticDecode<typeof PaginatedPermissionsSchema>,
+      });
     },
     {
       query: PaginatedPermissionsSchema,
@@ -49,7 +52,7 @@ export const permissionRoutes = new Elysia({ prefix: "/permissions" })
       return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      params: Type.Object({ id: RetrievePermissionSchema.properties.id }),
       response: {
         200: RetrievePermissionResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -70,7 +73,7 @@ export const permissionRoutes = new Elysia({ prefix: "/permissions" })
       return process.runOperations({ input });
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      params: Type.Object({ id: UpdatePermissionSchema.properties.id }),
       body: Type.Omit(UpdatePermissionSchema, ["id"]),
       response: {
         200: UpdatePermissionResponseSchema,

@@ -9,13 +9,17 @@ import {
 } from "@danimai/core";
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type CreateRoleProcessInput, CreateRoleSchema } from "./create-role.schema";
-import type { Database, Role } from "../../../db/type";
+import {
+  type CreateRoleProcessOutput,
+  CreateRoleSchema,
+} from "./create-role.schema";
+import type { Database } from "../../../db/type";
 
 export const CREATE_ROLE_PROCESS = Symbol("CreateRole");
 
 @Process(CREATE_ROLE_PROCESS)
-export class CreateRoleProcess implements ProcessContract<Role | undefined> {
+export class CreateRoleProcess
+  implements ProcessContract<typeof CreateRoleSchema, CreateRoleProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -50,6 +54,6 @@ export class CreateRoleProcess implements ProcessContract<Role | undefined> {
         description: input.description ?? "",
       })
       .returningAll()
-      .executeTakeFirst();
+      .executeTakeFirstOrThrow();
   }
 }

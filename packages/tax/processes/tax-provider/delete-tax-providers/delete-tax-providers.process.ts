@@ -11,6 +11,7 @@ import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type DeleteTaxProvidersProcessInput,
+  type DeleteTaxProvidersProcessOutput,
   DeleteTaxProvidersSchema,
 } from "./delete-tax-providers.schema";
 import type { Database } from "@danimai/tax/db";
@@ -18,7 +19,11 @@ import type { Database } from "@danimai/tax/db";
 export const DELETE_TAX_PROVIDERS_PROCESS = Symbol("DeleteTaxProviders");
 
 @Process(DELETE_TAX_PROVIDERS_PROCESS)
-export class DeleteTaxProvidersProcess implements ProcessContract<void> {
+export class DeleteTaxProvidersProcess
+  implements ProcessContract<
+    typeof DeleteTaxProvidersSchema,
+    DeleteTaxProvidersProcessOutput
+  > {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -29,7 +34,7 @@ export class DeleteTaxProvidersProcess implements ProcessContract<void> {
   async runOperations(
     @ProcessContext({ schema: DeleteTaxProvidersSchema })
     context: ProcessContextType<typeof DeleteTaxProvidersSchema>
-  ): Promise<void> {
+  ) {
     const { input } = context;
     await this.validateTaxProviders(input);
     await this.deleteTaxProviders(input);
@@ -65,7 +70,7 @@ export class DeleteTaxProvidersProcess implements ProcessContract<void> {
     });
     await this.db
       .updateTable("tax_providers")
-      .set({ deleted_at: new Date().toISOString() })
+      .set({ deleted_at: new Date() })
       .where("id", "in", input.tax_provider_ids)
       .where("deleted_at", "is", null)
       .execute();
