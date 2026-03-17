@@ -3,7 +3,6 @@
 	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import Lock from '@lucide/svelte/icons/lock';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import Search from '@lucide/svelte/icons/search';
@@ -13,6 +12,7 @@
 	import { DropdownMenu } from 'bits-ui';
 	import { client } from '$lib/client.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import EditPermissionSheet from '../../../lib/components/organs/permissions/update/EditPermissionSheet.svelte';
 
 	type Permission = {
 		id: string;
@@ -62,55 +62,13 @@
 	// Edit permission sheet
 	let editOpen = $state(false);
 	let editPermission = $state<Permission | null>(null);
-	let editName = $state('');
-	let editDescription = $state('');
-	let editError = $state<string | null>(null);
-	let editSubmitting = $state(false);
 
 	function openEdit(perm: Permission) {
 		editPermission = perm;
 		editOpen = true;
-		editName = perm.name;
-		editDescription = perm.description ?? '';
-		editError = null;
-	}
-
-	function closeEdit() {
-		editOpen = false;
-		editPermission = null;
 	}
 
 	const refetch = $derived(paginateState.refetch);
-
-	async function submitEdit() {
-		if (!editPermission) return;
-		editError = null;
-		editSubmitting = true;
-		try {
-			const body: { description?: string } = {};
-			if (editDescription.trim() !== (editPermission.description ?? '')) body.description = editDescription.trim();
-			const res = await fetch(`/admin/permissions/${editPermission.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body)
-			});
-			const text = await res.text();
-			if (!res.ok) {
-				let msg = text;
-				try {
-					const j = JSON.parse(text);
-					msg = j.message ?? text;
-				} catch {}
-				throw new Error(msg);
-			}
-			closeEdit();
-			refetch();
-		} catch (e) {
-			editError = e instanceof Error ? e.message : String(e);
-		} finally {
-			editSubmitting = false;
-		}
-	}
 </script>
 
 <svelte:head>
@@ -252,60 +210,5 @@
 		{/if}
 	</div>
 
-	<!-- Edit permission sheet -->
-	<Sheet.Root bind:open={editOpen}>
-		<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-			<div class="flex h-full flex-col">
-				<div class="border-b px-6 py-4">
-					<h2 class="text-lg font-semibold">Edit permission</h2>
-					<p class="mt-1 text-sm text-muted-foreground">
-						Update name and description.
-					</p>
-				</div>
-				<form
-					onsubmit={(e) => {
-						e.preventDefault();
-						submitEdit();
-					}}
-					class="flex flex-1 flex-col overflow-auto"
-				>
-					<div class="space-y-4 px-6 py-6">
-						<div class="space-y-2">
-							<label for="edit-permission-name" class="block text-sm font-medium">Name</label>
-							<Input
-								id="edit-permission-name"
-								type="text"
-								placeholder="e.g. customer:read"
-								class="w-full"
-								bind:value={editName}
-								disabled
-							/>
-						</div>
-						<div class="space-y-2">
-							<label for="edit-permission-description" class="block text-sm font-medium">Description</label>
-							<Input
-								id="edit-permission-description"
-								type="text"
-								placeholder="Description"
-								class="w-full"
-								bind:value={editDescription}
-								disabled={editSubmitting}
-							/>
-						</div>
-						{#if editError}
-							<p class="text-sm text-destructive">{editError}</p>
-						{/if}
-					</div>
-					<div class="flex justify-end gap-2 border-t p-4">
-						<Button type="button" variant="outline" onclick={closeEdit} disabled={editSubmitting}>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={editSubmitting}>
-							{editSubmitting ? 'Saving…' : 'Save'}
-						</Button>
-					</div>
-				</form>
-			</div>
-		</Sheet.Content>
-	</Sheet.Root>
+	<EditPermissionSheet bind:open={editOpen} permission={editPermission} onSaved={refetch} />
 </div>

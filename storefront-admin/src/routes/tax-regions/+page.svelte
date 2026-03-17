@@ -15,6 +15,7 @@
 	import { deleteTaxRegions, listTaxRegions } from '$lib/tax-regions/api.js';
 	import type { TaxRegion, TaxRegionsListResponse } from '$lib/tax-regions/types.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import EditTax from '$lib/components/organs/tax-region/update/EditTax.svelte';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
@@ -47,6 +48,11 @@
 	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
 	const confirmDelete = $derived(paginateState.confirmDelete);
 	const refetch = $derived(paginateState.refetch);
+
+	async function handleFormSaved() {
+		paginateState.closeForm();
+		await paginateState.refetch();
+	}
 
 	const tableColumns: TableColumn[] = [
 		{ label: 'Name', key: 'name', type: 'text' },
@@ -123,12 +129,16 @@
 	</div>
 </div>
 
-<TaxRegionFormSheet
-	bind:open={paginateState.formSheetOpen}
-	mode={formMode}
-	region={(formItem as TaxRegion | null)}
-	onSuccess={refetch}
-/>
+{#if formMode === 'edit'}
+	<EditTax
+		bind:open={paginateState.formSheetOpen}
+		mode="edit"
+		region={(formItem as TaxRegion | null)}
+		onSuccess={handleFormSaved}
+	/>
+{:else}
+	<TaxRegionFormSheet bind:open={paginateState.formSheetOpen} mode="create" onSuccess={handleFormSaved} />
+{/if}
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}

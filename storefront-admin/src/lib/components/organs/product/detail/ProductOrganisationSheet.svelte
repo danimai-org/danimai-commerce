@@ -15,9 +15,9 @@
 
 	const collectionsOptions = $derived(getProductDetail().data?.collections?.map((c) => ({ id: c.id, value: c.title })) ?? []);
 
-	// const categoriesOptions = $derived(
-	// 	getProductDetail().data?.category?.value ? [{ value: getProductDetail().data?.category?.value }] : []
-	// );
+	const categoriesOptions = $derived(
+		getProductDetail().data?.category?.value ? [{ value: getProductDetail().data?.category?.value }] : []
+	);
 	
 	const productCategoryId = $derived(getProductDetail().data?.category?.id);
 	const productCollectionIds = $derived(getProductDetail().data?.collections?.map((c) => c.id));

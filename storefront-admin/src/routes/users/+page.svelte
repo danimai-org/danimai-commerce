@@ -16,7 +16,6 @@
 	import Users from '@lucide/svelte/icons/users';
 	import MultiSelectCombobox from '$lib/components/organs/multi-select-combobox/multi-select-combobox.svelte';
 
-	const API_BASE = 'http://localhost:8000/admin';
 	type Role = {
 		id: string;
 		name: string;
@@ -57,11 +56,14 @@
 	// Load roles once for Role column and Edit sheet
 	$effect(() => {
 		if (roles.length > 0) return;
-		fetch(`${API_BASE}/roles?limit=100`, { cache: 'no-store' })
-			.then((r) => r.json())
-			.then((j: { rows: Role[] }) => {
-				if (j.rows?.length) roles = j.rows;
-			});
+		client.roles
+			.get({ query: { limit: 100 } as any })
+			.then((res) => {
+				if (res.error) return;
+				const rows = ((res.data as { rows?: Role[] } | null)?.rows ?? []) as Role[];
+				if (rows.length > 0) roles = rows;
+			})
+			.catch(() => {});
 	});
 
 	const rolesById = $derived.by(() => {
@@ -109,23 +111,28 @@
 		}
 	];
 
-	function formatDate(iso: string | Date) {	
-			if (iso instanceof Date) {
-				return iso.toLocaleDateString('en-US', {
-					year: 'numeric',
-					month: 'short',
-					day: '2-digit'
-				});
-			}
-			try {
-				return new Date(iso).toLocaleDateString('en-US', {
-					year: 'numeric',
-					month: 'short',
-					day: '2-digit'
-				});
-			} catch {
-				return iso;
-			}
+	function formatDate(iso: string | Date) {
+		if (iso instanceof Date) {
+			return iso.toLocaleDateString('en-US', {
+				year: 'numeric',
+				month: 'short',
+				day: '2-digit'
+			});
+		}
+		try {
+			return new Date(iso).toLocaleDateString('en-US', {
+				year: 'numeric',
+				month: 'short',
+				day: '2-digit'
+			});
+		} catch {
+			return iso;
+		}
+	}
+
+	function parseClientError(result: any, fallback: string) {
+		const msg = result?.error?.value?.message;
+		return typeof msg === 'string' && msg.trim().length > 0 ? msg : fallback;
 	}
 
 	// Invite user dialog
@@ -144,11 +151,13 @@
 		inviteError = null;
 		inviteLoading = true;
 		try {
-			const res = await fetch(`${API_BASE}/roles?limit=100`, { cache: 'no-store' });
-			if (res.ok) {
-				const json = (await res.json()) as { rows: Role[] };
-				roles = json.rows ?? [];
+			const res = await client.roles.get({ query: { limit: 100 } as any });
+			if (res.error) {
+				throw new Error(parseClientError(res, 'Failed to load roles'));
 			}
+			roles = ((res.data as { rows?: Role[] } | null)?.rows ?? []) as Role[];
+		} catch (e) {
+			inviteError = e instanceof Error ? e.message : String(e);
 		} finally {
 			inviteLoading = false;
 		}
@@ -165,19 +174,9 @@
 		try {
 			const body: { email: string; role_id?: string } = { email };
 			if (inviteRoleIds.length > 0) body.role_id = inviteRoleIds[0];
-			const res = await fetch(`${API_BASE}/invites`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body)
-			});
-			const text = await res.text();
-			if (!res.ok) {
-				let msg = text;
-				try {
-					const j = JSON.parse(text);
-					msg = j.message ?? text;
-				} catch {}
-				throw new Error(msg);
+			const res = await client.invites.post(body as any);
+			if (res.error) {
+				throw new Error(parseClientError(res, 'Failed to send invite'));
 			}
 			inviteOpen = false;
 			refetch();
@@ -233,19 +232,9 @@
 				closeEdit();
 				return;
 			}
-			const res = await fetch(`${API_BASE}/users/${editUser.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body)
-			});
-			const text = await res.text();
-			if (!res.ok) {
-				let msg = text;
-				try {
-					const j = JSON.parse(text);
-					msg = j.message ?? text;
-				} catch {}
-				throw new Error(msg);
+			const res = await (client as any).users({ id: editUser.id }).put(body as any);
+			if (res.error) {
+				throw new Error(parseClientError(res, 'Failed to update user'));
 			}
 			closeEdit();
 			refetch();
@@ -287,9 +276,9 @@
 							e.preventDefault();
 							submitInvite();
 						}}
-						class="flex flex-1 flex-col overflow-auto"
+						class="flex h-full flex-col"
 					>
-						<div class="space-y-4 px-6 py-6">
+						<div class="min-h-0 flex-1 overflow-auto space-y-4 px-6 py-6">
 							<div class="space-y-2">
 								<label for="invite-email" class="block text-sm font-medium">Email</label>
 								<Input
@@ -320,7 +309,7 @@
 								<p class="text-sm text-destructive">{inviteError}</p>
 							{/if}
 						</div>
-						<div class="flex justify-end gap-2 border-t p-4">
+						<div class="flex shrink-0 justify-end gap-2 border-t px-6 py-4">
 							<Button type="button" variant="outline" onclick={() => (inviteOpen = false)} disabled={inviteSubmitting}>
 								Cancel
 							</Button>
