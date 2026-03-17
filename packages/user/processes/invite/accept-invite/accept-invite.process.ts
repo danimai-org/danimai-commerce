@@ -11,13 +11,17 @@ import {
 } from "@danimai/core";
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type AcceptInviteProcessInput, AcceptInviteSchema } from "./accept-invite.schema";
-import type { Database, User } from "../../../db/type";
+import {
+  type AcceptInviteProcessOutput,
+  AcceptInviteSchema,
+} from "./accept-invite.schema";
+import type { Database } from "../../../db/type";
 
 export const ACCEPT_INVITE_PROCESS = Symbol("AcceptInvite");
 
 @Process(ACCEPT_INVITE_PROCESS)
-export class AcceptInviteProcess implements ProcessContract<User | undefined> {
+export class AcceptInviteProcess
+  implements ProcessContract<typeof AcceptInviteSchema, AcceptInviteProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -100,6 +104,10 @@ export class AcceptInviteProcess implements ProcessContract<User | undefined> {
       .where("id", "=", invite.id)
       .execute();
 
-    return user;
+    if (!user) {
+      return undefined;
+    }
+
+    return user
   }
 }

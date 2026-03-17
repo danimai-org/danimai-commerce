@@ -13,10 +13,10 @@ import {
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
-  type ResendInviteProcessInput,
+  type ResendInviteProcessOutput,
   ResendInviteSchema,
 } from "./resend-invite.schema";
-import type { Database, Invite } from "../../../db/type";
+import type { Database } from "../../../db/type";
 
 const INVITE_EXPIRY_DAYS = 7;
 
@@ -24,7 +24,8 @@ export const RESEND_INVITE_PROCESS = Symbol("ResendInvite");
 
 @Process(RESEND_INVITE_PROCESS)
 export class ResendInviteProcess implements ProcessContract<
-  Invite | undefined
+  typeof ResendInviteSchema,
+  ResendInviteProcessOutput
 > {
   constructor(
     @InjectDB()
@@ -33,7 +34,7 @@ export class ResendInviteProcess implements ProcessContract<
     private readonly logger: Logger,
     @InjectEmail()
     private readonly emailService: EmailInterface,
-  ) {}
+  ) { }
 
   async runOperations(
     @ProcessContext({
@@ -102,6 +103,10 @@ export class ResendInviteProcess implements ProcessContract<
         roleName: existing.role ?? undefined,
       },
     });
+
+    if (!invite) {
+      return undefined;
+    }
 
     return invite;
   }

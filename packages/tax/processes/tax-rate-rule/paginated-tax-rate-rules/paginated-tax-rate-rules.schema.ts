@@ -1,28 +1,23 @@
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static, type StaticDecode } from "@sinclair/typebox";
 import {
-  createFilterableColumnsSchema,
+  createPaginationSchema,
   createPaginatedResponseSchema,
-  FilterOperator,
-  PaginationSchema,
 } from "@danimai/core";
-import type { TaxRateRule } from "@danimai/tax/db";
-import { TaxRateRuleResponseSchema } from "../update-tax-rate-rules/update-tax-rate-rules.schema";
+import { TaxRateRuleResponseSchema } from "../retrieve-tax-rate-rule/retrieve-tax-rate-rule.schema";
 
-export const PaginatedTaxRateRulesSchema = Type.Intersect([
-  PaginationSchema,
-  Type.Object({
-    filters: Type.Optional(
-      createFilterableColumnsSchema<
-        keyof Pick<TaxRateRule, "tax_rate_id" | "rule_type">
-      >({
-        tax_rate_id: [FilterOperator.EQUAL, FilterOperator.IN],
-        rule_type: true,
-      })
-    ),
-  }),
-]);
+export const PaginatedTaxRateRulesSchema = createPaginationSchema(
+  Type.Object({}),
+  [
+    "tax_rate_rules.id",
+    "tax_rate_rules.tax_rate_id",
+    "tax_rate_rules.rule_type",
+    "tax_rate_rules.value",
+    "tax_rate_rules.created_at",
+    "tax_rate_rules.updated_at",
+  ]
+);
 
-export type PaginatedTaxRateRulesProcessInput = Static<
+export type PaginatedTaxRateRulesProcessInput = StaticDecode<
   typeof PaginatedTaxRateRulesSchema
 >;
 

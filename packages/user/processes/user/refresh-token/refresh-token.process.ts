@@ -18,7 +18,7 @@ import type { ValidateSessionProcess } from "../../session/validate-session/vali
 import { UPDATE_SESSION_PROCESS } from "../../session/update-session/update-session.process";
 import type { UpdateSessionProcess } from "../../session/update-session/update-session.process";
 import {
-  type RefreshTokenProcessInput,
+  type RefreshTokenProcessOutput,
   RefreshTokenSchema,
 } from "./refresh-token.schema";
 import type { Database } from "../../../db/type";
@@ -30,7 +30,8 @@ const ACCESS_TOKEN_EXPIRES_IN_SECONDS = 15 * 60; // 900
 export const REFRESH_TOKEN_PROCESS = Symbol("RefreshToken");
 
 @Process(REFRESH_TOKEN_PROCESS)
-export class RefreshTokenProcess implements ProcessContract<LoginResult> {
+export class RefreshTokenProcess
+  implements ProcessContract<typeof RefreshTokenSchema, RefreshTokenProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -90,7 +91,6 @@ export class RefreshTokenProcess implements ProcessContract<LoginResult> {
     try {
       session = await this.validateSessionProcess.runOperations({
         input: { id: sid, user_id: sub, refresh_token: input.refresh_token },
-        logger: context.logger,
       });
     } catch {
       throw new ValidationError("Invalid or expired refresh token", [{
@@ -140,7 +140,6 @@ export class RefreshTokenProcess implements ProcessContract<LoginResult> {
         refresh_token,
         expires_at: newExpiresAt.toISOString(),
       },
-      logger: context.logger,
     });
 
     return {

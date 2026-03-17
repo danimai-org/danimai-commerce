@@ -1,21 +1,21 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   PAGINATED_TAX_REGIONS_PROCESS,
-  CREATE_TAX_REGIONS_PROCESS,
+  CREATE_TAX_REGION_PROCESS,
   UPDATE_TAX_REGIONS_PROCESS,
   DELETE_TAX_REGIONS_PROCESS,
   PaginatedTaxRegionsProcess,
-  CreateTaxRegionsProcess,
+  CreateTaxRegionProcess,
   UpdateTaxRegionsProcess,
   DeleteTaxRegionsProcess,
   PaginatedTaxRegionsSchema,
   PaginatedTaxRegionsResponseSchema,
-  CreateTaxRegionsSchema,
-  CreateTaxRegionsResponseSchema,
+  CreateTaxRegionSchema,
+  CreateTaxRegionResponseSchema,
   UpdateTaxRegionSchema,
-  UpdateTaxRegionsResponseSchema,
+  UpdateTaxRegionResponseSchema,
   DeleteTaxRegionsSchema,
 } from "@danimai/tax";
 import { handleProcessError } from "../../utils/error-handler";
@@ -25,20 +25,19 @@ import {
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
-const UpdateTaxRegionBodySchema = Type.Object({
-  name: Type.Optional(Type.String()),
-  tax_provider_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-});
+const UpdateTaxRegionBodySchema = Type.Omit(UpdateTaxRegionSchema, ["id"]);
 
 export const taxRegionRoutes = new Elysia({ prefix: "/tax-regions" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedTaxRegionsProcess>(
         PAGINATED_TAX_REGIONS_PROCESS
       );
-      return process.runOperations({ input });
+      return process.runOperations({
+        input: query as StaticDecode<typeof PaginatedTaxRegionsSchema>,
+      });
     },
     {
       query: PaginatedTaxRegionsSchema,
@@ -56,14 +55,14 @@ export const taxRegionRoutes = new Elysia({ prefix: "/tax-regions" })
   )
   .post(
     "/",
-    async ({ body: input }) => {
-      const process = getService<CreateTaxRegionsProcess>(CREATE_TAX_REGIONS_PROCESS);
-      return process.runOperations({ input });
+    async ({ body }: { body: StaticDecode<typeof CreateTaxRegionSchema> }) => {
+      const process = getService<CreateTaxRegionProcess>(CREATE_TAX_REGION_PROCESS);
+      return process.runOperations({ input: body });
     },
     {
-      body: CreateTaxRegionsSchema,
+      body: CreateTaxRegionSchema,
       response: {
-        200: CreateTaxRegionsResponseSchema,
+        200: CreateTaxRegionResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -83,10 +82,10 @@ export const taxRegionRoutes = new Elysia({ prefix: "/tax-regions" })
       });
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      params: Type.Object({ id: UpdateTaxRegionSchema.properties.id }),
       body: UpdateTaxRegionBodySchema,
       response: {
-        200: UpdateTaxRegionsResponseSchema,
+        200: UpdateTaxRegionResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },

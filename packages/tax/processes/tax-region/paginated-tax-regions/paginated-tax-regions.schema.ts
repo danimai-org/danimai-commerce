@@ -1,28 +1,23 @@
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static, type StaticDecode } from "@sinclair/typebox";
 import {
-  createFilterableColumnsSchema,
+  createPaginationSchema,
   createPaginatedResponseSchema,
-  FilterOperator,
-  PaginationSchema,
 } from "@danimai/core";
-import type { TaxRegion } from "@danimai/tax/db";
-import { TaxRegionResponseSchema } from "../update-tax-regions/update-tax-regions.schema";
+import { TaxRegionResponseSchema } from "../retrieve-tax-region/retrieve-tax-region.schema";
 
-const paginationProperties = (PaginationSchema as unknown as {
-  properties?: Record<string, ReturnType<typeof Type.Any>>;
-}).properties ?? {};
+export const PaginatedTaxRegionsSchema = createPaginationSchema(
+  Type.Object({}),
+  [
+    "tax_regions.id",
+    "tax_regions.name",
+    "tax_regions.tax_provider_id",
+    "tax_regions.parent_id",
+    "tax_regions.created_at",
+    "tax_regions.updated_at",
+  ]
+);
 
-const taxRegionsFiltersSchema = createFilterableColumnsSchema<
-  keyof Pick<TaxRegion, "name">
->({ name: true });
-
-/** Flat schema for Elysia query (avoids Type.Intersect compile failure). */
-export const PaginatedTaxRegionsSchema = Type.Object({
-  ...paginationProperties,
-  filters: Type.Optional(taxRegionsFiltersSchema),
-});
-
-export type PaginatedTaxRegionsProcessInput = Static<
+export type PaginatedTaxRegionsProcessInput = StaticDecode<
   typeof PaginatedTaxRegionsSchema
 >;
 

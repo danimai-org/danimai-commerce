@@ -10,15 +10,16 @@ import {
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
-  type RetrieveUserProcessInput,
+  type RetrieveUserProcessOutput,
   RetrieveUserSchema,
 } from "./retrieve-user.schema";
-import type { Database, User } from "../../../db/type";
+import type { Database } from "../../../db/type";
 
 export const RETRIEVE_USER_PROCESS = Symbol("RetrieveUser");
 
 @Process(RETRIEVE_USER_PROCESS)
-export class RetrieveUserProcess implements ProcessContract<User | undefined> {
+export class RetrieveUserProcess
+  implements ProcessContract<typeof RetrieveUserSchema, RetrieveUserProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,

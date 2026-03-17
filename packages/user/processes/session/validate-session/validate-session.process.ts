@@ -11,10 +11,10 @@ import {
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
-  type ValidateSessionProcessInput,
+  type ValidateSessionProcessOutput,
   ValidateSessionSchema,
 } from "./validate-session.schema";
-import type { Database, Session } from "../../../db/type";
+import type { Database } from "../../../db/type";
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -23,7 +23,11 @@ function hashToken(token: string): string {
 export const VALIDATE_SESSION_PROCESS = Symbol("ValidateSession");
 
 @Process(VALIDATE_SESSION_PROCESS)
-export class ValidateSessionProcess implements ProcessContract<Session | undefined> {
+export class ValidateSessionProcess
+  implements ProcessContract<
+    typeof ValidateSessionSchema,
+    ValidateSessionProcessOutput
+  > {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,

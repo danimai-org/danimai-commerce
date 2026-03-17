@@ -9,13 +9,21 @@ import {
 } from "@danimai/core";
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type UpdatePermissionProcessInput, UpdatePermissionSchema } from "./update-permission.schema";
-import type { Database, Permission } from "../../../db/type";
+import {
+  type UpdatePermissionProcessInput,
+  type UpdatePermissionProcessOutput,
+  UpdatePermissionSchema,
+} from "./update-permission.schema";
+import type { Database, PermissionUpdate } from "../../../db/type";
 
 export const UPDATE_PERMISSION_PROCESS = Symbol("UpdatePermission");
 
 @Process(UPDATE_PERMISSION_PROCESS)
-export class UpdatePermissionProcess implements ProcessContract<Permission | undefined> {
+export class UpdatePermissionProcess
+  implements ProcessContract<
+    typeof UpdatePermissionSchema,
+    UpdatePermissionProcessOutput
+  > {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -44,10 +52,10 @@ export class UpdatePermissionProcess implements ProcessContract<Permission | und
     }
 
     if (input.name !== undefined) {
+      const name = input.name as Exclude<PermissionUpdate["name"], undefined>;
       const existing = await this.db
-        .withSchema("public")
         .selectFrom("permissions")
-        .where("name", "=", input.name)
+        .where("name", "=", name)
         .where("id", "!=", input.id)
         .where("deleted_at", "is", null)
         .select("id")
@@ -61,8 +69,8 @@ export class UpdatePermissionProcess implements ProcessContract<Permission | und
       }
     }
 
-    const updateData: { name?: string; description?: string } = {};
-    if (input.name !== undefined) updateData.name = input.name;
+    const updateData: PermissionUpdate = {};
+    if (input.name !== undefined) updateData.name = input.name as PermissionUpdate["name"];
     if (input.description !== undefined) updateData.description = input.description;
 
     if (Object.keys(updateData).length === 0) {

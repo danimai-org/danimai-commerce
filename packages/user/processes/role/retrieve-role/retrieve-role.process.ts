@@ -1,6 +1,7 @@
 import {
   InjectDB,
   InjectLogger,
+  NotFoundError,
   Process,
   ProcessContext,
   type ProcessContextType,
@@ -9,13 +10,17 @@ import {
 } from "@danimai/core";
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type RetrieveRoleProcessInput, RetrieveRoleSchema } from "./retrieve-role.schema";
-import type { Database, Role } from "../../../db/type";
+import {
+  type RetrieveRoleProcessOutput,
+  RetrieveRoleSchema,
+} from "./retrieve-role.schema";
+import type { Database } from "../../../db/type";
 
 export const RETRIEVE_ROLE_PROCESS = Symbol("RetrieveRole");
 
 @Process(RETRIEVE_ROLE_PROCESS)
-export class RetrieveRoleProcess implements ProcessContract<Role | undefined> {
+export class RetrieveRoleProcess
+  implements ProcessContract<typeof RetrieveRoleSchema, RetrieveRoleProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -36,11 +41,7 @@ export class RetrieveRoleProcess implements ProcessContract<Role | undefined> {
       .executeTakeFirst();
 
     if (!role) {
-      throw new ValidationError("Role not found", [{
-        type: "not_found",
-        message: "Role not found",
-        path: "id",
-      }]);
+      throw new NotFoundError("Role not found");
     }
 
     return role;

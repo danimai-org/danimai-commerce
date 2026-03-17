@@ -13,10 +13,10 @@ import {
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
-  type CreateInviteProcessInput,
+  type CreateInviteProcessOutput,
   CreateInviteSchema,
 } from "./create-invite.schema";
-import type { Database, Invite } from "../../../db/type";
+import type { Database } from "../../../db/type";
 
 const INVITE_EXPIRY_DAYS = 7;
 
@@ -24,7 +24,8 @@ export const CREATE_INVITE_PROCESS = Symbol("CreateInvite");
 
 @Process(CREATE_INVITE_PROCESS)
 export class CreateInviteProcess implements ProcessContract<
-  Invite | undefined
+  typeof CreateInviteSchema,
+  CreateInviteProcessOutput
 > {
   constructor(
     @InjectDB()
@@ -33,7 +34,7 @@ export class CreateInviteProcess implements ProcessContract<
     private readonly logger: Logger,
     @InjectEmail()
     private readonly emailService: EmailInterface,
-  ) {}
+  ) { }
 
   async runOperations(
     @ProcessContext({
@@ -130,6 +131,10 @@ export class CreateInviteProcess implements ProcessContract<
         roleName: role ?? undefined,
       },
     });
+
+    if (!invite) {
+      return undefined;
+    }
 
     return invite;
   }

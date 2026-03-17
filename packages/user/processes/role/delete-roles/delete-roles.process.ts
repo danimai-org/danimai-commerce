@@ -9,13 +9,17 @@ import {
 } from "@danimai/core";
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type DeleteRolesProcessInput, DeleteRolesSchema } from "./delete-roles.schema";
+import {
+  type DeleteRolesProcessOutput,
+  DeleteRolesSchema,
+} from "./delete-roles.schema";
 import type { Database } from "../../../db/type";
 
 export const DELETE_ROLES_PROCESS = Symbol("DeleteRoles");
 
 @Process(DELETE_ROLES_PROCESS)
-export class DeleteRolesProcess implements ProcessContract<void> {
+export class DeleteRolesProcess
+  implements ProcessContract<typeof DeleteRolesSchema, DeleteRolesProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -25,7 +29,7 @@ export class DeleteRolesProcess implements ProcessContract<void> {
 
   async runOperations(@ProcessContext({
     schema: DeleteRolesSchema,
-  }) context: ProcessContextType<typeof DeleteRolesSchema>): Promise<void> {
+  }) context: ProcessContextType<typeof DeleteRolesSchema>) {
     const { input } = context;
 
     const roles = await this.db
@@ -52,7 +56,7 @@ export class DeleteRolesProcess implements ProcessContract<void> {
 
     await this.db
       .updateTable("roles")
-      .set({ deleted_at: new Date().toISOString() })
+      .set({ deleted_at: new Date() })
       .where("id", "in", input.role_ids)
       .where("deleted_at", "is", null)
       .execute();

@@ -5,23 +5,27 @@ import {
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  ValidationError,
+  NotFoundError,
 } from "@danimai/core";
-import { Kysely } from "kysely";
+import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type UpdateUserProcessInput, UpdateUserSchema } from "./update-user.schema";
-import type { Database, User } from "../../../db/type";
+import {
+  type UpdateUserProcessOutput,
+  UpdateUserSchema,
+} from "./update-user.schema";
+import type { Database } from "../../../db/type";
 
 export const UPDATE_USER_PROCESS = Symbol("UpdateUser");
 
 @Process(UPDATE_USER_PROCESS)
-export class UpdateUserProcess implements ProcessContract<User | undefined> {
+export class UpdateUserProcess
+  implements ProcessContract<typeof UpdateUserSchema, UpdateUserProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
     @InjectLogger()
     private readonly logger: Logger
-  ) {}
+  ) { }
 
   async runOperations(@ProcessContext({
     schema: UpdateUserSchema,
@@ -36,29 +40,25 @@ export class UpdateUserProcess implements ProcessContract<User | undefined> {
       .executeTakeFirst();
 
     if (!user) {
-      throw new ValidationError("User not found", [{
-        type: "not_found",
-        message: "User not found",
-        path: "id",
-      }]);
+      throw new NotFoundError("User not found");
     }
 
-    const updateData: { first_name?: string | null; last_name?: string | null; role_id?: string | null } = {};
-    if (input.first_name !== undefined) updateData.first_name = input.first_name;
-    if (input.last_name !== undefined) updateData.last_name = input.last_name;
-    if (input.role_id !== undefined) updateData.role_id = input.role_id;
-
-    if (Object.keys(updateData).length === 0) {
-      return user;
-    }
 
     const result = await this.db
       .updateTable("users")
-      .set(updateData)
+      .set({
+        ...input,
+        updated_at: sql`now()`,
+        id: undefined
+      })
       .where("id", "=", input.id)
       .where("deleted_at", "is", null)
       .returningAll()
       .executeTakeFirst();
+
+    if (!result) {
+      return undefined;
+    }
 
     return result;
   }

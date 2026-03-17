@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   PAGINATED_ROLES_PROCESS,
@@ -14,6 +14,7 @@ import {
   DeleteRolesProcess,
   PaginatedRolesSchema,
   PaginatedRolesResponseSchema,
+  RetrieveRoleSchema,
   RetrieveRoleResponseSchema,
   CreateRoleSchema,
   CreateRoleResponseSchema,
@@ -32,9 +33,11 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedRolesProcess>(PAGINATED_ROLES_PROCESS);
-      return process.runOperations({ input });
+      return process.runOperations({
+        input: query as StaticDecode<typeof PaginatedRolesSchema>,
+      });
     },
     {
       query: PaginatedRolesSchema,
@@ -57,7 +60,7 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
       return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      params: Type.Object({ id: RetrieveRoleSchema.properties.id }),
       response: {
         200: RetrieveRoleResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -72,9 +75,9 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
   )
   .post(
     "/",
-    async ({ body: input }) => {
+    async ({ body }: { body: StaticDecode<typeof CreateRoleSchema> }) => {
       const process = getService<CreateRoleProcess>(CREATE_ROLE_PROCESS);
-      return process.runOperations({ input });
+      return process.runOperations({ input: body });
     },
     {
       body: CreateRoleSchema,
@@ -98,7 +101,7 @@ export const roleRoutes = new Elysia({ prefix: "/roles" })
       return process.runOperations({ input });
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      params: Type.Object({ id: UpdateRoleSchema.properties.id }),
       body: Type.Omit(UpdateRoleSchema, ["id"]),
       response: {
         200: UpdateRoleResponseSchema,

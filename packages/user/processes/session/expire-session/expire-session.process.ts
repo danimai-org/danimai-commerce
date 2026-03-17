@@ -10,15 +10,16 @@ import {
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
-  type ExpireSessionProcessInput,
+  type ExpireSessionProcessOutput,
   ExpireSessionSchema,
 } from "./expire-session.schema";
-import type { Database, Session } from "../../../db/type";
+import type { Database } from "../../../db/type";
 
 export const EXPIRE_SESSION_PROCESS = Symbol("ExpireSession");
 
 @Process(EXPIRE_SESSION_PROCESS)
-export class ExpireSessionProcess implements ProcessContract<Session | undefined> {
+export class ExpireSessionProcess
+  implements ProcessContract<typeof ExpireSessionSchema, ExpireSessionProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -37,7 +38,7 @@ export class ExpireSessionProcess implements ProcessContract<Session | undefined
       .set({
         logged_out_at: now,
         expires_at: now,
-        updated_at: now,
+        updated_at: new Date(),
       })
       .where("id", "=", input.id)
       .returningAll()

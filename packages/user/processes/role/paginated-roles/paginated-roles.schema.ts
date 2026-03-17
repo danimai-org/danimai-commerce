@@ -1,10 +1,24 @@
-import { type Static } from "@sinclair/typebox";
-import { createPaginatedResponseSchema, PaginationSchema, type PaginationType } from "@danimai/core";
+import { Type, type Static, type StaticDecode } from "@sinclair/typebox";
+import {
+  createPaginatedResponseSchema,
+  createPaginationSchema,
+} from "@danimai/core";
 import { RoleResponseSchema } from "../retrieve-role/retrieve-role.schema";
 
-export const PaginatedRolesSchema = PaginationSchema;
+export const PaginatedRolesSchema = createPaginationSchema(
+  Type.Object({}),
+  [
+    "roles.id",
+    "roles.name",
+    "roles.description",
+    "roles.created_at",
+    "roles.updated_at",
+  ]
+);
 
-export type PaginatedRolesProcessInput = PaginationType;
+export type PaginatedRolesProcessInput = StaticDecode<
+  typeof PaginatedRolesSchema
+>;
 
 export const PaginatedRolesResponseSchema =
   createPaginatedResponseSchema(RoleResponseSchema);

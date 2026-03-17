@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   PAGINATED_USERS_PROCESS,
@@ -17,10 +17,7 @@ import {
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
-const UpdateUserBodySchema = Type.Object({
-  first_name: Type.Optional(Type.String()),
-  last_name: Type.Optional(Type.String()),
-});
+const UpdateUserBodySchema = Type.Omit(UpdateUserSchema, ["id"]);
 
 const toDateString = (v: string | Date | null): string | null =>
   v == null ? null : v instanceof Date ? v.toISOString() : v;
@@ -38,9 +35,11 @@ export const userRoutes = new Elysia({ prefix: "/users" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedUsersProcess>(PAGINATED_USERS_PROCESS);
-      return process.runOperations({ input });
+      return process.runOperations({
+        input: query as StaticDecode<typeof PaginatedUsersSchema>,
+      });
     },
     {
       query: PaginatedUsersSchema,
@@ -69,7 +68,7 @@ export const userRoutes = new Elysia({ prefix: "/users" })
       return result ? serializeUserDates(result) : result;
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      params: Type.Object({ id: UpdateUserSchema.properties.id }),
       body: UpdateUserBodySchema,
       response: {
         200: UpdateUserResponseSchema,

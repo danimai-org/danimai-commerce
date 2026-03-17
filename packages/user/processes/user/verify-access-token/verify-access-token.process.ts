@@ -14,6 +14,7 @@ import { VALIDATE_SESSION_PROCESS } from "../../session/validate-session/validat
 import type { ValidateSessionProcess } from "../../session/validate-session/validate-session.process";
 import {
   type VerifyAccessTokenProcessInput,
+  type VerifyAccessTokenProcessOutput,
   VerifyAccessTokenSchema,
 } from "./verify-access-token.schema";
 
@@ -26,7 +27,10 @@ export const VERIFY_ACCESS_TOKEN_PROCESS = Symbol("VerifyAccessToken");
 
 @Process(VERIFY_ACCESS_TOKEN_PROCESS)
 export class VerifyAccessTokenProcess
-  implements ProcessContract<VerifyAccessTokenResult>
+  implements ProcessContract<
+    typeof VerifyAccessTokenSchema,
+    VerifyAccessTokenProcessOutput
+  >
 {
   constructor(
     @InjectLogger()
@@ -67,7 +71,6 @@ export class VerifyAccessTokenProcess
       try {
         await this.validateSessionProcess.runOperations({
           input: { id: sid, user_id: sub },
-          logger: context.logger,
         });
       } catch {
         throw new ValidationError("Invalid or expired access token", [{

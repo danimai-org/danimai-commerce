@@ -10,15 +10,16 @@ import {
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
-  type CreateSessionProcessInput,
+  type CreateSessionProcessOutput,
   CreateSessionSchema,
 } from "./create-session.schema";
-import type { Database, Session } from "../../../db/type";
+import type { Database } from "../../../db/type";
 
 export const CREATE_SESSION_PROCESS = Symbol("CreateSession");
 
 @Process(CREATE_SESSION_PROCESS)
-export class CreateSessionProcess implements ProcessContract<Session | undefined> {
+export class CreateSessionProcess
+  implements ProcessContract<typeof CreateSessionSchema, CreateSessionProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,

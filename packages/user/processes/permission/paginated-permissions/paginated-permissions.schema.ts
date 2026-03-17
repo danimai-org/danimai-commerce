@@ -1,10 +1,24 @@
-import { type Static } from "@sinclair/typebox";
-import { createPaginatedResponseSchema, PaginationSchema, type PaginationType } from "@danimai/core";
+import { Type, type Static, type StaticDecode } from "@sinclair/typebox";
+import {
+  createPaginatedResponseSchema,
+  createPaginationSchema,
+} from "@danimai/core";
 import { PermissionResponseSchema } from "../retrieve-permission/retrieve-permission.schema";
 
-export const PaginatedPermissionsSchema = PaginationSchema;
+export const PaginatedPermissionsSchema = createPaginationSchema(
+  Type.Object({}),
+  [
+    "permissions.id",
+    "permissions.name",
+    "permissions.description",
+    "permissions.created_at",
+    "permissions.updated_at",
+  ]
+);
 
-export type PaginatedPermissionsProcessInput = PaginationType;
+export type PaginatedPermissionsProcessInput = StaticDecode<
+  typeof PaginatedPermissionsSchema
+>;
 
 export const PaginatedPermissionsResponseSchema =
   createPaginatedResponseSchema(PermissionResponseSchema);
