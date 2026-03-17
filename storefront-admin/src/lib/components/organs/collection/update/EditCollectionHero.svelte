@@ -1,67 +1,59 @@
+
+
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { cn } from '$lib/utils.js';
-	import { client } from '$lib/client';
-	import { superForm, defaults } from 'sveltekit-superforms';
-	import { zod4 } from 'sveltekit-superforms/adapters';
-	import { z } from 'zod';
+	import { superForm } from 'sveltekit-superforms/client';
 	import { Toaster, toast } from 'svelte-sonner';
-	const AttributeUpdateSchema = z.object({
-		id: z.string(),
-		title: z.string().min(3, 'Title must be at least 3 characters').max(50, 'Title is too long'),
-	});
-
-	type AttributeFormData = z.infer<typeof AttributeUpdateSchema>;
-	type AttributeItem = { id: string; title: string };
-	type Mode = 'update' ;
 
 	interface Props {
-		attribute?: AttributeFormData | null;
-		mode?: Mode;
+		collection?: {
+			id: string;
+			title?: string;
+			value?: string;
+			handle?: string;
+			metadata?: { handle?: string } | null;
+		} | null;
 		onSaved?: () => void | Promise<void>;
 		onClosed?: () => void | Promise<void>;
 	}
 
-	let { attribute = null, onSaved = () => {}, onClosed = () => {} }: Props = $props();
+	let { collection = null, onSaved = () => {}, onClosed = () => {} }: Props = $props();
 
 	let open = $state(false);
-	let lastAttributeId = $state<string | null>(null);
+	let lastCollectionId = $state<string | null>(null);
 
 	const { form, errors, enhance, delayed, message, reset } = superForm(
-		defaults({ id: '', title: '' }, zod4(AttributeUpdateSchema)),
+		{ id: '', title: '', handle: '' },
 		{
-			SPA: true,
-			validators: zod4(AttributeUpdateSchema),
-			async onUpdate({ form }) {
-				if (!form.valid) return;
-				try {
-					const id = form.data.id;
-					await client['product-attributes']({ id }).put({
-						id,
-						title: form.data.title.trim(),
-					});
-					toast.success('Attribute updated successfully');
-					open = false;
+			resetForm: true,
+			onResult: async ({ result }) => {
+				if (result.status === 200) {
+					toast.success('Collection updated successfully');
 					await onSaved();
-				} catch (e: any) {
-					const errorMessage = e?.message || 'Failed to update attribute';
-					message.set(errorMessage);
-					toast.error(errorMessage);
+					open = false;
 				}
 			}
 		}
 	);
 
 	$effect(() => {
-		const attributeId = attribute?.id ?? null;
-		if (!attributeId || lastAttributeId === attributeId) return;
-		lastAttributeId = attributeId;
+		const collectionId = collection?.id ?? null;
+		if (!collectionId || lastCollectionId === collectionId) return;
+		lastCollectionId = collectionId;
+		const collectionValue = collection as any;
+		const metadata =
+			typeof collectionValue?.metadata === 'object' && collectionValue?.metadata !== null
+				? collectionValue.metadata
+				: {};
 		reset({
 			data: {
-				id: attribute?.id ?? '',
-				title: attribute?.title ?? '',
+						id: collection?.id ?? '',
+				title: collection?.title ?? collectionValue?.value ?? '',
+				handle: (collection?.handle ?? metadata?.handle ?? '').replace(/^\//, ''),
+				
 			}
 		});
 		message.set('');
@@ -70,8 +62,8 @@
 
 	$effect(() => {
 		if (open) return;
-		if (!lastAttributeId) return;
-		lastAttributeId = null;
+		if (!lastCollectionId) return;
+		lastCollectionId = null;
 		if (!$delayed) {
 			onClosed();
 		}
@@ -90,7 +82,9 @@
 			reset({
 				data: {
 					id: '',
-					title: ''
+					title: '',
+					handle: '',
+					
 				}
 			});
 		}
@@ -102,10 +96,11 @@
 
 <Sheet.Root bind:open={open} onOpenChange={onOpenChange}>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-		<form action="?/update" method="POST" use:enhance class="flex h-full flex-col">
+		<form method="POST" action="?/update" use:enhance class="flex h-full flex-col">
+			<input type="hidden" name="id" bind:value={$form.id} />
 			<div class="flex-1 overflow-auto p-6 pt-12">
-				<h2 class="text-lg font-semibold">Edit Attribute</h2>
-				<p class="mt-1 text-sm text-muted-foreground">Update the attribute title.</p>
+				<h2 class="text-lg font-semibold">Edit Collection</h2>
+				<p class="mt-1 text-sm text-muted-foreground">Update the collection title.</p>
 				{#if $message}
 					<p class="mt-4 text-sm text-destructive">{$message}</p>
 				{/if}
@@ -124,7 +119,23 @@
 							<span class="text-xs text-destructive">{$errors.title}</span>
 						{/if}
 					</div>
+					<div class="flex flex-col gap-2">
+						<label for="edit-handle" class="text-sm font-medium">Handle</label>
+						<Input
+							id="edit-handle"
+							name="handle"
+							bind:value={$form.handle}
+							placeholder="e.g. collection-name"
+						
+							class={cn('h-9', $errors.handle && 'border-destructive')}
+						/>
+						{#if $errors.handle}
+							<span class="text-xs text-destructive">{$errors.handle}</span>
+						{/if}
+					</div>
+					
 				</div>
+			
 			</div>
 			<div class="flex justify-end gap-2 border-t p-4">
 				<Button variant="outline" type="button" onclick={closeSheet}>Cancel</Button>

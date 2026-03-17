@@ -11,10 +11,15 @@
 	
 
 	type TagProduct = any & { collection?: { id: string; title: string; handle: string } | null };
+	type ProductTag = {
+		id: string;
+		value: string;
+		metadata?: Record<string, unknown> | null;
+	};
 
 	const tagId = $derived($page.params.id);
 
-	let tag = $state< Record<string, unknown> | null | undefined>(null);
+	let tag = $state<ProductTag | null>(null);
 	let productsData = $state<{ data: Record<string, unknown>[]; pagination: PaginationMeta } | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
@@ -27,9 +32,9 @@
 		loading = true;
 		error = null;
 		try {
-		const result = await (client as any)['product-tags']({ id: tagId }).get();
-		const payload = (result as any)?.data ?? result;
-		tag = payload?.product_tag ?? payload ?? null;
+			const result = await (client as any)['product-tags']({ id: tagId }).get();
+			const payload = (result as any)?.data ?? result;
+			tag = (payload?.product_tag ?? payload ?? null) as ProductTag | null;
 		} catch (e) {
 			const err = e as any;
 			if (err?.status === 404) {
@@ -41,6 +46,11 @@
 		} finally {
 			loading = false;
 		}
+	}
+
+	async function handleTagUpdated() {
+		await loadTag();
+		await loadProducts();
 	}
 
 	async function loadProducts() {
@@ -130,7 +140,7 @@
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="flex flex-col gap-8 p-6">
 				<div class="flex gap-6">
-					<TagHeroCard tag={tag as any} onUpdated={loadTag} />
+					<TagHeroCard {tag} onUpdated={handleTagUpdated} />
 				</div>
 
 				<TagProductsCard

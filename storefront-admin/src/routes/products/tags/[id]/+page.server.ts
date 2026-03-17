@@ -5,6 +5,7 @@ import { zod4 } from 'sveltekit-superforms/adapters';
 import { superValidate, message } from 'sveltekit-superforms';
 import { client } from '$lib/client';
 
+
 const TagUpdateSchema = z.object({
     value: z.string().min(3, "Value must be at least 3 characters").max(50, "Tag is too long"),
 });
@@ -15,11 +16,13 @@ export const load: PageServerLoad = async () => {
     return { tagUpdateForm };
 };
 
-
 export const actions = {
 
     update: async ({ request, params }) => {
         const tagId = params.id;
+        if (!tagId) {
+            return fail(400, { error: 'Tag id is required' });
+        }
         const tagUpdateForm = await superValidate(request, zod4(TagUpdateSchema));
 
         if (!tagUpdateForm.valid) {
