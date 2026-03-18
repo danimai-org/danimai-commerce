@@ -1,29 +1,20 @@
 <script lang="ts">
+	import type { PageData } from './$types';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import {
-		MultiSelectCombobox,
 		PaginationTable,
 		TableHead,
 		TablePagination,
 		type TableColumn
 	} from '$lib/components/organs/index.js';
+	import InviteCreateSheet from '$lib/components/organs/invite/create/inviteCreate.svelte';
 	import Mail from '@lucide/svelte/icons/mail';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { client } from '$lib/client.js';
-	import { getAccessToken } from '$lib/auth.js';
 
-	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
-
-	function authHeaders(): Record<string, string> {
-		const h: Record<string, string> = { 'Content-Type': 'application/json' };
-		const token = getAccessToken();
-		if (token) h['Authorization'] = `Bearer ${token}`;
-		return h;
-	}
+	let { data }: { data: PageData } = $props();
 
 	type Invite = {
 		id: string;
@@ -33,8 +24,6 @@
 		expires_at: string | Date;
 		created_at: string | Date;
 	};
-	type Role = { id: string; name: string };
-
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
 	function goToPage(pageNum: number) {
@@ -62,14 +51,8 @@
 	const invitesError = $derived(paginateState.error);
 
 	let inviteOpen = $state(false);
-	let inviteEmail = $state('');
-	let inviteRoleIds = $state<string[]>([]);
-	let inviteError = $state<string | null>(null);
-	let inviteSuccess = $state(false);
-	let inviteLoading = $state(false);
-	let inviteSubmitting = $state(false);
+	let resendError = $state<string | null>(null);
 	let resendingId = $state<string | null>(null);
-	let roles = $state<Role[]>([]);
 
 	const tableColumns: TableColumn[] = [
 		{ label: 'Email', key: 'email', type: 'text' },
@@ -109,86 +92,23 @@
 		return new Date(expiresAt) < new Date();
 	}
 
-	async function openInviteSheet() {
-		inviteOpen = true;
-		inviteEmail = '';
-		inviteRoleIds = [];
-		inviteError = null;
-		inviteSuccess = false;
-		inviteLoading = true;
-		try {
-			const res = await fetch(`${API_BASE}/roles?limit=100`, {
-				cache: 'no-store',
-				headers: authHeaders()
-			});
-			if (res.ok) {
-				const json = (await res.json()) as { rows: Role[] };
-				roles = json.rows ?? [];
-			}
-		} finally {
-			inviteLoading = false;
-		}
-	}
-
-	async function submitInvite() {
-		inviteError = null;
-		inviteSuccess = false;
-		const email = inviteEmail.trim();
-		if (!email) {
-			inviteError = 'Email is required';
-			return;
-		}
-		inviteSubmitting = true;
-		try {
-			const body: { email: string; role_ids?: string[] } = { email };
-			if (inviteRoleIds.length > 0) body.role_ids = inviteRoleIds;
-			const res = await fetch(`${API_BASE}/invites`, {
-				method: 'POST',
-				headers: authHeaders(),
-				body: JSON.stringify(body)
-			});
-			const text = await res.text();
-			if (!res.ok) {
-				let msg = text;
-				try {
-					const j = JSON.parse(text);
-					msg = j.message ?? text;
-				} catch {}
-				throw new Error(msg);
-			}
-			inviteSuccess = true;
-			inviteEmail = '';
-			inviteRoleIds = [];
-			paginateState.refetch();
-		} catch (e) {
-			const msg = e instanceof Error ? e.message : String(e);
-			inviteError =
-				msg === 'Failed to fetch'
-					? 'Could not reach the API. Ensure the backend is running (e.g. bun dev in backend).'
-					: msg;
-		} finally {
-			inviteSubmitting = false;
-		}
+	function parseClientError(result: any, fallback: string) {
+		const msg = result?.error?.value?.message;
+		return typeof msg === 'string' && msg.trim().length > 0 ? msg : fallback;
 	}
 
 	async function resendInvite(invite: Invite) {
 		if (invite.accepted) return;
+		resendError = null;
 		resendingId = invite.id;
 		try {
-			const res = await fetch(`${API_BASE}/invites/${invite.id}/resend`, {
-				method: 'POST',
-				headers: authHeaders()
-			});
-			const text = await res.text();
-			if (!res.ok) {
-				let msg = text;
-				try {
-					const j = JSON.parse(text);
-					msg = j.message ?? text;
-				} catch {}
-				throw new Error(msg);
+			const res = await (client as any).invites({ id: invite.id }).resend.post();
+			if (res.error) {
+				throw new Error(parseClientError(res, 'Failed to resend invite'));
 			}
 			paginateState.refetch();
+		} catch (e) {
+			resendError = e instanceof Error ? e.message : String(e);
 		} finally {
 			resendingId = null;
 		}
@@ -207,9 +127,16 @@
 				<Mail class="size-4" />
 				<span class="font-semibold">Invites</span>
 			</div>
-			<Button size="sm" onclick={openInviteSheet}>Invite user</Button>
+			<Button size="sm" onclick={() => (inviteOpen = true)}>Invite user</Button>
 		</div>
 		<PaginationTable>
+			{#if resendError}
+				<div
+					class="mb-4 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+				>
+					{resendError}
+				</div>
+			{/if}
 			{#if invitesError}
 				<div
 					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
@@ -282,73 +209,4 @@
 		</PaginationTable>
 	</div>
 </div>
-
-<Sheet.Root bind:open={inviteOpen}>
-	<Sheet.Content side="right" class="flex h-full max-h-dvh w-full max-w-lg flex-col sm:max-w-lg">
-		<div class="flex min-h-0 flex-1 flex-col">
-			<div class="shrink-0 border-b px-6 py-4">
-				<h2 class="text-lg font-semibold">Invite user</h2>
-				<p class="mt-1 text-sm text-muted-foreground">
-					Send an invite by email. Optionally assign roles.
-				</p>
-			</div>
-			<form
-				onsubmit={(e) => {
-					e.preventDefault();
-					submitInvite();
-				}}
-				class="flex min-h-0 flex-1 flex-col"
-			>
-				<div class="min-h-0 flex-1 overflow-auto space-y-4 px-6 py-6">
-					<div class="space-y-2">
-						<label for="invite-email" class="block text-sm font-medium">Email</label>
-						<Input
-							id="invite-email"
-							type="email"
-							placeholder="user@example.com"
-							class="w-full"
-							bind:value={inviteEmail}
-							disabled={inviteSubmitting}
-							required
-						/>
-					</div>
-					{#if roles.length > 0}
-						<div class="space-y-2">
-							<label for="invite-role" class="block text-sm font-medium">Roles (optional)</label>
-							{#if inviteLoading}
-								<p class="text-sm text-muted-foreground">Loading roles…</p>
-							{:else}
-								<MultiSelectCombobox
-									id="invite-role"
-									options={roles.map((r) => ({ id: r.id, value: r.name }))}
-									bind:value={inviteRoleIds}
-									placeholder="Select roles…"
-									disabled={inviteSubmitting}
-								/>
-							{/if}
-						</div>
-					{/if}
-					{#if inviteError}
-						<p class="text-sm text-destructive">{inviteError}</p>
-					{/if}
-					{#if inviteSuccess}
-						<p class="text-sm text-green-600 dark:text-green-400">Invite sent successfully.</p>
-					{/if}
-				</div>
-				<div class="flex shrink-0 justify-end gap-2 border-t p-4">
-					<Button
-						type="button"
-						variant="outline"
-						onclick={() => (inviteOpen = false)}
-						disabled={inviteSubmitting}
-					>
-						Cancel
-					</Button>
-					<Button type="submit" disabled={inviteSubmitting}>
-						{inviteSubmitting ? 'Sending…' : 'Send invite'}
-					</Button>
-				</div>
-			</form>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
+<InviteCreateSheet bind:open={inviteOpen} formData={data.inviteCreateForm} onSuccess={() => paginateState.refetch()} />

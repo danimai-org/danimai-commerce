@@ -2,8 +2,13 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { updateCurrency } from '$lib/currencies/api.js';
-	import type { Currency } from '$lib/currencies/types.js';
 
+	type Currency = {
+		id: string;
+		code: string;
+		tax_inclusive_pricing: boolean;
+	};
+	
 	let {
 		open = $bindable(false),
 		currency = null as Currency | null,

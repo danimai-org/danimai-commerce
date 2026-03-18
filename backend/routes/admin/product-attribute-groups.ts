@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { StaticDecode, Type } from "@sinclair/typebox";
+import { type StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   CREATE_PRODUCT_ATTRIBUTE_GROUP_PROCESS,

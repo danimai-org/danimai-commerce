@@ -12,14 +12,16 @@
 		type TableColumn
 	} from '$lib/components/organs/index.js';
 	import Receipt from '@lucide/svelte/icons/receipt';
-	import { deleteTaxRegions, listTaxRegions } from '$lib/tax-regions/api.js';
-	import type { TaxRegion, TaxRegionsListResponse } from '$lib/tax-regions/types.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import EditTax from '$lib/components/organs/tax-region/update/EditTax.svelte';
+	import { client } from '$lib/client.js';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
 	const paginateState = createPagination(
-		async () => listTaxRegions(paginationQuery),
+		async () => client['tax-regions'].get({
+			query: paginationQuery as Record<string, unknown>
+		}),
 		['tax-regions']
 	);
 
@@ -29,9 +31,9 @@
 		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	const queryData = $derived(paginateState.query.data as TaxRegionsListResponse | undefined);
-	const rows = $derived(queryData?.rows ?? []);
-	const pagination = $derived(queryData?.pagination ?? null);
+	const queryData = $derived(paginateState.query.data as any | undefined);
+	const rows = $derived((queryData?.data?.rows ?? []) as any[]);
+	const pagination = $derived((queryData?.data?.pagination ?? null) as any);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
 	const formMode = $derived(paginateState.formMode);
@@ -47,6 +49,11 @@
 	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
 	const confirmDelete = $derived(paginateState.confirmDelete);
 	const refetch = $derived(paginateState.refetch);
+
+	async function handleFormSaved() {
+		paginateState.closeForm();
+		await paginateState.refetch();
+	}
 
 	const tableColumns: TableColumn[] = [
 		{ label: 'Name', key: 'name', type: 'text' },
@@ -123,18 +130,27 @@
 	</div>
 </div>
 
-<TaxRegionFormSheet
-	bind:open={paginateState.formSheetOpen}
-	mode={formMode}
-	region={(formItem as TaxRegion | null)}
-	onSuccess={refetch}
-/>
+{#if formMode === 'edit'}
+	<EditTax
+		bind:open={paginateState.formSheetOpen}
+		mode="edit"
+			region={(formItem as any | null) as any}
+		onSuccess={handleFormSaved}
+	/>
+{:else}
+	<TaxRegionFormSheet bind:open={paginateState.formSheetOpen} mode="create" onSuccess={handleFormSaved} />
+{/if}
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="tax region"
-	entityTitle={(deleteItem as TaxRegion | null)?.name ?? (deleteItem as TaxRegion | null)?.id ?? ''}
-	onConfirm={() => confirmDelete((item: Record<string, unknown>) => deleteTaxRegions([(item as { id: string }).id]))}
+	entityTitle={(deleteItem as any | null)?.name ?? (deleteItem as any | null)?.id ?? ''}
+	onConfirm={() =>
+		confirmDelete(async (item) => {
+			await client['tax-regions'].delete({
+				tax_region_ids: [((item as { data?: { id?: string } }).data?.id ?? (item as { id?: string }).id)!]
+			});
+		})}
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}
 />

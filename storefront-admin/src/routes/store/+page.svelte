@@ -5,7 +5,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import Store from '@lucide/svelte/icons/store';
+	import StoreIcon from '@lucide/svelte/icons/store';
 	import {
 		DeleteConfirmationModal,
 		CurrencyFormSheet,
@@ -17,11 +17,9 @@
 		type TableColumn
 	} from '$lib/components/organs/index.js';
 	import Combobox from '$lib/components/organs/combobox/combobox.svelte';
-	import { listCurrencies, deleteCurrencies } from '$lib/currencies/api.js';
-	import type { Currency, CurrenciesListResponse } from '$lib/currencies/types.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import { client } from '$lib/client.js';
 
-	const API_BASE = 'http://localhost:8000/admin';
 
 	type Store = {
 		id: string;
@@ -31,9 +29,9 @@
 		default_region_id: string | null;
 		default_location_id: string | null;
 		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
+		created_at: string | Date;
+		updated_at: string | Date;
+		deleted_at: string | Date | null;
 	};
 
 	type Region = {
@@ -63,6 +61,38 @@
 	};
 
 	type StoresListResponse = { rows: Store[]; pagination: StoreListPagination };
+	type Currency = {
+		id: string;
+		code: string;
+		name: string;
+		symbol: string;
+		symbol_native: string;
+		tax_inclusive_pricing: boolean;
+		metadata: unknown | null;
+		created_at: string | Date;
+		updated_at: string | Date;
+		deleted_at: string | Date | null;
+	};
+	type CurrenciesListResponse = { rows: Currency[]; pagination: StoreListPagination };
+
+	async function listCurrencies(query: Record<string, unknown>) {
+		const res = await (client as any).currencies.get({
+			query
+		});
+		if (res?.error) {
+			throw new Error(String(res.error.value?.message ?? 'Failed to list currencies'));
+		}
+		return res.data as CurrenciesListResponse;
+	}
+
+	async function deleteCurrencies(ids: string[]) {
+		const res = await (client as any).currencies.delete({
+			currency_ids: ids
+		});
+		if (res?.error) {
+			throw new Error(String(res.error.value?.message ?? 'Failed to delete currencies'));
+		}
+	}
 
 	// Store list: URL pagination (store_page, store_limit) + createPagination, like currencies
 	const storePaginationQuery = $derived.by(() => {
@@ -76,12 +106,13 @@
 	});
 
 	async function listStores(query: ReturnType<typeof createPaginationQuery>) {
-		const params = new URLSearchParams();
-		if (query.page != null) params.set('page', String(query.page));
-		if (query.limit != null) params.set('limit', String(query.limit));
-		const res = await fetch(`${API_BASE}/stores?${params}`, { cache: 'no-store' });
-		if (!res.ok) throw new Error(await res.text());
-		return res.json() as Promise<StoresListResponse>;
+		const res = await client.stores.get({
+			query: query as Record<string, unknown>
+		});
+		if (res?.error) {
+			throw new Error(String(res.error.value?.message ?? 'Failed to list stores'));
+		}
+		return res.data as StoresListResponse;
 	}
 
 	const storePaginateState = createPagination(
@@ -122,23 +153,21 @@
 		storeOptionsLoading = true;
 		try {
 			const [regionsRes, channelsRes, locationsRes, currenciesData] = await Promise.all([
-				fetch(`${API_BASE}/regions?limit=100`, { cache: 'no-store' }),
-				fetch(`${API_BASE}/sales-channels?limit=100`, { cache: 'no-store' }),
-				fetch(`${API_BASE}/stock-locations?limit=100`, { cache: 'no-store' }),
+				client.regions.get({ query: { limit: 100 } as Record<string, unknown> }),
+				client['sales-channels'].get({ query: { limit: 100 } as Record<string, unknown> }),
+				client['stock-locations'].get({ query: { limit: 100 } as Record<string, unknown> }),
 				listCurrencies({ limit: 100 })
 			]);
 
-			if (regionsRes.ok) {
-				const json = (await regionsRes.json()) as { rows: Region[] };
-				storeRegions = json.rows ?? [];
+			if (regionsRes?.data) {
+				storeRegions = ((regionsRes.data as { rows?: Region[] }).rows ?? []) as Region[];
 			}
-			if (channelsRes.ok) {
-				const json = (await channelsRes.json()) as { rows: SalesChannel[] };
-				storeSalesChannels = json.rows ?? [];
+			if (channelsRes?.data) {
+				storeSalesChannels = ((channelsRes.data as { rows?: SalesChannel[] }).rows ?? []) as SalesChannel[];
 			}
-			if (locationsRes.ok) {
-				const json = (await locationsRes.json()) as { rows: StockLocation[] };
-				storeStockLocations = json.rows ?? [];
+			if (locationsRes?.data) {
+				storeStockLocations = ((locationsRes.data as { rows?: StockLocation[] }).rows ??
+					[]) as StockLocation[];
 			}
 			storeCurrencies = currenciesData.rows;
 		} catch (e) {
@@ -192,12 +221,11 @@
 			if (editStoreDefaultLocation !== (storeToEdit.default_location_id ?? ''))
 				body.default_location_id = editStoreDefaultLocation || null;
 
-			const res = await fetch(`${API_BASE}/stores/${storeToEdit.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body)
+			const res = await (client as any).stores[":id"].put({
+				params: { id: storeToEdit.id },
+				body
 			});
-			if (!res.ok) throw new Error(await res.text());
+			if (res?.error) throw new Error(String(res.error.value?.message ?? 'Failed to update store'));
 			closeEditStore();
 			storePaginateState.refetch();
 		} catch (e) {
@@ -336,7 +364,7 @@
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex items-center justify-between border-b pb-4">
 			<div class="flex items-center gap-2">
-				<Store class="size-5 text-foreground" />
+				<StoreIcon class="size-5 text-foreground" />
 				<span class="text-lg font-semibold text-foreground">Store</span>
 			</div>
 		</div>

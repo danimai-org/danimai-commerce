@@ -2,7 +2,16 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { PaginationTable, TableHead, TableBody, TablePagination, DeleteConfirmationModal, RoleFormSheet, type TableColumn } from '$lib/components/organs/index.js';
+	import {
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		DeleteConfirmationModal,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
+	import RoleCreateSheet from '$lib/components/organs/role/Create/roleCreate.svelte';
+	import EditRoleSheet from '$lib/components/organs/role/update/EditRole.svelte';
 	import ShieldCheck from '@lucide/svelte/icons/shield-check';
 	import { client } from '$lib/client.js';
 	import { createPagination, createPaginationQuery } from '$lib/api/pagination.svelte.js';
@@ -127,12 +136,20 @@
 	</div>
 </div>
 
-<RoleFormSheet
-	bind:open={paginateState.formSheetOpen}
-	mode={formMode}
-	role={formItem as any}
-	on:success={() => refetch()}
-/>
+{#if formMode === 'edit'}
+	<EditRoleSheet
+		bind:open={paginateState.formSheetOpen}
+		mode="edit"
+		role={formItem as any}
+		onSuccess={() => refetch()}
+	/>
+{:else}
+	<RoleCreateSheet
+		bind:open={paginateState.formSheetOpen}
+		mode="create"
+		onSuccess={() => refetch()}
+	/>
+{/if}
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}

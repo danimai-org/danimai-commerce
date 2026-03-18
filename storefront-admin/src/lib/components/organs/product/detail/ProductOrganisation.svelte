@@ -16,7 +16,7 @@ const product = $derived(getProductDetail()?.data?? null);
 			size="icon"
 			class="size-8 shrink-0"
 			onclick={() => {
-				console.log('clicked');
+				
 				orgSheetOpen = true;
 			}}
 			aria-label="Edit organisation"
@@ -27,15 +27,14 @@ const product = $derived(getProductDetail()?.data?? null);
 	<dl class="mt-4 grid gap-3 text-sm">
 		<div>
 			<dt class="font-medium text-muted-foreground">Category</dt>
-			<dd class="mt-0.5">{product?.category?.value ?? '—'}</dd>
+			<dd class="mt-0.5">{product?.category?.value || '—'}</dd>
 		</div>
 		<div>
 			<dt class="font-medium text-muted-foreground">Collections</dt>
 			<dd class="mt-0.5">
 				{#if product?.collections?.length}
 					{product.collections.map((c) => c.title).join(', ')}
-				{:else}
-					—
+				{product.collections.length > 0 ? product.collections.map((c) => c.title).join(', ') : '—'}
 				{/if}
 			</dd>
 		</div>

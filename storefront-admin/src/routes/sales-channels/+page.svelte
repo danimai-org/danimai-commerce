@@ -30,7 +30,6 @@
 	const formMode = $derived(paginateState.formMode);
 	const formItem = $derived(paginateState.formItem);
 	const openCreate = $derived(paginateState.openCreate);
-	const openEdit = $derived(paginateState.openEdit);
 	const closeForm = $derived(paginateState.closeForm);
 	const deleteConfirmOpen = $derived(paginateState.deleteConfirmOpen);
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
@@ -41,8 +40,13 @@
 	const confirmDelete = $derived(paginateState.confirmDelete);
 	const refetch = $derived(paginateState.refetch);
 
-const tableColumns: TableColumn[] = [
-	{ label: 'Name', key: 'name', type: 'text' },
+	async function handleFormSaved() {
+		paginateState.closeForm();
+		await paginateState.refetch();
+	}
+
+	const tableColumns: TableColumn[] = [
+	{ label: 'Name', key: 'name', type: 'link', cellHref: '/sales-channels/{{id}}' },
 	{ label: 'Description', key: 'description', type: 'text' },
 	{ label: 'Default', key: 'is_default', type: 'boolean' },
 	{ label: 'Created', key: 'created_at', type: 'date' },
@@ -52,7 +56,12 @@ const tableColumns: TableColumn[] = [
 		key: 'actions',
 		type: 'actions',
 		actions: [
-			{ label: 'Edit', key: 'edit', type: 'button', onClick: (item) => openEdit(item as Parameters<typeof openEdit>[0]) },
+			{
+				label: 'Edit',
+				key: 'edit',
+				type: 'button',
+				onClick: (item) => goto(`/sales-channels/${String((item as { id?: string }).id ?? '')}`)
+			},
 			{ label: 'Delete', key: 'delete', type: 'button', onClick: (item) => openDeleteConfirm(item as Parameters<typeof openDeleteConfirm>[0]) },
 		],
 	},
@@ -109,10 +118,11 @@ const tableColumns: TableColumn[] = [
 
 <SalesChannelFormSheet
 	bind:open={paginateState.formSheetOpen}
-	mode={formMode}
-	channel={formItem as any}
-	onSuccess={refetch}
+	mode="create"
+	onSuccess={handleFormSaved}
 />
+
+
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}

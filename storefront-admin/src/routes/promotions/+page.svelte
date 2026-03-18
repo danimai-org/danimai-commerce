@@ -15,71 +15,52 @@
 		type Promotion,
 		type Campaign
 	} from '$lib/components/organs/index.js';
+	import { client } from '$lib/client.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import Folder from '@lucide/svelte/icons/folder';
 
-	// Load from localStorage or use default
-	function loadPromotions(): Promotion[] {
-		if (typeof window === 'undefined') {
-			return [{ id: '1', code: 'SUMMER15', method: 'Automatic', status: 'Active' }];
-		}
-		try {
-			const stored = localStorage.getItem('promotions');
-			if (stored) {
-				return JSON.parse(stored);
-			}
-		} catch (e) {
-			console.error('Failed to load promotions from localStorage:', e);
-		}
-		return [{ id: '1', code: 'SUMMER15', method: 'Automatic', status: 'Active' }];
-	}
-
-	function savePromotionsToStorage(proms: Promotion[]) {
-		if (typeof window !== 'undefined') {
-			try {
-				localStorage.setItem('promotions', JSON.stringify(proms));
-			} catch (e) {
-				console.error('Failed to save promotions to localStorage:', e);
-			}
-		}
-	}
-
-	// In-memory state with localStorage persistence
-	let promotions = $state<Promotion[]>(loadPromotions());
-	let campaigns = $state<Campaign[]>(loadCampaigns());
+	let campaigns = $state<Campaign[]>([]);
 	let searchQuery = $state('');
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
 	const paginateState = createPagination(
-		async () => {
-			const all = loadPromotions();
-			const q = searchQuery.trim().toLowerCase();
-			const filtered = q
-				? all.filter((p) => p.code.toLowerCase().includes(q))
-				: all;
-			const pageNum = Number((paginationQuery as Record<string, string>)?.['page']) || 1;
-			const limitNum = Number((paginationQuery as Record<string, string>)?.['limit']) || 10;
-			const total = filtered.length;
-			const totalPages = Math.max(1, Math.ceil(total / limitNum));
-			const startIdx = (pageNum - 1) * limitNum;
-			const rows = filtered.slice(startIdx, startIdx + limitNum);
-			return {
-				rows,
-				pagination: {
-					total,
-					page: pageNum,
-					limit: limitNum,
-					total_pages: totalPages,
-					has_next_page: pageNum < totalPages,
-					has_previous_page: pageNum > 1
+		async () =>
+			client['promotions'].get({
+				query: {
+					...(paginationQuery as Record<string, unknown>),
+					search: searchQuery.trim() || undefined
 				}
-			};
-		},
+			}),
 		['promotions']
 	);
 
-	
+	let lastRefetchKey = $state<string | null>(null);
+
+	$effect(() => {
+		const currentRefetchKey = `${searchQuery.trim()}::${page.url.searchParams.toString()}`;
+		if (lastRefetchKey === null) {
+			lastRefetchKey = currentRefetchKey;
+			return;
+		}
+		if (lastRefetchKey === currentRefetchKey) return;
+		lastRefetchKey = currentRefetchKey;
+		paginateState.refetch();
+	});
+
+	async function fetchCampaigns() {
+		const res = await client['campaigns'].get({
+			query: { page: 1, limit: 100 }
+		});
+		campaigns = ((res as { data?: { rows?: Campaign[] } })?.data?.rows ?? []) as Campaign[];
+	}
+
+	let campaignsLoaded = $state(false);
+	$effect(() => {
+		if (campaignsLoaded) return;
+		campaignsLoaded = true;
+		void fetchCampaigns();
+	});
 
 	function goToPage(pageNum: number) {
 		const params = new URLSearchParams(page.url.searchParams);
@@ -87,8 +68,8 @@
 		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	const rows = $derived((paginateState.query.data?.rows ?? []) as Record<string, unknown>[]);
-	const listPagination = $derived(paginateState.query.data?.pagination ?? null);
+	const rows = $derived((paginateState.query.data?.data?.rows ?? []) as Record<string, unknown>[]);
+	const listPagination = $derived(paginateState.query.data?.data?.pagination ?? null);
 	const start = $derived(
 		listPagination ? (listPagination.page - 1) * listPagination.limit + 1 : 0
 	);
@@ -105,61 +86,32 @@
 	let deleteModalOpen = $state(false);
 	let promotionToDelete = $state<Promotion | null>(null);
 
-	function loadCampaigns(): Campaign[] {
-		if (typeof window === 'undefined') {
-			return [
-				{
-					id: '1',
-					name: 'Big Bang sale',
-					description: null,
-					identifier: 'BIGBANG',
-					start_date: null,
-					end_date: null
-				}
-			];
-		}
-		try {
-			const stored = localStorage.getItem('campaigns');
-			if (stored) {
-				return JSON.parse(stored);
-			}
-		} catch (e) {
-			console.error('Failed to load campaigns from localStorage:', e);
-		}
-		return [
-			{
-				id: '1',
-				name: 'Big Bang sale',
-				description: null,
-				identifier: 'BIGBANG',
-				start_date: null,
-				end_date: null
-			}
-		];
-	}
-
-	function saveCampaignsToStorage(camps: Campaign[]) {
-		if (typeof window !== 'undefined') {
-			try {
-				localStorage.setItem('campaigns', JSON.stringify(camps));
-			} catch (e) {
-				console.error('Failed to save campaigns to localStorage:', e);
-			}
-		}
-	}
-
 	function openCreate() {
 		createOpen = true;
 	}
 
-	function handleCreateSave(payload: { promotion: Promotion; newCampaign?: Campaign }) {
-		promotions = [...promotions, payload.promotion];
-		savePromotionsToStorage(promotions);
+	async function handleCreateSave(payload: { promotion: Promotion; newCampaign?: Campaign }) {
+		let campaignId = payload.promotion.campaign_id ?? null;
+
 		if (payload.newCampaign) {
-			campaigns = [...campaigns, payload.newCampaign];
-			saveCampaignsToStorage(campaigns);
+			const campaignRes = await client['campaigns'].post({
+				name: payload.newCampaign.name,
+				description: payload.newCampaign.description,
+				identifier: payload.newCampaign.identifier,
+				start_date: payload.newCampaign.start_date,
+				end_date: payload.newCampaign.end_date
+			});
+			campaignId = (campaignRes as { data?: Campaign })?.data?.id ?? null;
+			await fetchCampaigns();
 		}
-		paginateState.refetch();
+
+		await client['promotions'].post({
+			code: payload.promotion.code,
+			method: payload.promotion.method,
+			status: payload.promotion.status,
+			campaign_id: campaignId
+		});
+		await paginateState.refetch();
 	}
 
 	function openDetails(p: Promotion) {
@@ -177,36 +129,33 @@
 		editOpen = true;
 	}
 
-	function handleEditSave(updated: Pick<Promotion, 'id' | 'code' | 'method' | 'status'>) {
-		promotions = promotions.map((x) =>
-			x.id === updated.id ? { ...x, code: updated.code, method: updated.method, status: updated.status } : x
-		);
-		savePromotionsToStorage(promotions);
+	async function handleEditSave(updated: Pick<Promotion, 'id' | 'code' | 'method' | 'status'>) {
+		await client['promotions']({ id: updated.id }).put({
+			code: updated.code,
+			method: updated.method,
+			status: updated.status
+		});
 		editingPromotion = null;
-		paginateState.refetch();
+		await paginateState.refetch();
 	}
 
 	$effect(() => {
 		if (!editOpen) editingPromotion = null;
-		campaigns = loadCampaigns();
 	});
-
-	function deletePromotion(p: Promotion) {
-		promotions = promotions.filter((x) => x.id !== p.id);
-		savePromotionsToStorage(promotions);
-	}
 
 	function openDeleteModal(p: Promotion) {
 		promotionToDelete = p;
 		deleteModalOpen = true;
 	}
 
-	function handleConfirmDelete() {
+	async function handleConfirmDelete() {
 		if (promotionToDelete) {
-			deletePromotion(promotionToDelete);
+			await client['promotions'].delete({
+				promotion_ids: [promotionToDelete.id]
+			});
 			promotionToDelete = null;
 			deleteModalOpen = false;
-			paginateState.refetch();
+			await paginateState.refetch();
 		}
 	}
 

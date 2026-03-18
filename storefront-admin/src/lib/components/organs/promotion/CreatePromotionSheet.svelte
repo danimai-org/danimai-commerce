@@ -6,8 +6,83 @@
 	import Clock from '@lucide/svelte/icons/clock';
 	import Info from '@lucide/svelte/icons/info';
 	import { cn } from '$lib/utils.js';
-	import type { Promotion, Campaign, PromotionTypeId, CodeCondition } from './types.js';
-	import { PROMOTION_TYPES, CURRENCIES } from './types.js';
+
+	type Campaign = {
+		id: string;
+		name: string;
+		description: string | null;
+		identifier: string;
+		start_date: string | null;
+		end_date: string | null;
+	};
+
+	type Promotion = {
+		id: string;
+		code: string;
+		method: 'Manual' | 'Automatic';
+		status: 'Draft' | 'Active' | 'Inactive';
+		campaign_id: string | null;
+	};
+
+	type PromotionTypeId =
+		| 'amount_off_products'
+		| 'amount_off_order'
+		| 'percentage_off_product'
+		| 'percentage_off_order'
+		| 'buy_x_get_y'
+		| 'free_shipping';
+
+	type PromotionType = {
+		id: PromotionTypeId;
+		label: string;
+		description: string;
+	};
+
+	type CodeCondition = {
+		id: string;
+		field: string;
+		op: string;
+		value: string;
+	};
+
+	const PROMOTION_TYPES: PromotionType[] = [
+		{
+			id: 'amount_off_products',
+			label: 'Amount off products',
+			description: 'Discount by a fixed amount on selected products.'
+		},
+		{
+			id: 'amount_off_order',
+			label: 'Amount off order',
+			description: 'Discount by a fixed amount on the order total.'
+		},
+		{
+			id: 'percentage_off_product',
+			label: 'Percentage off products',
+			description: 'Discount selected products by a percentage.'
+		},
+		{
+			id: 'percentage_off_order',
+			label: 'Percentage off order',
+			description: 'Discount the order total by a percentage.'
+		},
+		{
+			id: 'buy_x_get_y',
+			label: 'Buy X get Y',
+			description: 'Unlock discounts when qualifying cart conditions are met.'
+		},
+		{
+			id: 'free_shipping',
+			label: 'Free shipping',
+			description: 'Apply free shipping when shipping conditions are met.'
+		}
+	];
+
+	const CURRENCIES = [
+		{ code: 'USD', name: 'US Dollar', symbol: '$' },
+		{ code: 'EUR', name: 'Euro', symbol: 'EUR' },
+		{ code: 'GBP', name: 'British Pound', symbol: 'GBP' }
+	] as const;
 
 	let {
 		open = $bindable(false),

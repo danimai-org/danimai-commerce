@@ -24,8 +24,7 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import Info from '@lucide/svelte/icons/info';
 	import { cn } from '$lib/utils.js';
-
-	const API_BASE = 'http://localhost:8000/admin';
+	import { client } from '$lib/client.js';
 	
 	type Campaign = {
 		id: string;
@@ -95,122 +94,31 @@
 		{ code: 'GBP', name: 'British Pound', symbol: '£' }
 	] as const;
 
-	// Load from localStorage or use default
-	function loadCampaigns(): Campaign[] {
-		if (typeof window === 'undefined') {
-		return [
-			{
-				id: '1',
-				name: 'Big Bang sale',
-				description: null,
-				identifier: 'BIGBANG',
-				start_date: null,
-				end_date: null,
-				budget_type: null,
-				budget_limit: null,
-				budget_limit_per: null
-			}
-		];
-		}
-		try {
-			const stored = localStorage.getItem('campaigns');
-			if (stored) {
-				return JSON.parse(stored);
-			}
-		} catch (e) {
-			console.error('Failed to load campaigns from localStorage:', e);
-		}
-		return [
-			{
-				id: '1',
-				name: 'Big Bang sale',
-				description: null,
-				identifier: 'BIGBANG',
-				start_date: null,
-				end_date: null,
-				budget_type: null,
-				budget_limit: null,
-				budget_limit_per: null
-			}
-		];
-	}
-
-	function saveCampaignsToStorage(camps: Campaign[]) {
-		if (typeof window !== 'undefined') {
-			try {
-				localStorage.setItem('campaigns', JSON.stringify(camps));
-			} catch (e) {
-				console.error('Failed to save campaigns to localStorage:', e);
-			}
-		}
-	}
-
-	function loadPromotions(): Promotion[] {
-		if (typeof window === 'undefined') {
-			return [];
-		}
-		try {
-			const stored = localStorage.getItem('promotions');
-			if (stored) {
-				return JSON.parse(stored);
-			}
-		} catch (e) {
-			console.error('Failed to load promotions from localStorage:', e);
-		}
-		return [];
-	}
-
-	function savePromotionsToStorage(proms: Promotion[]) {
-		if (typeof window !== 'undefined') {
-			try {
-				localStorage.setItem('promotions', JSON.stringify(proms));
-			} catch (e) {
-				console.error('Failed to save promotions to localStorage:', e);
-			}
-		}
-	}
-
-	let campaigns = $state<Campaign[]>(loadCampaigns());
 	let searchQuery = $state('');
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
 	const paginateState = createPagination(
-		async () => {
-			const all = loadCampaigns();
-			const q = searchQuery.trim().toLowerCase();
-			const filtered = q
-				? all.filter(
-						(c) =>
-							c.name.toLowerCase().includes(q) ||
-							c.identifier.toLowerCase().includes(q) ||
-							(c.description?.toLowerCase().includes(q) ?? false)
-					)
-				: all;
-			const pageNum = Number((paginationQuery as Record<string, string>)?.['page']) || 1;
-			const limitNum = Number((paginationQuery as Record<string, string>)?.['limit']) || 10;
-			const total = filtered.length;
-			const totalPages = Math.max(1, Math.ceil(total / limitNum));
-			const startIdx = (pageNum - 1) * limitNum;
-			const rows = filtered.slice(startIdx, startIdx + limitNum);
-			return {
-				rows,
-				pagination: {
-					total,
-					page: pageNum,
-					limit: limitNum,
-					total_pages: totalPages,
-					has_next_page: pageNum < totalPages,
-					has_previous_page: pageNum > 1
+		async () =>
+			client['campaigns'].get({
+				query: {
+					...(paginationQuery as Record<string, unknown>),
+					search: searchQuery.trim() || undefined
 				}
-			};
-		},
+			}),
 		['campaigns']
 	);
 
+	let lastRefetchKey = $state<string | null>(null);
+
 	$effect(() => {
-		searchQuery;
-		page.url.searchParams.toString();
+		const currentRefetchKey = `${searchQuery.trim()}::${page.url.searchParams.toString()}`;
+		if (lastRefetchKey === null) {
+			lastRefetchKey = currentRefetchKey;
+			return;
+		}
+		if (lastRefetchKey === currentRefetchKey) return;
+		lastRefetchKey = currentRefetchKey;
 		paginateState.refetch();
 	});
 
@@ -220,8 +128,8 @@
 		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	const rows = $derived((paginateState.query.data?.rows ?? []) as Record<string, unknown>[]);
-	const listPagination = $derived(paginateState.query.data?.pagination ?? null);
+	const rows = $derived((paginateState.query.data?.data?.rows ?? []) as Record<string, unknown>[]);
+	const listPagination = $derived(paginateState.query.data?.data?.pagination ?? null);
 	const start = $derived(
 		listPagination ? (listPagination.page - 1) * listPagination.limit + 1 : 0
 	);
@@ -281,7 +189,7 @@
 	// View campaign sheet
 	let viewOpen = $state(false);
 	let viewingCampaign = $state<Campaign | null>(null);
-	let promotions = $state<Promotion[]>(loadPromotions());
+	let promotions = $state<Promotion[]>([]);
 	let viewingCampaignPromotions = $derived(
 		viewingCampaign ? promotions.filter((p) => p.campaign_id === viewingCampaign!.id) : []
 	);
@@ -319,6 +227,14 @@
 	const isBuyXGetY = $derived(createPromotionType === 'buy_x_get_y');
 	const isFreeShipping = $derived(createPromotionType === 'free_shipping');
 
+	async function fetchPromotionsForCampaign(campaignId: string) {
+		const res = await client['promotions'].get({
+			query: { page: 1, limit: 200 }
+		});
+		const all = ((res as { data?: { rows?: Promotion[] } })?.data?.rows ?? []) as Promotion[];
+		promotions = all.filter((promotion) => promotion.campaign_id === campaignId);
+	}
+
 	function openCreate() {
 		createOpen = true;
 		createName = '';
@@ -336,7 +252,7 @@
 		createOpen = false;
 	}
 
-	function submitCreate() {
+	async function submitCreate() {
 		createError = null;
 		if (!createName.trim()) {
 			createError = 'Name is required';
@@ -346,21 +262,15 @@
 			createError = 'Identifier is required';
 			return;
 		}
-		const newCampaign: Campaign = {
-			id: crypto.randomUUID(),
+		await client['campaigns'].post({
 			name: createName.trim(),
 			description: createDescription.trim() || null,
 			identifier: createIdentifier.trim(),
 			start_date: createStartDate || null,
-			end_date: createEndDate || null,
-			budget_type: createBudgetType,
-			budget_limit: createBudgetLimit ? parseFloat(createBudgetLimit) : null,
-			budget_limit_per: createBudgetLimitPer || null
-		};
-		campaigns = [...campaigns, newCampaign];
-		saveCampaignsToStorage(campaigns);
+			end_date: createEndDate || null
+		});
 		closeCreate();
-		paginateState.refetch();
+		await paginateState.refetch();
 	}
 
 	function openEdit(c: Campaign) {
@@ -379,7 +289,7 @@
 		editingCampaign = null;
 	}
 
-	function saveEdit() {
+	async function saveEdit() {
 		if (!editingCampaign) return;
 		editError = null;
 		if (!editName.trim()) {
@@ -390,26 +300,19 @@
 			editError = 'Identifier is required';
 			return;
 		}
-		campaigns = campaigns.map((x) =>
-			x.id === editingCampaign!.id
-				? {
-						...x,
-						name: editName.trim(),
-						identifier: editIdentifier.trim(),
-						description: editDescription.trim() || null,
-						start_date: editStartDate || null,
-						end_date: editEndDate || null
-					}
-				: x
-		);
-		saveCampaignsToStorage(campaigns);
+		const res = await client['campaigns']({ id: editingCampaign.id }).put({
+			name: editName.trim(),
+			identifier: editIdentifier.trim(),
+			description: editDescription.trim() || null,
+			start_date: editStartDate || null,
+			end_date: editEndDate || null
+		});
+		const updated = (res as { data?: Campaign })?.data ?? null;
+		if (viewingCampaign?.id === editingCampaign.id && updated) {
+			viewingCampaign = updated;
+		}
 		closeEdit();
-		paginateState.refetch();
-	}
-
-	function deleteCampaign(c: Campaign) {
-		campaigns = campaigns.filter((x) => x.id !== c.id);
-		saveCampaignsToStorage(campaigns);
+		await paginateState.refetch();
 	}
 
 	function openDeleteModal(c: Campaign) {
@@ -417,18 +320,20 @@
 		deleteModalOpen = true;
 	}
 
-	function handleConfirmDelete() {
+	async function handleConfirmDelete() {
 		if (campaignToDelete) {
-			deleteCampaign(campaignToDelete);
+			await client['campaigns'].delete({
+				campaign_ids: [campaignToDelete.id]
+			});
 			campaignToDelete = null;
 			deleteModalOpen = false;
-			paginateState.refetch();
+			await paginateState.refetch();
 		}
 	}
 
-	function openView(c: Campaign) {
+	async function openView(c: Campaign) {
 		viewingCampaign = c;
-		promotions = loadPromotions();
+		await fetchPromotionsForCampaign(c.id);
 		viewName = c.name;
 		viewIdentifier = c.identifier;
 		viewDescription = c.description || '';
@@ -467,7 +372,7 @@
 		}
 	}
 
-	function saveInfo() {
+	async function saveInfo() {
 		if (!viewingCampaign) return;
 		viewError = null;
 		if (!viewName.trim()) {
@@ -478,20 +383,14 @@
 			viewError = 'Identifier is required';
 			return;
 		}
-		campaigns = campaigns.map((x) =>
-			x.id === viewingCampaign!.id
-				? {
-						...x,
-						name: viewName.trim(),
-						identifier: viewIdentifier.trim(),
-						description: viewDescription.trim() || null
-					}
-				: x
-		);
-		saveCampaignsToStorage(campaigns);
-		viewingCampaign = campaigns.find((c) => c.id === viewingCampaign!.id) || null;
+		const res = await client['campaigns']({ id: viewingCampaign.id }).put({
+			name: viewName.trim(),
+			identifier: viewIdentifier.trim(),
+			description: viewDescription.trim() || null
+		});
+		viewingCampaign = ((res as { data?: Campaign })?.data ?? viewingCampaign) as Campaign;
 		editingInfo = false;
-		paginateState.refetch();
+		await paginateState.refetch();
 	}
 
 	function startEditConfig() {
@@ -512,22 +411,16 @@
 		}
 	}
 
-	function saveConfig() {
+	async function saveConfig() {
 		if (!viewingCampaign) return;
 		viewError = null;
-		campaigns = campaigns.map((x) =>
-			x.id === viewingCampaign!.id
-				? {
-						...x,
-						start_date: viewStartDate || null,
-						end_date: viewEndDate || null
-					}
-				: x
-		);
-		saveCampaignsToStorage(campaigns);
-		viewingCampaign = campaigns.find((c) => c.id === viewingCampaign!.id) || null;
+		const res = await client['campaigns']({ id: viewingCampaign.id }).put({
+			start_date: viewStartDate || null,
+			end_date: viewEndDate || null
+		});
+		viewingCampaign = ((res as { data?: Campaign })?.data ?? viewingCampaign) as Campaign;
 		editingConfig = false;
-		paginateState.refetch();
+		await paginateState.refetch();
 	}
 
 	function openCreatePromotion(campaignId: string) {
@@ -561,15 +454,13 @@
 		createPromotionStep = 3;
 	}
 
-	function savePromotion() {
+	async function savePromotion() {
 		// Validate required fields
 		if (detailMethod === 'promotion_code' && !detailCode.trim()) {
 			return;
 		}
 
-		// Create new promotion
-		const newPromotion: Promotion = {
-			id: crypto.randomUUID(),
+		await client['promotions'].post({
 			code: detailMethod === 'promotion_code' ? detailCode.trim() : '',
 			method: detailMethod === 'automatic' ? 'Automatic' : 'Manual',
 			status:
@@ -579,16 +470,8 @@
 						? 'Draft'
 						: 'Inactive',
 			campaign_id: createPromotionCampaignId
-		};
-
-		// Add promotion to promotions array
-		promotions = [...promotions, newPromotion];
-		savePromotionsToStorage(promotions);
-
-		// Reload promotions to update the view
-		if (viewOpen && viewingCampaign) {
-			promotions = loadPromotions();
-		}
+		});
+		if (viewOpen && viewingCampaign) await fetchPromotionsForCampaign(viewingCampaign.id);
 
 		// Close the create sheet
 		closeCreatePromotion();
@@ -599,17 +482,6 @@
 
 	$effect(() => {
 		if (!editOpen) editingCampaign = null;
-		if (viewOpen && viewingCampaign) {
-			promotions = loadPromotions();
-			// Sync view state with campaign data
-			if (!editingInfo && !editingConfig) {
-				viewName = viewingCampaign.name;
-				viewIdentifier = viewingCampaign.identifier;
-				viewDescription = viewingCampaign.description || '';
-				viewStartDate = viewingCampaign.start_date ? new Date(viewingCampaign.start_date).toISOString().slice(0, 16) : '';
-				viewEndDate = viewingCampaign.end_date ? new Date(viewingCampaign.end_date).toISOString().slice(0, 16) : '';
-			}
-		}
 		if (!viewOpen) {
 			editingInfo = false;
 			editingConfig = false;
@@ -1612,7 +1484,7 @@
 						<div class="rounded-md border border-primary/50 bg-primary/5 px-3 py-2 text-sm">
 							<span class="font-medium">Campaign:</span>
 							<span class="ml-2">
-								{campaigns.find(c => c.id === createPromotionCampaignId)?.name || 'Unknown'}
+								{viewingCampaign?.name || 'Unknown'}
 							</span>
 						</div>
 					</div>
