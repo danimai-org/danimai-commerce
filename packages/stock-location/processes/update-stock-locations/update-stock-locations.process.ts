@@ -11,16 +11,21 @@ import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type UpdateStockLocationProcessInput,
+  type UpdateStockLocationsProcessOutput,
   UpdateStockLocationSchema,
 } from "./update-stock-locations.schema";
-import type { Database, StockLocation } from "@danimai/stock-location/db";
+import type { Database } from "../../db/type";
 
 export const UPDATE_STOCK_LOCATIONS_PROCESS = Symbol("UpdateStockLocations");
 
 @Process(UPDATE_STOCK_LOCATIONS_PROCESS)
-export class UpdateStockLocationsProcess implements ProcessContract<
-  StockLocation | undefined
-> {
+export class UpdateStockLocationsProcess
+  implements
+    ProcessContract<
+      typeof UpdateStockLocationSchema,
+      UpdateStockLocationsProcessOutput
+    >
+{
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -54,7 +59,7 @@ export class UpdateStockLocationsProcess implements ProcessContract<
 
   async updateStockLocation(input: UpdateStockLocationProcessInput) {
     this.logger.info("Updating stock location", { input });
-    let addressId: string | null =
+    let addressId: string | null | undefined =
       input.address_id !== undefined ? input.address_id : undefined;
 
     if (

@@ -11,14 +11,18 @@ import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type RetrieveStockLocationProcessInput,
+  type StockLocationProcessOutput,
   RetrieveStockLocationSchema,
 } from "./retrieve-stock-location.schema";
-import type { Database, StockLocation } from "@danimai/stock-location/db";
+import type { Database } from "../../db/type";
 
 export const RETRIEVE_STOCK_LOCATION_PROCESS = Symbol("RetrieveStockLocation");
 
 @Process(RETRIEVE_STOCK_LOCATION_PROCESS)
-export class RetrieveStockLocationProcess implements ProcessContract<StockLocation> {
+export class RetrieveStockLocationProcess
+  implements
+    ProcessContract<typeof RetrieveStockLocationSchema, StockLocationProcessOutput>
+{
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -29,7 +33,7 @@ export class RetrieveStockLocationProcess implements ProcessContract<StockLocati
   async runOperations(
     @ProcessContext({ schema: RetrieveStockLocationSchema })
     context: ProcessContextType<typeof RetrieveStockLocationSchema>
-  ): Promise<StockLocation> {
+  ): Promise<StockLocationProcessOutput> {
     const { input } = context;
 
     const stockLocation = await this.db

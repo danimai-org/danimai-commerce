@@ -5,7 +5,6 @@ import {
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  type PaginationResponseType,
   paginationResponse,
   SortOrder,
 } from "@danimai/core";
@@ -13,18 +12,23 @@ import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type PaginatedStockLocationsProcessInput,
+  type PaginatedStockLocationsProcessOutput,
   PaginatedStockLocationsSchema,
 } from "./paginated-stock-locations.schema";
-import type { Database, StockLocation } from "@danimai/stock-location/db";
+import type { Database } from "../../db/type";
 
 export const PAGINATED_STOCK_LOCATIONS_PROCESS = Symbol(
   "PaginatedStockLocations",
 );
 
 @Process(PAGINATED_STOCK_LOCATIONS_PROCESS)
-export class PaginatedStockLocationsProcess implements ProcessContract<
-  PaginationResponseType<StockLocation>
-> {
+export class PaginatedStockLocationsProcess
+  implements
+    ProcessContract<
+      typeof PaginatedStockLocationsSchema,
+      PaginatedStockLocationsProcessOutput
+    >
+{
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -40,7 +44,7 @@ export class PaginatedStockLocationsProcess implements ProcessContract<
     const {
       page = 1,
       limit = 10,
-      sorting_field = "created_at",
+      sorting_field = "stock_locations.created_at",
       sorting_direction = SortOrder.DESC,
     } = input;
 
@@ -56,19 +60,16 @@ export class PaginatedStockLocationsProcess implements ProcessContract<
 
     const sortOrder = sorting_direction === SortOrder.ASC ? "asc" : "desc";
     const allowedSortFields = [
-      "id",
-      "name",
-      "address_id",
-      "created_at",
-      "updated_at",
+      "stock_locations.id",
+      "stock_locations.name",
+      "stock_locations.address_id",
+      "stock_locations.created_at",
+      "stock_locations.updated_at",
     ];
     const safeSortField = allowedSortFields.includes(sorting_field)
       ? sorting_field
-      : "created_at";
-    query = query.orderBy(
-      sql.ref(`stock_locations.${safeSortField}`),
-      sortOrder,
-    );
+      : "stock_locations.created_at";
+    query = query.orderBy(sql.ref(safeSortField), sortOrder);
 
     const offset = (page - 1) * limit;
     const rows = await query
@@ -136,8 +137,6 @@ export class PaginatedStockLocationsProcess implements ProcessContract<
       };
     });
 
-    return paginationResponse<
-      StockLocation & { address: Record<string, string | null> | null }
-    >(data, total, input);
+    return paginationResponse(data, total, input);
   }
 }

@@ -11,6 +11,7 @@ import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type GetInventoryItemProcessInput,
+  type GetInventoryItemProcessOutput,
   GetInventoryItemSchema,
 } from "./get-inventory-item.schema";
 import type {
@@ -29,7 +30,10 @@ export type GetInventoryItemResult = {
 export const GET_INVENTORY_ITEM_PROCESS = Symbol("GetInventoryItem");
 
 @Process(GET_INVENTORY_ITEM_PROCESS)
-export class GetInventoryItemProcess implements ProcessContract<GetInventoryItemResult | null> {
+export class GetInventoryItemProcess
+  implements
+    ProcessContract<typeof GetInventoryItemSchema, GetInventoryItemProcessOutput>
+{
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,

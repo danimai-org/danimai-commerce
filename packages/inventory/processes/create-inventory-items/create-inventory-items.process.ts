@@ -9,15 +9,18 @@ import {
 import type { Logger } from "@logtape/logtape";
 import {
   type CreateInventoryItemsProcessInput,
+  type CreateInventoryItemsProcessOutput,
   CreateInventoryItemsSchema,
 } from "./create-inventory-items.schema";
 import type { Database, InventoryItem } from "../../db/type";
+import { Kysely } from "kysely";
 
 export const CREATE_INVENTORY_ITEMS_PROCESS = Symbol("CreateInventoryItems");
 
 @Process(CREATE_INVENTORY_ITEMS_PROCESS)
 export class CreateInventoryItemsProcess implements ProcessContract<
-  InventoryItem[]
+  typeof CreateInventoryItemsSchema,
+  CreateInventoryItemsProcessOutput
 > {
   constructor(
     @InjectDB()

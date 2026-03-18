@@ -11,15 +11,17 @@ import type { Logger } from "@logtape/logtape";
 import {
   type CreateStockLocationProcessInput,
   type CreateStockLocationsProcessInput,
+  type CreateStockLocationsProcessOutput,
   CreateStockLocationsSchema,
 } from "./create-stock-locations.schema";
-import type { Database, StockLocation } from "@danimai/stock-location/db";
+import type { Database, StockLocation } from "../../db/type";
 
 export const CREATE_STOCK_LOCATIONS_PROCESS = Symbol("CreateStockLocations");
 
 @Process(CREATE_STOCK_LOCATIONS_PROCESS)
 export class CreateStockLocationsProcess implements ProcessContract<
-  StockLocation[]
+  typeof CreateStockLocationsSchema,
+  CreateStockLocationsProcessOutput
 > {
   constructor(
     @InjectDB()

@@ -11,14 +11,21 @@ import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type DeleteStockLocationsProcessInput,
+  type DeleteStockLocationsProcessOutput,
   DeleteStockLocationsSchema,
 } from "./delete-stock-locations.schema";
-import type { Database } from "@danimai/stock-location/db";
+import type { Database } from "../../db/type";
 
 export const DELETE_STOCK_LOCATIONS_PROCESS = Symbol("DeleteStockLocations");
 
 @Process(DELETE_STOCK_LOCATIONS_PROCESS)
-export class DeleteStockLocationsProcess implements ProcessContract<void> {
+export class DeleteStockLocationsProcess
+  implements
+    ProcessContract<
+      typeof DeleteStockLocationsSchema,
+      DeleteStockLocationsProcessOutput
+    >
+{
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -63,7 +70,7 @@ export class DeleteStockLocationsProcess implements ProcessContract<void> {
     this.logger.info("Deleting stock locations", { stock_location_ids: input.stock_location_ids });
     await this.db
       .updateTable("stock_locations")
-      .set({ deleted_at: new Date().toISOString() })
+      .set({ deleted_at: new Date() })
       .where("id", "in", input.stock_location_ids)
       .where("deleted_at", "is", null)
       .execute();
