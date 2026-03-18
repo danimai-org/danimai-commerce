@@ -10,18 +10,19 @@ import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type ListStockLocationsByIdsProcessInput,
+  type ListStockLocationsByIdsProcessOutput,
   ListStockLocationsByIdsSchema,
 } from "./list-stock-locations-by-ids.schema";
-import type { Database } from "@danimai/stock-location/db";
+import type { Database } from "../../db/type";
 
 export type StockLocationWithAddress = {
   id: string;
   name: string | null;
   address_id: string | null;
   metadata: unknown | null;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
+  created_at: Date;
+  updated_at: Date;
+  deleted_at: Date | null;
   address: {
     address_1: string | null;
     address_2: string | null;
@@ -40,7 +41,11 @@ export const LIST_STOCK_LOCATIONS_BY_IDS_PROCESS = Symbol(
 
 @Process(LIST_STOCK_LOCATIONS_BY_IDS_PROCESS)
 export class ListStockLocationsByIdsProcess
-  implements ProcessContract<StockLocationWithAddress[]>
+  implements
+    ProcessContract<
+      typeof ListStockLocationsByIdsSchema,
+      ListStockLocationsByIdsProcessOutput
+    >
 {
   constructor(
     @InjectDB()
@@ -52,7 +57,7 @@ export class ListStockLocationsByIdsProcess
   async runOperations(
     @ProcessContext({ schema: ListStockLocationsByIdsSchema })
     context: ProcessContextType<typeof ListStockLocationsByIdsSchema>
-  ): Promise<StockLocationWithAddress[]> {
+  ): Promise<ListStockLocationsByIdsProcessOutput> {
     const { input } = context;
     if (input.ids.length === 0) return [];
 

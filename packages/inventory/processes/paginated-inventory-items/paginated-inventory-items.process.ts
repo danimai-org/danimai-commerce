@@ -5,7 +5,6 @@ import {
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  type PaginationResponseType,
   paginationResponse,
   SortOrder,
 } from "@danimai/core";
@@ -13,9 +12,10 @@ import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type PaginatedInventoryItemsProcessInput,
+  type PaginatedInventoryItemsProcessOutput,
   PaginatedInventoryItemsSchema,
 } from "./paginated-inventory-items.schema";
-import type { Database, InventoryItem } from "../../db/type";
+import type { Database } from "../../db/type";
 
 export const PAGINATED_INVENTORY_ITEMS_PROCESS = Symbol(
   "PaginatedInventoryItems"
@@ -23,7 +23,10 @@ export const PAGINATED_INVENTORY_ITEMS_PROCESS = Symbol(
 
 @Process(PAGINATED_INVENTORY_ITEMS_PROCESS)
 export class PaginatedInventoryItemsProcess
-  implements ProcessContract<PaginationResponseType<InventoryItem>> {
+  implements ProcessContract<
+    typeof PaginatedInventoryItemsSchema,
+    PaginatedInventoryItemsProcessOutput
+  > {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -41,7 +44,7 @@ export class PaginatedInventoryItemsProcess
     const {
       page = 1,
       limit = 10,
-      sorting_field = "created_at",
+      sorting_field = "inventory_items.created_at",
       sorting_direction = SortOrder.DESC,
     } = input;
 
@@ -58,19 +61,16 @@ export class PaginatedInventoryItemsProcess
     const sortOrder =
       sorting_direction === SortOrder.ASC ? "asc" : "desc";
     const allowedSortFields = [
-      "id",
-      "sku",
-      "requires_shipping",
-      "created_at",
-      "updated_at",
+      "inventory_items.id",
+      "inventory_items.sku",
+      "inventory_items.requires_shipping",
+      "inventory_items.created_at",
+      "inventory_items.updated_at",
     ];
     const safeSortField = allowedSortFields.includes(sorting_field)
       ? sorting_field
-      : "created_at";
-    query = query.orderBy(
-      sql.ref(`inventory_items.${safeSortField}`),
-      sortOrder
-    );
+      : "inventory_items.created_at";
+    query = query.orderBy(sql.ref(safeSortField), sortOrder);
 
     const offset = (page - 1) * limit;
     const data = await query
@@ -79,6 +79,6 @@ export class PaginatedInventoryItemsProcess
       .offset(offset)
       .execute();
 
-    return paginationResponse<InventoryItem>(data, total, input);
+    return paginationResponse(data, total, input);
   }
 }

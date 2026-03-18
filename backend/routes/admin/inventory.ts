@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   PAGINATED_INVENTORY_ITEMS_PROCESS,
@@ -22,6 +22,7 @@ import {
   PaginatedInventoryItemsResponseSchema,
   CreateInventoryItemsSchema,
   CreateInventoryItemsResponseSchema,
+  GetInventoryItemSchema,
   GetInventoryItemResponseSchema,
   UpdateInventoryItemSchema,
   UpdateInventoryItemResponseSchema,
@@ -31,20 +32,15 @@ import {
   SetInventoryLevelResponseSchema,
   DeleteInventoryLevelSchema,
   DeleteInventoryItemsSchema,
-  DeleteInventoryItemsResponseSchema,
 } from "@danimai/inventory";
-import {
-  LIST_STOCK_LOCATIONS_BY_IDS_PROCESS,
-  ListStockLocationsByIdsProcess,
-  type StockLocationWithAddress,
-} from "@danimai/stock-location";
-import {
-} from "@danimai/product";
 import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
+  NoContentResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
+
+const UpdateInventoryItemBodySchema = Type.Omit(UpdateInventoryItemSchema, ["id"]);
 
 export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
   .onError(({ error, set }) => handleProcessError(error, set))
@@ -76,46 +72,10 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
       const process = getService<GetInventoryItemProcess>(
         GET_INVENTORY_ITEM_PROCESS
       );
-      const input = { id: params.id };
-      const result = await process.runOperations({ input });
-      if (!result) return result;
-      const locationIds = [
-        ...new Set(result.levels.map((l) => l.location_id)),
-      ];
-      let locationMap: Record<string, StockLocationWithAddress> = {};
-      if (locationIds.length > 0) {
-        const listLocations = getService<ListStockLocationsByIdsProcess>(
-          LIST_STOCK_LOCATIONS_BY_IDS_PROCESS
-        );
-        const locations = await listLocations.runOperations({
-          input: { ids: locationIds },
-        });
-        locationMap = Object.fromEntries(
-          locations.map((loc) => [loc.id, loc])
-        );
-      }
-      const levelsWithLocation = result.levels.map((level) => ({
-        ...level,
-        location: locationMap[level.location_id] ?? null,
-      }));
-      let associated_variants: unknown[] = [];
-      let product_summaries: Record<string, { id: string; title: string | null; thumbnail: string | null }> = {};
-      if (result.item.sku) {
-        try {
-        } catch {
-          // leave empty on error
-        }
-      }
-      return {
-        item: result.item,
-        levels: levelsWithLocation,
-        reservations: result.reservations,
-        associated_variants,
-        product_summaries,
-      };
+      return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      params: Type.Object({ id: GetInventoryItemSchema.properties.id }),
       response: {
         200: GetInventoryItemResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -134,12 +94,12 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
       const process = getService<UpdateInventoryItemProcess>(
         UPDATE_INVENTORY_ITEM_PROCESS
       );
-      const input = { id: params.id, ...(body as Record<string, unknown>) };
+      const input = { ...(body as Record<string, unknown>), id: params.id };
       return process.runOperations({ input });
     },
     {
-      params: Type.Object({ id: Type.String() }),
-      body: UpdateInventoryItemSchema,
+      params: Type.Object({ id: UpdateInventoryItemSchema.properties.id }),
+      body: UpdateInventoryItemBodySchema,
       response: {
         200: UpdateInventoryItemResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -154,11 +114,13 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
   )
   .get(
     "/items",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedInventoryItemsProcess>(
         PAGINATED_INVENTORY_ITEMS_PROCESS
       );
-      return process.runOperations({ input });
+      return process.runOperations({
+        input: query as StaticDecode<typeof PaginatedInventoryItemsSchema>,
+      });
     },
     {
       query: PaginatedInventoryItemsSchema,
@@ -176,17 +138,18 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
   )
   .delete(
     "/items",
-    async ({ body: input }) => {
+    async ({ body: input, set }) => {
       const process = getService<DeleteInventoryItemsProcess>(
         DELETE_INVENTORY_ITEMS_PROCESS
       );
       await process.runOperations({ input });
+      set.status = 204;
       return undefined;
     },
     {
       body: DeleteInventoryItemsSchema,
       response: {
-        200: DeleteInventoryItemsResponseSchema,
+        204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -221,18 +184,19 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
   )
   .delete(
     "/levels/:id",
-    async ({ params }) => {
+    async ({ params, set }) => {
       const process = getService<DeleteInventoryLevelProcess>(
         DELETE_INVENTORY_LEVEL_PROCESS
       );
       const input = { id: params.id };
       await process.runOperations({ input });
-      return { success: true };
+      set.status = 204;
+      return undefined;
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      params: Type.Object({ id: DeleteInventoryLevelSchema.properties.id }),
       response: {
-        200: Type.Object({ success: Type.Literal(true) }),
+        204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -245,11 +209,13 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
   )
   .get(
     "/levels",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedInventoryLevelsProcess>(
         PAGINATED_INVENTORY_LEVELS_PROCESS
       );
-      return process.runOperations({ input });
+      return process.runOperations({
+        input: query as StaticDecode<typeof PaginatedInventoryLevelsSchema>,
+      });
     },
     {
       query: PaginatedInventoryLevelsSchema,

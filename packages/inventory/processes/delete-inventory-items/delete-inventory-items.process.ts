@@ -10,6 +10,7 @@ import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type DeleteInventoryItemsProcessInput,
+  type DeleteInventoryItemsProcessOutput,
   DeleteInventoryItemsSchema,
 } from "./delete-inventory-items.schema";
 import type { Database } from "../../db/type";
@@ -17,7 +18,13 @@ import type { Database } from "../../db/type";
 export const DELETE_INVENTORY_ITEMS_PROCESS = Symbol("DeleteInventoryItems");
 
 @Process(DELETE_INVENTORY_ITEMS_PROCESS)
-export class DeleteInventoryItemsProcess implements ProcessContract<void> {
+export class DeleteInventoryItemsProcess
+  implements
+    ProcessContract<
+      typeof DeleteInventoryItemsSchema,
+      DeleteInventoryItemsProcessOutput
+    >
+{
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,

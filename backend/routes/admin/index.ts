@@ -21,6 +21,7 @@ import { customerGroupRoutes } from "./customer-groups";
 import { inventoryRoutes } from "./inventory";
 import { orderRoutes } from "./orders";
 import { stockLocationRoutes } from "./stock-locations";
+import { priceListRoutes } from "./price-lists";
 import { uploadRoutes } from "./upload";
 
 export const routes = new Elysia()
@@ -48,4 +49,5 @@ export const routes = new Elysia()
             .use(inventoryRoutes)
             .use(orderRoutes)
             .use(stockLocationRoutes)
+            .use(priceListRoutes)
     });

@@ -1,10 +1,22 @@
-import { type Static } from "@sinclair/typebox";
-import { createPaginatedResponseSchema, PaginationSchema } from "@danimai/core";
+import { Type, type Static, type StaticDecode } from "@sinclair/typebox";
+import {
+  createPaginatedResponseSchema,
+  createPaginationSchema,
+} from "@danimai/core";
 import { InventoryItemResponseSchema } from "../get-inventory-item/get-inventory-item.schema";
 
-export const PaginatedInventoryItemsSchema = PaginationSchema;
+export const PaginatedInventoryItemsSchema = createPaginationSchema(
+  Type.Object({}),
+  [
+    "inventory_items.id",
+    "inventory_items.sku",
+    "inventory_items.requires_shipping",
+    "inventory_items.created_at",
+    "inventory_items.updated_at",
+  ],
+);
 
-export type PaginatedInventoryItemsProcessInput = Static<
+export type PaginatedInventoryItemsProcessInput = StaticDecode<
   typeof PaginatedInventoryItemsSchema
 >;
 

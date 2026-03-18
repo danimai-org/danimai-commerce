@@ -11,6 +11,7 @@ import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type SetInventoryLevelProcessInput,
+  type SetInventoryLevelProcessOutput,
   SetInventoryLevelSchema,
 } from "./set-inventory-level.schema";
 import type { Database, InventoryLevel } from "../../db/type";
@@ -19,7 +20,7 @@ export const SET_INVENTORY_LEVEL_PROCESS = Symbol("SetInventoryLevel");
 
 @Process(SET_INVENTORY_LEVEL_PROCESS)
 export class SetInventoryLevelProcess
-  implements ProcessContract<InventoryLevel | null>
+  implements ProcessContract<typeof SetInventoryLevelSchema, SetInventoryLevelProcessOutput>
 {
   constructor(
     @InjectDB()
@@ -79,7 +80,7 @@ export class SetInventoryLevelProcess
           stocked_quantity: stocked,
           reserved_quantity: reserved,
           available_quantity: available,
-          updated_at: new Date().toISOString(),
+          updated_at: new Date(),
         })
         .where("id", "=", existing.id)
         .returningAll()
@@ -97,6 +98,7 @@ export class SetInventoryLevelProcess
         available_quantity: available,
       })
       .returningAll()
-      .executeTakeFirst();
+      .executeTakeFirst()
+      .then((row) => row ?? null);
   }
 }

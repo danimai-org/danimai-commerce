@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
+import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   PAGINATED_STOCK_LOCATIONS_PROCESS,
@@ -17,10 +17,10 @@ import {
   StockLocationResponseSchema,
   CreateStockLocationsSchema,
   CreateStockLocationsResponseSchema,
+  UpdateStockLocationSchema,
   UpdateStockLocationsResponseSchema,
   DeleteStockLocationsSchema,
 } from "@danimai/stock-location";
-import type { UpdateStockLocationsProcessOutput } from "@danimai/stock-location";
 import {
   CHECK_LOCATIONS_IN_USE_PROCESS,
   CheckLocationsInUseProcess,
@@ -32,21 +32,19 @@ import {
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
-const UpdateStockLocationBodySchema = Type.Object({
-  name: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-  address_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-  metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()]))),
-});
+const UpdateStockLocationBodySchema = Type.Omit(UpdateStockLocationSchema, ["id"]);
 
 export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query: input }) => {
+    async ({ query }) => {
       const process = getService<PaginatedStockLocationsProcess>(
         PAGINATED_STOCK_LOCATIONS_PROCESS
       );
-      return process.runOperations({ input });
+      return process.runOperations({
+        input: query as StaticDecode<typeof PaginatedStockLocationsSchema>,
+      });
     },
     {
       query: PaginatedStockLocationsSchema,
@@ -69,7 +67,7 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
       return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      params: Type.Object({ id: UpdateStockLocationSchema.properties.id }),
       response: {
         200: StockLocationResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -123,10 +121,10 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
       const result = await process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
       });
-      return result as UpdateStockLocationsProcessOutput;
+      return result;
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      params: Type.Object({ id: UpdateStockLocationSchema.properties.id }),
       body: UpdateStockLocationBodySchema,
       response: {
         200: UpdateStockLocationsResponseSchema,

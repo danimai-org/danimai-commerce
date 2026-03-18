@@ -5,7 +5,6 @@ import {
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  type PaginationResponseType,
   paginationResponse,
   SortOrder,
 } from "@danimai/core";
@@ -13,9 +12,10 @@ import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type PaginatedInventoryLevelsProcessInput,
+  type PaginatedInventoryLevelsProcessOutput,
   PaginatedInventoryLevelsSchema,
 } from "./paginated-inventory-levels.schema";
-import type { Database, InventoryLevel } from "../../db/type";
+import type { Database } from "../../db/type";
 
 export const PAGINATED_INVENTORY_LEVELS_PROCESS = Symbol(
   "PaginatedInventoryLevels"
@@ -23,7 +23,10 @@ export const PAGINATED_INVENTORY_LEVELS_PROCESS = Symbol(
 
 @Process(PAGINATED_INVENTORY_LEVELS_PROCESS)
 export class PaginatedInventoryLevelsProcess
-  implements ProcessContract<PaginationResponseType<InventoryLevel>> {
+  implements ProcessContract<
+    typeof PaginatedInventoryLevelsSchema,
+    PaginatedInventoryLevelsProcessOutput
+  > {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -41,7 +44,7 @@ export class PaginatedInventoryLevelsProcess
     const {
       page = 1,
       limit = 10,
-      sorting_field = "created_at",
+      sorting_field = "inventory_levels.created_at",
       sorting_direction = SortOrder.DESC,
     } = input;
 
@@ -58,22 +61,19 @@ export class PaginatedInventoryLevelsProcess
     const sortOrder =
       sorting_direction === SortOrder.ASC ? "asc" : "desc";
     const allowedSortFields = [
-      "id",
-      "inventory_item_id",
-      "location_id",
-      "stocked_quantity",
-      "reserved_quantity",
-      "available_quantity",
-      "created_at",
-      "updated_at",
+      "inventory_levels.id",
+      "inventory_levels.inventory_item_id",
+      "inventory_levels.location_id",
+      "inventory_levels.stocked_quantity",
+      "inventory_levels.reserved_quantity",
+      "inventory_levels.available_quantity",
+      "inventory_levels.created_at",
+      "inventory_levels.updated_at",
     ];
     const safeSortField = allowedSortFields.includes(sorting_field)
       ? sorting_field
-      : "created_at";
-    query = query.orderBy(
-      sql.ref(`inventory_levels.${safeSortField}`),
-      sortOrder
-    );
+      : "inventory_levels.created_at";
+    query = query.orderBy(sql.ref(safeSortField), sortOrder);
 
     const offset = (page - 1) * limit;
     const data = await query
@@ -82,6 +82,6 @@ export class PaginatedInventoryLevelsProcess
       .offset(offset)
       .execute();
 
-    return paginationResponse<InventoryLevel>(data, total, input);
+    return paginationResponse(data, total, input);
   }
 }

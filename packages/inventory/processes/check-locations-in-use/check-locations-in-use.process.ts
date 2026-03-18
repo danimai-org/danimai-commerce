@@ -11,6 +11,7 @@ import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type CheckLocationsInUseProcessInput,
+  type CheckLocationsInUseProcessOutput,
   CheckLocationsInUseSchema,
 } from "./check-locations-in-use.schema";
 import type { Database } from "../../db/type";
@@ -18,7 +19,13 @@ import type { Database } from "../../db/type";
 export const CHECK_LOCATIONS_IN_USE_PROCESS = Symbol("CheckLocationsInUse");
 
 @Process(CHECK_LOCATIONS_IN_USE_PROCESS)
-export class CheckLocationsInUseProcess implements ProcessContract<void> {
+export class CheckLocationsInUseProcess
+  implements
+    ProcessContract<
+      typeof CheckLocationsInUseSchema,
+      CheckLocationsInUseProcessOutput
+    >
+{
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -46,10 +53,10 @@ export class CheckLocationsInUseProcess implements ProcessContract<void> {
         "Please remove inventory items that are related to the location.",
         [
           {
-            type: "location_in_use",
+            type: "invalid_state",
             message:
               "Please remove inventory items that are related to the location.",
-            path: "stock_location_ids",
+            path: "location_ids",
           },
         ]
       );

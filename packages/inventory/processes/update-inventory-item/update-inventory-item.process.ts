@@ -11,6 +11,7 @@ import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type UpdateInventoryItemProcessInput,
+  type UpdateInventoryItemProcessOutput,
   UpdateInventoryItemSchema,
 } from "./update-inventory-item.schema";
 import type { Database, InventoryItem } from "../../db/type";
@@ -19,7 +20,10 @@ export const UPDATE_INVENTORY_ITEM_PROCESS = Symbol("UpdateInventoryItem");
 
 @Process(UPDATE_INVENTORY_ITEM_PROCESS)
 export class UpdateInventoryItemProcess
-  implements ProcessContract<InventoryItem | null>
+  implements ProcessContract<
+    typeof UpdateInventoryItemSchema,
+    UpdateInventoryItemProcessOutput
+  >
 {
   constructor(
     @InjectDB()
@@ -60,8 +64,12 @@ export class UpdateInventoryItemProcess
       ]);
     }
 
-    const updates: { sku?: string | null; requires_shipping?: boolean; updated_at: string } = {
-      updated_at: new Date().toISOString(),
+    const updates: {
+      sku?: string | null;
+      requires_shipping?: boolean;
+      updated_at: Date;
+    } = {
+      updated_at: new Date(),
     };
     if (input.sku !== undefined) updates.sku = input.sku;
     if (input.requires_shipping !== undefined)
