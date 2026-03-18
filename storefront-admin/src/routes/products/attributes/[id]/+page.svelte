@@ -81,6 +81,9 @@
 	);
 	const products = $derived((productsData?.data ?? []) as AttributeProduct[]);
 	const pagination = $derived((productsData?.pagination ?? null) as PaginationMeta | null);
+	const count = $derived(pagination?.total ?? 0);
+	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
+	const end = $derived(pagination ? Math.min(pagination.page * pagination.limit, count) : 0);
 
 	function goToProductPage(pageNumber: number) {
 		const params = new URLSearchParams(page.url.searchParams);
@@ -145,10 +148,17 @@
 
 				
 				<AttributeProductsCard
+					attributeId={attributeId ?? null}
 					{products}
 					pagination={pagination}
 					loading={productsQuery.isPending}
+					{start}
+					{end}
 					onPageChange={goToProductPage}
+					paginationQuery={paginationQuery ?? {}}
+					onProductsUpdated={async () => {
+						await productsQuery.refetch();
+					}}
 				/>
 
 				<div class="grid gap-4 sm:grid-cols-2">

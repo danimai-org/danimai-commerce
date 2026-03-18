@@ -7,7 +7,11 @@ import {
   type ProcessContract,
 } from "@danimai/core";
 import { Kysely, sql } from "kysely";
-import {  type RetrieveProductAttributeGroupProcessOutput, RetrieveProductAttributeGroupSchema } from "./retrieve-product-attribute-group.schema";
+import {
+  type RetrieveProductAttributeGroupProcessOutput,
+  RetrieveProductAttributeGroupResponseSchema,
+  RetrieveProductAttributeGroupSchema,
+} from "./retrieve-product-attribute-group.schema";
 import type { Database } from "../../../db/type";
 import type { Static } from "@sinclair/typebox";
 
@@ -31,12 +35,12 @@ export class RetrieveProductAttributeGroupProcess
       .selectFrom("product_attribute_groups")
       .where("product_attribute_groups.id", "=", input.id)
       .where("product_attribute_groups.deleted_at", "is", null)
-      .leftJoin("product_attribute_group_attributes", (join) =>
+      .leftJoin("product_attribute_group_relations", (join) =>
         join
-          .onRef("product_attribute_group_attributes.attribute_group_id", "=", "product_attribute_groups.id")
+          .onRef("product_attribute_group_relations.attribute_group_id", "=", "product_attribute_groups.id")
       ).leftJoin("product_attributes", (join) =>
         join
-          .onRef("product_attributes.id", "=", "product_attribute_group_attributes.attribute_id")
+          .onRef("product_attributes.id", "=", "product_attribute_group_relations.product_attribute_id")
           .on("product_attributes.deleted_at", "is", null)
       )
       .select([
@@ -46,7 +50,7 @@ export class RetrieveProductAttributeGroupProcess
         "product_attribute_groups.created_at",
         "product_attribute_groups.updated_at",
         "product_attribute_groups.deleted_at",
-        () => sql<Static<typeof RetrieveProductAttributeGroupSchema["attributes"]>[]>`
+        () => sql<Static<typeof RetrieveProductAttributeGroupResponseSchema["properties"]["attributes"]>>`
           CASE
             WHEN count(product_attributes.id) = 0 THEN ARRAY[]::json[]
             ELSE array_agg(

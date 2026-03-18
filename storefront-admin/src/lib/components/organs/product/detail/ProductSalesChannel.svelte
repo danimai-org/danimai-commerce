@@ -7,7 +7,6 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import { client } from '$lib/client.js';
 	import { createQuery } from '@tanstack/svelte-query';
-	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
 
 
 	const salesChannels = $derived(getProductDetail().data?.sales_channels ?? []);
@@ -15,12 +14,11 @@
 		queryKey: ['sales-channels', 'product-detail-sheet'],
 		queryFn: async () =>
 			client['sales-channels'].get({
-				query: createPaginationQuery({
+				query: {
 					page: '1',
 					limit: '100',
-					sorting_field: 'created_at',
-					sorting_direction: 'desc'
-				})
+					sorting_field: 'created_at'
+				}
 			}),
 		refetchOnWindowFocus: false
 	}));

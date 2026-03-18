@@ -24,6 +24,7 @@
 
 	let {
 		createHasVariants = true,
+		variantsError = null as string | null,
 		createOptions = $bindable([] as ProductOption[]),
 		displayedVariants = [] as ProductVariantForm[],
 		variantSearch = $bindable(''),
@@ -40,6 +41,7 @@
 		onEnableVariants
 	}: {
 		createHasVariants: boolean;
+		variantsError: string | null;
 		createOptions: ProductOption[];
 		displayedVariants: ProductVariantForm[];
 		variantSearch: string;
@@ -57,14 +59,17 @@
 	} = $props();
 </script>
 
-<div class="flex-1 overflow-auto p-6 pt-4">
+<div class="flex-1 overflow-auto p-4 pt-4 sm:p-6 sm:pt-4">
 	<h2 class="text-lg font-semibold">Variants</h2>
 	{#if createHasVariants}
 		<p class="mt-1 text-sm text-muted-foreground">
 			Define options and variant details. This ranking will affect the variants' order in your storefront.
 		</p>
+		{#if variantsError}
+			<p class="mt-2 text-sm text-destructive">{variantsError}</p>
+		{/if}
 		<div class="mt-6">
-			<div class="flex items-center justify-between">
+			<div class="flex flex-wrap items-start justify-between gap-2">
 				<div>
 					<h3 class="text-sm font-medium">Product options</h3>
 					<p class="text-xs text-muted-foreground">
@@ -106,18 +111,15 @@
 									</button>
 								</span>
 							{/each}
-							<form
-								class="inline-flex gap-1"
-								onsubmit={(e) => {
-									e.preventDefault();
-									const input = e.currentTarget.querySelector('input') as HTMLInputElement;
-									addOptionValue(optIndex, input?.value ?? '');
-									if (input) input.value = '';
-								}}
-							>
+							<div class="inline-flex gap-1">
 								<Input
 									placeholder="Add value"
 									class="h-7 w-24"
+									onblur={(e) => {
+										const input = e.currentTarget as HTMLInputElement;
+										addOptionValue(optIndex, input.value);
+										input.value = '';
+									}}
 									onkeydown={(e) => {
 										if (e.key === 'Enter') {
 											e.preventDefault();
@@ -127,7 +129,7 @@
 										}
 									}}
 								/>
-							</form>
+							</div>
 						</div>
 					</div>
 				{/each}
@@ -143,8 +145,8 @@
 				showSort={false}
 				showToolbar={true}
 			>
-				<div class="mt-2 min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-					<table class="w-full text-sm">
+				<div class="mt-2 min-h-0 flex-1 overflow-x-auto rounded-lg border bg-card">
+					<table class="min-w-[720px] w-full text-sm">
 						<TableHead columns={variantTableColumns} />
 						<tbody>
 							{#each displayedVariants as v (v.variant_rank)}

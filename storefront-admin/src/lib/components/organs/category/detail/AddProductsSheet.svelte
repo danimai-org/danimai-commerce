@@ -5,7 +5,7 @@
 	import Search from '@lucide/svelte/icons/search';
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import { client } from '$lib/client.js';
-	import type { Product } from '$lib/products/types.js';
+	import type { Product } from '$lib/components/organs/product/create/types.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import { cn } from '$lib/utils.js';
 

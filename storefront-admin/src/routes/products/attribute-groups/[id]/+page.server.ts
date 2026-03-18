@@ -33,13 +33,17 @@ export const actions = {
 			id,
 			title: attributeGroupUpdateForm.data.title.trim(),
 			metadata: {
-				required: attributeGroupUpdateForm.data.required,
 				rank: attributeGroupUpdateForm.data.rank,
 			} as Record<string, any>,
 			attributes: attributeGroupUpdateForm.data.attribute_ids.map((attribute_id) => ({ attribute_id })),
 		});
-		if (!attributeGroup) {
-			return fail(400, { error: 'Failed to update attribute group' });
+
+		if (!attributeGroup || attributeGroup.error) {
+			const error = attributeGroup?.error as { value?: { message?: string } } | undefined;
+			return fail(400, {
+				attributeGroupUpdateForm,
+				error: error?.value?.message ?? 'Failed to update attribute group'
+			});
 		}
 		return message(attributeGroupUpdateForm, 'Attribute group updated successfully');
 	},

@@ -72,16 +72,20 @@ export class CreateProductAttributeGroupProcess
         .executeTakeFirst();
 
       if (group) {
-        await trx
-          .insertInto("product_attribute_group_relations")
-          .values((input.attributes ?? []).map((attribute, rank) => ({
-            id: randomUUID(),
-            attribute_group_id: group.id,
-            product_attribute_id: attribute.attribute_id,
-            required: attribute.required ?? false,
-            rank,
-          })))
-          .execute();
+        const relations = (input.attributes ?? []).map((attribute, rank) => ({
+          id: randomUUID(),
+          attribute_group_id: group.id,
+          product_attribute_id: attribute.attribute_id,
+          required: attribute.required ?? false,
+          rank,
+        }));
+
+        if (relations.length > 0) {
+          await trx
+            .insertInto("product_attribute_group_relations")
+            .values(relations)
+            .execute();
+        }
       }
 
       return group;

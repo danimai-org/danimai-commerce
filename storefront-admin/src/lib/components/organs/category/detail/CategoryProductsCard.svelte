@@ -1,9 +1,12 @@
 <script lang="ts">
-	import { DetailProductsCard, type TableColumn } from '$lib/components/organs/index.js';
+	import {
+		DeleteConfirmationModal,
+		DetailProductsCard,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
 	import { client } from '$lib/client.js';
 	import AddProductsSheet from './AddProductsSheet.svelte';
-	import type { Product } from '$lib/products/types.js';
-	import type { ProductCategory } from '$lib/product-categories/types.js';
+	import type { Product } from '$lib/components/organs/product/create/types.js';
 
 	type ProductWithCollection = Product & {
 		collection?: { id: string; title: string; handle: string } | null;
@@ -11,7 +14,7 @@
 
 	interface Props {
 		categoryId: string | null;
-		category: ProductCategory | null;
+		category: Record<string, unknown> | null;
 		products: ProductWithCollection[];
 		count: number;
 		start: number;
@@ -64,7 +67,7 @@
 					label: 'Remove from category',
 					key: 'remove',
 					type: 'button',
-					onClick: (item) => removeProduct(item as ProductWithCollection)
+					onClick: (item) => openRemoveProductConfirm(item as ProductWithCollection)
 				}
 			]
 		}
@@ -94,13 +97,38 @@
 		has_next_page: currentPage < totalPages
 	});
 
-	async function removeProduct(product: ProductWithCollection) {
-		if (!categoryId || !category) return;
+	let removeProductModalOpen = $state(false);
+	let productToRemove = $state<ProductWithCollection | null>(null);
+	let removeSubmitting = $state(false);
+	let removeError = $state<string | null>(null);
+
+	function openRemoveProductConfirm(product: ProductWithCollection) {
+		productToRemove = product;
+		removeError = null;
+		removeProductModalOpen = true;
+	}
+
+	function closeRemoveProductConfirm() {
+		if (!removeSubmitting) {
+			removeProductModalOpen = false;
+			productToRemove = null;
+			removeError = null;
+		}
+	}
+
+	async function confirmRemoveProduct() {
+		if (!categoryId || !category || !productToRemove) return;
+		removeSubmitting = true;
+		removeError = null;
 		try {
-			await client.products({ id: product.id }).put({ category_id: '' });
+			await client.products({ id: productToRemove.id }).put({ category_id: '' });
+			removeProductModalOpen = false;
+			productToRemove = null;
 			await onProductsUpdated();
 		} catch (e) {
-			console.error(e);
+			removeError = e instanceof Error ? e.message : String(e);
+		} finally {
+			removeSubmitting = false;
 		}
 	}
 </script>
@@ -129,4 +157,15 @@
 	{categoryId}
 	{paginationQuery}
 	onSuccess={onProductsUpdated}
+/>
+
+<DeleteConfirmationModal
+	bind:open={removeProductModalOpen}
+	entityName="product"
+	entityTitle={productToRemove?.title ?? productToRemove?.id ?? ''}
+	customMessage="Remove this product from the category? The product will remain but will no longer be associated with this category."
+	onConfirm={confirmRemoveProduct}
+	onCancel={closeRemoveProductConfirm}
+	submitting={removeSubmitting}
+	error={removeError}
 />

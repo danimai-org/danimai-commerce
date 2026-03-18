@@ -7,6 +7,7 @@
 	type Props = {
 		options: ComboboxOption[];
 		value?: string;
+		onValueChange?: (value: string) => void;
 		placeholder?: string;
 		id?: string;
 		disabled?: boolean;
@@ -20,6 +21,7 @@
 	let {
 		options = [],
 		value = $bindable(''),
+		onValueChange,
 		placeholder = 'Select…',
 		id: propId,
 		disabled = false,
@@ -47,6 +49,7 @@
 
 	function select(optionId: string) {
 		value = optionId;
+		onValueChange?.(optionId);
 		input = '';
 		open = false;
 	}
@@ -54,6 +57,7 @@
 	function clear(e: MouseEvent) {
 		e.stopPropagation();
 		value = '';
+		onValueChange?.('');
 		input = '';
 		open = false;
 	}
