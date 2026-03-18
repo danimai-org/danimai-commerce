@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { createQuery } from '@tanstack/svelte-query';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
@@ -14,8 +15,6 @@
 	} from '$lib/components/organs/index.js';
 	import Package from '@lucide/svelte/icons/package';
 	import { client } from '$lib/client.js';
-	import { createInventoryItems, deleteInventoryItems } from '$lib/inventory-items/api.js';
-	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 
 	type InventoryItem = {
 		id: string;
@@ -27,40 +26,49 @@
 		deleted_at: string | null;
 	};
 
-	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
-	const paginateState = createPagination(
-		async () => {
-			return client.inventory.items.get({ query: paginationQuery });
-		},
-		['inventory-items'],
-		undefined,
-		{
-			queryKeyPart: () => [
-				paginationQuery?.page ?? '1',
-				paginationQuery?.limit ?? '10'
-			]
-		}
-	);
+	type PaginationMeta = {
+		total: number;
+		page: number;
+		limit: number;
+		total_pages: number;
+		has_next_page: boolean;
+		has_previous_page: boolean;
+	};
 
-	const rows = $derived(
-		(paginateState.query.data?.data?.rows ?? []) as unknown as InventoryItem[]
+	const pageNum = $derived(Math.max(1, parseInt(page.url.searchParams.get('page') ?? '1', 10) || 1));
+	const pageLimit = $derived(Math.max(1, Math.min(100, parseInt(page.url.searchParams.get('limit') ?? '10', 10) || 10)));
+
+	const listQuery = createQuery(() => ({
+		queryKey: ['inventory-items', String(pageNum), String(pageLimit)],
+		queryFn: async (): Promise<{ data: { rows: InventoryItem[]; pagination: PaginationMeta } } | null> => {
+			const res = await client.inventory.items.get({
+				query: { page: pageNum, limit: pageLimit } as Record<string, string | number>
+			});
+			if (res?.error) {
+				throw new Error(String(res?.error?.value?.message ?? 'Failed to fetch inventory items'));
+			}
+			return (res.data ?? null) as unknown as { data: { rows: InventoryItem[]; pagination: PaginationMeta } } | null;
+		}
+	}));
+
+	const loading = $derived(listQuery.isPending);
+	const error = $derived(
+		listQuery.error != null ? (listQuery.error instanceof Error ? listQuery.error.message : String(listQuery.error)) : null
 	);
-	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
-	const start = $derived(paginateState.start);
-	const end = $derived(paginateState.end);
-	const refetch = $derived(paginateState.refetch);
-	const deleteItem = $derived(paginateState.deleteItem);
-	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
-	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
-	const confirmDelete = $derived(paginateState.confirmDelete);
-	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
-	const deleteError = $derived(paginateState.deleteError);
+	const rows = $derived((listQuery.data?.data?.rows ?? []) as InventoryItem[]);
+	const pagination = $derived((listQuery.data?.data?.pagination ?? null) as PaginationMeta | null);
+	const start = $derived(pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0);
+	const end = $derived(pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0);
 
 	let createSheetOpen = $state(false);
 	let createSku = $state('');
 	let createRequiresShipping = $state(true);
 	let createSubmitting = $state(false);
 	let createError = $state<string | null>(null);
+	let deleteConfirmOpen = $state(false);
+	let deleteSubmitting = $state(false);
+	let deleteError = $state<string | null>(null);
+	let deleteItem = $state<InventoryItem | null>(null);
 
 	function goToPage(pageNum: number) {
 		const params = new URLSearchParams(page.url.searchParams);
@@ -83,18 +91,56 @@
 		createError = null;
 		createSubmitting = true;
 		try {
-			await createInventoryItems([
-				{
+			const res = await client.inventory.items.post({
+				inventory_items: [{
 					sku: createSku.trim() || null,
 					requires_shipping: createRequiresShipping
-				}
-			]);
+				}]
+			});
+			if (res?.error) {
+				throw new Error(String(res?.error?.value?.message ?? 'Failed to create inventory item'));
+			}
 			closeCreateSheet();
-			refetch();
+			listQuery.refetch();
 		} catch (e) {
 			createError = e instanceof Error ? e.message : String(e);
 		} finally {
 			createSubmitting = false;
+		}
+	}
+
+	function openDeleteConfirm(item: InventoryItem) {
+		deleteItem = item;
+		deleteError = null;
+		deleteConfirmOpen = true;
+	}
+
+	function closeDeleteConfirm() {
+		if (!deleteSubmitting) {
+			deleteConfirmOpen = false;
+			deleteItem = null;
+			deleteError = null;
+		}
+	}
+
+	async function confirmDeleteItem() {
+		if (!deleteItem?.id) return;
+		deleteSubmitting = true;
+		deleteError = null;
+		try {
+			const res = await client.inventory.items.delete({
+				inventory_item_ids: [deleteItem.id]
+			});
+			if (res?.error) {
+				throw new Error(String(res?.error?.value?.message ?? 'Failed to delete inventory item'));
+			}
+			deleteConfirmOpen = false;
+			deleteItem = null;
+			listQuery.refetch();
+		} catch (e) {
+			deleteError = e instanceof Error ? e.message : String(e);
+		} finally {
+			deleteSubmitting = false;
 		}
 	}
 
@@ -141,7 +187,7 @@
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => openDeleteConfirm(item as Parameters<typeof openDeleteConfirm>[0])
+					onClick: (item) => openDeleteConfirm(item as InventoryItem)
 				}
 			]
 		}
@@ -163,13 +209,13 @@
 			<Button size="sm" onclick={openCreateSheet}>Create</Button>
 		</div>
 		<PaginationTable>
-			{#if paginateState.error}
+			{#if error}
 				<div
 					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 				>
-					{paginateState.error}
+					{error}
 				</div>
-			{:else if paginateState.loading}
+			{:else if loading}
 				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
 					<p class="text-muted-foreground">Loading…</p>
 				</div>
@@ -252,10 +298,10 @@
 </Sheet.Root>
 
 <DeleteConfirmationModal
-	bind:open={paginateState.deleteConfirmOpen}
+	bind:open={deleteConfirmOpen}
 	entityName="inventory item"
 	entityTitle={(deleteItem as InventoryItem | null)?.sku ?? (deleteItem as InventoryItem | null)?.id ?? ''}
-	onConfirm={() => confirmDelete((item: Record<string, unknown>) => deleteInventoryItems([(item as { id: string }).id]))}
+	onConfirm={confirmDeleteItem}
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}
 	error={deleteError}

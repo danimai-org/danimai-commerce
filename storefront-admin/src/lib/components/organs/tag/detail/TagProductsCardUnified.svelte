@@ -13,45 +13,41 @@
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import type { Product } from '$lib/components/organs/product/create/types.js';
 
-	type AttributeProduct = Product & {
+	type TagProduct = Product & {
 		collection?: { id: string; title: string; handle: string } | null;
 	};
 
 	interface Props {
-		attributeId: string | null;
-		products: AttributeProduct[];
+		tagId: string | null;
+		products: TagProduct[];
 		pagination: PaginationMeta | null;
-		loading?: boolean;
 		start: number;
 		end: number;
-		onPageChange?: (page: number) => void;
-		paginationQuery?: Record<string, string | number | undefined>;
+		onPageChange: (page: number) => void;
 		onProductsUpdated?: () => void | Promise<void>;
+		loading?: boolean;
 	}
 
 	let {
-		attributeId,
-		products = [],
-		pagination = null,
-		loading = false,
-		start = 0,
-		end = 0,
-		onPageChange = () => {},
-		paginationQuery = {},
-		onProductsUpdated = () => {}
+		tagId,
+		products,
+		pagination,
+		start,
+		end,
+		onPageChange,
+		onProductsUpdated = () => {},
+		loading = false
 	}: Props = $props();
 
 	let search = $state('');
 	let addSheetOpen = $state(false);
-	let addListData = $state<{ rows: AttributeProduct[]; pagination: PaginationMeta } | null>(null);
-	let addPage = $state(1);
-	let addLimit = $state(20);
+	let addList = $state<TagProduct[]>([]);
 	let addSearch = $state('');
 	let addSelectedIds = $state<Set<string>>(new Set());
 	let addSubmitting = $state(false);
 	let addError = $state<string | null>(null);
 	let removeProductModalOpen = $state(false);
-	let productToRemove = $state<AttributeProduct | null>(null);
+	let productToRemove = $state<TagProduct | null>(null);
 	let removeSubmitting = $state(false);
 	let removeError = $state<string | null>(null);
 
@@ -65,7 +61,7 @@
 			label: 'Actions',
 			key: 'actions',
 			type: 'actions',
-			actions: [{ label: 'Remove from attribute', key: 'remove', type: 'button', onClick: (item) => openRemoveProductConfirm(item as AttributeProduct) }]
+			actions: [{ label: 'Remove from tag', key: 'remove', type: 'button', onClick: (item) => openRemoveProductConfirm(item as TagProduct) }]
 		}
 	];
 
@@ -80,8 +76,7 @@
 			})) as Record<string, unknown>[]
 	);
 
-	const addList = $derived(addListData?.rows ?? []);
-	const addFiltered = $derived(
+	const filteredAddList = $derived(
 		addSearch.trim()
 			? addList.filter((p) => p.title.toLowerCase().includes(addSearch.trim().toLowerCase()))
 			: addList
@@ -90,31 +85,18 @@
 	$effect(() => {
 		if (!addSheetOpen) return;
 		addSelectedIds = new Set();
-		addPage = 1;
 		addSearch = '';
 		addError = null;
-		addPage;
-		addLimit;
-		paginationQuery;
 		void loadAddList();
 	});
 
 	async function loadAddList() {
 		try {
-			const sortDir = paginationQuery.sorting_direction ?? 'desc';
-			const res = await client.products.get({
-				query: {
-					...paginationQuery,
-					page: addPage,
-					limit: addLimit,
-					sorting_field: (paginationQuery.sorting_field as string) ?? 'created_at',
-					sorting_direction: sortDir === 'asc' ? 'asc' : 'desc'
-				} as Record<string, string | number | undefined>
-			});
-			const data = res.data as { data?: { rows: AttributeProduct[]; pagination: PaginationMeta } };
-			addListData = data?.data ?? null;
+			const res = await client.products.get({ query: { page: 1, limit: 100 } });
+			const data = res.data as { data?: { rows: TagProduct[] } };
+			addList = data?.data?.rows ?? [];
 		} catch {
-			addListData = null;
+			addList = [];
 		}
 	}
 
@@ -125,7 +107,7 @@
 		addSelectedIds = next;
 	}
 
-	function openRemoveProductConfirm(product: AttributeProduct) {
+	function openRemoveProductConfirm(product: TagProduct) {
 		productToRemove = product;
 		removeError = null;
 		removeProductModalOpen = true;
@@ -139,11 +121,11 @@
 	}
 
 	async function confirmRemoveProduct() {
-		if (!attributeId || !productToRemove) return;
+		if (!tagId || !productToRemove) return;
 		removeSubmitting = true;
 		removeError = null;
 		try {
-			const res = await (client as any)['product-attributes']({ id: attributeId }).products.delete({
+			const res = await (client as any)['product-tags']({ id: tagId }).products.delete({
 				product_ids: [productToRemove.id]
 			});
 			if (res.error) {
@@ -161,11 +143,11 @@
 	}
 
 	async function submitAdd() {
-		if (!attributeId || addSelectedIds.size === 0) return;
+		if (!tagId || addSelectedIds.size === 0) return;
 		addSubmitting = true;
 		addError = null;
 		try {
-			const res = await (client as any)['product-attributes']({ id: attributeId }).products.post({
+			const res = await (client as any)['product-tags']({ id: tagId }).products.post({
 				product_ids: Array.from(addSelectedIds)
 			});
 			if (res.error) {
@@ -185,13 +167,13 @@
 <DetailProductsCard
 	rows={rows}
 	columns={tableColumns}
-	emptyMessage="No products with this attribute."
+	emptyMessage="No products with this tag."
 	{loading}
 	error={null}
 	{pagination}
 	{start}
 	{end}
-	{onPageChange}
+	onPageChange={onPageChange}
 	showAddButton={true}
 	onAdd={() => (addSheetOpen = true)}
 	showSearchInput={true}
@@ -204,7 +186,7 @@
 		<div class="flex h-full flex-col">
 			<div class="border-b px-6 py-4">
 				<h2 class="text-lg font-semibold">Add products</h2>
-				<p class="mt-1 text-sm text-muted-foreground">Select products to add to this attribute.</p>
+				<p class="mt-1 text-sm text-muted-foreground">Select products to add to this tag.</p>
 			</div>
 			<div class="flex min-h-0 flex-1 flex-col">
 				<div class="border-b px-6 py-4">
@@ -214,10 +196,10 @@
 					</div>
 				</div>
 				<div class="min-h-0 flex-1 overflow-auto px-6">
-					{#if addFiltered.length === 0}
+					{#if filteredAddList.length === 0}
 						<p class="py-8 text-center text-muted-foreground">No products to show.</p>
 					{:else}
-						{#each addFiltered as p (p.id)}
+						{#each filteredAddList as p (p.id)}
 							<label class="flex items-center gap-3 border-b py-3">
 								<input type="checkbox" checked={addSelectedIds.has(p.id)} onchange={() => toggleAddSelection(p.id)} />
 								{#if p.thumbnail}
@@ -246,7 +228,7 @@
 	bind:open={removeProductModalOpen}
 	entityName="product"
 	entityTitle={productToRemove?.title ?? productToRemove?.id ?? ''}
-	customMessage="Remove this product from the attribute? The product will remain but will no longer be associated with this attribute."
+	customMessage="Remove this product from the tag? The product will remain but will no longer be associated with this tag."
 	onConfirm={confirmRemoveProduct}
 	onCancel={closeRemoveProductConfirm}
 	submitting={removeSubmitting}

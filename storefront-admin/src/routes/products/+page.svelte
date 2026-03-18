@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import type { PageData } from './$types';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
 		DeleteConfirmationModal,
@@ -12,12 +13,12 @@
 	} from '$lib/components/organs/index.js';
 	import Package from '@lucide/svelte/icons/package';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
-	import type { Product, ProductsListResponse } from '$lib/products/types.js';
-	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
+	import type { Product, PaginationMeta } from '$lib/components/organs/product/create/types.js';
 	import { client } from '$lib/client.js';
-	import CreateProductModal from '$lib/products/CreateProductModal.svelte';
+	import { CreateProductModal } from '$lib/components/organs/product/create/index.js';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { untrack } from 'svelte';
+	let { data }: { data: PageData } = $props();
 	let createOpen = $state(false);
 
 	const paginationQuery = createPaginationQuery(page.url.searchParams);
@@ -34,7 +35,7 @@
 		await client.products.delete({ product_ids: ids });
 	}
 
-	const queryData = $derived(paginateState.query.data as ProductsListResponse | undefined);
+	const queryData = $derived(paginateState.query.data as { data: { rows: Product[]; pagination: PaginationMeta } } | undefined);
 	const rawRows = $derived(queryData?.data?.rows ?? []);
 	const rows = $derived(
 		rawRows.map((p: Product) => ({
@@ -162,7 +163,11 @@
 	</div>
 </div>
 
-<CreateProductModal bind:open={createOpen} onSuccess={() => paginateState.query.refetch()} />
+<CreateProductModal
+	bind:open={createOpen}
+	productCreateForm={data.productCreateForm}
+	onSuccess={() => paginateState.query.refetch()}
+/>
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}

@@ -12,6 +12,7 @@
 		createHandle = $bindable(''),
 		createDescription = $bindable(''),
 		createError = null as string | null,
+		titleError = null as string | null,
 		createHasVariants = $bindable(true),
 		createMediaModalOpen = $bindable(false),
 		createMediaImageUrl = $bindable(''),
@@ -26,6 +27,7 @@
 		createHandle: string;
 		createDescription: string;
 		createError: string | null;
+		titleError: string | null;
 		createHasVariants: boolean;
 		createMediaModalOpen: boolean;
 		createMediaImageUrl: string;
@@ -37,7 +39,7 @@
 	} = $props();
 </script>
 
-<div class="flex-1 overflow-auto p-6 pt-4">
+<div class="flex-1 overflow-auto p-4 pt-4 sm:p-6 sm:pt-4">
 	<h2 class="text-lg font-semibold">Details</h2>
 	<p class="mt-1 text-sm text-muted-foreground">Add the basic information for your product.</p>
 	<div class="mt-6 flex flex-col gap-6">
@@ -47,8 +49,11 @@
 				id="create-title"
 				bind:value={createTitle}
 				placeholder="e.g. Winter jacket"
-				class={cn('h-9', createError === 'Title is required' && 'border-destructive')}
+				class={cn('h-9', (createError === 'Title is required' || titleError) && 'border-destructive')}
 			/>
+			{#if titleError}
+				<p class="text-xs text-destructive">{titleError}</p>
+			{/if}
 		</div>
 		<div class="flex flex-col gap-2">
 			<label for="create-subtitle" class="text-sm font-medium">

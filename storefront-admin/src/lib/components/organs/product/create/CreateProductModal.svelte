@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
-	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import type { TableColumn } from '$lib/components/organs/index.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
@@ -8,19 +8,20 @@
 	import Check from '@lucide/svelte/icons/check';
 	import { cn } from '$lib/utils.js';
 	import { client } from '$lib/client.js';
-	import type { Product } from './types.js';
-	import CreateProductStepDetails from './create-product-modal/CreateProductStepDetails.svelte';
-	import CreateProductStepAttributes from './create-product-modal/CreateProductStepAttributes.svelte';
-	import CreateProductStepOrganize from './create-product-modal/CreateProductStepOrganize.svelte';
-	import CreateProductStepVariants from './create-product-modal/CreateProductStepVariants.svelte';
+	import { superForm } from 'sveltekit-superforms/client';
+	import CreateProductStepDetails from './CreateProductStepDetails.svelte';
+	import CreateProductStepAttributes from './CreateProductStepAttributes.svelte';
+	import CreateProductStepOrganize from './CreateProductStepOrganize.svelte';
+	import CreateProductStepVariants from './CreateProductStepVariants.svelte';
+	import type { SuperValidated } from 'sveltekit-superforms';
+	import { get } from 'svelte/store';
 
 	interface Props {
 		open: boolean;
+		productCreateForm: Record<string, unknown>;
 		onSuccess?: () => void;
 	}
-	let { open = $bindable(false), onSuccess }: Props = $props();
-
-	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
+	let { open = $bindable(false), productCreateForm: initialProductCreateForm, onSuccess }: Props = $props();
 
 	type ProductOption = { title: string; values: string[] };
 	type ProductVariantForm = {
@@ -65,7 +66,38 @@
 
 	let createStep = $state(1);
 	let createError = $state<string | null>(null);
-	let createSubmitting = $state(false);
+	let createFormElement = $state<HTMLFormElement | null>(null);
+	let submitStatus = $state<'draft' | 'published'>('draft');
+	let submitPending = $state(false);
+
+	const {
+		form: createFormData,
+		enhance: enhanceCreate,
+		submitting: createSubmitting,
+		errors: serverFieldErrors
+	} = superForm(initialProductCreateForm as SuperValidated<Record<string, unknown>, any, Record<string, unknown>>, {
+		resetForm: false,
+		invalidateAll: false,
+		dataType: 'json',
+		onResult: ({ result }) => {
+			if (result.type === 'failure') {
+				const data = result.data as { error?: string } | undefined;
+				createError = data?.error ?? 'Failed to create product';
+				submitPending = false;
+			}
+		},
+		onUpdated: ({ form }) => {
+			if (!submitPending) return;
+			submitPending = false;
+			if (form.valid) {
+				createError = null;
+				closeCreate();
+				onSuccess?.();
+				return;
+			}
+			createError = 'Please fix the highlighted fields and try again.';
+		}
+	});
 
 	let createTitle = $state('');
 	let createSubtitle = $state('');
@@ -138,8 +170,22 @@
 	let collectionsList = $state<{ id: string; title: string; handle: string }[]>([]);
 	let categoriesList = $state<{ id: string; value: string; handle: string }[]>([]);
 	let tagsList = $state<{ id: string; value: string }[]>([]);
-	let attributesList = $state<{ id: string; title: string; type: string }[]>([]);
-	let attributeGroupsList = $state<{ id: string; title: string }[]>([]);
+	let attributesList = $state<
+		{
+			id: string;
+			title: string;
+			type: string;
+			attribute_group_id?: string | null;
+			product_attribute_group_id?: string | null;
+			attributeGroupId?: string | null;
+			attribute_group?: { id?: string | null } | null;
+			product_attribute_group?: { id?: string | null } | null;
+			group_id?: string | null;
+		}[]
+	>([]);
+	let attributeGroupsList = $state<
+		{ id: string; title: string; value?: string; name?: string }[]
+	>([]);
 	let salesChannelsList = $state<{ id: string; name: string }[]>([]);
 
 	type CreateAttributeEntry = { attributeId: string; attributeTitle: string; value: string };
@@ -178,8 +224,24 @@
 	function setAttributeEntryAttribute(index: number, attributeId: string) {
 		const attr = attributesList.find((a) => a.id === attributeId);
 		createAttributeEntries = createAttributeEntries.map((e, i) =>
-			i === index ? { ...e, attributeId: attributeId, attributeTitle: attr?.title ?? '' } : e
+			i === index
+				? {
+						...e,
+						attributeId: attributeId,
+						attributeTitle:
+							attr?.title ??
+							(attr as { value?: string; name?: string } | undefined)?.value ??
+							(attr as { value?: string; name?: string } | undefined)?.name ??
+							''
+					}
+				: e
 		);
+		if (!createAttributeGroupId && attr) {
+			const attributeGroupId = resolveAttributeGroupId(attr);
+			if (attributeGroupId) {
+				createAttributeGroupId = attributeGroupId;
+			}
+		}
 	}
 
 	function setAttributeEntryValue(entryIndex: number, value: string) {
@@ -189,11 +251,40 @@
 	}
 
 	function extractRows<T>(response: unknown): T[] {
-		const payload = (response as { data?: { rows?: T[]; data?: T[] } | T[] } | null)?.data;
-		if (Array.isArray(payload)) return payload;
-		if (Array.isArray(payload?.rows)) return payload.rows;
-		if (Array.isArray(payload?.data)) return payload.data;
+		const payload = (response as { data?: unknown } | null)?.data;
+		if (!payload) return [];
+		if (Array.isArray(payload)) return payload as T[];
+		if (typeof payload !== 'object') return [];
+		const record = payload as Record<string, unknown>;
+		if (Array.isArray(record.rows)) return record.rows as T[];
+		if (Array.isArray(record.data)) return record.data as T[];
+		for (const value of Object.values(record)) {
+			if (Array.isArray(value)) return value as T[];
+		}
 		return [];
+	}
+
+	function pickLabel(row: { title?: string; value?: string; name?: string }): string {
+		return row.title ?? row.value ?? row.name ?? '';
+	}
+
+	function resolveAttributeGroupId(attribute: {
+		attribute_group_id?: string | null;
+		product_attribute_group_id?: string | null;
+		attributeGroupId?: string | null;
+		attribute_group?: { id?: string | null } | null;
+		product_attribute_group?: { id?: string | null } | null;
+		group_id?: string | null;
+	}): string {
+		return (
+			attribute.attribute_group_id ??
+			attribute.product_attribute_group_id ??
+			attribute.attributeGroupId ??
+			attribute.attribute_group?.id ??
+			attribute.product_attribute_group?.id ??
+			attribute.group_id ??
+			''
+		).trim();
 	}
 
 	const listQuery = createPaginationQuery({
@@ -227,6 +318,7 @@
 		createMediaUrl = '';
 		createMediaFile = null;
 		createError = null;
+		submitPending = false;
 		variantSearch = '';
 		variantPage = 1;
 		syncVariantsFromOptions();
@@ -260,11 +352,42 @@
 				: [];
 		attributesList =
 			attributesResponse.status === 'fulfilled'
-				? extractRows<{ id: string; title: string; type: string }>(attributesResponse.value)
+				? extractRows<
+						{
+							id: string;
+							title?: string;
+							value?: string;
+							name?: string;
+							type?: string;
+							attribute_group_id?: string | null;
+							product_attribute_group_id?: string | null;
+							attributeGroupId?: string | null;
+							attribute_group?: { id?: string | null } | null;
+							product_attribute_group?: { id?: string | null } | null;
+							group_id?: string | null;
+						}
+				  >(attributesResponse.value).map((row) => ({
+						id: row.id,
+						title: pickLabel(row),
+						type: row.type ?? '',
+						attribute_group_id: row.attribute_group_id,
+						product_attribute_group_id: row.product_attribute_group_id,
+						attributeGroupId: row.attributeGroupId,
+						attribute_group: row.attribute_group,
+						product_attribute_group: row.product_attribute_group,
+						group_id: row.group_id
+					}))
 				: [];
 		attributeGroupsList =
 			attributeGroupsResponse.status === 'fulfilled'
-				? extractRows<{ id: string; title: string }>(attributeGroupsResponse.value)
+				? extractRows<{ id: string; title?: string; value?: string; name?: string }>(
+						attributeGroupsResponse.value
+				  ).map((row) => ({
+						id: row.id,
+						title: pickLabel(row),
+						value: row.value,
+						name: row.name
+					}))
 				: [];
 
 		const fetchedSalesChannels =
@@ -372,83 +495,88 @@
 		createTagIds = createTagIds.filter((id) => id !== tagId);
 	}
 
-	function buildPayload(status: 'draft' | 'published') {
-		const optionsForApi = createOptions
-			.filter((o) => o.title.trim() && o.values.length > 0)
-			.map((o) => ({
-				title: o.title.trim(),
-				values: o.values.map((val) => (typeof val === 'string' ? val.trim() : val))
-			}));
+	const createTagIdsJson = $derived(JSON.stringify(createTagIds));
+	const createSalesChannelIdsJson = $derived(
+		JSON.stringify(createSalesChannels.map((channel) => channel.id))
+	);
+	const createOptionsJson = $derived(
+		JSON.stringify(
+			createOptions
+				.filter((option) => option.title.trim() && option.values.length > 0)
+				.map((option) => ({
+					title: option.title.trim(),
+					values: option.values.map((value) => value.trim())
+				}))
+		)
+	);
+	const createVariantsJson = $derived(
+		JSON.stringify(
+			createVariants.map((variant, index) => {
+				const availableCount = String(variant.availableCount ?? '').trim();
+				return {
+					title: variant.title,
+					options: variant.options,
+					sku: variant.sku.trim() || undefined,
+					available_count: availableCount ? parseInt(availableCount, 10) : undefined,
+					allow_backorder: variant.allow_backorder,
+					variant_rank: index,
+					price_amount: variant.priceAmount.trim() || undefined
+				};
+			})
+		)
+	);
+	const createAttributesJson = $derived(
+		JSON.stringify(
+			createAttributeEntries
+				.filter((entry) => entry.attributeId && entry.value.trim())
+				.map((entry) => ({
+					attribute_id: entry.attributeId,
+					value: entry.value.trim()
+				}))
+		)
+	);
 
-		const variantsForApi = createVariants.map((v, i) => {
-			const prices = v.priceAmount.trim()
-				? [{ amount: Math.round(parseFloat(v.priceAmount) * 100), currency_code: 'eur' }]
-				: [];
-			const availableCountStr = String(v.availableCount || '').trim();
-			const availableCountNum = availableCountStr ? parseInt(availableCountStr, 10) : null;
-			const optionsTrimmed = Object.fromEntries(
-				Object.entries(v.options).map(([k, val]) => [
-					k.trim(),
-					typeof val === 'string' ? val.trim() : val
-				])
-			);
-			return {
-				title: v.title,
-				options: optionsTrimmed,
-				sku: v.sku || undefined,
-				manage_inventory: availableCountNum !== null && availableCountNum >= 0,
-				allow_backorder: v.allow_backorder,
-				variant_rank: i,
-				prices,
-				available_count: availableCountNum !== null ? availableCountNum : undefined
-			};
-		});
-
-		const attributesFiltered = createAttributeEntries.filter(
-			(e) => e.attributeId && e.value.trim()
-		);
-		const attributesForApi =
-			createAttributeGroupId && attributesFiltered.length > 0
-				? attributesFiltered.map((e) => ({
-						attribute_group_id: createAttributeGroupId,
-						attribute_id: e.attributeId,
-						value: e.value.trim()
-					}))
-				: undefined;
-		const attributeGroupsForApi =
-			createAttributeGroupId && attributesFiltered.length > 0
-				? [{ attribute_group_id: createAttributeGroupId, required: false, rank: 0 }]
-				: undefined;
-
-		return {
-			title: createTitle.trim(),
-			handle: createHandle.trim() || undefined,
-			subtitle: createSubtitle.trim() || undefined,
-			description: createDescription.trim() || undefined,
-			status,
-			is_giftcard: false,
-			discountable: createDiscountable,
-			category_id: createCategoryId || undefined,
-			tag_ids: createTagIds.length > 0 ? createTagIds : undefined,
-			options: createHasVariants ? optionsForApi : undefined,
-			variants: createHasVariants && variantsForApi.length > 0 ? variantsForApi : undefined,
-			sales_channels:
-				createSalesChannels.length > 0
-					? createSalesChannels.map((ch) => ({ id: ch.id }))
-					: undefined,
-			attribute_groups: attributeGroupsForApi,
-			attributes: attributesForApi
-		};
+	function firstError(value: unknown): string | null {
+		if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
+		return null;
 	}
 
-	async function submitCreate(status: 'draft' | 'published') {
+	const normalizedFieldErrors = $derived(($serverFieldErrors ?? {}) as Record<string, unknown>);
+	const titleError = $derived(firstError(normalizedFieldErrors.title));
+	const attributeGroupError = $derived(
+		firstError(normalizedFieldErrors.attribute_group_id)
+	);
+	const categoryError = $derived(firstError(normalizedFieldErrors.category_id));
+	const variantsError = $derived(firstError(normalizedFieldErrors.variants));
+
+	function submitCreate(status: 'draft' | 'published') {
 		createError = null;
 		if (!createTitle.trim()) {
 			createError = 'Title is required';
 			return;
 		}
-		const hasAttributeEntries = createAttributeEntries.some((e) => e.attributeId && e.value.trim());
-		if (hasAttributeEntries && !createAttributeGroupId) {
+		const selectedAttributeEntries = createAttributeEntries.filter(
+			(entry) => entry.attributeId.trim() && entry.value.trim()
+		);
+		const hasAttributeEntries = selectedAttributeEntries.length > 0;
+		let effectiveAttributeGroupId = createAttributeGroupId.trim();
+		if (hasAttributeEntries && !effectiveAttributeGroupId) {
+			const inferredGroupIds = Array.from(
+				new Set(
+					selectedAttributeEntries
+						.map((entry) => {
+							const attr = attributesList.find((a) => a.id === entry.attributeId);
+							return attr ? resolveAttributeGroupId(attr) : '';
+						})
+						.filter((id) => id.length > 0)
+				)
+			);
+			if (inferredGroupIds.length === 1) {
+				effectiveAttributeGroupId = inferredGroupIds[0];
+				createAttributeGroupId = effectiveAttributeGroupId;
+			}
+		}
+		if (hasAttributeEntries && !effectiveAttributeGroupId) {
 			createError = 'Select an attribute group when setting attributes.';
 			return;
 		}
@@ -480,33 +608,48 @@
 				}
 			}
 		}
-		createSubmitting = true;
-		try {
-			const body = buildPayload(status);
-			const res = await fetch(`${API_BASE}/products`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body)
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
-			}
-			const product = (await res.json()) as Product;
-			if (createCollectionId && product.id) {
-				await fetch(`${API_BASE}/collections/${createCollectionId}/products`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ product_ids: [product.id] })
-				});
-			}
-			closeCreate();
-			onSuccess?.();
-		} catch (e) {
-			createError = e instanceof Error ? e.message : String(e);
-		} finally {
-			createSubmitting = false;
-		}
+		submitStatus = status;
+		createFormData.set({
+			...get(createFormData),
+			title: createTitle,
+			subtitle: createSubtitle,
+			handle: createHandle,
+			description: createDescription,
+			status,
+			discountable: createDiscountable,
+			collection_id: createCollectionId,
+			category_id: createCategoryId,
+			tag_ids: createTagIds,
+			sales_channel_ids: createSalesChannels.map((channel) => channel.id),
+			has_variants: createHasVariants,
+			options: createOptions
+				.filter((option) => option.title.trim() && option.values.length > 0)
+				.map((option) => ({
+					title: option.title.trim(),
+					values: option.values.map((value) => value.trim())
+				})),
+			variants: createVariants.map((variant, index) => {
+				const availableCount = String(variant.availableCount ?? '').trim();
+				return {
+					title: variant.title,
+					options: variant.options,
+					sku: variant.sku.trim() || undefined,
+					available_count: availableCount ? parseInt(availableCount, 10) : undefined,
+					allow_backorder: variant.allow_backorder,
+					variant_rank: index,
+					price_amount: variant.priceAmount.trim() || undefined
+				};
+			}),
+			attribute_group_id: createAttributeGroupId,
+			attributes: createAttributeEntries
+				.filter((entry) => entry.attributeId && entry.value.trim())
+				.map((entry) => ({
+					attribute_id: entry.attributeId,
+					value: entry.value.trim()
+				}))
+		});
+		submitPending = true;
+		createFormElement?.requestSubmit();
 	}
 
 	let wasOpen = $state(false);
@@ -519,82 +662,90 @@
 	});
 </script>
 
-<Dialog.Root bind:open>
-	<Dialog.Content class="h-full w-full">
-		<div class="flex h-full flex-col">
-			<div class="flex shrink-0 items-center gap-1 border-b px-6 py-4">
-				<button
-					type="button"
-					class={cn(
-						'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-						createStep === 1
-							? 'bg-primary/10 text-primary'
-							: 'text-muted-foreground hover:text-foreground'
-					)}
-					onclick={() => (createStep = 1)}
-				>
-					{#if createStep > 1}
-						<Check class="size-4" />
-					{:else}
-						<Info class="size-4" />
-					{/if}
-					Details
-				</button>
-				<button
-					type="button"
-					class={cn(
-						'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-						createStep === 2
-							? 'bg-primary/10 text-primary'
-							: 'text-muted-foreground hover:text-foreground'
-					)}
-					onclick={() => goToStep2()}
-				>
-					{#if createStep > 2}
-						<Check class="size-4" />
-					{:else if createStep === 2}
-						<Info class="size-4" />
-					{/if}
-					Attributes
-				</button>
-				<button
-					type="button"
-					class={cn(
-						'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-						createStep === 3
-							? 'bg-primary/10 text-primary'
-							: 'text-muted-foreground hover:text-foreground'
-					)}
-					onclick={() => goToStep3()}
-				>
-					{#if createStep > 3}
-						<Check class="size-4" />
-					{:else if createStep === 3}
-						<Info class="size-4" />
-					{/if}
-					Organize
-				</button>
-				<button
-					type="button"
-					class={cn(
-						'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-						createStep === 4
-							? 'bg-primary/10 text-primary'
-							: 'text-muted-foreground hover:text-foreground'
-					)}
-					onclick={() => goToStep4()}
-				>
-					{#if createStep === 4}
-						<Info class="size-4" />
-					{/if}
-					Variants
-				</button>
+<Sheet.Root bind:open>
+	<Sheet.Content side="right" class="flex h-full max-h-dvh w-full max-w-lg flex-col p-0 sm:max-w-lg">
+		<form
+			method="POST"
+			action="?/create"
+			use:enhanceCreate
+			bind:this={createFormElement}
+			class="flex h-full min-h-0 flex-col"
+		>
+			<div class="shrink-0 border-b px-4 py-4 sm:px-6">
+				<div class="-mx-1 overflow-x-auto px-1">
+					<div class="flex min-w-max items-center gap-1">
+						<button
+							type="button"
+							class={cn(
+								'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+								createStep === 1
+									? 'bg-primary/10 text-primary'
+									: 'text-muted-foreground hover:text-foreground'
+							)}
+							onclick={() => (createStep = 1)}
+						>
+							{#if createStep > 1}
+								<Check class="size-4" />
+							{:else}
+								<Info class="size-4" />
+							{/if}
+							Details
+						</button>
+						<button
+							type="button"
+							class={cn(
+								'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+								createStep === 2
+									? 'bg-primary/10 text-primary'
+									: 'text-muted-foreground hover:text-foreground'
+							)}
+							onclick={() => goToStep2()}
+						>
+							{#if createStep > 2}
+								<Check class="size-4" />
+							{:else if createStep === 2}
+								<Info class="size-4" />
+							{/if}
+							Attributes
+						</button>
+						<button
+							type="button"
+							class={cn(
+								'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+								createStep === 3
+									? 'bg-primary/10 text-primary'
+									: 'text-muted-foreground hover:text-foreground'
+							)}
+							onclick={() => goToStep3()}
+						>
+							{#if createStep > 3}
+								<Check class="size-4" />
+							{:else if createStep === 3}
+								<Info class="size-4" />
+							{/if}
+							Organize
+						</button>
+						<button
+							type="button"
+							class={cn(
+								'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+								createStep === 4
+									? 'bg-primary/10 text-primary'
+									: 'text-muted-foreground hover:text-foreground'
+							)}
+							onclick={() => goToStep4()}
+						>
+							{#if createStep === 4}
+								<Info class="size-4" />
+							{/if}
+							Variants
+						</button>
+					</div>
+				</div>
 			</div>
 
-			{#if createError && !createSubmitting}
-				<div
-					class="mx-6 mt-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-				>
+			{#if createError && !$createSubmitting}
+				<div class="mx-4 mt-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive sm:mx-6">
 					{createError}
 				</div>
 			{/if}
@@ -606,6 +757,7 @@
 					bind:createHandle
 					bind:createDescription
 					{createError}
+					{titleError}
 					bind:createHasVariants
 					bind:createMediaModalOpen
 					bind:createMediaImageUrl
@@ -627,6 +779,7 @@
 					{removeAttributeEntry}
 					{setAttributeEntryAttribute}
 					{setAttributeEntryValue}
+					{attributeGroupError}
 				/>
 			{/if}
 
@@ -646,6 +799,7 @@
 					{removeTag}
 					{addSalesChannel}
 					{removeSalesChannel}
+					{categoryError}
 				/>
 			{/if}
 
@@ -669,33 +823,55 @@
 						createHasVariants = true;
 						syncVariantsFromOptions();
 					}}
+					{variantsError}
 				/>
 			{/if}
 
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeCreate}>Cancel</Button>
+			<input type="hidden" name="title" value={createTitle} />
+			<input type="hidden" name="subtitle" value={createSubtitle} />
+			<input type="hidden" name="handle" value={createHandle} />
+			<input type="hidden" name="description" value={createDescription} />
+			<input type="hidden" name="status" value={submitStatus} />
+			<input type="hidden" name="discountable" value={String(createDiscountable)} />
+			<input type="hidden" name="collection_id" value={createCollectionId} />
+			<input type="hidden" name="category_id" value={createCategoryId} />
+			<input type="hidden" name="tag_ids" value={createTagIdsJson} />
+			<input type="hidden" name="sales_channel_ids" value={createSalesChannelIdsJson} />
+			<input type="hidden" name="has_variants" value={String(createHasVariants)} />
+			<input type="hidden" name="options" value={createOptionsJson} />
+			<input type="hidden" name="variants" value={createVariantsJson} />
+			<input type="hidden" name="attribute_group_id" value={createAttributeGroupId} />
+			<input type="hidden" name="attributes" value={createAttributesJson} />
+
+			<div class="flex shrink-0 flex-wrap justify-end gap-2 border-t p-4">
+				<Button type="button" variant="outline" onclick={closeCreate}>Cancel</Button>
 				{#if createStep === 1}
-					<Button onclick={() => goToStep2()}>Continue</Button>
+					<Button type="button" onclick={() => goToStep2()}>Continue</Button>
 				{:else if createStep === 2}
-					<Button variant="outline" onclick={() => (createStep = 1)}>Back</Button>
-					<Button onclick={() => goToStep3()}>Continue</Button>
+					<Button type="button" variant="outline" onclick={() => (createStep = 1)}>Back</Button>
+					<Button type="button" onclick={() => goToStep3()}>Continue</Button>
 				{:else if createStep === 3}
-					<Button variant="outline" onclick={() => (createStep = 2)}>Back</Button>
-					<Button onclick={() => goToStep4()}>Continue</Button>
+					<Button type="button" variant="outline" onclick={() => (createStep = 2)}>Back</Button>
+					<Button type="button" onclick={() => goToStep4()}>Continue</Button>
 				{:else}
-					<Button variant="outline" onclick={() => (createStep = 3)}>Back</Button>
+					<Button type="button" variant="outline" onclick={() => (createStep = 3)}>Back</Button>
 					<Button
+						type="button"
 						variant="outline"
-						disabled={createSubmitting}
+						disabled={$createSubmitting}
 						onclick={() => submitCreate('draft')}
 					>
 						Save as draft
 					</Button>
-					<Button disabled={createSubmitting} onclick={() => submitCreate('published')}>
+					<Button
+						type="button"
+						disabled={$createSubmitting}
+						onclick={() => submitCreate('published')}
+					>
 						Publish
 					</Button>
 				{/if}
 			</div>
-		</div>
-	</Dialog.Content>
-</Dialog.Root>
+		</form>
+	</Sheet.Content>
+</Sheet.Root>

@@ -1,14 +1,10 @@
-const state = createStore<{
+import { writable } from 'svelte/store';
+import type { Product } from '$lib/components/organs/product/create/types.js';
+
+const state = writable<{
 	product: Product | null;
-	variants: ProductVariant[];
-	options: ProductOption[];
-	category: ProductCategory | null;
-	allSalesChannels: SalesChannel[];
-	productSalesChannelIds: Set<string>;
 }>({
-	product: null,
-	variants: [],
-	options: [],
-	category: null,
-	allSalesChannels: [],
+	product: null
 });
+
+export default state;

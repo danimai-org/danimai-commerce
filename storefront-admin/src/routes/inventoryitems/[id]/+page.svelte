@@ -4,10 +4,10 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import { DetailHeaderCards, ResourceTableCard, ReservationsCard, AddVariantSheet, EditDetailsSheet } from '$lib/components/organs/inventoryitems/detail/index.js';
 	import {
 		DeleteConfirmationModal,
 		PaginationTable,
@@ -18,9 +18,9 @@
 	} from '$lib/components/organs/index.js';
 	import { createPaginationQuery, createPagination, type PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import { client } from '$lib/client.js';
+	import { deleteInventoryItems } from '$lib/inventory-items/api.js';
 	import { DropdownMenu } from 'bits-ui';
 
-	const API_BASE = 'http://localhost:8000/admin';
 
 	const itemId = $derived(page.params?.id ?? '');
 
@@ -104,14 +104,12 @@
 		queryKey: ['inventory-item-detail', itemId],
 		queryFn: async (): Promise<DetailData | null> => {
 			if (!itemId) return null;
-			const res = await fetch(`${API_BASE}/inventory/items/${itemId}`, { cache: 'no-store' });
-			if (!res.ok) {
-				if (res.status === 404) return null;
-				throw new Error(await res.text());
+			const res = await client.inventory.items({id: itemId}).get();
+			if (res?.error) {
+				throw new Error(String(res?.error?.value?.message ?? 'Failed to get inventory item detail'));
 			}
-			return res.json() as Promise<DetailData>;
-		},
-		enabled: !!itemId
+			return res.data as unknown as DetailData;
+		}
 	}));
 
 	const data = $derived(itemDetailQuery.data ?? null);
@@ -237,13 +235,17 @@
 					})
 				)
 			}),
-		['stock-locations-picker'],
-		undefined,
-		{
-			enabled: () => manageLocationsSheetOpen,
-			queryKeyPart: () => [String(locationsSheetPage), String(locationsSheetLimit)]
-		}
+		['stock-locations-picker']
 	);
+
+	$effect(() => {
+		manageLocationsSheetOpen;
+		locationsSheetPage;
+		locationsSheetLimit;
+		if (manageLocationsSheetOpen) {
+			stockLocationsPaginateState.refetch();
+		}
+	});
 
 	const stockLocationsRows = $derived(
 		(stockLocationsPaginateState.query.data?.data?.rows ?? []) as unknown as StockLocation[]
@@ -307,13 +309,17 @@
 		addVariantTitle = '';
 		(async () => {
 			try {
-				const res = await fetch(`${API_BASE}/products?limit=100`, { cache: 'no-store' });
-				if (res.ok) {
-					const j = (await res.json()) as { products?: { id: string; title: string }[] };
-					productsList = j.products ?? [];
-				} else {
-					productsList = [];
+				const res = await client.products.get({
+					query: { page: 1, limit: 100 } as Record<string, string | number>
+				});
+				if (res?.error) {
+					throw new Error(String(res?.error?.value?.message ?? 'Failed to load products'));
 				}
+				const payload = res.data as { data?: { rows?: { id: string; title: string | null }[] } };
+				productsList = (payload?.data?.rows ?? []).map((product) => ({
+					id: product.id,
+					title: product.title ?? product.id
+				}));
 			} catch {
 				productsList = [];
 			}
@@ -325,18 +331,13 @@
 		addVariantError = null;
 		addVariantSubmitting = true;
 		try {
-			const res = await fetch(`${API_BASE}/product-variants`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					product_id: addVariantProductId,
-					title: addVariantTitle.trim(),
-					sku: data.item.sku
-				})
+			const res = await client['product-variants'].post({
+				product_id: addVariantProductId,
+				title: addVariantTitle.trim(),
+				sku: data.item.sku
 			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
+			if (res?.error) {
+				throw new Error(String(res?.error?.value?.message ?? 'Failed to add variant'));
 			}
 			addVariantSheetOpen = false;
 			await itemDetailQuery.refetch();
@@ -360,17 +361,13 @@
 		editDetailsError = null;
 		editDetailsSaving = true;
 		try {
-			const res = await fetch(`${API_BASE}/inventory/items/${data.item.id}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					sku: editDetailsSku.trim() || null,
-					requires_shipping: editDetailsRequiresShipping
-				})
+			const res = await client.inventory.items({ id: data.item.id }).put({
+				id: data.item.id,
+				sku: editDetailsSku.trim() || null,
+				requires_shipping: editDetailsRequiresShipping
 			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
+			if (res?.error) {
+				throw new Error(String(res?.error?.value?.message ?? 'Failed to save inventory item details'));
 			}
 			editDetailsSheetOpen = false;
 			await itemDetailQuery.refetch();
@@ -419,19 +416,14 @@
 		try {
 			const stocked = Math.max(0, parseInt(addStockedQty, 10) || 0);
 			const reserved = Math.max(0, parseInt(addReservedQty, 10) || 0);
-			const res = await fetch(`${API_BASE}/inventory/levels`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					inventory_item_id: data.item.id,
-					location_id: addLocationId,
-					stocked_quantity: stocked,
-					reserved_quantity: reserved
-				})
+			const res = await client.inventory.levels.post({
+				inventory_item_id: data.item.id,
+				location_id: addLocationId,
+				stocked_quantity: stocked,
+				reserved_quantity: reserved
 			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
+			if (res?.error) {
+				throw new Error(String(res?.error?.value?.message ?? 'Failed to add inventory level'));
 			}
 			addLocationId = '';
 			addStockedQty = '0';
@@ -464,19 +456,14 @@
 			for (const level of data.levels) {
 				const stocked = Math.max(0, parseInt(levelStockEdit[level.id] ?? '', 10) || 0);
 				const reserved = Math.max(0, parseInt(levelReservedEdit[level.id] ?? '', 10) || 0);
-				const res = await fetch(`${API_BASE}/inventory/levels`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						inventory_item_id: data.item.id,
-						location_id: level.location_id,
-						stocked_quantity: stocked,
-						reserved_quantity: reserved
-					})
+				const res = await client.inventory.levels.post({
+					inventory_item_id: data.item.id,
+					location_id: level.location_id,
+					stocked_quantity: stocked,
+					reserved_quantity: reserved
 				});
-				if (!res.ok) {
-					const text = await res.text();
-					throw new Error(text || `HTTP ${res.status}`);
+				if (res?.error) {
+					throw new Error(String(res?.error?.value?.message ?? 'Failed to save inventory levels'));
 				}
 			}
 			await itemDetailQuery.refetch();
@@ -502,12 +489,9 @@
 		levelsError = null;
 		levelsSaving = true;
 		try {
-			const res = await fetch(`${API_BASE}/inventory/levels/${level.id}`, {
-				method: 'DELETE'
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `HTTP ${res.status}`);
+			const res = await client.inventory.levels({ id: level.id }).delete();
+			if (res?.error) {
+				throw new Error(String(res?.error?.value?.message ?? 'Failed to delete inventory level'));
 			}
 			await itemDetailQuery.refetch();
 			levelStockEdit = Object.fromEntries(
@@ -543,21 +527,7 @@
 		deleteItemSubmitting = true;
 		deleteItemError = null;
 		try {
-			const res = await fetch(`${API_BASE}/inventory/items/${data.item.id}`, {
-				method: 'DELETE'
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				let message = text;
-				try {
-					const json = JSON.parse(text) as { message?: string };
-					if (json.message) message = json.message;
-				} catch {
-					// use text as-is
-				}
-				deleteItemError = message;
-				return;
-			}
+			await deleteInventoryItems([data.item.id]);
 			deleteItemModalOpen = false;
 			goto('/inventoryitems');
 		} catch (e) {
@@ -599,124 +569,39 @@
 			</div>
 		{:else if data}
 			<div class="flex flex-col gap-6">
-					<div class="flex gap-6">
-						<!-- Details card -->
-						<div class="flex-1 rounded-lg border bg-card p-6 shadow-sm">
-							<div class="flex items-center justify-between">
-								<h2 class="font-semibold">{displayName} Details</h2>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									onclick={openEditDetailsSheet}
-									aria-label="Edit details"
-								>
-									<Pencil class="size-4" />
-								</Button>
-							</div>
-							<dl class="mt-4 grid gap-2 text-sm">
-								<div>
-									<dt class="text-muted-foreground">SKU</dt>
-									<dd class="font-medium">{data.item.sku ?? '–'}</dd>
-								</div>
-								<div>
-									<dt class="text-muted-foreground">In stock</dt>
-									<dd class="font-medium">
-										{totals.inStock} across {totals.locationCount} location{totals.locationCount === 1 ? '' : 's'}
-									</dd>
-								</div>
-								<div>
-									<dt class="text-muted-foreground">Reserved</dt>
-									<dd class="font-medium">
-										{totals.reserved} across {totals.locationCount} location{totals.locationCount === 1 ? '' : 's'}
-									</dd>
-								</div>
-								<div>
-									<dt class="text-muted-foreground">Available</dt>
-									<dd class="font-medium">
-										{totals.available} across {totals.locationCount} location{totals.locationCount === 1 ? '' : 's'}
-									</dd>
-								</div>
-							</dl>
-						</div>
+				<DetailHeaderCards
+					displayName={displayName}
+					sku={data.item.sku}
+					{totals}
+					onEditDetails={openEditDetailsSheet}
+					onAddVariant={openAddVariantSheet}
+				/>
 
-						<!-- Associated variants header -->
-						<div class="rounded-lg border bg-card p-6 shadow-sm self-start w-52">
-							<div class="flex flex-col gap-2">
-								<div>
-									<h2 class="font-semibold">Associated variants</h2>
-									<p class="mt-1 text-xs text-muted-foreground">Product variants linked to this inventory item by SKU.</p>
-								</div>
-								{#if data.item.sku}
-									<Button variant="outline" size="sm" onclick={openAddVariantSheet}>
-										Add variant
-									</Button>
-								{:else}
-									<p class="text-xs text-muted-foreground">Set SKU in Edit details to link variants.</p>
-								{/if}
-							</div>
-						</div>
-					</div>
+				<ResourceTableCard
+					title="Associated variants"
+					columns={variantsColumns}
+					rows={variantsRowsForTable}
+					emptyMessage="No associated variants."
+					pagination={variantsPaginationMeta}
+					start={variantsStart}
+					end={variantsEnd}
+					onPageChange={goToVariantsPage}
+				/>
 
-					<!-- Associated variants table - Full width -->
-					<div class="rounded-lg border bg-card p-6 shadow-sm">
-						<h2 class="font-semibold">Associated variants</h2>
-						<PaginationTable showToolbar={false}>
-							<div class="mt-4 min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-								<table class="w-full text-sm">
-									<TableHead columns={variantsColumns} />
-									<TableBody
-										rows={variantsRowsForTable}
-										columns={variantsColumns}
-										emptyMessage="No associated variants."
-									/>
-								</table>
-							</div>
-							<TablePagination
-								pagination={variantsPaginationMeta}
-								start={variantsStart}
-								end={variantsEnd}
-								onPageChange={goToVariantsPage}
-							/>
-						</PaginationTable>
-					</div>
+				<ResourceTableCard
+					title="Locations"
+					columns={levelsColumns}
+					rows={levelsRowsForTable}
+					emptyMessage="No locations."
+					pagination={levelsPaginationMeta}
+					start={levelsStart}
+					end={levelsEnd}
+					onPageChange={goToLevelsPage}
+					actionLabel="Manage locations"
+					onActionClick={openManageLocationsSheet}
+				/>
 
-					<!-- Locations card - Full width -->
-					<div class="rounded-lg border bg-card p-6 shadow-sm">
-						<div class="flex items-center justify-between">
-							<h2 class="font-semibold">Locations</h2>
-							<Button variant="outline" size="sm" onclick={openManageLocationsSheet}>Manage locations</Button>
-						</div>
-						<PaginationTable showToolbar={false}>
-							<div class="mt-4 min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-								<table class="w-full text-sm">
-									<TableHead columns={levelsColumns} />
-									<TableBody
-										rows={levelsRowsForTable}
-										columns={levelsColumns}
-										emptyMessage="No locations."
-									/>
-								</table>
-							</div>
-							<TablePagination
-								pagination={levelsPaginationMeta}
-								start={levelsStart}
-								end={levelsEnd}
-								onPageChange={goToLevelsPage}
-							/>
-						</PaginationTable>
-					</div>
-
-					<!-- Reservations card - Full width -->
-					<div class="rounded-lg border bg-card p-6 shadow-sm">
-					<div class="flex items-center justify-between">
-						<h2 class="font-semibold">Reservations</h2>
-						<Button variant="outline" size="sm">Create</Button>
-					</div>
-					<div class="mt-4 py-8 text-center text-sm text-muted-foreground">
-						No reservations.
-					</div>
-					</div>
+				<ReservationsCard />
 			</div>
 		{/if}
 	</div>
@@ -953,111 +838,25 @@
 	</Sheet.Content>
 </Sheet.Root>
 
-<!-- Add associated variant sheet -->
-<Sheet.Root bind:open={addVariantSheetOpen}>
-	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-		<div class="flex h-full flex-col">
-			<Sheet.Header class="flex flex-col gap-1.5 border-b px-6 py-4">
-				<Sheet.Title>Create associated variant</Sheet.Title>
-				<Sheet.Description class="text-sm text-muted-foreground">
-					Create a new product variant linked to this inventory item (SKU: {data?.item?.sku ?? '–'}).
-				</Sheet.Description>
-			</Sheet.Header>
-			<div class="min-h-0 flex-1 overflow-auto p-6">
-				{#if addVariantError}
-					<div class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-						{addVariantError}
-					</div>
-				{/if}
-				<div class="flex flex-col gap-4">
-					<div class="flex flex-col gap-2">
-						<label for="add-variant-product" class="text-sm font-medium">Product</label>
-						<select
-							id="add-variant-product"
-							bind:value={addVariantProductId}
-							class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-						>
-							<option value="">Select product…</option>
-							{#each productsList as prod (prod.id)}
-								<option value={prod.id}>{prod.title}</option>
-							{/each}
-						</select>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="add-variant-title" class="text-sm font-medium">Variant title</label>
-						<Input
-							id="add-variant-title"
-							bind:value={addVariantTitle}
-							placeholder="e.g. Small / Red"
-							class="h-9"
-						/>
-					</div>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={() => (addVariantSheetOpen = false)} disabled={addVariantSubmitting}>
-					Cancel
-				</Button>
-				<Button
-					onclick={submitAddVariant}
-					disabled={addVariantSubmitting || !addVariantProductId || !addVariantTitle.trim()}
-				>
-					{addVariantSubmitting ? 'Creating…' : 'Create'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
+<AddVariantSheet
+	bind:open={addVariantSheetOpen}
+	sku={data?.item?.sku}
+	error={addVariantError}
+	bind:productId={addVariantProductId}
+	bind:title={addVariantTitle}
+	{productsList}
+	submitting={addVariantSubmitting}
+	onSubmit={submitAddVariant}
+/>
 
-<!-- Edit details sheet -->
-<Sheet.Root bind:open={editDetailsSheetOpen}>
-	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-		<div class="flex h-full flex-col">
-			<Sheet.Header class="flex flex-col gap-1.5 border-b px-6 py-4">
-				<Sheet.Title>Edit details</Sheet.Title>
-				<Sheet.Description class="text-sm text-muted-foreground">
-					Update SKU and shipping settings for this inventory item.
-				</Sheet.Description>
-			</Sheet.Header>
-			<div class="min-h-0 flex-1 overflow-auto p-6">
-				{#if editDetailsError}
-					<div class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-						{editDetailsError}
-					</div>
-				{/if}
-				<div class="flex flex-col gap-4">
-					<div class="flex flex-col gap-2">
-						<label for="edit-details-sku" class="text-sm font-medium">SKU</label>
-						<Input
-							id="edit-details-sku"
-							bind:value={editDetailsSku}
-							placeholder="e.g. SKU-001"
-							class="h-9"
-						/>
-						<p class="text-xs text-muted-foreground">Optional. Leave blank for non-shippable items.</p>
-					</div>
-					<div class="flex items-center gap-2">
-						<input
-							type="checkbox"
-							id="edit-details-requires-shipping"
-							bind:checked={editDetailsRequiresShipping}
-							class="h-4 w-4 rounded border-input"
-						/>
-						<label for="edit-details-requires-shipping" class="text-sm font-medium">Requires shipping</label>
-					</div>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={() => (editDetailsSheetOpen = false)} disabled={editDetailsSaving}>
-					Cancel
-				</Button>
-				<Button onclick={saveEditDetails} disabled={editDetailsSaving}>
-					{editDetailsSaving ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
+<EditDetailsSheet
+	bind:open={editDetailsSheetOpen}
+	error={editDetailsError}
+	bind:sku={editDetailsSku}
+	bind:requiresShipping={editDetailsRequiresShipping}
+	saving={editDetailsSaving}
+	onSave={saveEditDetails}
+/>
 
 <!-- Delete level confirmation -->
 <DeleteConfirmationModal

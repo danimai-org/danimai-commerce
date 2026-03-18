@@ -10,7 +10,7 @@
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import { client } from '$lib/client.js';
-	import type { Product } from '$lib/products/types.js';
+	import type { Product } from '$lib/components/organs/product/create/types.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import { cn } from '$lib/utils.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
@@ -157,8 +157,11 @@
 		removeSubmitting = true;
 		removeError = null;
 		try {
-			const res = await client['collections']({ id: collectionId }).products.delete({
-				product_ids: [productToRemove.id]
+			const res = await client['collections']({ id: collectionId }).products.put({
+				products: {
+					remove: [productToRemove.id],
+					add: []
+				}
 			});
 			if (res.error) {
 				const err = res.error as { value?: { message?: string } };
@@ -261,8 +264,11 @@
 		addError = null;
 		addSubmitting = true;
 		try {
-			const res = await client['collections']({ id: collectionId }).products.post({
-				product_ids: ids
+			const res = await client['collections']({ id: collectionId }).products.put({
+				products: {
+					add: ids,
+					remove: []
+				}
 			});
 			if (res.error) {
 				const err = res.error as { value?: { message?: string } };

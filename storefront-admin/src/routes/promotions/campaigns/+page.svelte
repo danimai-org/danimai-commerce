@@ -21,7 +21,6 @@
 	import Clock from '@lucide/svelte/icons/clock';
 	import DollarSign from '@lucide/svelte/icons/dollar-sign';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
-	import Plus from '@lucide/svelte/icons/plus';
 	import Info from '@lucide/svelte/icons/info';
 	import { cn } from '$lib/utils.js';
 	import { client } from '$lib/client.js';

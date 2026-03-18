@@ -7,6 +7,7 @@
 		createCollectionId = $bindable(''),
 		createCategoryId = $bindable(''),
 		createTagIds = [] as string[],
+		categoryError = null as string | null,
 		createSalesChannels = [] as { id: string; name: string }[],
 		createSalesChannelInput = $bindable(''),
 		collectionsList = [] as { id: string; title: string; handle: string }[],
@@ -22,6 +23,7 @@
 		createCollectionId: string;
 		createCategoryId: string;
 		createTagIds: string[];
+		categoryError: string | null;
 		createSalesChannels: { id: string; name: string }[];
 		createSalesChannelInput: string;
 		collectionsList: { id: string; title: string; handle: string }[];
@@ -35,7 +37,7 @@
 	} = $props();
 </script>
 
-<div class="flex-1 overflow-auto p-6 pt-4">
+<div class="flex-1 overflow-auto p-4 pt-4 sm:p-6 sm:pt-4">
 	<h2 class="text-lg font-semibold">Organize</h2>
 	<p class="mt-1 text-sm text-muted-foreground">
 		Organize your product with collections, categories, and channels.
@@ -102,6 +104,9 @@
 			</select>
 			{#if createCategoryId}
 				<p class="text-xs text-muted-foreground">1 selected</p>
+			{/if}
+			{#if categoryError}
+				<p class="text-xs text-destructive">{categoryError}</p>
 			{/if}
 		</div>
 		<div class="flex flex-col gap-2">
@@ -171,7 +176,7 @@
 				<div class="flex gap-1">
 					<select
 						id="create-sales-channel-input"
-						class="h-8 w-48 rounded-md border border-input bg-background px-3 py-1 text-sm"
+						class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-3 py-1 text-sm sm:w-48"
 						bind:value={createSalesChannelInput}
 						onchange={() => {
 							if (createSalesChannelInput) {
