@@ -36,3 +36,7 @@ export * from './attribute-group/update/index.js';
 export * from './attribute/detail/index.js';
 export * from './attribute/create/index.js';
 export * from './product/variant/index.js';
+export * from './product/create/index.js';
+export * from './product/detail/index.js';
+export * from './product/create/types.js';
+export type { Product, PaginationMeta } from './product/create/types.js';

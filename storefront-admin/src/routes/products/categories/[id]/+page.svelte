@@ -1,57 +1,23 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { createQuery } from '@tanstack/svelte-query';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import FolderTree from '@lucide/svelte/icons/folder-tree';
 	import { client } from '$lib/client.js';
-	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
-	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import {
 		CategoryHeroCard,
-		CategoryStatusCard,
-		CategoryProductsCard
+		CategoryStatusCard
 	} from '$lib/components/organs/category/detail/index.js';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
-
+	import { ProductListingCard } from '$lib/components/organs/index.js';
 	const categoryId = $derived($page.params.id);
+	let selectedIds = $state<Set<string>>(new Set());
 
 	let category = $state<any | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-
-	const paginationQuery = $derived.by(() => createPaginationQuery($page.url.searchParams));
-
-	const productsQuery = createQuery(() => ({
-		queryKey: ['category-products', categoryId, paginationQuery],
-		queryFn: async () => {
-			const query = { ...paginationQuery, category_id: categoryId } as Record<
-				string,
-				string | number | undefined
-			>;
-			const res = await client.products.get({ query });
-			return res.data;
-		},
-		enabled: !!categoryId,
-		refetchOnWindowFocus: false
-	}));
-
-	const productsData = $derived(
-		productsQuery.data as
-			| { data?: { rows: any[]; pagination: PaginationMeta }; pagination?: PaginationMeta }
-			| undefined
-	);
-	const products = $derived(productsData?.data?.rows ?? ([] as any[]));
-	const pagination = $derived(productsData?.data?.pagination ?? productsData?.pagination ?? null);
-	const count = $derived(pagination?.total ?? 0);
-	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(pagination ? Math.min(pagination.page * pagination.limit, count) : 0);
-	const totalPages = $derived(pagination?.total_pages ?? 1);
-	const currentPage = $derived(pagination?.page ?? 1);
-	const productsLoading = $derived(productsQuery.isPending);
-
 	async function loadCategory() {
 		if (!categoryId) return;
 		loading = true;
@@ -81,12 +47,6 @@
 		categoryId;
 		loadCategory();
 	});
-
-	function goToPage(pageNum: number) {
-		const params = new URLSearchParams($page.url.searchParams);
-		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${$page.url.pathname}?${params.toString()}`, { replaceState: true });
-	}
 </script>
 
 <svelte:head>
@@ -129,23 +89,11 @@
 					<CategoryStatusCard category={category as any | null} onUpdated={loadCategory} />
 				</div>
 
-				<CategoryProductsCard
-					categoryId={categoryId ?? null}
-					{category}
-					{products}
-					{count}
-					{start}
-					{end}
-					{totalPages}
-					{currentPage}
-					loading={productsLoading}
-					paginationQuery={paginationQuery ?? {}}
-					onProductsUpdated={async () => {
-						await productsQuery.refetch();
-					}}
-					{goToPage}
+				<ProductListingCard
+					title="Category Products"
+					filter={{ category_id: categoryId }}
+					bind:selectedIds
 				/>
-
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent
 						productId={category?.id ?? null}

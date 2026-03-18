@@ -1,9 +1,9 @@
-<script lang="ts">
+<!-- <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
 		DeleteConfirmationModal,
-		DetailProductsCard,
+
 		type TableColumn
 	} from '$lib/components/organs/index.js';
 	import Search from '@lucide/svelte/icons/search';
@@ -286,22 +286,6 @@
 	}
 </script>
 
-<DetailProductsCard
-	rows={rows}
-	columns={tableColumns}
-	emptyMessage="No products in this collection."
-	{loading}
-	{error}
-	{pagination}
-	{start}
-	{end}
-	onPageChange={goToPage}
-	showAddButton={true}
-	onAdd={() => (addSheetOpen = true)}
-	showSearchInput={true}
-	searchValue={search}
-	onSearchChange={handleSearchChange}
-/>
 
 <Sheet.Root bind:open={addSheetOpen}>
 	<Sheet.Content side="right" class="w-full max-w-4xl sm:max-w-4xl">
@@ -482,5 +466,5 @@
 	onCancel={closeRemoveProductConfirm}
 	submitting={removeSubmitting}
 	error={removeError}
-/>
+/> -->
 

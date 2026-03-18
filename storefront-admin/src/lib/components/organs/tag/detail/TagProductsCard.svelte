@@ -1,4 +1,4 @@
-<script lang="ts">
+<!-- <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
@@ -6,7 +6,7 @@
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import {
 		DeleteConfirmationModal,
-		DetailProductsCard,
+		
 		type TableColumn
 	} from '$lib/components/organs/index.js';
 	import { client } from '$lib/client.js';
@@ -164,22 +164,7 @@
 	}
 </script>
 
-<DetailProductsCard
-	rows={rows}
-	columns={tableColumns}
-	emptyMessage="No products with this tag."
-	{loading}
-	error={null}
-	{pagination}
-	{start}
-	{end}
-	onPageChange={onPageChange}
-	showAddButton={true}
-	onAdd={() => (addSheetOpen = true)}
-	showSearchInput={true}
-	searchValue={search}
-	onSearchChange={(value) => (search = value)}
-/>
+
 
 <Sheet.Root bind:open={addSheetOpen}>
 	<Sheet.Content side="right" class="w-full max-w-4xl sm:max-w-4xl">
@@ -233,4 +218,4 @@
 	onCancel={closeRemoveProductConfirm}
 	submitting={removeSubmitting}
 	error={removeError}
-/>
+/> -->

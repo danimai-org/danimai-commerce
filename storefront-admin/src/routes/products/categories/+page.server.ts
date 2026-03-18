@@ -36,13 +36,17 @@ export const actions = {
             .toLowerCase()
             .replace(/\s+/g, '-')
             .replace(/[^a-z0-9-]/g, '');
-        const category = await client['product-categories'].post({
-            value: name,
-            metadata: { handle } as Record<string, string>
-        });
+        try {
+            const category = await client['product-categories'].post({
+                value: name,
+                metadata: { handle } as Record<string, string>
+            });
 
-        if (!category || category.error) {
-            return fail(400, { error: 'Failed to create category' });
+            if (!category || category.error) {
+                return fail(400, { categoryCreateForm, error: 'Failed to create category' });
+            }
+        } catch {
+            return fail(400, { categoryCreateForm, error: 'Failed to create category' });
         }
 
         return message(categoryCreateForm, 'Category created successfully');

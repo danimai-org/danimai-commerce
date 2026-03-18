@@ -8,10 +8,15 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
-	import { CollectionHeroCard, CollectionProductsCard } from '$lib/components/organs/index.js';
+	import {
+		CollectionHeroCard,
+		CollectionProductsCard,
+		ProductListingCard
+	} from '$lib/components/organs/index.js';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 
+	let selectedIds = $state<Set<string>>(new Set());
 	const collectionId = $derived($page.params.id);
 
 	let collection = $state<any | null>(null);
@@ -37,10 +42,10 @@
 	const productsData = $derived(
 		productsQuery.data as { data?: { rows: any[]; pagination: PaginationMeta } } | null
 	);
-	
+
 	const pagination = $derived(productsData?.data?.pagination ?? null);
 	const count = $derived(pagination?.total ?? 0);
-	
+
 	async function loadCollection() {
 		if (!collectionId) return;
 		loading = true;
@@ -118,13 +123,10 @@
 					<CollectionHeroCard {collection} onUpdated={loadCollection} />
 				</div>
 
-				<CollectionProductsCard
-					collectionId={collectionId ?? null}
-					{collection}
-					paginationQuery={paginationQuery ?? {}}
-					onProductsUpdated={async () => {
-						await productsQuery.refetch();
-					}}
+				<ProductListingCard
+					title="Collection Products"
+					filter={{ collection_id: collectionId }}
+					bind:selectedIds
 				/>
 
 				<div class="grid gap-4 sm:grid-cols-2">

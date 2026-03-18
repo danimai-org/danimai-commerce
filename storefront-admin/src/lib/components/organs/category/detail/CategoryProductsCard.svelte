@@ -1,47 +1,14 @@
-<script lang="ts">
+<!-- <script lang="ts">
 	import {
 		DeleteConfirmationModal,
-		DetailProductsCard,
 		type TableColumn
 	} from '$lib/components/organs/index.js';
 	import { client } from '$lib/client.js';
-	import AddProductsSheet from './AddProductsSheet.svelte';
+	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import type { Product } from '$lib/components/organs/product/create/types.js';
+	import ProductListingCard from '$lib/components/organs/product/detail/ProductListingCard.svelte';
 
-	type ProductWithCollection = Product & {
-		collection?: { id: string; title: string; handle: string } | null;
-	};
-
-	interface Props {
-		categoryId: string | null;
-		category: Record<string, unknown> | null;
-		products: ProductWithCollection[];
-		count: number;
-		start: number;
-		end: number;
-		totalPages: number;
-		currentPage: number;
-		loading: boolean;
-		paginationQuery: Record<string, string | number | undefined>;
-		onProductsUpdated: () => void | Promise<void>;
-		goToPage: (page: number) => void;
-	}
-
-	let {
-		categoryId,
-		category,
-		products,
-		count,
-		start,
-		end,
-		totalPages,
-		currentPage,
-		loading,
-		paginationQuery,
-		onProductsUpdated,
-		goToPage
-	}: Props = $props();
-
+	
 	let addSheetOpen = $state(false);
 	let search = $state('');
 
@@ -133,23 +100,10 @@
 	}
 </script>
 
-<DetailProductsCard
-	rows={rows}
-	columns={tableColumns}
-	emptyMessage="No products in this category."
-	{loading}
-	error={null}
-	{pagination}
-	{start}
-	{end}
-	onPageChange={goToPage}
-	showAddButton={true}
-	onAdd={() => (addSheetOpen = true)}
-	showSortButton={true}
-	showSortIconButton={true}
-	showSearchInput={true}
-	searchValue={search}
-	onSearchChange={(value) => (search = value)}
+<ProductListingCard
+filter={{ category_id: categoryId }}
+bind:selectedIds={selectedIds}
+
 />
 
 <AddProductsSheet
@@ -168,4 +122,4 @@
 	onCancel={closeRemoveProductConfirm}
 	submitting={removeSubmitting}
 	error={removeError}
-/>
+/> -->
