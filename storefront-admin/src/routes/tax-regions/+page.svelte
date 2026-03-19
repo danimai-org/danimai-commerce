@@ -13,7 +13,6 @@
 	} from '$lib/components/organs/index.js';
 	import Receipt from '@lucide/svelte/icons/receipt';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
-	import EditTax from '$lib/components/organs/tax-region/update/EditTax.svelte';
 	import { client } from '$lib/client.js';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
@@ -36,10 +35,7 @@
 	const pagination = $derived((queryData?.data?.pagination ?? null) as any);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
-	const formMode = $derived(paginateState.formMode);
-	const formItem = $derived(paginateState.formItem);
 	const openCreate = $derived(paginateState.openCreate);
-	const openEdit = $derived(paginateState.openEdit);
 	const closeForm = $derived(paginateState.closeForm);
 	const deleteConfirmOpen = $derived(paginateState.deleteConfirmOpen);
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
@@ -74,7 +70,7 @@ const tableColumns: TableColumn[] = [
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => openEdit(item as Parameters<typeof openEdit>[0])
+					onClick: (item) => goto(`/tax-regions/${String((item as { id?: string }).id ?? '')}`)
 				},
 				{
 					label: 'Delete',
@@ -135,16 +131,7 @@ const tableColumns: TableColumn[] = [
 	</div>
 </div>
 
-{#if formMode === 'edit'}
-	<EditTax
-		bind:open={paginateState.formSheetOpen}
-		mode="edit"
-			region={(formItem as any | null) as any}
-		onSuccess={handleFormSaved}
-	/>
-{:else}
-	<TaxRegionFormSheet bind:open={paginateState.formSheetOpen} mode="create" onSuccess={handleFormSaved} />
-{/if}
+<TaxRegionFormSheet bind:open={paginateState.formSheetOpen} mode="create" onSuccess={handleFormSaved} />
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}

@@ -27,17 +27,18 @@
 
 	interface Props {
 		open: boolean;
-		formData: any;
 		onSuccess?: () => void;
 	}
 
 	let {
 		open = $bindable(false),
-		formData: initialFormData,
 		onSuccess = () => {}
 	}: Props = $props();
 
-	const { form, errors, enhance, delayed } = superForm(initialFormData, {
+	const { form, errors, enhance, delayed } = superForm({
+		name: '',
+		currency_code: ''
+	}, {
 		resetForm: true,
 		onResult: ({ result }) => {
 			if (result.type === 'success') {

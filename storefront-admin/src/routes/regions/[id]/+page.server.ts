@@ -7,11 +7,11 @@ import { client } from '$lib/client';
 
 const RegionUpdateSchema = z.object({
 	id: z.string().min(1, 'Region id is required'),
-	name: z.string().min(3, 'Name must be at least 3 characters').max(50, 'Name is too long'),
+	name: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name is too long'),
 	currency_code: z
 		.string()
-		.min(3, 'Currency code must be at least 3 characters')
-		.max(3, 'Currency code is too long')
+		.min(3, 'Currency code must be 3 characters (e.g. USD)')
+		.max(3, 'Currency code must be 3 characters (e.g. USD)')
 });
 
 export const load: PageServerLoad = async () => {

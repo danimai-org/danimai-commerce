@@ -3,6 +3,7 @@
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { DropdownMenu } from 'bits-ui';
+	import { client } from '$lib/client.js';
 
 	interface Props {
 		regionId: string;
@@ -10,29 +11,55 @@
 
 	let { regionId }: Props = $props();
 
-	const PLACEHOLDER_COUNTRIES = [
-		{ name: 'India', code: 'IN' },
-		{ name: 'United States', code: 'US' },
-		{ name: 'United Kingdom', code: 'GB' },
-		{ name: 'Germany', code: 'DE' },
-		{ name: 'France', code: 'FR' },
-		{ name: 'Canada', code: 'CA' },
-		{ name: 'Australia', code: 'AU' },
-		{ name: 'Japan', code: 'JP' },
-		{ name: 'Spain', code: 'ES' },
-		{ name: 'Italy', code: 'IT' },
-		{ name: 'Brazil', code: 'BR' },
-		{ name: 'Mexico', code: 'MX' },
-		{ name: 'Netherlands', code: 'NL' },
-		{ name: 'Singapore', code: 'SG' }
-	];
+	type CountryRow = { id: string; name: string; code: string };
+	let countries = $state<CountryRow[]>([]);
+	let loading = $state(false);
+	let error = $state<string | null>(null);
+
+	$effect(() => {
+		if (!regionId) {
+			countries = [];
+			error = null;
+			return;
+		}
+		let cancelled = false;
+		loading = true;
+		error = null;
+		client.regions({ id: regionId }).countries
+			.get()
+			.then((res) => {
+				if (cancelled) return;
+				loading = false;
+				if (res.error) {
+					error = String((res.error as { value?: { message?: string } })?.value?.message ?? res.error);
+					countries = [];
+					return;
+				}
+				const raw = res.data as unknown;
+				const rows = Array.isArray(raw) ? raw : (raw as { rows?: unknown[] })?.rows ?? [];
+				countries = rows.map((c: { id?: string; display_name?: string; iso_2?: string }) => ({
+					id: c.id ?? '',
+					name: c.display_name ?? c.iso_2 ?? '',
+					code: (c.iso_2 ?? '').toUpperCase()
+				}));
+			})
+			.catch((e) => {
+				if (cancelled) return;
+				loading = false;
+				error = e instanceof Error ? e.message : String(e);
+				countries = [];
+			});
+		return () => {
+			cancelled = true;
+		};
+	});
 
 	let searchQuery = $state('');
 
 	const filteredCountries = $derived.by(() => {
 		const q = searchQuery.trim().toLowerCase();
-		if (!q) return PLACEHOLDER_COUNTRIES;
-		return PLACEHOLDER_COUNTRIES.filter(
+		if (!q) return countries;
+		return countries.filter(
 			(c) => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)
 		);
 	});
@@ -40,23 +67,23 @@
 	let selectedIds = $state<Set<string>>(new Set());
 
 	const allSelected = $derived(
-		filteredCountries.length > 0 && filteredCountries.every((c) => selectedIds.has(c.code))
+		filteredCountries.length > 0 && filteredCountries.every((c) => selectedIds.has(c.id))
 	);
 
 	function toggleAll() {
 		if (allSelected) {
 			selectedIds = new Set();
 		} else {
-			selectedIds = new Set(filteredCountries.map((c) => c.code));
+			selectedIds = new Set(filteredCountries.map((c) => c.id));
 		}
 	}
 
-	function toggleOne(code: string) {
+	function toggleOne(id: string) {
 		const next = new Set(selectedIds);
-		if (next.has(code)) {
-			next.delete(code);
+		if (next.has(id)) {
+			next.delete(id);
 		} else {
-			next.add(code);
+			next.add(id);
 		}
 		selectedIds = next;
 	}
@@ -99,6 +126,11 @@
 		</div>
 	</div>
 
+	{#if loading}
+		<div class="px-6 py-8 text-center text-muted-foreground">Loading…</div>
+	{:else if error}
+		<div class="px-6 py-8 text-center text-destructive">{error}</div>
+	{:else}
 	<div class="overflow-auto">
 		<table class="w-full text-sm">
 			<thead>
@@ -117,13 +149,13 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each filteredCountries as country (country.code)}
+				{#each filteredCountries as country (country.id)}
 					<tr class="border-b last:border-b-0 hover:bg-muted/50">
 						<td class="px-6 py-3">
 							<input
 								type="checkbox"
-								checked={selectedIds.has(country.code)}
-								onchange={() => toggleOne(country.code)}
+								checked={selectedIds.has(country.id)}
+								onchange={() => toggleOne(country.id)}
 								class="size-4 rounded border-input"
 							/>
 						</td>
@@ -163,4 +195,5 @@
 			</tbody>
 		</table>
 	</div>
+	{/if}
 </div>

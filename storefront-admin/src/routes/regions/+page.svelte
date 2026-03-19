@@ -16,15 +16,8 @@
 	import { client } from '$lib/client.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 
-	let { data }: { data: any } = $props();
 
-	type Region = {
-		id: string;
-		name: string;
-		currency_code: string;
-		created_at: string;
-		updated_at: string;
-	};
+	
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
@@ -42,7 +35,7 @@
 		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
-	function openRegionDetails(region: Region) {
+	function openRegionDetails(region: any) {
 		goto(`/regions/${region.id}`);
 	}
 
@@ -79,7 +72,7 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => handleOpenEdit(item as Region)
+					onClick: (item) => openRegionDetails(item as any)
 				},
 				{
 					label: 'Delete',
@@ -105,12 +98,8 @@
 
 	// Edit sheet
 	let editOpen = $state(false);
-	let editRegion = $state<Region | null>(null);
+	let editRegion = $state<any | null>(null);
 
-	function handleOpenEdit(region: Region) {
-		editRegion = region;
-		editOpen = true;
-	}
 
 	function closeEdit() {
 		editOpen = false;
@@ -165,7 +154,7 @@
 							rows={rows}
 							columns={tableColumns}
 							emptyMessage="No regions found."
-							onRowClick={(row) => openRegionDetails(row as Region)}
+							onRowClick={(row) => openRegionDetails(row as any)}
 						/>
 					</table>
 				</div>
@@ -183,14 +172,12 @@
 
 <CreateRegion
 	bind:open={createOpen}
-	formData={data.regionCreateForm}
 	onSuccess={handleCreateSuccess}
 />
 
 <EditRegion
 	bind:open={editOpen}
 	region={editRegion}
-	formData={data.regionUpdateForm}
 	onSuccess={handleEditSuccess}
 />
 
