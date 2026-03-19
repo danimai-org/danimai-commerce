@@ -29,6 +29,7 @@
 		options: Record<string, string>;
 		sku: string;
 		availableCount: string;
+		manage_inventory: boolean;
 		allow_backorder: boolean;
 		variant_rank: number;
 		priceAmount: string;
@@ -57,6 +58,7 @@
 				options: optionsRecord,
 				sku: '',
 				availableCount: '',
+				manage_inventory: true,
 				allow_backorder: false,
 				variant_rank: i,
 				priceAmount: ''
@@ -112,11 +114,10 @@
 	let createMediaFile = $state<File | null>(null);
 
 	let createDiscountable = $state(true);
-	let createCollectionId = $state('');
+	let createCollectionIds = $state<string[]>([]);
 	let createCategoryId = $state('');
 	let createTagIds = $state<string[]>([]);
-	let createSalesChannels = $state<{ id: string; name: string }[]>([]);
-	let createSalesChannelInput = $state('');
+	let createSalesChannelIds = $state<string[]>([]);
 
 	let createOptions = $state<ProductOption[]>([]);
 	let createVariants = $state<ProductVariantForm[]>([]);
@@ -158,6 +159,7 @@
 		{ label: 'Title', key: 'title' },
 		{ label: 'SKU', key: 'sku' },
 		{ label: 'Available count', key: 'availableCount' },
+		{ label: 'Manage inventory', key: 'manage_inventory' },
 		{ label: 'Allow backorder', key: 'allow_backorder' },
 		{ label: 'Price EUR', key: 'priceAmount' }
 	];
@@ -202,6 +204,7 @@
 						...v,
 						sku: ex.sku,
 						availableCount: ex.availableCount,
+					manage_inventory: ex.manage_inventory,
 						allow_backorder: ex.allow_backorder,
 						priceAmount: ex.priceAmount
 					}
@@ -307,11 +310,10 @@
 		createDescription = '';
 		createHasVariants = true;
 		createDiscountable = true;
-		createCollectionId = '';
+		createCollectionIds = [];
 		createCategoryId = '';
 		createTagIds = [];
-		createSalesChannels = [];
-		createSalesChannelInput = '';
+		createSalesChannelIds = [];
 		createOptions = [];
 		createAttributeGroupId = '';
 		createAttributeEntries = [];
@@ -397,7 +399,7 @@
 		salesChannelsList = fetchedSalesChannels.map((ch) => ({ id: ch.id, name: ch.name }));
 		const defaultChannels = fetchedSalesChannels.filter((ch) => ch.is_default);
 		if (defaultChannels.length > 0) {
-			createSalesChannels = defaultChannels.map((ch) => ({ id: ch.id, name: ch.name }));
+			createSalesChannelIds = defaultChannels.map((ch) => ch.id);
 		}
 	}
 
@@ -470,21 +472,6 @@
 		syncVariantsFromOptions();
 	}
 
-	function addSalesChannel() {
-		const id = createSalesChannelInput.trim();
-		if (id && !createSalesChannels.some((s) => s.id === id)) {
-			const channel = salesChannelsList.find((ch) => ch.id === id);
-			if (channel) {
-				createSalesChannels = [...createSalesChannels, { id: channel.id, name: channel.name }];
-				createSalesChannelInput = '';
-			}
-		}
-	}
-
-	function removeSalesChannel(id: string) {
-		createSalesChannels = createSalesChannels.filter((s) => s.id !== id);
-	}
-
 	function addTag(tagId: string) {
 		if (tagId && !createTagIds.includes(tagId)) {
 			createTagIds = [...createTagIds, tagId];
@@ -496,9 +483,8 @@
 	}
 
 	const createTagIdsJson = $derived(JSON.stringify(createTagIds));
-	const createSalesChannelIdsJson = $derived(
-		JSON.stringify(createSalesChannels.map((channel) => channel.id))
-	);
+	const createCollectionIdsJson = $derived(JSON.stringify(createCollectionIds));
+	const createSalesChannelIdsJson = $derived(JSON.stringify(createSalesChannelIds));
 	const createOptionsJson = $derived(
 		JSON.stringify(
 			createOptions
@@ -617,10 +603,10 @@
 			description: createDescription,
 			status,
 			discountable: createDiscountable,
-			collection_id: createCollectionId,
+			collection_ids: createCollectionIds,
 			category_id: createCategoryId,
 			tag_ids: createTagIds,
-			sales_channel_ids: createSalesChannels.map((channel) => channel.id),
+			sales_channel_ids: createSalesChannelIds,
 			has_variants: createHasVariants,
 			options: createOptions
 				.filter((option) => option.title.trim() && option.values.length > 0)
@@ -663,7 +649,7 @@
 </script>
 
 <Sheet.Root bind:open>
-	<Sheet.Content side="right" class="flex h-full max-h-dvh w-full max-w-lg flex-col p-0 sm:max-w-lg">
+	<Sheet.Content side="right" class="w-full max-w-xl sm:max-w-2xl">
 		<form
 			method="POST"
 			action="?/create"
@@ -786,20 +772,21 @@
 			{#if createStep === 3}
 				<CreateProductStepOrganize
 					bind:createDiscountable
-					bind:createCollectionId
+					bind:createCollectionIds
 					bind:createCategoryId
-					{createTagIds}
-					{createSalesChannels}
-					bind:createSalesChannelInput
-					{collectionsList}
-					{categoriesList}
-					{tagsList}
-					{salesChannelsList}
-					{addTag}
-					{removeTag}
-					{addSalesChannel}
-					{removeSalesChannel}
-					{categoryError}
+					bind:createTagIds
+					bind:createSalesChannelIds
+					
+					collectionsList={collectionsList}
+					categoriesList={categoriesList}
+					tagsList={tagsList}
+					salesChannelsList={salesChannelsList}
+					addTag={addTag}
+					removeTag={removeTag}
+					addSalesChannel={(ids: string[]) => (createSalesChannelIds = ids)}
+					removeSalesChannel={(id: string) =>
+						(createSalesChannelIds = createSalesChannelIds.filter((channelId) => channelId !== id))}
+					
 				/>
 			{/if}
 
@@ -833,7 +820,7 @@
 			<input type="hidden" name="description" value={createDescription} />
 			<input type="hidden" name="status" value={submitStatus} />
 			<input type="hidden" name="discountable" value={String(createDiscountable)} />
-			<input type="hidden" name="collection_id" value={createCollectionId} />
+			<input type="hidden" name="collection_ids" value={createCollectionIdsJson} />
 			<input type="hidden" name="category_id" value={createCategoryId} />
 			<input type="hidden" name="tag_ids" value={createTagIdsJson} />
 			<input type="hidden" name="sales_channel_ids" value={createSalesChannelIdsJson} />

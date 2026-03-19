@@ -10,7 +10,6 @@
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import {
 		CollectionHeroCard,
-		CollectionProductsCard,
 		ProductListingCard
 	} from '$lib/components/organs/index.js';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
@@ -76,11 +75,11 @@
 		loadCollection();
 	});
 
-	function goToPage(pageNum: number) {
-		const params = new URLSearchParams($page.url.searchParams);
-		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${$page.url.pathname}?${params.toString()}`, { replaceState: true });
-	}
+	// function goToPage(pageNum: number) {
+	// 	const params = new URLSearchParams($page.url.searchParams);
+	// 	params.set('page', String(Math.max(1, pageNum)));
+	// 	goto(`${$page.url.pathname}?${params.toString()}`, { replaceState: true });
+	// }
 </script>
 
 <svelte:head>
@@ -89,7 +88,7 @@
 </svelte:head>
 
 <div class="flex h-full flex-col">
-	<!-- Breadcrumb + actions -->
+	
 	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
 		<nav class="flex items-center gap-[5px] pl-[10px] text-sm">
 			<button

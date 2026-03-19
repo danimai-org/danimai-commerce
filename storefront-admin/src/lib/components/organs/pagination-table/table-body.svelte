@@ -15,6 +15,7 @@
 		selectedIds,
 		onToggleSelect,
 		rowIdKey = 'id',
+		onRowClick,
 	}: {
 		rows: Record<string, unknown>[];
 		columns: TableColumn[];
@@ -24,6 +25,7 @@
 		selectedIds?: Set<string>;
 		onToggleSelect?: (id: string) => void;
 		rowIdKey?: string;
+		onRowClick?: (item: Record<string, unknown>) => void;
 	} = $props();
 
 	const showSelection = $derived(selectedIds != null && onToggleSelect != null);
@@ -120,10 +122,13 @@
 		</tr>
 	{:else}
 		{#each rows as row, i (row.id ?? i)}
-			<tr class="border-b transition-colors hover:bg-muted/30">
+			<tr
+				class="border-b transition-colors hover:bg-muted/30 {onRowClick ? 'cursor-pointer' : ''}"
+				onclick={() => onRowClick?.(row)}
+			>
 				{#if showSelection}
 					{@const rowId = String(row[rowIdKey] ?? '')}
-					<td class="px-4 py-3">
+					<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
 						<input
 							type="checkbox"
 							class="h-4 w-4 rounded border-input"
@@ -156,7 +161,7 @@
 							</a>
 						</td>
 					{:else if isActionsColumn(column)}
-						<td class="px-4 py-3">
+						<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
 							<DropdownMenu.Root>
 								<DropdownMenu.Trigger
 									class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
@@ -183,7 +188,7 @@
 							</DropdownMenu.Root>
 						</td>
 					{:else if hasLegacyActions(column)}
-						<td class="px-4 py-3">
+						<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
 							<DropdownMenu.Root>
 								<DropdownMenu.Trigger
 									class="flex size-8 items-center justify-center rounded-md hover:bg-muted"

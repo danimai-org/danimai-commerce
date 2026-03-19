@@ -12,7 +12,16 @@ const ProductCreateSchema = z.object({
 	description: z.string().max(4000, 'Description is too long').optional(),
 	status: z.enum(['draft', 'published']),
 	discountable: z.coerce.boolean().default(true),
-	collection_id: z.string().uuid('Collection ID must be a valid UUID').optional().or(z.literal('')),
+	collection_ids: z.preprocess((value) => {
+		if (Array.isArray(value)) return value;
+		if (typeof value !== 'string') return [];
+		try {
+			const parsed = JSON.parse(value) as unknown;
+			return Array.isArray(parsed) ? parsed : [];
+		} catch {
+			return [];
+		}
+	}, z.array(z.string().uuid('Collection ID must be a valid UUID'))),
 	category_id: z.string().uuid('Category ID must be a valid UUID').optional().or(z.literal('')),
 	tag_ids: z.preprocess((value) => {
 		if (Array.isArray(value)) return value;
@@ -118,7 +127,7 @@ export const actions = {
 			const cleanHandle = data.handle?.trim() ? data.handle.trim() : undefined;
 			const cleanDescription = data.description?.trim() ? data.description.trim() : undefined;
 			const cleanCategoryId = data.category_id?.trim() ? data.category_id : undefined;
-			const cleanCollectionId = data.collection_id?.trim() ? data.collection_id : undefined;
+			const cleanCollectionIds = Array.from(new Set(data.collection_ids.map((id) => id.trim()).filter(Boolean)));
 			const cleanAttributeGroupId = data.attribute_group_id?.trim() ? data.attribute_group_id : undefined;
 
 			const optionsForApi = data.has_variants
@@ -192,19 +201,21 @@ export const actions = {
 			}
 
 			const product = (productResponse.data ?? null) as { id?: string } | null;
-			if (cleanCollectionId && product?.id) {
-				const collectionResponse = await client['collections']({ id: cleanCollectionId }).products.put({
-					products: {
-						add: [product.id],
-						remove: []
-					}
-				});
-				if (collectionResponse.error) {
-					const error = collectionResponse.error as { value?: { message?: string } };
-					return fail(400, {
-						productCreateForm,
-						error: error.value?.message ?? 'Product created, but failed to add it to collection'
+			if (cleanCollectionIds.length > 0 && product?.id) {
+				for (const collectionId of cleanCollectionIds) {
+					const collectionResponse = await client['collections']({ id: collectionId }).products.put({
+						products: {
+							add: [product.id],
+							remove: []
+						}
 					});
+					if (collectionResponse.error) {
+						const error = collectionResponse.error as { value?: { message?: string } };
+						return fail(400, {
+							productCreateForm,
+							error: error.value?.message ?? 'Product created, but failed to add it to one or more collections'
+						});
+					}
 				}
 			}
 
