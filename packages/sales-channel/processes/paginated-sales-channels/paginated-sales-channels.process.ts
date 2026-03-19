@@ -47,6 +47,10 @@ export class PaginatedSalesChannelsProcess
       .selectFrom("sales_channels")
       .where("deleted_at", "is", null);
 
+    if (input.filters?.is_default !== undefined) {
+      query = query.where("is_default", "=", input.filters.is_default);
+    }
+
     const countResult = await query
       .select(({ fn }) => fn.count<number>("id").as("count"))
       .executeTakeFirst();

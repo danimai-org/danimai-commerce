@@ -11,11 +11,12 @@ import {
 import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
-  type PaginatedStockLocationsProcessInput,
   type PaginatedStockLocationsProcessOutput,
   PaginatedStockLocationsSchema,
+  StockLocationAddressSchema,
 } from "./paginated-stock-locations.schema";
-import type { Database } from "../../db/type";
+import type { Database } from "../../db";
+import type { Static } from "@sinclair/typebox";
 
 export const PAGINATED_STOCK_LOCATIONS_PROCESS = Symbol(
   "PaginatedStockLocations",
@@ -24,17 +25,16 @@ export const PAGINATED_STOCK_LOCATIONS_PROCESS = Symbol(
 @Process(PAGINATED_STOCK_LOCATIONS_PROCESS)
 export class PaginatedStockLocationsProcess
   implements
-    ProcessContract<
-      typeof PaginatedStockLocationsSchema,
-      PaginatedStockLocationsProcessOutput
-    >
-{
+  ProcessContract<
+    typeof PaginatedStockLocationsSchema,
+    PaginatedStockLocationsProcessOutput
+  > {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
     @InjectLogger()
     private readonly logger: Logger,
-  ) {}
+  ) { }
 
   async runOperations(
     @ProcessContext({ schema: PaginatedStockLocationsSchema })
@@ -58,18 +58,7 @@ export class PaginatedStockLocationsProcess
 
     const total = Number(countResult?.count ?? 0);
 
-    const sortOrder = sorting_direction === SortOrder.ASC ? "asc" : "desc";
-    const allowedSortFields = [
-      "stock_locations.id",
-      "stock_locations.name",
-      "stock_locations.address_id",
-      "stock_locations.created_at",
-      "stock_locations.updated_at",
-    ];
-    const safeSortField = allowedSortFields.includes(sorting_field)
-      ? sorting_field
-      : "stock_locations.created_at";
-    query = query.orderBy(sql.ref(safeSortField), sortOrder);
+    query = query.orderBy(sql.ref(sorting_field), sorting_direction);
 
     const offset = (page - 1) * limit;
     const rows = await query
@@ -86,57 +75,22 @@ export class PaginatedStockLocationsProcess
         "stock_locations.created_at",
         "stock_locations.updated_at",
         "stock_locations.deleted_at",
-        "stock_location_addresses.address_1 as address_1",
-        "stock_location_addresses.address_2 as address_2",
-        "stock_location_addresses.company as company",
-        "stock_location_addresses.city as city",
-        "stock_location_addresses.province as province",
-        "stock_location_addresses.postal_code as postal_code",
-        "stock_location_addresses.country_code as country_code",
-        "stock_location_addresses.phone as phone",
+        (eb) => sql<Static<typeof StockLocationAddressSchema>>`
+        jsonb_build_object(
+          'address_1', 'stock_location_addresses.address_1',
+          'address_2', 'stock_location_addresses.address_2',
+          'company', 'stock_location_addresses.company',
+          'city', 'stock_location_addresses.city',
+          'province', 'stock_location_addresses.province',
+          'postal_code', 'stock_location_addresses.postal_code',
+          'country_code', 'stock_location_addresses.country_code',
+          'phone', 'stock_location_addresses.phone',
+        )`.as("address"),
       ])
       .limit(limit)
       .offset(offset)
       .execute();
 
-    const data = rows.map((row) => {
-      const {
-        address_1,
-        address_2,
-        company,
-        city,
-        province,
-        postal_code,
-        country_code,
-        phone,
-        ...location
-      } = row;
-      const hasAddress =
-        address_1 != null ||
-        address_2 != null ||
-        company != null ||
-        city != null ||
-        province != null ||
-        postal_code != null ||
-        country_code != null ||
-        phone != null;
-      return {
-        ...location,
-        address: hasAddress
-          ? {
-              address_1: address_1 ?? null,
-              address_2: address_2 ?? null,
-              company: company ?? null,
-              city: city ?? null,
-              province: province ?? null,
-              postal_code: postal_code ?? null,
-              country_code: country_code ?? null,
-              phone: phone ?? null,
-            }
-          : null,
-      };
-    });
-
-    return paginationResponse(data, total, input);
+    return paginationResponse(rows, total, input);
   }
 }

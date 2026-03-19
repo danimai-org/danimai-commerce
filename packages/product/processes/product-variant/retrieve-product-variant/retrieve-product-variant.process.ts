@@ -18,7 +18,7 @@ export class RetrieveProductVariantProcess
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
-  ) {}
+  ) { }
 
   async runOperations(@ProcessContext({
     schema: RetrieveProductVariantSchema,

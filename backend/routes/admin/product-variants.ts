@@ -2,11 +2,9 @@ import { Elysia } from "elysia";
 import { type StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
-  CREATE_PRODUCT_VARIANTS_PROCESS,
   UPDATE_PRODUCT_VARIANTS_PROCESS,
   DELETE_PRODUCT_VARIANTS_PROCESS,
   PAGINATED_PRODUCT_VARIANTS_PROCESS,
-  CreateProductVariantsProcess,
   UpdateProductVariantsProcess,
   DeleteProductVariantsProcess,
   PaginatedProductVariantsProcess,
@@ -15,8 +13,6 @@ import {
   RETRIEVE_PRODUCT_VARIANT_PROCESS,
   RetrieveProductVariantProcess,
   RetrieveProductVariantResponseSchema,
-  CreateProductVariantSchema,
-  CreateProductVariantsResponseSchema,
   UpdateProductVariantSchema,
   UpdateProductVariantsResponseSchema,
   DeleteProductVariantsSchema,
@@ -80,26 +76,6 @@ export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
         tags: ["Product Variants"],
         summary: "Get a product variant by ID",
         description: "Retrieves a single product variant by its ID",
-      },
-    }
-  )
-  .post(
-    "/",
-    async ({ body: input }) => {
-      const process = getService<CreateProductVariantsProcess>(CREATE_PRODUCT_VARIANTS_PROCESS);
-      return process.runOperations({ input });
-    },
-    {
-      body: CreateProductVariantSchema,
-      response: {
-        200: CreateProductVariantsResponseSchema,
-        400: ValidationErrorResponseSchema,
-        500: InternalErrorResponseSchema,
-      },
-      detail: {
-        tags: ["Product Variants"],
-        summary: "Create a new product variant",
-        description: "Creates a single product variant with the provided details",
       },
     }
   )

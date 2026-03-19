@@ -4,33 +4,33 @@ import { getService } from "@danimai/core";
 import {
   PAGINATED_INVENTORY_ITEMS_PROCESS,
   PAGINATED_INVENTORY_LEVELS_PROCESS,
-  CREATE_INVENTORY_ITEMS_PROCESS,
-  GET_INVENTORY_ITEM_PROCESS,
+  CREATE_INVENTORY_ITEM_PROCESS,
+  RETRIEVE_INVENTORY_ITEM_PROCESS,
   UPDATE_INVENTORY_ITEM_PROCESS,
-  SET_INVENTORY_LEVEL_PROCESS,
-  DELETE_INVENTORY_LEVEL_PROCESS,
+  CREATE_INVENTORY_LEVEL_PROCESS,
+  DELETE_INVENTORY_LEVELS_PROCESS,
   DELETE_INVENTORY_ITEMS_PROCESS,
   PaginatedInventoryItemsProcess,
   PaginatedInventoryLevelsProcess,
-  CreateInventoryItemsProcess,
-  GetInventoryItemProcess,
+  CreateInventoryItemProcess,
+  RetrieveInventoryItemProcess,
   UpdateInventoryItemProcess,
-  SetInventoryLevelProcess,
-  DeleteInventoryLevelProcess,
+  CreateInventoryLevelProcess,
+  DeleteInventoryLevelsProcess,
   DeleteInventoryItemsProcess,
   PaginatedInventoryItemsSchema,
   PaginatedInventoryItemsResponseSchema,
-  CreateInventoryItemsSchema,
-  CreateInventoryItemsResponseSchema,
-  GetInventoryItemSchema,
-  GetInventoryItemResponseSchema,
+  CreateInventoryItemSchema,
+  CreateInventoryItemResponseSchema,
+  RetrieveInventoryItemSchema,
+  RetrieveInventoryItemResponseSchema,
   UpdateInventoryItemSchema,
   UpdateInventoryItemResponseSchema,
   PaginatedInventoryLevelsSchema,
   PaginatedInventoryLevelsResponseSchema,
-  SetInventoryLevelSchema,
-  SetInventoryLevelResponseSchema,
-  DeleteInventoryLevelSchema,
+  CreateInventoryLevelSchema,
+  CreateInventoryLevelResponseSchema,
+  DeleteInventoryLevelsSchema,
   DeleteInventoryItemsSchema,
 } from "@danimai/inventory";
 import { handleProcessError } from "../../utils/error-handler";
@@ -47,43 +47,43 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
   .post(
     "/items",
     async ({ body: input }) => {
-      const process = getService<CreateInventoryItemsProcess>(
-        CREATE_INVENTORY_ITEMS_PROCESS
+      const process = getService<CreateInventoryItemProcess>(
+        CREATE_INVENTORY_ITEM_PROCESS
       );
       return process.runOperations({ input });
     },
     {
-      body: CreateInventoryItemsSchema,
+      body: CreateInventoryItemSchema,
       response: {
-        200: CreateInventoryItemsResponseSchema,
+        200: CreateInventoryItemResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {
         tags: ["Inventory"],
-        summary: "Create inventory item(s)",
-        description: "Creates one or more inventory items",
+        summary: "Create inventory item",
+        description: "Creates an inventory item",
       },
     }
   )
   .get(
     "/items/:id",
     async ({ params }) => {
-      const process = getService<GetInventoryItemProcess>(
-        GET_INVENTORY_ITEM_PROCESS
+      const process = getService<RetrieveInventoryItemProcess>(
+        RETRIEVE_INVENTORY_ITEM_PROCESS
       );
       return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: GetInventoryItemSchema.properties.id }),
+      params: Type.Object({ id: RetrieveInventoryItemSchema.properties.id }),
       response: {
-        200: GetInventoryItemResponseSchema,
+        200: RetrieveInventoryItemResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {
         tags: ["Inventory"],
-        summary: "Get inventory item by ID",
+        summary: "Retrieve inventory item",
         description: "Gets a single inventory item with its levels and reservations",
       },
     }
@@ -163,38 +163,37 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
   .post(
     "/levels",
     async ({ body: input }) => {
-      const process = getService<SetInventoryLevelProcess>(
-        SET_INVENTORY_LEVEL_PROCESS
+      const process = getService<CreateInventoryLevelProcess>(
+        CREATE_INVENTORY_LEVEL_PROCESS
       );
       return process.runOperations({ input });
     },
     {
-      body: SetInventoryLevelSchema,
+      body: CreateInventoryLevelSchema,
       response: {
-        200: SetInventoryLevelResponseSchema,
+        200: CreateInventoryLevelResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {
         tags: ["Inventory"],
-        summary: "Set inventory level",
-        description: "Create or update stock quantity for an inventory item at a location",
+        summary: "Create inventory level",
+        description: "Creates an inventory level for an inventory item at a location",
       },
     }
   )
   .delete(
     "/levels/:id",
     async ({ params, set }) => {
-      const process = getService<DeleteInventoryLevelProcess>(
-        DELETE_INVENTORY_LEVEL_PROCESS
+      const process = getService<DeleteInventoryLevelsProcess>(
+        DELETE_INVENTORY_LEVELS_PROCESS
       );
-      const input = { id: params.id };
-      await process.runOperations({ input });
+      await process.runOperations({ input: { ids: [params.id] } });
       set.status = 204;
       return undefined;
     },
     {
-      params: Type.Object({ id: DeleteInventoryLevelSchema.properties.id }),
+      params: Type.Object({ id: Type.String() }),
       response: {
         204: NoContentResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -203,7 +202,7 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
       detail: {
         tags: ["Inventory"],
         summary: "Delete inventory level",
-        description: "Soft-deletes an inventory level by ID",
+        description: "Deletes an inventory level by ID",
       },
     }
   )

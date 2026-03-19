@@ -24,7 +24,7 @@ export class PaginatedProductsProcess implements ProcessContract<
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>
-  ) {}
+  ) { }
 
   async runOperations(
     @ProcessContext({
@@ -78,7 +78,7 @@ export class PaginatedProductsProcess implements ProcessContract<
     }
 
     if (sales_channel_ids && sales_channel_ids.length > 0) {
-      query = query.innerJoin("product_sales_channels",(join) => join.onRef("product_sales_channels.product_id", "=", "products.id").on("product_sales_channels.sales_channel_id", "in", sales_channel_ids));
+      query = query.innerJoin("product_sales_channels", (join) => join.onRef("product_sales_channels.product_id", "=", "products.id").on("product_sales_channels.sales_channel_id", "in", sales_channel_ids));
     }
 
     if (search && search.trim()) {
@@ -105,7 +105,7 @@ export class PaginatedProductsProcess implements ProcessContract<
 
     const productIds = rows.map((p) => p.id);
     if (productIds.length === 0) {
-      return  paginationResponse([], total, input);
+      return paginationResponse([], total, input);
     }
 
     const products = await this.db
