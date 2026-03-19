@@ -10,8 +10,8 @@
 		TablePagination,
 		type TableColumn
 	} from '$lib/components/organs/index.js';
-	import CreateRegion from '$lib/components/organs/region/create-region.svelte';
-	import EditRegion from '$lib/components/organs/region/edit-region.svelte';
+	import CreateRegion from '$lib/components/organs/region/create/create-region.svelte';
+	import EditRegion from '$lib/components/organs/region/update/edit-region.svelte';
 	import Globe from '@lucide/svelte/icons/globe';
 	import { client } from '$lib/client.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
@@ -40,6 +40,10 @@
 		const params = new URLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
 		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+	}
+
+	function openRegionDetails(region: Region) {
+		goto(`/regions/${region.id}`);
 	}
 
 	const rows = $derived(paginateState.query.data?.data?.rows ?? []);
@@ -161,6 +165,7 @@
 							rows={rows}
 							columns={tableColumns}
 							emptyMessage="No regions found."
+							onRowClick={(row) => openRegionDetails(row as Region)}
 						/>
 					</table>
 				</div>

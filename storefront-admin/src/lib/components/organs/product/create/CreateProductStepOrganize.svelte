@@ -2,38 +2,25 @@
 	import X from '@lucide/svelte/icons/x';
 	import { cn } from '$lib/utils.js';
 
+	import { Combobox } from '$lib/components/organs/index.js';
+	import { MultiSelectCombobox } from '$lib/components/organs/index.js';
+
 	let {
 		createDiscountable = $bindable(true),
-		createCollectionId = $bindable(''),
+		createCollectionIds = $bindable([]),
 		createCategoryId = $bindable(''),
-		createTagIds = [] as string[],
+		createTagIds = $bindable([] as string[]),
 		categoryError = null as string | null,
 		createSalesChannels = [] as { id: string; name: string }[],
-		createSalesChannelInput = $bindable(''),
-		collectionsList = [] as { id: string; title: string; handle: string }[],
-		categoriesList = [] as { id: string; value: string; handle: string }[],
-		tagsList = [] as { id: string; value: string }[],
-		salesChannelsList = [] as { id: string; name: string }[],
-		addTag,
-		removeTag,
-		addSalesChannel,
-		removeSalesChannel
-	}: {
-		createDiscountable: boolean;
-		createCollectionId: string;
-		createCategoryId: string;
-		createTagIds: string[];
-		categoryError: string | null;
-		createSalesChannels: { id: string; name: string }[];
-		createSalesChannelInput: string;
-		collectionsList: { id: string; title: string; handle: string }[];
-		categoriesList: { id: string; value: string; handle: string }[];
-		tagsList: { id: string; value: string }[];
-		salesChannelsList: { id: string; name: string }[];
-		addTag: (tagId: string) => void;
-		removeTag: (tagId: string) => void;
-		addSalesChannel: () => void;
-		removeSalesChannel: (id: string) => void;
+		createSalesChannelIds = $bindable([]),
+		collectionsList = $bindable([]),
+		categoriesList = $bindable([]),
+		tagsList = $bindable([]),
+		salesChannelsList = $bindable([]),
+		addTag = $bindable((tagIds: string[]) => {}),
+		removeTag = $bindable((tagId: string) => {}),
+		addSalesChannel = $bindable((ids: string[]) => {}),
+		removeSalesChannel = $bindable((id: string) => {}),
 	} = $props();
 </script>
 
@@ -77,31 +64,51 @@
 			<label for="create-collection" class="text-sm font-medium">
 				Collection <span class="font-normal text-muted-foreground">(Optional)</span>
 			</label>
-			<select
+			<MultiSelectCombobox
 				id="create-collection"
-				bind:value={createCollectionId}
-				class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			>
-				<option value="">None</option>
-				{#each collectionsList as col (col.id)}
-					<option value={col.id}>{col.title}</option>
-				{/each}
-			</select>
+				triggerClass="h-10 min-w-[10px] rounded-md border border-input bg-background px-3 py-1 text-sm"
+				bind:value={createCollectionIds}
+				options={collectionsList
+					.filter((col) => !createCollectionIds.includes(col.id))
+					.map((col) => ({ id: col.id, value: col.title }))}
+				placeholder="Select collection"
+				emptyMessage="No collections found"
+			/>
+			{#if createCollectionIds.length > 0}
+				<div class="flex flex-wrap items-center gap-2">
+					{#each createCollectionIds as collectionId (collectionId)}
+						{@const collection = collectionsList.find((col) => col.id === collectionId)}
+						{#if collection}
+							<span class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm">
+								{collection.title}
+								<button
+									type="button"
+									class="rounded p-0.5 hover:bg-muted"
+									onclick={() =>
+										(createCollectionIds = createCollectionIds.filter((id) => id !== collectionId))}
+									aria-label={`Remove ${collection.title} collection`}
+								>
+									<X class="size-3.5" />
+								</button>
+							</span>
+						{/if}
+					{/each}
+				</div>
+				<p class="text-xs text-muted-foreground">{createCollectionIds.length} selected</p>
+			{/if}
 		</div>
 		<div class="flex flex-col gap-2">
 			<label for="create-category" class="text-sm font-medium">
-				Categories <span class="font-normal text-muted-foreground">(Optional)</span>
+				Category <span class="font-normal text-muted-foreground">(Optional)</span>
 			</label>
-			<select
+			<Combobox
+				triggerClass="h-10 min-w-[10px] rounded-md border border-input bg-background px-3 py-1 text-sm"
 				id="create-category"
 				bind:value={createCategoryId}
-				class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			>
-				<option value="">None</option>
-				{#each categoriesList as cat (cat.id)}
-					<option value={cat.id}>{cat.value}</option>
-				{/each}
-			</select>
+				options={categoriesList.map((cat) => ({ id: cat.id, value: cat.value }))}
+				placeholder="Select category"
+				emptyMessage="No categories found"
+			/>
 			{#if createCategoryId}
 				<p class="text-xs text-muted-foreground">1 selected</p>
 			{/if}
@@ -113,85 +120,69 @@
 			<label for="create-tags-select" class="text-sm font-medium">
 				Tags <span class="font-normal text-muted-foreground">(Optional)</span>
 			</label>
-			<div class="flex flex-wrap items-center gap-2">
-				{#each createTagIds as tagId (tagId)}
-					{@const tag = tagsList.find((t) => t.id === tagId)}
-					{#if tag}
-						<span class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm">
-							{tag.value}
-							<button
-								type="button"
-								class="rounded p-0.5 hover:bg-muted"
-								onclick={() => removeTag(tagId)}
-								aria-label="Remove tag"
-							>
-								<X class="size-3.5" />
-							</button>
-						</span>
-					{/if}
-				{/each}
-				<select
-					id="create-tags-select"
-					class="flex h-8 min-w-[120px] rounded-md border border-input bg-background px-2 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					onchange={(e) => {
-						const el = e.currentTarget;
-						const id = el.value;
-						if (id) {
-							addTag(id);
-							el.value = '';
-						}
-					}}
-				>
-					<option value="">Add tag</option>
-					{#each tagsList.filter((t) => !createTagIds.includes(t.id)) as tag (tag.id)}
-						<option value={tag.id}>{tag.value}</option>
-					{/each}
-				</select>
-			</div>
+			<MultiSelectCombobox
+				id="create-tags-select"
+				triggerClass="h-10 min-w-[10px] rounded-md border border-input bg-background px-3 py-1 text-sm"
+				bind:value={createTagIds}
+				options={tagsList.filter((t) => !createTagIds.includes(t.id)).map((t) => ({ id: t.id, value: t.value }))}
+			/>
 			{#if createTagIds.length > 0}
+				<div class="flex flex-wrap items-center gap-2">
+					{#each createTagIds as tagId (tagId)}
+						{@const tag = tagsList.find((t) => t.id === tagId)}
+						{#if tag}
+							<span class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm">
+								{tag.value}
+								<button
+									type="button"
+									class="rounded p-0.5 hover:bg-muted"
+									onclick={() => (createTagIds = createTagIds.filter((id) => id !== tagId))}
+									aria-label="Remove tag"
+								>
+									<X class="size-3.5" />
+								</button>
+							</span>
+						{/if}
+					{/each}
+				</div>
 				<p class="text-xs text-muted-foreground">{createTagIds.length} selected</p>
 			{/if}
 		</div>
 		<div class="flex flex-col gap-2">
-			<label for="create-sales-channel-input" class="text-sm font-medium">
+			<label for="create-sales-channel-select" class="text-sm font-medium">
 				Sales channels <span class="font-normal text-muted-foreground">(Optional)</span>
 			</label>
 			<p class="text-xs text-muted-foreground">
 				This product will only be available in the default sales channel if left untouched.
 			</p>
-			<div class="flex flex-wrap items-center gap-2">
-				{#each createSalesChannels as ch (ch.id)}
-					<span class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm">
-						{ch.name}
-						<button
-							type="button"
-							class="rounded p-0.5 hover:bg-muted"
-							onclick={() => removeSalesChannel(ch.id)}
-							aria-label="Remove"
-						>
-							<X class="size-3.5" />
-						</button>
-					</span>
-				{/each}
-				<div class="flex gap-1">
-					<select
-						id="create-sales-channel-input"
-						class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-3 py-1 text-sm sm:w-48"
-						bind:value={createSalesChannelInput}
-						onchange={() => {
-							if (createSalesChannelInput) {
-								addSalesChannel();
-								createSalesChannelInput = '';
-							}
-						}}
-					>
-						<option value="">Add sales channel</option>
-						{#each salesChannelsList.filter((ch) => !createSalesChannels.some((s) => s.id === ch.id)) as channel (channel.id)}
-							<option value={channel.id}>{channel.name}</option>
-						{/each}
-					</select>
+			<MultiSelectCombobox
+				id="create-sales-channel-select"
+				triggerClass="h-10 min-w-[10px] rounded-md border border-input bg-background px-3 py-1 text-sm"
+				bind:value={createSalesChannelIds}
+				options={salesChannelsList.filter((ch) => !createSalesChannelIds.includes(ch.id)).map((ch) => ({ id: ch.id, value: ch.name }))}
+			/>
+			{#if createSalesChannelIds.length > 0}
+				<div class="flex flex-wrap items-center gap-2">
+					{#each createSalesChannelIds as salesChannelId (salesChannelId)}
+						{@const salesChannel = salesChannelsList.find((ch) => ch.id === salesChannelId)}
+						{#if salesChannel}
+							<span class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm">
+								{salesChannel.name}
+								<button
+									type="button"
+									class="rounded p-0.5 hover:bg-muted"
+									onclick={() =>
+										(createSalesChannelIds = createSalesChannelIds.filter((id) => id !== salesChannelId))}
+									aria-label={`Remove ${salesChannel.name} sales channel`}
+								>
+									<X class="size-3.5" />
+								</button>
+							</span>
+						{/if}
+					{/each}
 				</div>
-			</div>
+				<p class="text-xs text-muted-foreground">{createSalesChannelIds.length} selected</p>
+			{/if}
 		</div>
 	</div>
 </div>

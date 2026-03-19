@@ -17,6 +17,7 @@
 		options: Record<string, string>;
 		sku: string;
 		availableCount: string;
+		manage_inventory: boolean;
 		allow_backorder: boolean;
 		variant_rank: number;
 		priceAmount: string;
@@ -173,6 +174,13 @@
 										{#if String(v.availableCount || '').trim() && !v.sku.trim()}
 											<p class="mt-0.5 text-xs text-destructive">SKU required</p>
 										{/if}
+									</td>
+									<td class="px-3 py-2">
+										<input
+											type="checkbox"
+											bind:checked={v.manage_inventory}
+											class="rounded border-input"
+										/>
 									</td>
 									<td class="px-3 py-2">
 										<input type="checkbox" bind:checked={v.allow_backorder} class="rounded border-input" />

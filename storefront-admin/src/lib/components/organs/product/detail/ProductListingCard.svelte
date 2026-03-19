@@ -161,11 +161,13 @@
 	function applyLocalRelationFilter(items: Product[], activeFilter: ProductFilter): Product[] {
 		let next = items;
 
+		const apiHandledKeys = new Set(Object.keys(queryFilter));
+
 		const categoryId =
 			typeof activeFilter.category_id === 'string' && activeFilter.category_id.trim().length > 0
 				? activeFilter.category_id
 				: undefined;
-		if (categoryId) {
+		if (categoryId && !apiHandledKeys.has('category_ids')) {
 			next = next.filter((item) => {
 				const candidate = item as Product & {
 					category?: { id?: string | null } | null;
@@ -178,7 +180,7 @@
 			typeof activeFilter.collection_id === 'string' && activeFilter.collection_id.trim().length > 0
 				? activeFilter.collection_id
 				: undefined;
-		if (collectionId) {
+		if (collectionId && !apiHandledKeys.has('collection_ids')) {
 			next = next.filter((item) => {
 				const candidate = item as Product & {
 					collection_id?: string | null;

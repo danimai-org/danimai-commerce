@@ -55,8 +55,13 @@
 		await paginateState.refetch();
 	}
 
-	const tableColumns: TableColumn[] = [
-		{ label: 'Name', key: 'name', type: 'text' },
+const tableColumns: TableColumn[] = [
+		{
+			label: 'Name',
+			key: 'name',
+			type: 'link',
+			cellHref: (item) => `/tax-regions/${String((item as { id?: string }).id ?? '')}`
+		},
 		{ label: 'Tax provider', key: 'tax_provider_id', type: 'text' },
 		{ label: 'Created', key: 'created_at', type: 'date' },
 		{ label: 'Updated', key: 'updated_at', type: 'date' },
