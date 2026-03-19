@@ -10,7 +10,6 @@
 	import RegionHeroCard from '$lib/components/organs/region/detail/RegionHeroCard.svelte';
 	import RegionCountriesCard from '$lib/components/organs/region/detail/RegionCountriesCard.svelte';
 
-	let { data }: { data: any } = $props();
 
 	const regionId = $derived(page.params?.id ?? '');
 
@@ -135,7 +134,6 @@
 <EditRegion
 	bind:open={editOpen}
 	region={region}
-	formData={data.regionUpdateForm}
 	onSuccess={handleEditSuccess}
 />
 

@@ -6,12 +6,20 @@ import {
   CREATE_REGIONS_PROCESS,
   UPDATE_REGION_PROCESS,
   DELETE_REGIONS_PROCESS,
+<<<<<<< HEAD
+  LIST_COUNTRIES_PROCESS,
+=======
   RETRIEVE_REGION_PROCESS,
+>>>>>>> a274fd9c337c04b2fb2e046d4d44092f28a42c56
   PaginatedRegionsProcess,
   CreateRegionsProcess,
   UpdateRegionProcess,
   DeleteRegionsProcess,
+<<<<<<< HEAD
+  ListCountriesProcess,
+=======
   RetrieveRegionProcess,
+>>>>>>> a274fd9c337c04b2fb2e046d4d44092f28a42c56
   PaginatedRegionsSchema,
   PaginatedRegionsResponseSchema,
   CreateRegionSchema,
@@ -19,8 +27,12 @@ import {
   UpdateRegionSchema,
   UpdateRegionResponseSchema,
   DeleteRegionsSchema,
+<<<<<<< HEAD
+  ListCountriesResponseSchema,
+=======
   RetrieveRegionSchema,
   RetrieveRegionResponseSchema,
+>>>>>>> a274fd9c337c04b2fb2e046d4d44092f28a42c56
 } from "@danimai/region";
 import { handleProcessError } from "../../utils/error-handler";
 import {
@@ -97,6 +109,28 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
         tags: ["Regions"],
         summary: "Retrieve a region",
         description: "Gets a region by ID",
+      },
+    }
+  )
+  .get(
+    "/:id/countries",
+    async ({ params }) => {
+      const process = getService<ListCountriesProcess>(LIST_COUNTRIES_PROCESS);
+      return process.runOperations({
+        input: { region_id: params.id },
+      });
+    },
+    {
+      params: Type.Object({ id: Type.String() }),
+      response: {
+        200: ListCountriesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Regions"],
+        summary: "List countries in region",
+        description: "Gets the list of countries assigned to a region",
       },
     }
   )
