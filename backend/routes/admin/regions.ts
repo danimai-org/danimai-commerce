@@ -4,26 +4,32 @@ import { getService } from "@danimai/core";
 import {
   PAGINATED_REGIONS_PROCESS,
   CREATE_REGIONS_PROCESS,
-  UPDATE_REGIONS_PROCESS,
+  UPDATE_REGION_PROCESS,
   DELETE_REGIONS_PROCESS,
+  RETRIEVE_REGION_PROCESS,
   PaginatedRegionsProcess,
   CreateRegionsProcess,
-  UpdateRegionsProcess,
+  UpdateRegionProcess,
   DeleteRegionsProcess,
+  RetrieveRegionProcess,
   PaginatedRegionsSchema,
   PaginatedRegionsResponseSchema,
-  CreateRegionsSchema,
-  CreateRegionsResponseSchema,
+  CreateRegionSchema,
+  CreateRegionResponseSchema,
   UpdateRegionSchema,
   UpdateRegionResponseSchema,
   DeleteRegionsSchema,
+  RetrieveRegionSchema,
+  RetrieveRegionResponseSchema,
 } from "@danimai/region";
 import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
   NoContentResponseSchema,
+  NotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
+import { StaticDecode } from "@sinclair/typebox";
 
 const UpdateRegionBodySchema = Type.Object({
   name: Type.Optional(Type.String()),
@@ -37,7 +43,7 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
     "/",
     async ({ query: input }) => {
       const process = getService<PaginatedRegionsProcess>(PAGINATED_REGIONS_PROCESS);
-      return process.runOperations({ input });
+      return process.runOperations({ input: input as StaticDecode<typeof PaginatedRegionsSchema> });
     },
     {
       query: PaginatedRegionsSchema,
@@ -60,23 +66,44 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
       return process.runOperations({ input });
     },
     {
-      body: CreateRegionsSchema,
+      body: CreateRegionSchema,
       response: {
-        200: CreateRegionsResponseSchema,
+        200: CreateRegionResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {
         tags: ["Regions"],
-        summary: "Create region(s)",
-        description: "Creates one or more regions",
+        summary: "Create a region",
+        description: "Creates a region",
+      },
+    }
+  )
+  .get(
+    "/:id",
+    async ({ params }) => {
+      const process = getService<RetrieveRegionProcess>(RETRIEVE_REGION_PROCESS);
+      return process.runOperations({ input: { id: params.id } });
+    },
+    {
+      params: Type.Object({ id: RetrieveRegionSchema.properties.id }),
+      response: {
+        200: RetrieveRegionResponseSchema,
+        400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Regions"],
+        summary: "Retrieve a region",
+        description: "Gets a region by ID",
       },
     }
   )
   .put(
     "/:id",
     async ({ params, body }) => {
-      const process = getService<UpdateRegionsProcess>(UPDATE_REGIONS_PROCESS);
+      const process = getService<UpdateRegionProcess>(UPDATE_REGION_PROCESS);
       return process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
       });

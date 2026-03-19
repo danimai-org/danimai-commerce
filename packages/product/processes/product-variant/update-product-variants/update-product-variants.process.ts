@@ -17,7 +17,7 @@ export const UPDATE_PRODUCT_VARIANTS_PROCESS = Symbol("UpdateProductVariants");
 
 @Process(UPDATE_PRODUCT_VARIANTS_PROCESS)
 export class UpdateProductVariantsProcess
-  implements ProcessContract<ProductVariant | undefined> {
+  implements ProcessContract<typeof UpdateProductVariantSchema, UpdateProductVariantProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,

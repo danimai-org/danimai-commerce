@@ -30,29 +30,20 @@ export class DeleteProductVariantsProcess implements ProcessContract<typeof Dele
 
     const variants = await this.db
       .selectFrom("product_variants")
-      .where("id", "in", input.variant_ids)
+      .where("id", "in", input.ids)
       .where("deleted_at", "is", null)
       .select("id")
       .execute();
 
-    if (variants.length !== input.variant_ids.length) {
-      const foundIds = variants.map((v) => v.id);
-      const missingIds = input.variant_ids.filter((id) => !foundIds.includes(id));
+    if (variants.length !== input.ids.length) {
       throw new NotFoundError(
-        `Product variants not found: ${missingIds.join(", ")}`
+        `Product variants not found`
       );
     }
 
-    await this.db.transaction().execute(async (trx) => {
-      this.logger.info("Deleting product variants", {
-        variant_ids: input.variant_ids,
-      });
-      await trx
-        .updateTable("product_variants")
-        .set({ deleted_at: new Date() })
-        .where("id", "in", input.variant_ids)
-        .where("deleted_at", "is", null)
-        .execute();
-    });
+    await this.db
+      .deleteFrom("product_variants")
+      .where("id", "in", input.ids)
+      .execute();
   }
 }

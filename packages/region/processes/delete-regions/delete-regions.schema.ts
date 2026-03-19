@@ -1,7 +1,7 @@
 import { Type, type Static } from "@sinclair/typebox";
 
 export const DeleteRegionsSchema = Type.Object({
-  region_ids: Type.Array(Type.String()),
+  ids: Type.Array(Type.String({ format: "uuid" })),
 });
 
 export type DeleteRegionsProcessInput = Static<typeof DeleteRegionsSchema>;

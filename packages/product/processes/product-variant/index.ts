@@ -1,4 +1,3 @@
-export * from "./create-product-variants";
 export * from "./delete-product-variants";
 export * from "./retrieve-product-variant";
 export * from "./update-product-variants";

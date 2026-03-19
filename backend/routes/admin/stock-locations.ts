@@ -4,21 +4,22 @@ import { getService } from "@danimai/core";
 import {
   PAGINATED_STOCK_LOCATIONS_PROCESS,
   RETRIEVE_STOCK_LOCATION_PROCESS,
-  CREATE_STOCK_LOCATIONS_PROCESS,
-  UPDATE_STOCK_LOCATIONS_PROCESS,
+  CREATE_STOCK_LOCATION_PROCESS,
+  UPDATE_STOCK_LOCATION_PROCESS,
   DELETE_STOCK_LOCATIONS_PROCESS,
   PaginatedStockLocationsProcess,
   RetrieveStockLocationProcess,
-  CreateStockLocationsProcess,
-  UpdateStockLocationsProcess,
+  CreateStockLocationProcess,
+  UpdateStockLocationProcess,
   DeleteStockLocationsProcess,
   PaginatedStockLocationsSchema,
   PaginatedStockLocationsResponseSchema,
+  RetrieveStockLocationSchema,
   StockLocationResponseSchema,
-  CreateStockLocationsSchema,
-  CreateStockLocationsResponseSchema,
+  CreateStockLocationSchema,
+  CreateStockLocationResponseSchema,
   UpdateStockLocationSchema,
-  UpdateStockLocationsResponseSchema,
+  UpdateStockLocationResponseSchema,
   DeleteStockLocationsSchema,
 } from "@danimai/stock-location";
 import {
@@ -67,7 +68,7 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
       return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: UpdateStockLocationSchema.properties.id }),
+      params: Type.Object({ id: RetrieveStockLocationSchema.properties.id }),
       response: {
         200: StockLocationResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -83,30 +84,26 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
   .post(
     "/",
     async ({ body: input }) => {
-      const process = getService<CreateStockLocationsProcess>(CREATE_STOCK_LOCATIONS_PROCESS);
+      const process = getService<CreateStockLocationProcess>(CREATE_STOCK_LOCATION_PROCESS);
       return process.runOperations({ input });
     },
     {
-      body: CreateStockLocationsSchema,
+      body: CreateStockLocationSchema,
       response: {
-        200: CreateStockLocationsResponseSchema,
+        200: CreateStockLocationResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
       detail: {
         tags: ["Stock Locations"],
-        summary: "Create stock location(s)",
-        description: "Creates one or more stock locations",
+        summary: "Create stock location",
+        description: "Creates a stock location",
         requestBody: {
           content: {
             "application/json": {
               example: {
-                stock_locations: [
-                  {
-                    name: "Main Warehouse",
-                    address_id: null,
-                  },
-                ],
+                name: "Main Warehouse",
+                address_id: null,
               },
             },
           },
@@ -117,7 +114,7 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
   .put(
     "/:id",
     async ({ params, body }) => {
-      const process = getService<UpdateStockLocationsProcess>(UPDATE_STOCK_LOCATIONS_PROCESS);
+      const process = getService<UpdateStockLocationProcess>(UPDATE_STOCK_LOCATION_PROCESS);
       const result = await process.runOperations({
         input: { ...(body as Record<string, unknown>), id: params.id },
       });
@@ -127,7 +124,7 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
       params: Type.Object({ id: UpdateStockLocationSchema.properties.id }),
       body: UpdateStockLocationBodySchema,
       response: {
-        200: UpdateStockLocationsResponseSchema,
+        200: UpdateStockLocationResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -135,33 +132,6 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
         tags: ["Stock Locations"],
         summary: "Update a stock location",
         description: "Updates an existing stock location by id",
-      },
-     }
-  )
-  .delete(
-    "/",
-    async ({ body: input, set }) => {
-      const checkProcess = getService<CheckLocationsInUseProcess>(CHECK_LOCATIONS_IN_USE_PROCESS);
-      const { stock_location_ids } = input as { stock_location_ids: string[] };
-      await checkProcess.runOperations({
-        input: { location_ids: stock_location_ids },
-      });
-      const process = getService<DeleteStockLocationsProcess>(DELETE_STOCK_LOCATIONS_PROCESS);
-      await process.runOperations({ input });
-      set.status = 204;
-      return undefined;
-    },
-    {
-      body: DeleteStockLocationsSchema,
-      response: {
-        204: NoContentResponseSchema,
-        400: ValidationErrorResponseSchema,
-        500: InternalErrorResponseSchema,
-      },
-      detail: {
-        tags: ["Stock Locations"],
-        summary: "Delete stock locations",
-        description: "Soft-deletes multiple stock locations by their IDs",
       },
     }
   );

@@ -5,23 +5,22 @@ import {
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  type PaginationResponseType,
   paginationResponse,
   SortOrder,
 } from "@danimai/core";
 import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
-  type PaginatedRegionsProcessInput,
+  type PaginatedRegionsProcessOutput,
   PaginatedRegionsSchema,
 } from "./paginated-regions.schema";
-import type { Database, Region } from "@danimai/region/db";
+import type { Database } from "@danimai/region/db";
 
 export const PAGINATED_REGIONS_PROCESS = Symbol("PaginatedRegions");
 
 @Process(PAGINATED_REGIONS_PROCESS)
 export class PaginatedRegionsProcess
-  implements ProcessContract<PaginationResponseType<Region>> {
+  implements ProcessContract<typeof PaginatedRegionsSchema, PaginatedRegionsProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -47,37 +46,25 @@ export class PaginatedRegionsProcess
       .selectFrom("regions")
       .where("deleted_at", "is", null);
 
+    if (input.filters?.currency_code) {
+      query = query.where("currency_code", "=", input.filters.currency_code);
+    }
+
     const countResult = await query
       .select(({ fn }) => fn.count<number>("id").as("count"))
       .executeTakeFirst();
 
     const total = Number(countResult?.count ?? 0);
 
-    const sortOrder =
-      sorting_direction === SortOrder.ASC ? "asc" : "desc";
-    const allowedSortFields = [
-      "id",
-      "name",
-      "currency_code",
-      "created_at",
-      "updated_at",
-      "deleted_at",
-    ];
-    const safeSortField = allowedSortFields.includes(sorting_field)
-      ? sorting_field
-      : "created_at";
-    query = query.orderBy(
-      sql.ref(`regions.${safeSortField}`),
-      sortOrder
-    );
+    query = query.orderBy(sql.ref(sorting_field), sorting_direction);
 
     const offset = (page - 1) * limit;
-    const data = await query
+    const regions = await query
       .selectAll()
       .limit(limit)
       .offset(offset)
       .execute();
 
-    return paginationResponse<Region>(data, total, input);
+    return paginationResponse(regions, total, input);
   }
 }
