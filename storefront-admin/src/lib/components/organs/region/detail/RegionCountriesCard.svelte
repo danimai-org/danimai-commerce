@@ -10,7 +10,6 @@
 	interface Props {
 		regionId: string;
 		onAddCountries?: () => void;
-		/** Increment after mutations to refetch the list. */
 		refreshNonce?: number;
 	}
 
@@ -27,6 +26,26 @@
 	}
 
 	type CountryRow = { id: string; name: string; code: string };
+
+	function mapApiCountries(data: unknown): CountryRow[] {
+		const list = Array.isArray(data)
+			? data
+			: data != null && typeof data === 'object' && Array.isArray((data as { rows?: unknown }).rows)
+				? (data as { rows: unknown[] }).rows
+				: [];
+		return list
+			.map((item) => {
+				const c = item as Record<string, unknown>;
+				const id = c.id != null ? String(c.id) : '';
+				const iso2 = String(c.iso_2 ?? '').trim();
+				const name = String(c.name ?? '').trim();
+				const displayName = String(c.display_name ?? '').trim();
+				const label = displayName || name || iso2 || '—';
+				return { id, name: label, code: iso2.toUpperCase() };
+			})
+			.filter((row) => row.id.length > 0);
+	}
+
 	let countries = $state<CountryRow[]>([]);
 	let loading = $state(false);
 	let error = $state<string | null>(null);
@@ -34,40 +53,40 @@
 	$effect(() => {
 		regionId;
 		refreshNonce;
-		if (!regionId) {
+		const id = regionId;
+		if (!id) {
 			countries = [];
 			error = null;
+			loading = false;
 			return;
 		}
-		let cancelled = false;
+		let active = true;
 		loading = true;
 		error = null;
-		client.regions({ id: regionId }).countries
-			.get()
+		client['regions']({ id: id as string })
+			.countries
+			.get({ query: { limit: 1000 } })
 			.then((res) => {
-				if (cancelled) return;
-				loading = false;
+				if (!active) return;
 				if (res.error) {
-					error = String((res.error as { value?: { message?: string } })?.value?.message ?? res.error);
+					error = String(
+						(res.error as { value?: { message?: string } })?.value?.message ?? res.error
+					);
 					countries = [];
 					return;
 				}
-				const raw = res.data as unknown;
-				const rows = Array.isArray(raw) ? raw : (raw as { rows?: unknown[] })?.rows ?? [];
-				countries = rows.map((c: { id?: string; display_name?: string; iso_2?: string }) => ({
-					id: c.id ?? '',
-					name: c.display_name ?? c.iso_2 ?? '',
-					code: (c.iso_2 ?? '').toUpperCase()
-				}));
+				countries = mapApiCountries(res.data);
 			})
 			.catch((e) => {
-				if (cancelled) return;
-				loading = false;
+				if (!active) return;
 				error = e instanceof Error ? e.message : String(e);
 				countries = [];
+			})
+			.finally(() => {
+				if (active) loading = false;
 			});
 		return () => {
-			cancelled = true;
+			active = false;
 		};
 	});
 
@@ -142,7 +161,7 @@
 							class="size-4 rounded border-input"
 						/>
 					</th>
-					<th class="px-4 py-3 font-medium text-muted-foreground">Name</th>
+					<th class="px-4 py-3 font-medium text-muted-foreground">Country</th>
 					<th class="px-4 py-3 font-medium text-muted-foreground">Code</th>
 					<th class="w-12 px-4 py-3"></th>
 				</tr>

@@ -28,8 +28,8 @@
 		currencyLoading = true;
 		currencyError = null;
 		currencyData = null;
-		client.currencies.list
-			.get({ query: { code: code.toUpperCase() } })
+		client.currencies
+			.get({ query: { limit: 1, filters: { code: code.toUpperCase() } } })
 			.then((res) => {
 				if (cancelled) return;
 				currencyLoading = false;

@@ -36,20 +36,21 @@
 		loading = true;
 		error = null;
 		try {
-			const res = await client.regions.get();
+			const res = await client.regions({ id: regionId }).get();
 			if (res.error) {
-				error = String((res.error as any)?.value?.message ?? res.error);
+				const err = res.error as { status?: number; value?: { message?: string } };
+				if (err?.status === 404) {
+					error = 'Region not found';
+				} else {
+					error = String(err?.value?.message ?? res.error);
+				}
 				region = null;
 				return;
 			}
-			const rows = (res.data as any)?.rows ?? [];
-			const found = rows.find((r: any) => r.id === regionId) ?? null;
-			if (!found) {
+			region = (res.data ?? null) as Region | null;
+			if (!region) {
 				error = 'Region not found';
-				region = null;
-				return;
 			}
-			region = found;
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			region = null;

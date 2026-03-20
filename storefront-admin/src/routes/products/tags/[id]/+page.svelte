@@ -4,14 +4,13 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
-	import { TagHeroCard, TagProductsCard } from '$lib/components/organs/index.js';
+	import { TagHeroCard } from '$lib/components/organs/index.js';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
 	import { client } from '$lib/client';
 	import { ProductListingCard } from '$lib/components/organs/index.js';
 	
 
-	type TagProduct = any & { collection?: { id: string; title: string; handle: string } | null };
 	type ProductTag = {
 		id: string;
 		value: string;
@@ -90,12 +89,8 @@
 		}
 	});
 
-	const products = $derived(productsData?.data ?? []);
 	const pagination = $derived(productsData?.pagination ?? null);
-	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
-	);
+	
 </script>
 
 <svelte:head>

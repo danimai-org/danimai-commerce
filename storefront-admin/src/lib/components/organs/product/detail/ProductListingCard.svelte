@@ -294,12 +294,12 @@
 				<span class="min-w-0 flex-1"></span>
 			{/if}
 			<div class="flex flex-wrap items-center gap-2">
-				{#if !embedded && onRemoveProducts && selectedCount > 0}
+				{#if !embedded && onRemoveProducts}
 					<Button
 						type="button"
 						size="sm"
 						variant="destructive"
-						disabled={removeSubmitting}
+						disabled={removeSubmitting || selectedCount === 0}
 						onclick={submitRemoveSelected}
 					>
 						{removeSubmitting

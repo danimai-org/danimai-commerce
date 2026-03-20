@@ -46,6 +46,11 @@ export class PaginatedCurrenciesProcess
       .selectFrom("currencies")
       .where("deleted_at", "is", null);
 
+    if (input.filters?.code) {
+      query = query.where("code", "=", input.filters.code.trim());
+    }
+    
+
     const countResult = await query
       .select(({ fn }) => fn.count<number>("id").as("count"))
       .executeTakeFirst();
