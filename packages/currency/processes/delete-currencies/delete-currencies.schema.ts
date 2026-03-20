@@ -1,10 +1,11 @@
-import { Type, type Static } from "@sinclair/typebox";
+import { commaSeparatedIds } from "@danimai/core";
+import { Type, type Static, type StaticDecode } from "@sinclair/typebox";
 
 export const DeleteCurrenciesSchema = Type.Object({
-  currency_ids: Type.Array(Type.String()),
+  ids: Type.Array(Type.String({ format: "uuid" })),
 });
 
-export type DeleteCurrenciesProcessInput = Static<typeof DeleteCurrenciesSchema>;
+export type DeleteCurrenciesProcessInput = StaticDecode<typeof DeleteCurrenciesSchema>;
 
 export const DeleteCurrenciesResponseSchema = Type.Undefined();
 

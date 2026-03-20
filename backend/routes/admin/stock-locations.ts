@@ -7,12 +7,10 @@ import {
   RETRIEVE_STOCK_LOCATION_PROCESS,
   CREATE_STOCK_LOCATION_PROCESS,
   UPDATE_STOCK_LOCATION_PROCESS,
-  DELETE_STOCK_LOCATIONS_PROCESS,
   PaginatedStockLocationsProcess,
   RetrieveStockLocationProcess,
   CreateStockLocationProcess,
   UpdateStockLocationProcess,
-  DeleteStockLocationsProcess,
   PaginatedStockLocationsSchema,
   PaginatedStockLocationsResponseSchema,
   RetrieveStockLocationSchema,
@@ -21,13 +19,14 @@ import {
   CreateStockLocationResponseSchema,
   UpdateStockLocationSchema,
   UpdateStockLocationResponseSchema,
-  DeleteStockLocationsSchema,
 } from "@danimai/stock-location";
+<<<<<<< HEAD
 
+=======
+>>>>>>> 33a1ed11878c0dc3e232b34291e6e10bb18330c1
 import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
-  NoContentResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 

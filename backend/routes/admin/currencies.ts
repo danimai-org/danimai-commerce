@@ -3,33 +3,22 @@ import { Type, type Static, type StaticDecode } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   PAGINATED_CURRENCIES_PROCESS,
-  LIST_CURRENCIES_PROCESS,
-  LIST_AND_COUNT_CURRENCIES_PROCESS,
   RETRIEVE_CURRENCY_PROCESS,
-  LIST_AVAILABLE_CURRENCIES_PROCESS,
-  CREATE_CURRENCIES_PROCESS,
+  CREATE_CURRENCY_PROCESS,
   UPDATE_CURRENCY_PROCESS,
   DELETE_CURRENCIES_PROCESS,
   PaginatedCurrenciesProcess,
-  ListCurrenciesProcess,
-  ListAndCountCurrenciesProcess,
   RetrieveCurrencyProcess,
-  ListAvailableCurrenciesProcess,
-  CreateCurrenciesProcess,
+  CreateCurrencyProcess,
   UpdateCurrencyProcess,
   DeleteCurrenciesProcess,
   PaginatedCurrenciesSchema,
   PaginatedCurrenciesResponseSchema,
-  ListCurrenciesSchema,
-  ListCurrenciesResponseSchema,
-  ListAndCountCurrenciesSchema,
-  ListAndCountCurrenciesResponseSchema,
+  RetrieveCurrencySchema,
   CurrencyResponseSchema,
-  ListAvailableCurrenciesSchema,
-  ListAvailableCurrenciesResponseSchema,
-  CreateCurrenciesSchema,
-  CreateCurrenciesResponseSchema,
-  UpdateCurrencySchema,
+  CreateCurrencySchema,
+  CreateCurrencyResponseSchema,
+  UpdateCurrencyBodySchema,
   UpdateCurrencyResponseSchema,
   DeleteCurrenciesSchema,
 } from "@danimai/currency";
@@ -40,20 +29,12 @@ import {
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
-const UpdateCurrencyBodySchema = Type.Object({
-  tax_inclusive_pricing: Type.Optional(Type.Boolean()),
-});
+const UpdateCurrencyRequestBodySchema = Type.Omit(UpdateCurrencyBodySchema, ["id"]);
 
-// Elysia query params are string | number; process expects StaticDecode (e.g. number). Cast for process input.
 function asPaginatedInput(
   q: unknown
 ): StaticDecode<typeof PaginatedCurrenciesSchema> {
   return q as StaticDecode<typeof PaginatedCurrenciesSchema>;
-}
-function asListAndCountInput(
-  q: unknown
-): StaticDecode<typeof ListAndCountCurrenciesSchema> {
-  return q as StaticDecode<typeof ListAndCountCurrenciesSchema>;
 }
 
 export const currencyRoutes = new Elysia({ prefix: "/currencies" })
@@ -81,86 +62,13 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     }
   )
   .get(
-    "/available",
-    async ({ query }) => {
-      const process = getService<ListAvailableCurrenciesProcess>(
-        LIST_AVAILABLE_CURRENCIES_PROCESS
-      );
-      const result = await process.runOperations({
-        input: query as unknown as StaticDecode<typeof ListAvailableCurrenciesSchema>,
-      });
-      return { data: result.rows, pagination: result.pagination };
-    },
-    {
-      query: ListAvailableCurrenciesSchema,
-      response: {
-        200: ListAvailableCurrenciesResponseSchema,
-        400: ValidationErrorResponseSchema,
-        500: InternalErrorResponseSchema,
-      },
-      detail: {
-        tags: ["Currencies"],
-        summary: "List available currencies (123 fixed list)",
-        description: "Returns the fixed list of 123 ISO currencies with active flag and tax_inclusive_pricing",
-      },
-    }
-  )
-  .get(
-    "/list",
-    async ({ query }) => {
-      const process = getService<ListCurrenciesProcess>(LIST_CURRENCIES_PROCESS);
-      const result = await process.runOperations({
-        input: query as unknown as StaticDecode<typeof ListCurrenciesSchema>,
-      });
-      return result as Static<typeof ListCurrenciesResponseSchema>;
-    },
-    {
-      query: ListCurrenciesSchema,
-      response: {
-        200: ListCurrenciesResponseSchema,
-        400: ValidationErrorResponseSchema,
-        500: InternalErrorResponseSchema,
-      },
-      detail: {
-        tags: ["Currencies"],
-        summary: "List currencies (listCurrencies)",
-        description: "List currencies with optional filters (code, codes, limit, offset). Danimai-style listCurrencies.",
-      },
-    }
-  )
-  .get(
-    "/list-and-count",
-    async ({ query }) => {
-      const process = getService<ListAndCountCurrenciesProcess>(
-        LIST_AND_COUNT_CURRENCIES_PROCESS
-      );
-      const [data, count] = await process.runOperations({
-        input: asListAndCountInput(query),
-      });
-      return { data, count };
-    },
-    {
-      query: ListAndCountCurrenciesSchema,
-      response: {
-        200: ListAndCountCurrenciesResponseSchema,
-        400: ValidationErrorResponseSchema,
-        500: InternalErrorResponseSchema,
-      },
-      detail: {
-        tags: ["Currencies"],
-        summary: "List and count currencies (listAndCountCurrencies)",
-        description: "Returns [data, count]. Danimai-style listAndCountCurrencies.",
-      },
-    }
-  )
-  .get(
     "/:id",
     async ({ params }) => {
       const process = getService<RetrieveCurrencyProcess>(RETRIEVE_CURRENCY_PROCESS);
       return process.runOperations({ input: { id: params.id } });
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      params: Type.Object({ id: RetrieveCurrencySchema.properties.id }),
       response: {
         200: CurrencyResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -176,13 +84,13 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
   .post(
     "/",
     async ({ body: input }) => {
-      const process = getService<CreateCurrenciesProcess>(CREATE_CURRENCIES_PROCESS);
+      const process = getService<CreateCurrencyProcess>(CREATE_CURRENCY_PROCESS);
       return process.runOperations({ input });
     },
     {
-      body: CreateCurrenciesSchema,
+      body: CreateCurrencySchema,
       response: {
-        200: CreateCurrenciesResponseSchema,
+        200: CreateCurrencyResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -198,13 +106,13 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     async ({ params, body }) => {
       const process = getService<UpdateCurrencyProcess>(UPDATE_CURRENCY_PROCESS);
       const result = await process.runOperations({
-        input: { ...(body as { tax_inclusive_pricing?: boolean }), id: params.id },
+        input: { ...(body as Record<string, unknown>), id: params.id },
       });
       return result as Static<typeof UpdateCurrencyResponseSchema>;
     },
     {
-      params: Type.Object({ id: Type.String() }),
-      body: UpdateCurrencyBodySchema,
+      params: Type.Object({ id: RetrieveCurrencySchema.properties.id }),
+      body: UpdateCurrencyRequestBodySchema,
       response: {
         200: UpdateCurrencyResponseSchema,
         400: ValidationErrorResponseSchema,

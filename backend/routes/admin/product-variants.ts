@@ -32,7 +32,7 @@ const UpdateProductVariantBodySchema = Type.Object({
   allow_backorder: Type.Optional(Type.Boolean()),
   manage_inventory: Type.Optional(Type.Boolean()),
   variant_rank: Type.Optional(Type.Number()),
-  thumbnail: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  thumbnail: Type.Optional(Type.String()),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
 });
 
@@ -81,11 +81,12 @@ export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
   )
   .put(
     "/:id",
-    async ({ params, body }) => {
+    async ({ params, body: input }) => {
       const process = getService<UpdateProductVariantsProcess>(UPDATE_PRODUCT_VARIANTS_PROCESS);
-      return process.runOperations({
-        input: { ...(body as Record<string, unknown>), id: params.id },
+      const result = await process.runOperations({
+        input: { ...input, id: params.id },
       });
+      return Response.json(result ?? null);
     },
     {
       params: Type.Object({ id: Type.String() }),

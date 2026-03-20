@@ -1,4 +1,4 @@
-import { Type, type Static, type TObject, type TSchema, type TIntersect } from "@sinclair/typebox";
+import { Type, type Static, type TSchema } from "@sinclair/typebox";
 
 const PaginationMetaSchema = Type.Object({
     total: Type.Number(),
@@ -16,7 +16,7 @@ export const PaginationResponseSchema = Type.Object({
 
 export type PaginationResponseType<T extends any = any> = Omit<Static<typeof PaginationResponseSchema>, "rows"> & { rows: T[] };
 
-export function createPaginatedResponseSchema<T extends TObject | TIntersect>(itemSchema: T) {
+export function createPaginatedResponseSchema<T extends TSchema>(itemSchema: T) {
     return Type.Object({
         rows: Type.Array(itemSchema),
         pagination: PaginationMetaSchema,

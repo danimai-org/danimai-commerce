@@ -13,33 +13,34 @@ import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type PaginatedCurrenciesProcessInput,
+  type PaginatedCurrenciesProcessOutput,
   PaginatedCurrenciesSchema,
 } from "./paginated-currencies.schema";
-import type { Database, Currency } from "@danimai/currency/db";
+import type { Database } from "../../db";
 
 export const PAGINATED_CURRENCIES_PROCESS = Symbol("PaginatedCurrencies");
 
 @Process(PAGINATED_CURRENCIES_PROCESS)
 export class PaginatedCurrenciesProcess
-  implements ProcessContract<PaginationResponseType<Currency>> {
+  implements ProcessContract<typeof PaginatedCurrenciesSchema, PaginatedCurrenciesProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
     @InjectLogger()
     private readonly logger: Logger
-  ) {}
+  ) { }
 
   async runOperations(
     @ProcessContext({ schema: PaginatedCurrenciesSchema })
     context: ProcessContextType<typeof PaginatedCurrenciesSchema>
-  ) {
+  ): Promise<PaginatedCurrenciesProcessOutput> {
     const { input } = context;
     const {
       page = 1,
       limit = 10,
       sorting_field = "created_at",
       sorting_direction = SortOrder.DESC,
-    } = input as PaginatedCurrenciesProcessInput;
+    } = input;
 
     let query = this.db
       .selectFrom("currencies")
@@ -50,25 +51,10 @@ export class PaginatedCurrenciesProcess
       .executeTakeFirst();
     const total = Number(countResult?.count ?? 0);
 
-    const sortOrder = sorting_direction === SortOrder.ASC ? "asc" : "desc";
-    const allowedSortFields = [
-      "id",
-      "code",
-      "name",
-      "tax_inclusive_pricing",
-      "created_at",
-      "updated_at",
-    ];
-    const safeSortField = allowedSortFields.includes(sorting_field ?? "")
-      ? sorting_field
-      : "created_at";
-    query = query.orderBy(
-      sql.ref(`currencies.${safeSortField}`),
-      sortOrder
-    );
+    query = query.orderBy(sql.ref(sorting_field), sorting_direction);
 
     const offset = (page - 1) * limit;
     const data = await query.selectAll().limit(limit).offset(offset).execute();
-    return paginationResponse<Currency>(data, total, input as PaginatedCurrenciesProcessInput);
+    return paginationResponse(data, total, input);
   }
 }

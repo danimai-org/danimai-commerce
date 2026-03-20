@@ -1,4 +1,4 @@
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static, type StaticDecode } from "@sinclair/typebox";
 
 /**
  * Danimai-style retrieveCurrency: get a single currency by id.
@@ -7,7 +7,7 @@ export const RetrieveCurrencySchema = Type.Object({
   id: Type.String(),
 });
 
-export type RetrieveCurrencyProcessInput = Static<
+export type RetrieveCurrencyProcessInput = StaticDecode<
   typeof RetrieveCurrencySchema
 >;
 
@@ -20,7 +20,7 @@ export const CurrencyResponseSchema = Type.Object({
   tax_inclusive_pricing: Type.Boolean(),
   metadata: Type.Union([Type.Unknown(), Type.Null()]),
   created_at: Type.Date(),
-  updated_at: Type.Date(),   deleted_at: Type.Union([Type.Date(), Type.Null()]),
+  updated_at: Type.Date(), deleted_at: Type.Union([Type.Date(), Type.Null()]),
 });
 
 export type CurrencyProcessOutput = Static<typeof CurrencyResponseSchema>;

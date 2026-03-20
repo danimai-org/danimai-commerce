@@ -1,6 +1,7 @@
 import {
   InjectDB,
   InjectLogger,
+  NotFoundError,
   Process,
   ProcessContext,
   type ProcessContextType,
@@ -10,10 +11,10 @@ import {
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
-  type RetrieveCurrencyProcessInput,
   RetrieveCurrencySchema,
+  type CurrencyProcessOutput,
 } from "./retrieve-currency.schema";
-import type { Database, Currency } from "@danimai/currency/db";
+import type { Database } from "../../db";
 
 /**
  * Danimai-style retrieveCurrency: retrieve a single currency by id.
@@ -21,18 +22,18 @@ import type { Database, Currency } from "@danimai/currency/db";
 export const RETRIEVE_CURRENCY_PROCESS = Symbol("RetrieveCurrency");
 
 @Process(RETRIEVE_CURRENCY_PROCESS)
-export class RetrieveCurrencyProcess implements ProcessContract<Currency> {
+export class RetrieveCurrencyProcess implements ProcessContract<typeof RetrieveCurrencySchema, CurrencyProcessOutput> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
     @InjectLogger()
     private readonly logger: Logger
-  ) {}
+  ) { }
 
   async runOperations(
     @ProcessContext({ schema: RetrieveCurrencySchema })
     context: ProcessContextType<typeof RetrieveCurrencySchema>
-  ): Promise<Currency> {
+  ): Promise<CurrencyProcessOutput> {
     const { input } = context;
 
     const currency = await this.db
@@ -43,13 +44,7 @@ export class RetrieveCurrencyProcess implements ProcessContract<Currency> {
       .executeTakeFirst();
 
     if (!currency) {
-      throw new ValidationError("Currency not found", [
-        {
-          type: "not_found",
-          message: "Currency not found",
-          path: "id",
-        },
-      ]);
+      throw new NotFoundError(`Currency not found`);
     }
 
     return currency;
