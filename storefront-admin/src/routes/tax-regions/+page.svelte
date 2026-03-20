@@ -5,12 +5,12 @@
 	import {
 		DeleteConfirmationModal,
 		PaginationTable,
-		TaxRegionFormSheet,
 		TableHead,
 		TableBody,
 		TablePagination,
 		type TableColumn
 	} from '$lib/components/organs/index.js';
+	import TaxCreate from '$lib/components/organs/tax-region/create/taxCreate.svelte';
 	import Receipt from '@lucide/svelte/icons/receipt';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import { client } from '$lib/client.js';
@@ -131,7 +131,7 @@ const tableColumns: TableColumn[] = [
 	</div>
 </div>
 
-<TaxRegionFormSheet bind:open={paginateState.formSheetOpen} mode="create" onSuccess={handleFormSaved} />
+<TaxCreate bind:open={paginateState.formSheetOpen} mode="create" onSuccess={handleFormSaved} />
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}

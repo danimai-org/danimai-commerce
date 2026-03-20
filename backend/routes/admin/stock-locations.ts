@@ -1,5 +1,6 @@
 import { Elysia } from "elysia";
-import { StaticDecode, Type } from "@sinclair/typebox";
+import type { StaticDecode } from "@sinclair/typebox";
+import { Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   PAGINATED_STOCK_LOCATIONS_PROCESS,
@@ -22,10 +23,7 @@ import {
   UpdateStockLocationResponseSchema,
   DeleteStockLocationsSchema,
 } from "@danimai/stock-location";
-import {
-  CHECK_LOCATIONS_IN_USE_PROCESS,
-  CheckLocationsInUseProcess,
-} from "@danimai/inventory";
+
 import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
@@ -132,6 +130,28 @@ export const stockLocationRoutes = new Elysia({ prefix: "/stock-locations" })
         tags: ["Stock Locations"],
         summary: "Update a stock location",
         description: "Updates an existing stock location by id",
+      },
+    }
+  )
+  .delete(
+    "/",
+    async ({ body: input, set }) => {
+      const process = getService<DeleteStockLocationsProcess>(DELETE_STOCK_LOCATIONS_PROCESS);
+      await process.runOperations({ input });
+      set.status = 204;
+      return undefined;
+    },
+    {
+      body: DeleteStockLocationsSchema,
+      response: {
+        204: NoContentResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Stock Locations"],
+        summary: "Delete stock locations",
+        description: "Deletes stock locations by id",
       },
     }
   );

@@ -16,7 +16,6 @@ export const UpdateProductSchema = Type.Object({
   id: Type.String(),
   title: Type.Optional(Type.String()),
   handle: Type.Optional(Type.String()),
-  subtitle: Type.Optional(Type.String()),
   description: Type.Optional(Type.String()),
   is_giftcard: Type.Optional(Type.Boolean()),
   discountable: Type.Optional(Type.Boolean()),

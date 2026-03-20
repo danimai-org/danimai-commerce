@@ -12,7 +12,9 @@
 	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
 	import AttributeGroupHeroCard from '$lib/components/organs/attribute-group/detail/AttributeGroupHeroCard.svelte';
 	import AttributeGroupAttributesCard from '$lib/components/organs/attribute-group/detail/AttributeGroupAttributesCard.svelte';
+	import { ProductListingCard } from '$lib/components/organs/index.js';
 	
+	let selectedIds = $state<Set<string>>(new Set());
 	const groupId = $derived(page.params.id);
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
@@ -89,6 +91,12 @@
 				</div>
 
 				<AttributeGroupAttributesCard group={group} attributes={attributes} />
+				<ProductListingCard
+					title="Products with this Attribute Group"
+					filter={{ attribute_group_ids: [groupId] }}
+					bind:selectedIds={selectedIds}
+					
+				/>
 				<div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
 					<MetadataComponent
 						productId={group?.id ?? null}

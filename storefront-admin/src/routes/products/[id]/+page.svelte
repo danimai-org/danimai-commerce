@@ -16,6 +16,9 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import { loadProductDetail, getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
 	import { resolve } from '$app/paths';
+	import type { PageData } from './$types';
+
+	let { data }: { data: PageData } = $props();
 
 	const productId = $derived(page.params?.id ?? '');
 	// $effect(() => {
@@ -23,7 +26,7 @@
 	// });
 	loadProductDetail(productId);
 	const {
-		data,
+		data: product,
 		error,
 		isPending
 	} = $derived(getProductDetail());
@@ -33,7 +36,7 @@
 </script>
 
 <svelte:head>
-	<title>{data ? `${data.title} | Product` : 'Product'} | Danimai Store</title>
+	<title>{product ? `${product.title} | Product` : 'Product'} | Danimai Store</title>
 	<meta name="description" content="Manage product." />
 </svelte:head>
 
@@ -49,7 +52,7 @@
 				Products
 			</button>
 			<span class="text-muted-foreground">/</span>
-			<span class="font-medium">{data?.title ?? productId ?? '…'}</span>
+			<span class="font-medium">{product?.title ?? productId ?? '…'}</span>
 		</nav>
 	</div>
 
@@ -57,7 +60,7 @@
 		<div class="flex flex-1 items-center justify-center p-6">
 			<p class="text-muted-foreground">Loading…</p>
 		</div>
-	{:else if error || !data}
+	{:else if error || !product}
 		<div class="flex flex-1 flex-col items-center justify-center gap-4 p-6">
 			<p class="text-destructive">{error ?? 'Product not found'}</p>
 			<Button variant="outline" onclick={() => goto(('/products'))}>Back to products</Button>
@@ -69,20 +72,19 @@
 					class="grid gap-6"
 					style="grid-template-columns: 1fr 24rem; grid-auto-rows: minmax(0, auto); align-items: start;"
 				>
-					<!-- Product card (row 1) -->
-					<ProductHero />
+				
+					<ProductHero productUpdateForm={data.productUpdateForm} />
 
 					<!-- Right: Status, Visibility, Organisation, Sales Channels, Attributes, Shipping -->
 					<div class="row-span-2 flex w-80 flex-col gap-6 self-start">
 						<ProductStatus/>
-						<ProductOrganisation/>
-						<ProductSalesChannel/>
-						<ProductAttribute/>
+						<ProductOrganisation productOrganisationForm={data.productOrganisationForm} />
+						<ProductSalesChannel />
+						<ProductAttribute productAttributesForm={data.productAttributesForm} />
 					</div>
 
 					<!-- Media + Options (row 2, column 1) --> 
 					<div class="flex min-w-0 flex-col gap-6">
-						<!-- Media card -->
 						<div class="rounded-lg border bg-card p-6 shadow-sm">
 							<div class="flex items-center justify-between">
 								<h2 class="font-semibold">Media</h2>
@@ -96,10 +98,10 @@
 									<Pencil class="size-4" />
 								</Button>
 							</div>
-							{#if data.title}
+							{#if product.title}
 								<div class="mt-4">
 									<img
-										src={data.title}
+										src={product.title}
 										alt="Product"
 										class="size-24 rounded-md border object-cover"
 									/>
@@ -120,11 +122,11 @@
 						<!-- Metadata / JSON -->
 						<div class="grid gap-4 sm:grid-cols-2">
 							<MetadataComponent
-								productId={data?.id}
-								metadata={data?.metadata ?? {}}
+								productId={product?.id}
+								metadata={product?.metadata ?? {}}
 								onSaved={() => {}}
 							/>
-							<JSONComponent product={data} options={[]} variants={[]} category={null} />
+							<JSONComponent product={product} options={[]} variants={[]} category={null} />
 						</div>
 					</div>
 				</div>

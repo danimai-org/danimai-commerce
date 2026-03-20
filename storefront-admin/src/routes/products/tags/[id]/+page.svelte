@@ -145,10 +145,29 @@
 				</div>
 
 				<ProductListingCard
-    title="Tagged Products"
-    filter={{ tag_id: tagId }} 
-    bind:selectedIds={selectedIds}
-/>
+					title="Tagged Products"
+					filter={{ tag_ids: [tagId] }}
+					pickerFilter={{}}
+					bind:selectedIds={selectedIds}
+					onAddProducts={async (ids) => {
+						const res = await (client as any)['product-tags']({ id: tagId }).products.post({
+							product_ids: ids
+						});
+						if (res.error) {
+							const err = res.error as { value?: { message?: string } };
+							throw new Error(err?.value?.message ?? String(res.error));
+						}
+					}}
+					onRemoveProducts={async (ids) => {
+						const res = await (client as any)['product-tags']({ id: tagId }).products.delete({
+							product_ids: ids
+						});
+						if (res.error) {
+							const err = res.error as { value?: { message?: string } };
+							throw new Error(err?.value?.message ?? String(res.error));
+						}
+					}}
+				/>
 
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent productId={(tag?.id as string | undefined) ?? null} metadata={tag?.metadata as Record<string, unknown> | null} onSaved={() => void loadTag()} />

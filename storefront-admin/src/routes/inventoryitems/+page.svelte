@@ -1,11 +1,11 @@
 <script lang="ts">
+	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import {
+		CreateInventoryItemSheet,
 		DeleteConfirmationModal,
 		PaginationTable,
 		TableHead,
@@ -15,60 +15,50 @@
 	} from '$lib/components/organs/index.js';
 	import Package from '@lucide/svelte/icons/package';
 	import { client } from '$lib/client.js';
+	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 
-	type InventoryItem = {
-		id: string;
-		sku: string | null;
-		requires_shipping: boolean;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	type PaginationMeta = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
+	let { data }: { data: PageData } = $props();
 
 	const pageNum = $derived(Math.max(1, parseInt(page.url.searchParams.get('page') ?? '1', 10) || 1));
 	const pageLimit = $derived(Math.max(1, Math.min(100, parseInt(page.url.searchParams.get('limit') ?? '10', 10) || 10)));
 
+	type ListPayload = { data: { rows: any[]; pagination: PaginationMeta | null } };
+
 	const listQuery = createQuery(() => ({
 		queryKey: ['inventory-items', String(pageNum), String(pageLimit)],
-		queryFn: async (): Promise<{ data: { rows: InventoryItem[]; pagination: PaginationMeta } } | null> => {
+		queryFn: async (): Promise<ListPayload> => {
 			const res = await client.inventory.items.get({
 				query: { page: pageNum, limit: pageLimit } as Record<string, string | number>
 			});
 			if (res?.error) {
 				throw new Error(String(res?.error?.value?.message ?? 'Failed to fetch inventory items'));
 			}
-			return (res.data ?? null) as unknown as { data: { rows: InventoryItem[]; pagination: PaginationMeta } } | null;
+			const raw = res?.data as Record<string, unknown> | null | undefined;
+			if (!raw) {
+				return { data: { rows: [], pagination: null } };
+			}
+			const inner = raw.data as { rows?: any[]; pagination?: PaginationMeta } | undefined;
+			const rows = (inner?.rows ?? raw.rows ?? []) as any[];
+			const pagination = (inner?.pagination ?? raw.pagination ?? null) as PaginationMeta | null;
+			return { data: { rows, pagination } };
 		}
 	}));
 
-	const loading = $derived(listQuery.isPending);
+	// isPending alone stays true when the query is disabled (e.g. SSR: global enabled: browser), which never clears.
+	const loading = $derived(listQuery.isPending && listQuery.isFetching);
 	const error = $derived(
 		listQuery.error != null ? (listQuery.error instanceof Error ? listQuery.error.message : String(listQuery.error)) : null
 	);
-	const rows = $derived((listQuery.data?.data?.rows ?? []) as InventoryItem[]);
+	const rows = $derived((listQuery.data?.data?.rows ?? []) as any[]);
 	const pagination = $derived((listQuery.data?.data?.pagination ?? null) as PaginationMeta | null);
 	const start = $derived(pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0);
 	const end = $derived(pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0);
 
 	let createSheetOpen = $state(false);
-	let createSku = $state('');
-	let createRequiresShipping = $state(true);
-	let createSubmitting = $state(false);
-	let createError = $state<string | null>(null);
 	let deleteConfirmOpen = $state(false);
 	let deleteSubmitting = $state(false);
 	let deleteError = $state<string | null>(null);
-	let deleteItem = $state<InventoryItem | null>(null);
+	let deleteItem = $state<any | null>(null);
 
 	function goToPage(pageNum: number) {
 		const params = new URLSearchParams(page.url.searchParams);
@@ -77,39 +67,10 @@
 	}
 
 	function openCreateSheet() {
-		createSku = '';
-		createRequiresShipping = true;
-		createError = null;
 		createSheetOpen = true;
 	}
 
-	function closeCreateSheet() {
-		if (!createSubmitting) createSheetOpen = false;
-	}
-
-	async function submitCreate() {
-		createError = null;
-		createSubmitting = true;
-		try {
-			const res = await client.inventory.items.post({
-				inventory_items: [{
-					sku: createSku.trim() || null,
-					requires_shipping: createRequiresShipping
-				}]
-			});
-			if (res?.error) {
-				throw new Error(String(res?.error?.value?.message ?? 'Failed to create inventory item'));
-			}
-			closeCreateSheet();
-			listQuery.refetch();
-		} catch (e) {
-			createError = e instanceof Error ? e.message : String(e);
-		} finally {
-			createSubmitting = false;
-		}
-	}
-
-	function openDeleteConfirm(item: InventoryItem) {
+	function openDeleteConfirm(item: any) {
 		deleteItem = item;
 		deleteError = null;
 		deleteConfirmOpen = true;
@@ -129,7 +90,7 @@
 		deleteError = null;
 		try {
 			const res = await client.inventory.items.delete({
-				inventory_item_ids: [deleteItem.id]
+				ids: [deleteItem.id]
 			});
 			if (res?.error) {
 				throw new Error(String(res?.error?.value?.message ?? 'Failed to delete inventory item'));
@@ -153,7 +114,7 @@
 	}
 
 	const rowsForTable = $derived(
-		(rows as InventoryItem[]).map((item) => ({
+		(rows as any[]).map((item) => ({
 			...item,
 			created_at_display: formatDate(item.created_at),
 			updated_at_display: formatDate(item.updated_at),
@@ -181,13 +142,13 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => goto(`/inventoryitems/${(item as InventoryItem).id}`)
+					onClick: (item) => goto(`/inventoryitems/${(item as any).id}`)
 				},
 				{
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => openDeleteConfirm(item as InventoryItem)
+					onClick: (item) => openDeleteConfirm(item as any)
 				}
 			]
 		}
@@ -242,65 +203,17 @@
 	</div>
 </div>
 
-<Sheet.Root bind:open={createSheetOpen}>
-	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-		<form
-			class="flex h-full flex-col"
-			onsubmit={(e) => {
-				e.preventDefault();
-				submitCreate();
-			}}
-		>
-			<div class="flex-1 overflow-auto p-6 pt-12">
-				<h2 class="text-lg font-semibold">Create inventory item</h2>
-				<p class="mt-1 text-sm text-muted-foreground">
-					Add a new inventory item by SKU and shipping options.
-				</p>
-				<div class="mt-6 flex flex-col gap-4">
-					<div class="flex flex-col gap-2">
-						<label for="create-sku" class="text-sm font-medium">SKU</label>
-						<Input
-							id="create-sku"
-							type="text"
-							placeholder="Optional"
-							bind:value={createSku}
-							class="w-full"
-						/>
-					</div>
-					<div class="flex items-center gap-2">
-						<input
-							type="checkbox"
-							id="create-requires-shipping"
-							bind:checked={createRequiresShipping}
-							class="size-4 rounded border-input"
-						/>
-						<label for="create-requires-shipping" class="text-sm font-medium">Requires shipping</label>
-					</div>
-					{#if createError}
-						<div
-							class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-						>
-							{createError}
-						</div>
-					{/if}
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button type="button" variant="outline" onclick={closeCreateSheet} disabled={createSubmitting}>
-					Cancel
-				</Button>
-				<Button type="submit" disabled={createSubmitting}>
-					{createSubmitting ? 'Creating…' : 'Create'}
-				</Button>
-			</div>
-		</form>
-	</Sheet.Content>
-</Sheet.Root>
+<CreateInventoryItemSheet
+	bind:open={createSheetOpen}
+	onSuccess={() => {
+		void listQuery.refetch();
+	}}
+/>
 
 <DeleteConfirmationModal
 	bind:open={deleteConfirmOpen}
 	entityName="inventory item"
-	entityTitle={(deleteItem as InventoryItem | null)?.sku ?? (deleteItem as InventoryItem | null)?.id ?? ''}
+	entityTitle={(deleteItem as any | null)?.sku ?? (deleteItem as any | null)?.id ?? ''}
 	onConfirm={confirmDeleteItem}
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}

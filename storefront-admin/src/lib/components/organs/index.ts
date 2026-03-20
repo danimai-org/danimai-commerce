@@ -4,7 +4,7 @@ export { default as SalesChannelFormSheet } from './sales-channel/create/CreateS
 export { default as RoleFormSheet } from './role/Create/roleCreate.svelte';
 export { default as CustomerFormSheet } from './customer-form-sheet/customer-form-sheet.svelte';
 export { default as CustomerAddressFormSheet } from './customer-address-form-sheet/customer-address-form-sheet.svelte';
-export { default as LocationFormSheet } from './location-form-sheet/location-form-sheet.svelte';
+export { default as LocationFormSheet } from './location/create/CreateLocation.svelte';
 export { default as CategoryFormSheet } from './category/create/categoryCreate.svelte';
 export { default as CollectionFormSheet } from './collection/create/collectionCreate.svelte';
 export { default as TagFormSheet } from './tag/create/tag-form-sheet.svelte';
@@ -42,3 +42,4 @@ export * from './product/detail/index.js';
 export * from './product/create/types.js';
 export type { Product, PaginationMeta } from './product/create/types.js';
 export * from './tax-region/detail/index.js';
+export { default as CreateInventoryItemSheet } from './inventoryitems/create/CreateInventoryItemSheet.svelte';

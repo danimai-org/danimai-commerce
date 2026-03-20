@@ -3,7 +3,22 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import ProductOrganisationSheet from './ProductOrganisationSheet.svelte';
 	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
-const product = $derived(getProductDetail()?.data?? null);
+	import type { SuperValidated } from 'sveltekit-superforms';
+
+	type ProductOrganisationFormData = {
+		id: string;
+		category_id: string;
+		collection_ids: string[];
+		tag_ids: string[];
+	};
+
+	let {
+		productOrganisationForm
+	}: {
+		productOrganisationForm: SuperValidated<ProductOrganisationFormData>;
+	} = $props();
+
+	const product = $derived(getProductDetail()?.data ?? null);
 
 	let orgSheetOpen = $state(false);
 </script>
@@ -51,4 +66,8 @@ const product = $derived(getProductDetail()?.data?? null);
 	</dl>
 </div>
 
-<ProductOrganisationSheet bind:open={orgSheetOpen} />
+<ProductOrganisationSheet
+	bind:open={orgSheetOpen}
+	{productOrganisationForm}
+	onSaved={() => void getProductDetail()?.refetch?.()}
+/>

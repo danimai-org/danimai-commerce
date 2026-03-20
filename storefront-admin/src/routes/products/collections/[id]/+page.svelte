@@ -124,8 +124,27 @@
 
 				<ProductListingCard
 					title="Collection Products"
-					filter={{ collection_id: collectionId }}
+					filter={{ collection_ids: [collectionId] }}
+					pickerFilter={{}}
 					bind:selectedIds
+					onAddProducts={async (ids) => {
+						const res = await client['collections']({ id: collectionId }).products.put({
+							products: { add: ids, remove: [] }
+						});
+						if (res.error) {
+							const err = res.error as { value?: { message?: string } };
+							throw new Error(err?.value?.message ?? String(res.error));
+						}
+					}}
+					onRemoveProducts={async (ids) => {
+						const res = await client['collections']({ id: collectionId }).products.put({
+							products: { add: [], remove: ids }
+						});
+						if (res.error) {
+							const err = res.error as { value?: { message?: string } };
+							throw new Error(err?.value?.message ?? String(res.error));
+						}
+					}}
 				/>
 
 				<div class="grid gap-4 sm:grid-cols-2">

@@ -3,7 +3,23 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import EditProductSheet from './EditProductSheet.svelte';
 	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
+	import type { SuperValidated } from 'sveltekit-superforms';
 
+	type ProductUpdateFormData = {
+		id: string;
+		status: 'draft' | 'proposed' | 'published' | 'rejected';
+		title: string;
+		subtitle: string;
+		handle: string;
+		description: string;
+		discountable: boolean;
+	};
+
+	let {
+		productUpdateForm
+	}: {
+		productUpdateForm: SuperValidated<ProductUpdateFormData>;
+	} = $props();
 
 	const product = $derived(getProductDetail()?.data?? null);
 
@@ -54,4 +70,8 @@
 	</div>
 </div>
 
-<EditProductSheet bind:open={editSheetOpen} />
+<EditProductSheet
+	bind:open={editSheetOpen}
+	{productUpdateForm}
+	onSaved={() => void getProductDetail()?.refetch?.()}
+/>

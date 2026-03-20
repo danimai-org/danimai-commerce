@@ -7,36 +7,33 @@ import {
   type ProcessContract,
 } from "@danimai/core";
 import { Kysely } from "kysely";
-import {
-  UpdateCollectionProductsSchema,
-} from "./update-collection-products.schema";
+import { UpdateProductTagProductsSchema } from "./update-product-tag-products.schema";
 import type { Database } from "../../../db/type";
 
-export const UPDATE_COLLECTION_PRODUCTS_PROCESS = Symbol(
-  "UpdateCollectionProducts"
-);
+export const UPDATE_PRODUCT_TAG_PRODUCTS_PROCESS = Symbol("UpdateProductTagProducts");
 
-@Process(UPDATE_COLLECTION_PRODUCTS_PROCESS)
-export class UpdateCollectionProductsProcess
-  implements ProcessContract<typeof UpdateCollectionProductsSchema, void> {
+@Process(UPDATE_PRODUCT_TAG_PRODUCTS_PROCESS)
+export class UpdateProductTagProductsProcess
+  implements ProcessContract<typeof UpdateProductTagProductsSchema, void> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>
   ) { }
 
   async runOperations(@ProcessContext({
-    schema: UpdateCollectionProductsSchema,
-  }) context: ProcessContextType<typeof UpdateCollectionProductsSchema>) {
+    schema: UpdateProductTagProductsSchema,
+  }) context: ProcessContextType<typeof UpdateProductTagProductsSchema>) {
     const { input } = context;
-    const collection = await this.db.selectFrom("product_collections")
-      .where("id", "=", input.collection_id)
+    const tag = await this.db.selectFrom("product_tags")
+      .where("id", "=", input.product_tag_id)
       .where("deleted_at", "is", null)
       .selectAll()
       .executeTakeFirst();
 
-    if (!collection) {
-      throw new NotFoundError("Collection not found");
+    if (!tag) {
+      throw new NotFoundError("Product tag not found");
     }
+
     const uniqueProductIds = new Set([...input.products.add, ...input.products.remove]);
 
     if (uniqueProductIds.size === 0) {
@@ -56,27 +53,23 @@ export class UpdateCollectionProductsProcess
 
     if (input.products.add.length > 0) {
       await this.db
-        .insertInto("product_collection_relations")
+        .insertInto("product_tag_relations")
         .values(
           input.products.add.map((product_id) => ({
             product_id,
-            product_collection_id: collection.id,
+            product_tag_id: tag.id,
           }))
         )
-        .onConflict((oc) => oc.columns([
-          "product_id",
-          "product_collection_id",
-        ]).doNothing())
+        .onConflict((oc) => oc.columns(["product_id", "product_tag_id"]).doNothing())
         .execute();
     }
 
     if (input.products.remove.length > 0) {
       await this.db
-        .deleteFrom("product_collection_relations")
+        .deleteFrom("product_tag_relations")
+        .where("product_tag_id", "=", tag.id)
         .where("product_id", "in", input.products.remove)
-        .where("product_collection_id", "=", collection.id)
         .execute();
     }
   }
-
 }

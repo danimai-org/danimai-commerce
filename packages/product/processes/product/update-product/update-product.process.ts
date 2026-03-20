@@ -158,9 +158,6 @@ export class UpdateProductProcess
       updateData.handle = handle;
     }
 
-    if (input.subtitle !== undefined) {
-      updateData.subtitle = input.subtitle ?? null;
-    }
 
     if (input.description !== undefined) {
       updateData.description = input.description ?? null;

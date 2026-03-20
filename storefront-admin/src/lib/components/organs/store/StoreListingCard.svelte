@@ -123,6 +123,9 @@
 				<tr>
 					<th class="px-4 py-3 font-medium">Name</th>
 					<th class="px-4 py-3 font-medium">Default currency</th>
+					<th class="px-4 py-3 font-medium">Default region</th>
+					<th class="px-4 py-3 font-medium">Default sales channel</th>
+					<th class="px-4 py-3 font-medium">Default location</th>
 					<th class="px-4 py-3 font-medium">Actions</th>
 				</tr>
 			</thead>
@@ -147,6 +150,9 @@
 							<td class="px-4 py-3 font-medium">{row.name}</td>
 							<td class="px-4 py-3 text-muted-foreground">
 								{row.default_currency_code ?? '—'}
+							</td>
+							<td class="px-4 py-3 text-muted-foreground">
+								{row.default_region_id ?? '—'}
 							</td>
 							<td class="px-4 py-3">
 								<DropdownMenu.Root>

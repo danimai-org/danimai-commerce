@@ -6,10 +6,12 @@ import {
   UPDATE_PRODUCT_TAG_PROCESS,
   DELETE_PRODUCT_TAGS_PROCESS,
   PAGINATED_PRODUCT_TAGS_PROCESS,
+  UPDATE_PRODUCT_TAG_PRODUCTS_PROCESS,
   CreateProductTagsProcess,
   UpdateProductTagProcess,
   DeleteProductTagsProcess,
   PaginatedProductTagsProcess,
+  UpdateProductTagProductsProcess,
   PaginatedProductTagsSchema,
   PaginatedProductTagsResponseSchema,
   RETRIEVE_PRODUCT_TAG_PROCESS,
@@ -20,6 +22,7 @@ import {
   UpdateProductTagBodySchema,
   UpdateProductTagResponseSchema,
   DeleteProductTagsSchema,
+  UpdateProductTagProductsBodySchema,
 } from "@danimai/product";
 import { handleProcessError } from "../../utils/error-handler";
 import {
@@ -112,6 +115,68 @@ export const productTagRoutes = new Elysia({ prefix: "/product-tags" })
         tags: ["Product Tags"],
         summary: "Update a product tag",
         description: "Updates an existing product tag by ID",
+      },
+    }
+  )
+  .post(
+    "/:id/products",
+    async ({ params, body, set }) => {
+      const process = getService<UpdateProductTagProductsProcess>(
+        UPDATE_PRODUCT_TAG_PRODUCTS_PROCESS
+      );
+      await process.runOperations({
+        input: {
+          product_tag_id: params.id,
+          products: { add: body.product_ids, remove: [] },
+        },
+      });
+      set.status = 204;
+      return undefined;
+    },
+    {
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateProductTagProductsBodySchema,
+      response: {
+        204: NoContentResponseSchema,
+        404: NotFoundResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Product Tags"],
+        summary: "Add products to a tag",
+        description: "Links products to a product tag",
+      },
+    }
+  )
+  .delete(
+    "/:id/products",
+    async ({ params, body, set }) => {
+      const process = getService<UpdateProductTagProductsProcess>(
+        UPDATE_PRODUCT_TAG_PRODUCTS_PROCESS
+      );
+      await process.runOperations({
+        input: {
+          product_tag_id: params.id,
+          products: { add: [], remove: body.product_ids },
+        },
+      });
+      set.status = 204;
+      return undefined;
+    },
+    {
+      params: Type.Object({ id: Type.String() }),
+      body: UpdateProductTagProductsBodySchema,
+      response: {
+        204: NoContentResponseSchema,
+        404: NotFoundResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Product Tags"],
+        summary: "Remove products from a tag",
+        description: "Unlinks products from a product tag",
       },
     }
   )

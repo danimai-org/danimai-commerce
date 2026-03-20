@@ -54,6 +54,7 @@ export const CreateProductSchema = Type.Object({
   variants: Type.Optional(Type.Array(ProductVariantSchema)),
   sales_channel_ids: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
   tag_ids: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
+  collection_ids: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
   shipping_profile_id: Type.Optional(Type.String({ format: "uuid" })),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
   attributes: Type.Optional(Type.Array(AttributeValueSchema, { uniqueItems: true })),

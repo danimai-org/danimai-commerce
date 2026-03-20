@@ -77,14 +77,14 @@ export class PaginatedStockLocationsProcess
         "stock_locations.deleted_at",
         (eb) => sql<Static<typeof StockLocationAddressSchema>>`
         jsonb_build_object(
-          'address_1', 'stock_location_addresses.address_1',
-          'address_2', 'stock_location_addresses.address_2',
-          'company', 'stock_location_addresses.company',
-          'city', 'stock_location_addresses.city',
-          'province', 'stock_location_addresses.province',
-          'postal_code', 'stock_location_addresses.postal_code',
-          'country_code', 'stock_location_addresses.country_code',
-          'phone', 'stock_location_addresses.phone',
+          'address_1', stock_location_addresses.address_1,
+          'address_2', stock_location_addresses.address_2,
+          'company', stock_location_addresses.company,
+          'city', stock_location_addresses.city,
+          'province', stock_location_addresses.province,
+          'postal_code', stock_location_addresses.postal_code,
+          'country_code', stock_location_addresses.country_code,
+          'phone', stock_location_addresses.phone
         )`.as("address"),
       ])
       .limit(limit)

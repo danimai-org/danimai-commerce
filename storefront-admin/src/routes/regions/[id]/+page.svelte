@@ -9,6 +9,8 @@
 	import EditRegion from '$lib/components/organs/region/update/edit-region.svelte';
 	import RegionHeroCard from '$lib/components/organs/region/detail/RegionHeroCard.svelte';
 	import RegionCountriesCard from '$lib/components/organs/region/detail/RegionCountriesCard.svelte';
+	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
+	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 
 
 	const regionId = $derived(page.params?.id ?? '');
@@ -75,7 +77,7 @@
 		deleteSubmitting = true;
 		deleteError = null;
 		try {
-			await client.regions.delete({ region_ids: [region.id] });
+			await client.regions.delete({ ids: [region.id] });
 			deleteConfirmOpen = false;
 			goto('/regions');
 		} catch (e) {
@@ -126,6 +128,11 @@
 			<div class="flex flex-col gap-6 p-6">
 				<RegionHeroCard {region} onEdit={openEdit} onDelete={openDelete} />
 				<RegionCountriesCard regionId={region.id} />
+				<div class="grid gap-4 sm:grid-cols-2">
+					<JSONComponent product={region} options={[]} variants={[]} category={null} />
+					<MetadataComponent
+						productId={region?.id ?? null} metadata={region?.metadata as Record<string, unknown> | null} onSaved={loadRegion} />
+				</div>
 			</div>
 		</div>
 	{/if}

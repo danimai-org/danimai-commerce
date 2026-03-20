@@ -88,10 +88,10 @@
 
 				
 				<ProductListingCard
-    title="Products with this Attribute"
-    filter={{ attribute_id: attributeId }} 
-    bind:selectedIds={selectedIds}
-/>
+              title="Products with this Attribute"
+             filter={{ attribute_ids: [attributeId] }} 
+              bind:selectedIds={selectedIds}
+              />
 
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent productId={attribute?.id ?? null} metadata={attribute?.metadata ?? {}} onSaved={refetchAttributeData} />

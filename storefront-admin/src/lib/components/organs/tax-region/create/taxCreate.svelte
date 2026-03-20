@@ -5,9 +5,9 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { cn } from '$lib/utils.js';
 	import Info from '@lucide/svelte/icons/info';
+	import { Combobox } from '$lib/components/organs/index.js';
 
 	const COUNTRY_OPTIONS = [
-		{ value: '', label: 'Select country' },
 		{ value: 'India', label: 'India' },
 		{ value: 'United States', label: 'United States' },
 		{ value: 'United Kingdom', label: 'United Kingdom' },
@@ -24,7 +24,13 @@
 		{ value: 'Singapore', label: 'Singapore' }
 	];
 
-	const TAX_PROVIDER_OPTIONS = [{ value: '', label: 'Select provider' }];
+	const TAX_PROVIDER_OPTIONS = [
+		{ id: 'manual', value: 'Manual' },
+		{ id: 'stripe', value: 'Stripe' },
+		{ id: 'paypal', value: 'PayPal' },
+		{ id: 'shopify', value: 'Shopify' },
+		{ id: 'shopify-pay', value: 'Shopify Pay' },
+	];
 
 	let {
 		open = $bindable(false),
@@ -109,38 +115,30 @@
 				<div class="mt-6 grid grid-cols-2 gap-4">
 					<div class="flex flex-col gap-2">
 						<label for="tr-country" class="text-sm font-medium">Country</label>
-						<select
+						<Combobox
 							id="tr-country"
-							bind:value={selectedCountry}
-							aria-invalid={$errors.name ? 'true' : undefined}
+							bind:value={selectedCountry}	
 							class={cn(
 								'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
 								$errors.name && 'border-destructive'
 							)}
-						>
-							{#each COUNTRY_OPTIONS as opt}
-								<option value={opt.value}>{opt.label}</option>
-							{/each}
-						</select>
+							options={COUNTRY_OPTIONS.map((opt) => ({ id: opt.value, value: opt.label }))}
+						/>
 						{#if $errors.name}
 							<span class="text-xs text-destructive">{$errors.name}</span>
 						{/if}
 					</div>
 					<div class="flex flex-col gap-2">
 						<label for="tr-tax-provider" class="text-sm font-medium">Tax provider</label>
-						<select
+						<Combobox
 							id="tr-tax-provider"
 							bind:value={selectedTaxProvider}
-							aria-invalid={$errors.tax_provider_id ? 'true' : undefined}
 							class={cn(
 								'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
 								$errors.tax_provider_id && 'border-destructive'
 							)}
-						>
-							{#each TAX_PROVIDER_OPTIONS as opt}
-								<option value={opt.value}>{opt.label}</option>
-							{/each}
-						</select>
+							options={TAX_PROVIDER_OPTIONS.map((opt) => ({ id: opt.id, value: opt.value }))}
+						/>
 						{#if $errors.tax_provider_id}
 							<span class="text-xs text-destructive">{$errors.tax_provider_id}</span>
 						{/if}

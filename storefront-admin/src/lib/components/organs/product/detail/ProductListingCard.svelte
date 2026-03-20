@@ -6,8 +6,10 @@
 	import { client } from '$lib/client.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { cn } from '$lib/utils.js';
 	import type { PaginationMeta, Product } from '../create/types.js';
+	import ProductListingCardPicker from './ProductListingCard.svelte';
 
 	type ProductFilter = Record<string, string | number | boolean | string[] | null | undefined>;
 	interface Props {
@@ -15,14 +17,34 @@
 		selectedIds?: Set<string>;
 		title?: string;
 		emptyText?: string;
+		embedded?: boolean;
+		pickerFilter?: ProductFilter;
+		addSheetTitle?: string;
+		addSheetDescription?: string;
+		onAddProducts?: (ids: string[]) => void | Promise<void>;
+		onRemoveProducts?: (ids: string[]) => void | Promise<void>;
 	}
 
 	let {
 		filter = {},
 		selectedIds = $bindable(new Set<string>()),
 		title = 'Products',
-		emptyText = 'No products to show.'
+		emptyText = 'No products to show.',
+		embedded = false,
+		pickerFilter,
+		addSheetTitle = 'Add products',
+		addSheetDescription = 'Select products to add.',
+		onAddProducts,
+		onRemoveProducts
 	}: Props = $props();
+
+	let addSheetOpen = $state(false);
+	let sheetSelectedIds = $state(new Set<string>());
+	let sheetError = $state<string | null>(null);
+	let addSubmitting = $state(false);
+	let removeSubmitting = $state(false);
+	let removeError = $state<string | null>(null);
+	let listVersion = $state(0);
 
 	let rows = $state<Product[]>([]);
 	let pagination = $state<PaginationMeta | null>(null);
@@ -64,6 +86,15 @@
 	});
 
 	const filterKey = $derived.by(() => JSON.stringify(normalizedFilter));
+	const isAttributeOrAttributeGroupListing = $derived.by(() => {
+		const f = normalizedFilter;
+		const attrId = typeof f.attribute_id === 'string' && f.attribute_id.trim().length > 0;
+		const attrIds = Array.isArray(f.attribute_ids) && f.attribute_ids.length > 0;
+		const groupId =
+			typeof f.attribute_group_id === 'string' && f.attribute_group_id.trim().length > 0;
+		const groupIds = Array.isArray(f.attribute_group_ids) && f.attribute_group_ids.length > 0;
+		return attrId || attrIds || groupId || groupIds;
+	});
 	const count = $derived(pagination?.total ?? 0);
 	const totalPages = $derived(Math.max(1, pagination?.total_pages ?? 1));
 	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
@@ -77,6 +108,7 @@
 
 	$effect(() => {
 		filterKey;
+		listVersion;
 		pageNum;
 		limit;
 		search;
@@ -94,8 +126,8 @@
 					limit,
 					search: search.trim() || undefined,
 					sorting_field: 'created_at',
-					sorting_direction: 'desc'
-				} as Record<string, string | number | boolean | string[] | undefined>
+					filters: filter ?? undefined
+				}
 			});
 			const payload = res.data as
 				| {
@@ -194,34 +226,120 @@
 
 		return next;
 	}
+
+	function openAddSheet() {
+		addSheetOpen = true;
+		sheetSelectedIds = new Set();
+		sheetError = null;
+	}
+
+	async function submitAddSelected() {
+		if (!onAddProducts) return;
+		if (sheetSelectedIds.size === 0) {
+			sheetError = 'Select at least one product.';
+			return;
+		}
+		sheetError = null;
+		addSubmitting = true;
+		try {
+			await onAddProducts(Array.from(sheetSelectedIds));
+			listVersion++;
+			addSheetOpen = false;
+			sheetSelectedIds = new Set();
+		} catch (e) {
+			sheetError = e instanceof Error ? e.message : String(e);
+		} finally {
+			addSubmitting = false;
+		}
+	}
+
+	const selectedCount = $derived(selectedIds.size);
+
+	async function submitRemoveSelected() {
+		if (!onRemoveProducts || selectedCount === 0) return;
+		removeSubmitting = true;
+		removeError = null;
+		try {
+			const ids = Array.from(selectedIds);
+			await onRemoveProducts(ids);
+			selectedIds = new Set();
+			listVersion++;
+		} catch (e) {
+			removeError = e instanceof Error ? e.message : String(e);
+		} finally {
+			removeSubmitting = false;
+		}
+	}
 </script>
 
-<div class="rounded-lg border bg-card shadow-sm">
-	<div class="flex items-center justify-between gap-4 border-b p-4">
-		<h2 class="font-semibold">{title}</h2>
-		<div class="flex items-center gap-2">
-			<Button size="sm">Add</Button>
-			<Button size="sm" variant="outline">
-				<SlidersHorizontal class="mr-2 size-4" />
-				Sort
-			</Button>
-			<div class="relative">
-				<Search
-					class="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-				/>
-				<Input class="h-9 w-56 pl-8" placeholder="Search" bind:value={search} />
+{#snippet listingInner()}
+	<div
+		class={cn(
+			'flex flex-col gap-2',
+			!embedded && 'border-b p-4',
+			embedded && 'border-b px-2 py-3 sm:px-4'
+		)}
+	>
+		<div
+			class={cn(
+				'flex flex-wrap items-center justify-between gap-4',
+				embedded && 'gap-2'
+			)}
+		>
+			{#if !embedded && title.trim().length > 0}
+				<h2 class="font-semibold">{title}</h2>
+			{:else if embedded && title.trim().length > 0}
+				<h3 class="text-sm font-medium text-muted-foreground">{title}</h3>
+			{:else}
+				<span class="min-w-0 flex-1"></span>
+			{/if}
+			<div class="flex flex-wrap items-center gap-2">
+				{#if !embedded && onRemoveProducts && selectedCount > 0}
+					<Button
+						type="button"
+						size="sm"
+						variant="destructive"
+						disabled={removeSubmitting}
+						onclick={submitRemoveSelected}
+					>
+						{removeSubmitting
+							? 'Removing…'
+							: `Remove${selectedCount > 1 ? ` (${selectedCount})` : ''}`}
+					</Button>
+				{/if}
+				{#if !embedded && !isAttributeOrAttributeGroupListing}
+					<Button type="button" size="sm" onclick={openAddSheet}>Add</Button>
+				{/if}
+				<Button size="sm" variant="outline">
+					<SlidersHorizontal class="mr-2 size-4" />
+					Sort
+				</Button>
+				<div class="relative">
+					<Search
+						class="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+					/>
+					<Input class="h-9 w-56 pl-8" placeholder="Search" bind:value={search} />
+				</div>
+				<Button size="icon" variant="outline" class="size-9">
+					<SlidersHorizontal class="size-4" />
+				</Button>
 			</div>
-			<Button size="icon" variant="outline" class="size-9">
-				<SlidersHorizontal class="size-4" />
-			</Button>
 		</div>
+		{#if removeError}
+			<p class="text-sm text-destructive">{removeError}</p>
+		{/if}
 	</div>
 
-	<div class="overflow-auto p-4">
+	<div
+		class={cn(
+			'min-h-0 overflow-y-auto pl-6 pr-4',
+			embedded ? 'flex-1 px-2 py-2 sm:px-4' : 'max-h-[min(55vh,28rem)]'
+		)}
+	>
 		<table class="w-full text-sm">
-			<thead class="border-b bg-muted/20 text-left">
+			<thead class="sticky top-0 z-10 border-b bg-muted/20 text-left backdrop-blur-sm">
 				<tr>
-					<th class="w-10 px-4 py-3">
+					<th class="w-10 ">
 						<input
 							type="checkbox"
 							class="rounded border-muted-foreground/50"
@@ -320,7 +438,12 @@
 	</div>
 
 	{#if count > 0}
-		<div class="flex items-center justify-between gap-4 border-t px-4 py-3">
+		<div
+			class={cn(
+				'flex flex-wrap items-center justify-between gap-4 border-t py-3',
+				embedded ? 'px-2 sm:px-4' : 'px-4'
+			)}
+		>
 			<p class="text-sm text-muted-foreground">{start} - {end} of {count} results</p>
 			<div class="flex items-center gap-2">
 				<Button size="sm" variant="outline" onclick={() => goToPage(pageNum - 1)} disabled={pageNum <= 1}>
@@ -338,5 +461,65 @@
 			</div>
 		</div>
 	{/if}
-</div> 
+{/snippet}
 
+{#if embedded}
+	<div class="flex min-h-0 flex-1 flex-col">
+		{@render listingInner()}
+	</div>
+{:else}
+	<div class="rounded-lg border bg-card shadow-sm">
+		{@render listingInner()}
+	</div>
+
+	{#if !isAttributeOrAttributeGroupListing}
+		<Sheet.Root
+			bind:open={addSheetOpen}
+			onOpenChange={(open: boolean) => {
+				if (!open) {
+					sheetError = null;
+				}
+			}}
+		>
+			<Sheet.Content side="right" class="flex h-full max-h-screen w-full flex-col sm:max-w-4xl">
+				<Sheet.Header class="flex flex-col gap-1.5 border-b px-6 py-4">
+					<Sheet.Title>{addSheetTitle}</Sheet.Title>
+					<Sheet.Description>{addSheetDescription}</Sheet.Description>
+				</Sheet.Header>
+				<div class="flex min-h-0 flex-1 flex-col overflow-hidden">
+					<ProductListingCardPicker
+						embedded
+						filter={pickerFilter ?? {}}
+						bind:selectedIds={sheetSelectedIds}
+						title=""
+						{emptyText}
+					/>
+				</div>
+				{#if sheetError}
+					<p class="px-6 text-sm text-destructive">{sheetError}</p>
+				{/if}
+				<Sheet.Footer class="mt-auto flex flex-wrap justify-end gap-2 border-t p-4">
+					<Button
+						type="button"
+						variant="outline"
+						onclick={() => {
+							addSheetOpen = false;
+							sheetError = null;
+						}}
+					>
+						Close
+					</Button>
+					{#if onAddProducts}
+						<Button
+							type="button"
+							disabled={addSubmitting || sheetSelectedIds.size === 0}
+							onclick={submitAddSelected}
+						>
+							{addSubmitting ? 'Adding…' : 'Add selected'}
+						</Button>
+					{/if}
+				</Sheet.Footer>
+			</Sheet.Content>
+		</Sheet.Root>
+	{/if}
+{/if}

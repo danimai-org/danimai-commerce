@@ -91,8 +91,20 @@
 
 				<ProductListingCard
 					title="Category Products"
-					filter={{ category_id: categoryId }}
+					filter={{ category_ids: [categoryId] }}
+					pickerFilter={{}}
 					bind:selectedIds
+					onAddProducts={async (ids) => {
+						for (const productId of ids) {
+							const res = await client.products({ id: productId }).put({
+								category_id: categoryId
+							} as Record<string, string>);
+							if (res.error) {
+								const err = res.error as { value?: { message?: string } };
+								throw new Error(err?.value?.message ?? String(res.error));
+							}
+						}
+					}}
 				/>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent

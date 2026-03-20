@@ -2,14 +2,29 @@
 	import Search from '@lucide/svelte/icons/search';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { DropdownMenu } from 'bits-ui';
 	import { client } from '$lib/client.js';
 
 	interface Props {
 		regionId: string;
+		onAddCountries?: () => void;
+		/** Increment after mutations to refetch the list. */
+		refreshNonce?: number;
 	}
 
-	let { regionId }: Props = $props();
+	let { regionId, onAddCountries, refreshNonce = 0 }: Props = $props();
+
+	let addCountriesOpen = $state(false);
+
+	function handleAddCountriesClick() {
+		if (onAddCountries) {
+			onAddCountries();
+			return;
+		}
+		addCountriesOpen = true;
+	}
 
 	type CountryRow = { id: string; name: string; code: string };
 	let countries = $state<CountryRow[]>([]);
@@ -17,6 +32,8 @@
 	let error = $state<string | null>(null);
 
 	$effect(() => {
+		regionId;
+		refreshNonce;
 		if (!regionId) {
 			countries = [];
 			error = null;
@@ -92,27 +109,9 @@
 <div class="rounded-lg border bg-card shadow-sm">
 	<div class="flex items-center justify-between gap-4 border-b px-6 py-4">
 		<h2 class="text-lg font-semibold">Countries</h2>
-		<DropdownMenu.Root>
-			<DropdownMenu.Trigger
-				class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
-				aria-label="Country actions"
-			>
-				<MoreHorizontal class="size-4" />
-			</DropdownMenu.Trigger>
-			<DropdownMenu.Portal>
-				<DropdownMenu.Content
-					class="z-50 min-w-32 rounded-xl border bg-popover p-1 text-popover-foreground shadow-md"
-					sideOffset={4}
-				>
-					<DropdownMenu.Item
-						textValue="Add countries"
-						class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-					>
-						Add countries
-					</DropdownMenu.Item>
-				</DropdownMenu.Content>
-			</DropdownMenu.Portal>
-		</DropdownMenu.Root>
+		<Button type="button" variant="outline" size="sm" onclick={handleAddCountriesClick}>
+			Add countries
+		</Button>
 	</div>
 
 	<div class="border-b px-6 py-3">
@@ -121,7 +120,7 @@
 			<Input
 				placeholder="Search countries…"
 				bind:value={searchQuery}
-				class="h-9 pl-9"
+				class="h-9 w-56 pl-9 rounded-md"
 			/>
 		</div>
 	</div>
@@ -197,3 +196,15 @@
 	</div>
 	{/if}
 </div>
+
+<Sheet.Root bind:open={addCountriesOpen}>
+	<Sheet.Content side="right" class="flex w-full flex-col sm:max-w-lg">
+		<Sheet.Header class="flex flex-col gap-1.5 border-b px-6 py-4">
+			<Sheet.Title>Add countries</Sheet.Title>
+			<Sheet.Description>Select countries to assign to this region.</Sheet.Description>
+		</Sheet.Header>
+		<Sheet.Footer class="mt-auto flex justify-end gap-2 border-t p-4">
+			<Button type="button" variant="outline" onclick={() => (addCountriesOpen = false)}>Close</Button>
+		</Sheet.Footer>
+	</Sheet.Content>
+</Sheet.Root>

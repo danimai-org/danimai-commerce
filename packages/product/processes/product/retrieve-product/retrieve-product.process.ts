@@ -131,7 +131,8 @@ export class RetrieveProductProcess
             'id', product_attributes.id, 
             'title', product_attributes.title,
             'type', product_attributes.type,
-            'value', product_attribute_values.value
+            'value', product_attribute_values.value,
+            'attribute_group_id', product_attribute_values.attribute_group_id
           ))::json[]
         END
        `.as('attributes'),

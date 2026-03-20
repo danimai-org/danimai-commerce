@@ -26,6 +26,7 @@ const RetrieveProductAttributeSchema = Type.Object({
   title: Type.String(),
   type: Type.String(),
   value: Type.String(),
+  attribute_group_id: Type.Union([Type.String(), Type.Null()]),
 });
 
 const RetrieveProductTagSchema = Type.Object({

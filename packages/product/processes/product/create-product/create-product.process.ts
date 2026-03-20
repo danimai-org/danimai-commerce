@@ -306,6 +306,20 @@ export class CreateProductProcess
           .onConflict((oc) => oc.doNothing())
           .execute();
       }
+
+      // ── Link product to collections ───────────────────────────────────────────
+      if (input.collection_ids && input.collection_ids.length > 0) {
+        await trx
+          .insertInto("product_collection_relations")
+          .values(
+            input.collection_ids.map((product_collection_id) => ({
+              product_id: product.id,
+              product_collection_id,
+            }))
+          )
+          .onConflict((oc) => oc.doNothing())
+          .execute();
+      }
       if (input.attributes && input.attributes.length > 0) {
         await trx
           .insertInto("product_attribute_values")

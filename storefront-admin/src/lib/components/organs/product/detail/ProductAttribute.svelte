@@ -2,10 +2,26 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
-    import EditAttributesSheet from './EditAttributesSheet.svelte';
+	import EditAttributesSheet from './EditAttributesSheet.svelte';
+	import type { SuperValidated } from 'sveltekit-superforms';
+
+	type ProductAttributesFormData = {
+		id: string;
+		attributes: Array<{
+			attribute_group_id: string;
+			attribute_id: string;
+			value: string;
+		}>;
+	};
+
+	let {
+		productAttributesForm
+	}: {
+		productAttributesForm: SuperValidated<ProductAttributesFormData>;
+	} = $props();
 
 	const attributes = $derived(getProductDetail().data?.attributes ?? []);
-		
+
 	let editAttributesSheetOpen = $state(false);
 </script>
 
@@ -41,4 +57,8 @@
 	</dl>
 </div>
 
-<EditAttributesSheet bind:open={editAttributesSheetOpen} />
+<EditAttributesSheet
+	bind:open={editAttributesSheetOpen}
+	{productAttributesForm}
+	onSaved={() => void getProductDetail()?.refetch?.()}
+/>

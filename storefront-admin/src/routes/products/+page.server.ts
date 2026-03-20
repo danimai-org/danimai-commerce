@@ -44,16 +44,7 @@ const ProductCreateSchema = z.object({
 		}
 	}, z.array(z.string().uuid('Sales channel ID must be a valid UUID'))),
 	has_variants: z.coerce.boolean().default(true),
-	options: z.preprocess(
-		(value) => {
-			if (Array.isArray(value)) return value;
-			if (typeof value !== 'string') return [];
-			try {
-				return JSON.parse(value);
-			} catch {
-				return [];
-			}
-		},
+	options: 
 		z
 			.array(
 				z.object({
@@ -61,18 +52,8 @@ const ProductCreateSchema = z.object({
 					values: z.array(z.string().min(1, 'Option value is required')).min(1)
 				})
 			)
-			.default([])
-	),
-	variants: z.preprocess(
-		(value) => {
-			if (Array.isArray(value)) return value;
-			if (typeof value !== 'string') return [];
-			try {
-				return JSON.parse(value);
-			} catch {
-				return [];
-			}
-		},
+			.default([]),
+	variants: 
 		z
 			.array(
 				z.object({
@@ -86,7 +67,7 @@ const ProductCreateSchema = z.object({
 				})
 			)
 			.default([])
-	),
+	,
 	attribute_group_id: z.string().uuid('Attribute group ID must be a valid UUID').optional().or(z.literal('')),
 	attributes: z.preprocess(
 		(value) => {
@@ -127,7 +108,7 @@ export const actions = {
 			const cleanHandle = data.handle?.trim() ? data.handle.trim() : undefined;
 			const cleanDescription = data.description?.trim() ? data.description.trim() : undefined;
 			const cleanCategoryId = data.category_id?.trim() ? data.category_id : undefined;
-			const cleanCollectionIds = Array.from(new Set(data.collection_ids.map((id) => id.trim()).filter(Boolean)));
+			const cleanCollectionIds = data.collection_ids.length > 0 ? Array.from(new Set(data.collection_ids.map((id) => id.trim()).filter(Boolean))) : undefined;
 			const cleanAttributeGroupId = data.attribute_group_id?.trim() ? data.attribute_group_id : undefined;
 
 			const optionsForApi = data.has_variants
@@ -188,7 +169,8 @@ export const actions = {
 				sales_channel_ids: data.sales_channel_ids.length > 0 ? data.sales_channel_ids : undefined,
 				options: optionsForApi,
 				variants: variantsForApi && variantsForApi.length > 0 ? variantsForApi : undefined,
-				attributes: attributesForApi
+				attributes: attributesForApi,
+				collection_ids: cleanCollectionIds.length > 0 ? cleanCollectionIds : undefined
 			};
 
 			const productResponse = await client.products.post(payload as never);
@@ -198,25 +180,6 @@ export const actions = {
 					productCreateForm,
 					error: error.value?.message ?? 'Failed to create product'
 				});
-			}
-
-			const product = (productResponse.data ?? null) as { id?: string } | null;
-			if (cleanCollectionIds.length > 0 && product?.id) {
-				for (const collectionId of cleanCollectionIds) {
-					const collectionResponse = await client['collections']({ id: collectionId }).products.put({
-						products: {
-							add: [product.id],
-							remove: []
-						}
-					});
-					if (collectionResponse.error) {
-						const error = collectionResponse.error as { value?: { message?: string } };
-						return fail(400, {
-							productCreateForm,
-							error: error.value?.message ?? 'Product created, but failed to add it to one or more collections'
-						});
-					}
-				}
 			}
 
 			return message(productCreateForm, 'Product created successfully');

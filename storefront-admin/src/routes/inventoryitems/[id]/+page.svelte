@@ -2,25 +2,17 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { createQuery } from '@tanstack/svelte-query';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import { DetailHeaderCards, ResourceTableCard, ReservationsCard, AddVariantSheet, EditDetailsSheet } from '$lib/components/organs/inventoryitems/detail/index.js';
 	import {
-		DeleteConfirmationModal,
-		PaginationTable,
-		TableHead,
-		TableBody,
-		TablePagination,
-		type TableColumn
-	} from '$lib/components/organs/index.js';
+		DetailHeaderCards,
+		ResourceTableCard,
+		ReservationsCard,
+		AddVariantSheet,
+		EditDetailsSheet,
+		ManageLocationsSheet
+	} from '$lib/components/organs/inventoryitems/detail/index.js';
+	import { DeleteConfirmationModal, type TableColumn } from '$lib/components/organs/index.js';
 	import { createPaginationQuery, createPagination, type PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import { client } from '$lib/client.js';
-	import { deleteInventoryItems } from '$lib/inventory-items/api.js';
-	import { DropdownMenu } from 'bits-ui';
-
 
 	const itemId = $derived(page.params?.id ?? '');
 
@@ -87,9 +79,38 @@
 		name: string | null;
 	};
 
-	function clientPaginationMeta(total: number, page: number, limit: number): PaginationMeta {
+	/** API returns item fields + inventory_levels + reservation_items (see RetrieveInventoryItemProcess). */
+	type RetrieveInventoryItemApiBody = Omit<DetailData, 'item' | 'levels' | 'reservations'> &
+		InventoryItem & {
+			inventory_levels: LevelWithLocation[];
+			reservation_items: ReservationItem[];
+		};
+
+	function mapRetrieveBodyToDetailData(raw: unknown): DetailData | null {
+		if (raw == null || typeof raw !== 'object') return null;
+		const o = raw as Record<string, unknown>;
+		if ('item' in o && o.item != null && typeof o.item === 'object') {
+			return raw as DetailData;
+		}
+		const {
+			inventory_levels,
+			reservation_items,
+			associated_variants,
+			product_summaries,
+			...itemRest
+		} = raw as RetrieveInventoryItemApiBody;
+		return {
+			item: itemRest as InventoryItem,
+			levels: inventory_levels ?? [],
+			reservations: reservation_items ?? [],
+			associated_variants,
+			product_summaries
+		};
+	}
+
+	function clientPaginationMeta(total: number, pageNum: number, limit: number): PaginationMeta {
 		const total_pages = Math.max(1, Math.ceil(total / limit));
-		const safePage = Math.max(1, Math.min(page, total_pages));
+		const safePage = Math.max(1, Math.min(pageNum, total_pages));
 		return {
 			total,
 			page: safePage,
@@ -104,35 +125,27 @@
 		queryKey: ['inventory-item-detail', itemId],
 		queryFn: async (): Promise<DetailData | null> => {
 			if (!itemId) return null;
-			const res = await client.inventory.items({id: itemId}).get();
+			const res = await client.inventory.items({ id: itemId }).get();
 			if (res?.error) {
 				throw new Error(String(res?.error?.value?.message ?? 'Failed to get inventory item detail'));
 			}
-			return res.data as unknown as DetailData;
+			return mapRetrieveBodyToDetailData(res?.data);
 		}
 	}));
 
 	const data = $derived(itemDetailQuery.data ?? null);
-	const loading = $derived(itemDetailQuery.isPending);
+	const loading = $derived(itemDetailQuery.isPending && itemDetailQuery.isFetching);
 	const error = $derived(
 		itemDetailQuery.error != null
-			? (itemDetailQuery.error instanceof Error ? itemDetailQuery.error.message : String(itemDetailQuery.error))
-			: (data === null && itemDetailQuery.isSuccess && itemId ? 'Inventory item not found' : null)
+			? itemDetailQuery.error instanceof Error
+				? itemDetailQuery.error.message
+				: String(itemDetailQuery.error)
+			: data === null && itemDetailQuery.isSuccess && itemId
+				? 'Inventory item not found'
+				: null
 	);
 
 	let manageLocationsSheetOpen = $state(false);
-	let addLocationId = $state('');
-	let addStockedQty = $state('0');
-	let addReservedQty = $state('0');
-	let addAvailableQty = $state('0');
-	let levelsSaving = $state(false);
-	let levelsError = $state<string | null>(null);
-	// Editable quantities per level id (for inline edit)
-	let levelStockEdit = $state<Record<string, string>>({});
-	let levelReservedEdit = $state<Record<string, string>>({});
-	let levelAvailableEdit = $state<Record<string, string>>({});
-	let deleteLevelModalOpen = $state(false);
-	let levelToDelete = $state<InventoryLevel | null>(null);
 	let editDetailsSheetOpen = $state(false);
 	let editDetailsSku = $state('');
 	let editDetailsRequiresShipping = $state(true);
@@ -147,6 +160,13 @@
 	let deleteItemModalOpen = $state(false);
 	let deleteItemSubmitting = $state(false);
 	let deleteItemError = $state<string | null>(null);
+
+	/** Defer open so the triggering click is not handled as an outside dismiss (bits-ui / Radix). */
+	function openManageLocationsSheet() {
+		setTimeout(() => {
+			manageLocationsSheetOpen = true;
+		}, 0);
+	}
 
 	const displayName = $derived(
 		data?.item?.sku ?? data?.item?.id?.slice(0, 8) ?? 'Inventory Item'
@@ -163,34 +183,26 @@
 			inStock,
 			reserved,
 			available,
-			locationCount: data.levels.length,
+			locationCount: data.levels.length
 		};
 	});
 
-	const associatedVariants = $derived(data?.associated_variants ?? []);
 	const productTitles = $derived(
 		Object.fromEntries(
-			Object.entries(data?.product_summaries ?? {}).map(([id, s]) => [
-				id,
-				s.title ?? '–',
-			])
-		)
-	);
-	const productThumbnails = $derived(
-		Object.fromEntries(
-			Object.entries(data?.product_summaries ?? {})
-				.filter(([, s]) => s.thumbnail)
-				.map(([id, s]) => [id, s.thumbnail!])
+			Object.entries(data?.product_summaries ?? {}).map(([id, s]) => [id, s.title ?? '–'])
 		)
 	);
 
-	// URL params for client-side pagination
 	const levelsPage = $derived(Math.max(1, parseInt(page.url.searchParams.get('levels_page') ?? '1', 10) || 1));
 	const levelsLimit = $derived(Math.max(1, Math.min(100, parseInt(page.url.searchParams.get('levels_limit') ?? '10', 10) || 10)));
 	const variantsPage = $derived(Math.max(1, parseInt(page.url.searchParams.get('variants_page') ?? '1', 10) || 1));
 	const variantsLimit = $derived(Math.max(1, Math.min(100, parseInt(page.url.searchParams.get('variants_limit') ?? '10', 10) || 10)));
-	const locationsSheetPage = $derived(Math.max(1, parseInt(page.url.searchParams.get('locations_sheet_page') ?? '1', 10) || 1));
-	const locationsSheetLimit = $derived(Math.max(1, Math.min(100, parseInt(page.url.searchParams.get('locations_sheet_limit') ?? '10', 10) || 10)));
+	const locationsSheetPage = $derived(
+		Math.max(1, parseInt(page.url.searchParams.get('locations_sheet_page') ?? '1', 10) || 1)
+	);
+	const locationsSheetLimit = $derived(
+		Math.max(1, Math.min(100, parseInt(page.url.searchParams.get('locations_sheet_limit') ?? '10', 10) || 10))
+	);
 
 	const levelsTotal = $derived(data?.levels?.length ?? 0);
 	const levelsPaginationMeta = $derived(clientPaginationMeta(levelsTotal, levelsPage, levelsLimit));
@@ -208,7 +220,9 @@
 	const variantsTotal = $derived((data?.associated_variants ?? []).length);
 	const variantsPaginationMeta = $derived(clientPaginationMeta(variantsTotal, variantsPage, variantsLimit));
 	const variantsOffset = $derived((variantsPaginationMeta.page - 1) * variantsLimit);
-	const variantsRows = $derived((data?.associated_variants ?? []).slice(variantsOffset, variantsOffset + variantsLimit));
+	const variantsRows = $derived(
+		(data?.associated_variants ?? []).slice(variantsOffset, variantsOffset + variantsLimit)
+	);
 	const variantsStart = $derived(variantsTotal === 0 ? 0 : variantsOffset + 1);
 	const variantsEnd = $derived(Math.min(variantsOffset + variantsLimit, variantsTotal));
 
@@ -231,7 +245,6 @@
 					new URLSearchParams({
 						page: String(locationsSheetPage),
 						limit: String(locationsSheetLimit)
-						
 					})
 				)
 			}),
@@ -253,6 +266,7 @@
 	const stockLocationsPagination = $derived(stockLocationsPaginateState.query.data?.data?.pagination ?? null);
 	const stockLocationsStart = $derived(stockLocationsPaginateState.start);
 	const stockLocationsEnd = $derived(stockLocationsPaginateState.end);
+	const stockLocationsLoading = $derived(stockLocationsPaginateState.loading);
 
 	const levelsColumns: TableColumn[] = [
 		{ label: 'Location', key: 'location_name', type: 'text' },
@@ -264,7 +278,12 @@
 			key: 'actions',
 			type: 'actions',
 			actions: [
-				{ label: 'Edit', key: 'edit', type: 'button', onClick: () => openManageLocationsSheet() }
+				{
+					label: 'Edit',
+					key: 'edit',
+					type: 'button',
+					onClick: openManageLocationsSheet
+				}
 			]
 		}
 	];
@@ -297,11 +316,6 @@
 		}))
 	);
 
-	const stockLocationsColumns: TableColumn[] = [
-		{ label: 'Name', key: 'name', type: 'text' },
-		{ label: 'ID', key: 'id', type: 'text' }
-	];
-
 	function openAddVariantSheet() {
 		addVariantSheetOpen = true;
 		addVariantError = null;
@@ -327,22 +341,12 @@
 	}
 
 	async function submitAddVariant() {
-		if (!data?.item?.sku || !addVariantProductId || !addVariantTitle.trim()) return;
+		if (!addVariantProductId || !addVariantTitle.trim()) return;
 		addVariantError = null;
 		addVariantSubmitting = true;
 		try {
-			const res = await client['product-variants'].post({
-				product_id: addVariantProductId,
-				title: addVariantTitle.trim(),
-				sku: data.item.sku
-			});
-			if (res?.error) {
-				throw new Error(String(res?.error?.value?.message ?? 'Failed to add variant'));
-			}
-			addVariantSheetOpen = false;
-			await itemDetailQuery.refetch();
-		} catch (e) {
-			addVariantError = e instanceof Error ? e.message : String(e);
+			addVariantError =
+				'The admin API has no endpoint to create variants from here. Open the product in Products and add a variant whose SKU matches this inventory item.';
 		} finally {
 			addVariantSubmitting = false;
 		}
@@ -362,7 +366,6 @@
 		editDetailsSaving = true;
 		try {
 			const res = await client.inventory.items({ id: data.item.id }).put({
-				id: data.item.id,
 				sku: editDetailsSku.trim() || null,
 				requires_shipping: editDetailsRequiresShipping
 			});
@@ -375,138 +378,6 @@
 			editDetailsError = e instanceof Error ? e.message : String(e);
 		} finally {
 			editDetailsSaving = false;
-		}
-	}
-
-	function openManageLocationsSheet() {
-		manageLocationsSheetOpen = true;
-		levelsError = null;
-		addLocationId = '';
-		addStockedQty = '0';
-		addReservedQty = '0';
-		addAvailableQty = '0';
-		levelStockEdit = {};
-		if (data?.levels) {
-			levelStockEdit = Object.fromEntries(
-				data.levels.map((l) => [l.id, String(l.stocked_quantity)])
-			);
-			levelReservedEdit = Object.fromEntries(
-				data.levels.map((l) => [l.id, String(l.reserved_quantity)])
-			);
-			levelAvailableEdit = Object.fromEntries(
-				data.levels.map((l) => [l.id, String(l.available_quantity)])
-			);
-		}
-	}
-
-	const existingLocationIds = $derived(
-		new Set((data?.levels ?? []).map((l) => l.location_id))
-	);
-	const locationsToAdd = $derived(
-		stockLocationsRows.filter((loc) => !existingLocationIds.has(loc.id))
-	);
-	const locationNameById = $derived(
-		Object.fromEntries(stockLocationsRows.map((loc) => [loc.id, loc.name ?? loc.id]))
-	);
-
-	async function addLevel() {
-		if (!data?.item?.id || !addLocationId) return;
-		levelsError = null;
-		levelsSaving = true;
-		try {
-			const stocked = Math.max(0, parseInt(addStockedQty, 10) || 0);
-			const reserved = Math.max(0, parseInt(addReservedQty, 10) || 0);
-			const res = await client.inventory.levels.post({
-				inventory_item_id: data.item.id,
-				location_id: addLocationId,
-				stocked_quantity: stocked,
-				reserved_quantity: reserved
-			});
-			if (res?.error) {
-				throw new Error(String(res?.error?.value?.message ?? 'Failed to add inventory level'));
-			}
-			addLocationId = '';
-			addStockedQty = '0';
-			addReservedQty = '0';
-			addAvailableQty = '0';
-			await itemDetailQuery.refetch();
-			if (data?.levels) {
-				levelStockEdit = Object.fromEntries(
-					data.levels.map((l) => [l.id, String(l.stocked_quantity)])
-				);
-				levelReservedEdit = Object.fromEntries(
-					data.levels.map((l) => [l.id, String(l.reserved_quantity)])
-				);
-				levelAvailableEdit = Object.fromEntries(
-					data.levels.map((l) => [l.id, String(l.available_quantity)])
-				);
-			}
-		} catch (e) {
-			levelsError = e instanceof Error ? e.message : String(e);
-		} finally {
-			levelsSaving = false;
-		}
-	}
-
-	async function saveAllLevels() {
-		if (!data?.item?.id || !data?.levels?.length) return;
-		levelsError = null;
-		levelsSaving = true;
-		try {
-			for (const level of data.levels) {
-				const stocked = Math.max(0, parseInt(levelStockEdit[level.id] ?? '', 10) || 0);
-				const reserved = Math.max(0, parseInt(levelReservedEdit[level.id] ?? '', 10) || 0);
-				const res = await client.inventory.levels.post({
-					inventory_item_id: data.item.id,
-					location_id: level.location_id,
-					stocked_quantity: stocked,
-					reserved_quantity: reserved
-				});
-				if (res?.error) {
-					throw new Error(String(res?.error?.value?.message ?? 'Failed to save inventory levels'));
-				}
-			}
-			await itemDetailQuery.refetch();
-			if (data?.levels) {
-				levelStockEdit = Object.fromEntries(
-					data.levels.map((l) => [l.id, String(l.stocked_quantity)])
-				);
-				levelReservedEdit = Object.fromEntries(
-					data.levels.map((l) => [l.id, String(l.reserved_quantity)])
-				);
-				levelAvailableEdit = Object.fromEntries(
-					data.levels.map((l) => [l.id, String(l.available_quantity)])
-				);
-			}
-		} catch (e) {
-			levelsError = e instanceof Error ? e.message : String(e);
-		} finally {
-			levelsSaving = false;
-		}
-	}
-
-	async function deleteLevel(level: InventoryLevel) {
-		levelsError = null;
-		levelsSaving = true;
-		try {
-			const res = await client.inventory.levels({ id: level.id }).delete();
-			if (res?.error) {
-				throw new Error(String(res?.error?.value?.message ?? 'Failed to delete inventory level'));
-			}
-			await itemDetailQuery.refetch();
-			levelStockEdit = Object.fromEntries(
-				(data?.levels ?? []).map((l) => [l.id, String(l.stocked_quantity)])
-			);
-			levelReservedEdit = Object.fromEntries(
-				(data?.levels ?? []).map((l) => [l.id, String(l.reserved_quantity)])
-			);
-			levelAvailableEdit = Object.fromEntries(
-				(data?.levels ?? []).map((l) => [l.id, String(l.available_quantity)])
-			);
-		} catch (e) {
-			levelsError = e instanceof Error ? e.message : String(e);
-		} finally {
-			levelsSaving = false;
 		}
 	}
 
@@ -527,7 +398,10 @@
 		deleteItemSubmitting = true;
 		deleteItemError = null;
 		try {
-			await deleteInventoryItems([data.item.id]);
+			const res = await client.inventory.items.delete({ ids: [data.item.id] });
+			if (res?.error) {
+				throw new Error(String(res?.error?.value?.message ?? 'Failed to delete inventory item'));
+			}
 			deleteItemModalOpen = false;
 			goto('/inventoryitems');
 		} catch (e) {
@@ -545,7 +419,6 @@
 
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<!-- Breadcrumbs -->
 		<div class="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-b pb-4 text-sm text-muted-foreground">
 			<a href="/inventoryitems" class="hover:text-foreground">Inventory</a>
 			<span>/</span>
@@ -607,236 +480,6 @@
 	</div>
 </div>
 
-<!-- Manage locations sheet -->
-<Sheet.Root bind:open={manageLocationsSheetOpen}>
-	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
-		<div class="flex h-full flex-col">
-			<Sheet.Header class="flex flex-col gap-1.5 border-b px-6 py-4">
-				<Sheet.Title>Manage locations</Sheet.Title>
-				<Sheet.Description class="text-sm text-muted-foreground">
-					{data ? `${displayName} – stock levels by location` : ''}
-				</Sheet.Description>
-			</Sheet.Header>
-			<div class="min-h-0 flex-1 overflow-auto p-6">
-				{#if data}
-					{#if levelsError}
-						<div class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-							{levelsError}
-						</div>
-					{/if}
-					<!-- Create: Add stock at a location -->
-					<div class="mb-6 flex flex-col gap-3 rounded-lg border p-4">
-						<p class="text-sm font-medium">Create – Add stock at a location</p>
-						<div class="flex flex-wrap items-end gap-3">
-							<div class="min-w-0 space-y-1.5">
-								<label for="add-location" class="text-xs text-muted-foreground">Location</label>
-								<select
-									id="add-location"
-									bind:value={addLocationId}
-									class="flex h-9 w-full min-w-[140px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-								>
-									<option value="">Select location…</option>
-									{#each locationsToAdd as loc (loc.id)}
-										<option value={loc.id}>{loc.name ?? loc.id}</option>
-									{/each}
-								</select>
-							</div>
-							<div class="min-w-0 space-y-1.5">
-								<label for="add-reserved" class="text-xs text-muted-foreground">Reserved</label>
-								<Input
-									id="add-reserved"
-									type="number"
-									min="0"
-									class="h-9 w-20"
-									value={addReservedQty}
-									oninput={(e) => {
-										const v = (e.currentTarget as HTMLInputElement).value;
-										addReservedQty = v;
-										addAvailableQty = String(Math.max(0, (parseInt(addStockedQty, 10) || 0) - (parseInt(v, 10) || 0)));
-									}}
-								/>
-							</div>
-							<div class="min-w-0 space-y-1.5">
-								<label for="add-qty" class="text-xs text-muted-foreground">In stock</label>
-								<Input
-									id="add-qty"
-									type="number"
-									min="0"
-									class="h-9 w-20"
-									value={addStockedQty}
-									oninput={(e) => {
-										const v = (e.currentTarget as HTMLInputElement).value;
-										addStockedQty = v;
-										addAvailableQty = String(Math.max(0, (parseInt(v, 10) || 0) - (parseInt(addReservedQty, 10) || 0)));
-									}}
-								/>
-							</div>
-							<div class="min-w-0 space-y-1.5">
-								<label for="add-available" class="text-xs text-muted-foreground">Available</label>
-								<Input
-									id="add-available"
-									type="number"
-									min="0"
-									class="h-9 w-20"
-									value={addAvailableQty}
-									oninput={(e) => {
-										const v = (e.currentTarget as HTMLInputElement).value;
-										addAvailableQty = v;
-										addStockedQty = String((parseInt(v, 10) || 0) + (parseInt(addReservedQty, 10) || 0));
-									}}
-								/>
-							</div>
-							<Button
-								size="sm"
-								disabled={!addLocationId || levelsSaving}
-								onclick={addLevel}
-							>
-								{levelsSaving ? 'Adding…' : 'Add'}
-							</Button>
-						</div>
-						{#if locationsToAdd.length === 0 && stockLocationsRows.length > 0}
-							<p class="text-xs text-muted-foreground">All locations already have stock for this item.</p>
-						{/if}
-					</div>
-					<!-- Stock locations list (paginated) -->
-					<div class="mb-6">
-						<p class="mb-2 text-sm font-medium">Stock locations</p>
-						<PaginationTable showToolbar={false}>
-							{#if stockLocationsPaginateState.loading}
-								<p class="py-4 text-sm text-muted-foreground">Loading…</p>
-							{:else}
-								<div class="overflow-auto rounded-lg border">
-									<table class="w-full text-sm">
-										<TableHead columns={stockLocationsColumns} />
-										<TableBody
-											rows={stockLocationsRows}
-											columns={stockLocationsColumns}
-											emptyMessage="No stock locations."
-										/>
-									</table>
-								</div>
-								<TablePagination
-									pagination={stockLocationsPagination}
-									start={stockLocationsStart}
-									end={stockLocationsEnd}
-									onPageChange={goToLocationsSheetPage}
-								/>
-							{/if}
-						</PaginationTable>
-					</div>
-					<!-- Existing levels (editable) -->
-					{#if data.levels.length === 0}
-						<p class="text-sm text-muted-foreground">No locations yet. Add stock at a location above.</p>
-					{:else}
-						<div class="overflow-auto rounded-lg border">
-							<table class="w-full text-sm">
-								<thead class="border-b bg-muted/50">
-									<tr>
-										<th class="px-3 py-2 text-left font-medium">Location</th>
-										<th class="px-3 py-2 text-left font-medium">Reserved</th>
-										<th class="px-3 py-2 text-left font-medium">In stock</th>
-										<th class="px-3 py-2 text-left font-medium">Available</th>
-										<th class="w-10 px-3 py-2"></th>
-									</tr>
-								</thead>
-								<tbody>
-									{#each data.levels as level (level.id)}
-										<tr class="border-b last:border-0">
-											<td class="px-3 py-2 text-xs">{level.location?.name ?? level.location_id}</td>
-											<td class="px-3 py-2">
-												<Input
-													type="number"
-													min="0"
-													class="h-8 w-16"
-													value={levelReservedEdit[level.id] ?? level.reserved_quantity}
-													oninput={(e) => {
-														const v = (e.currentTarget as HTMLInputElement).value;
-														const sid = level.id;
-														const stock = parseInt(levelStockEdit[sid] ?? String(level.stocked_quantity), 10) || 0;
-														levelReservedEdit = { ...levelReservedEdit, [sid]: v };
-														levelAvailableEdit = { ...levelAvailableEdit, [sid]: String(Math.max(0, stock - (parseInt(v, 10) || 0))) };
-													}}
-												/>
-											</td>
-											<td class="px-3 py-2">
-												<Input
-													type="number"
-													min="0"
-													class="h-8 w-16"
-													value={levelStockEdit[level.id] ?? level.stocked_quantity}
-													oninput={(e) => {
-														const v = (e.currentTarget as HTMLInputElement).value;
-														const sid = level.id;
-														const res = parseInt(levelReservedEdit[sid] ?? String(level.reserved_quantity), 10) || 0;
-														levelStockEdit = { ...levelStockEdit, [sid]: v };
-														levelAvailableEdit = { ...levelAvailableEdit, [sid]: String(Math.max(0, (parseInt(v, 10) || 0) - res)) };
-													}}
-												/>
-											</td>
-											<td class="px-3 py-2">
-												<Input
-													type="number"
-													min="0"
-													class="h-8 w-16"
-													value={levelAvailableEdit[level.id] ?? String(level.available_quantity)}
-													oninput={(e) => {
-														const v = (e.currentTarget as HTMLInputElement).value;
-														const sid = level.id;
-														const res = parseInt(levelReservedEdit[sid] ?? String(level.reserved_quantity), 10) || 0;
-														levelAvailableEdit = { ...levelAvailableEdit, [sid]: v };
-														levelStockEdit = { ...levelStockEdit, [sid]: String((parseInt(v, 10) || 0) + res) };
-													}}
-												/>
-											</td>
-											<td class="px-3 py-2">
-												<DropdownMenu.Root>
-													<DropdownMenu.Trigger
-														class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
-														disabled={levelsSaving}
-													>
-														<MoreHorizontal class="size-4" />
-														<span class="sr-only">Actions</span>
-													</DropdownMenu.Trigger>
-													<DropdownMenu.Portal>
-														<DropdownMenu.Content
-															class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-															sideOffset={4}
-														>
-															<DropdownMenu.Item
-																textValue="Remove"
-																class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-																onSelect={() => {
-																	levelToDelete = level;
-																	deleteLevelModalOpen = true;
-																}}
-															>
-																<Trash2 class="size-4" />
-																Remove
-															</DropdownMenu.Item>
-														</DropdownMenu.Content>
-													</DropdownMenu.Portal>
-												</DropdownMenu.Root>
-											</td>
-										</tr>
-									{/each}
-								</tbody>
-							</table>
-						</div>
-					{/if}
-				{/if}
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={() => (manageLocationsSheetOpen = false)}>Close</Button>
-				<Button
-					disabled={levelsSaving || !data?.levels?.length}
-					onclick={saveAllLevels}
-				>
-					{levelsSaving ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
 
 <AddVariantSheet
 	bind:open={addVariantSheetOpen}
@@ -858,32 +501,21 @@
 	onSave={saveEditDetails}
 />
 
-<!-- Delete level confirmation -->
-<DeleteConfirmationModal
-	bind:open={deleteLevelModalOpen}
-	entityName="location stock"
-	entityTitle={(() => {
-		const currentLevel = levelToDelete;
-		if (!currentLevel) return '';
-		const level = data?.levels.find(l => l.id === currentLevel.id);
-		return level?.location?.name ?? currentLevel.location_id;
-	})()}
-	customMessage="Remove this inventory level? Stock at this location will no longer be tracked for this item."
-	onConfirm={async () => {
-		if (levelToDelete) {
-			await deleteLevel(levelToDelete);
-			deleteLevelModalOpen = false;
-			levelToDelete = null;
-		}
+<ManageLocationsSheet
+	bind:open={manageLocationsSheetOpen}
+	detail={data ? { item: { id: data.item.id }, levels: data.levels } : null}
+	{displayName}
+	{stockLocationsRows}
+	stockLocationsPagination={stockLocationsPagination}
+	stockLocationsStart={stockLocationsStart}
+	stockLocationsEnd={stockLocationsEnd}
+	stockLocationsLoading={stockLocationsLoading}
+	onStockLocationsPageChange={goToLocationsSheetPage}
+	onDetailRefetch={async () => {
+		await itemDetailQuery.refetch();
 	}}
-	onCancel={() => {
-		deleteLevelModalOpen = false;
-		levelToDelete = null;
-	}}
-	submitting={levelsSaving}
 />
 
-<!-- Delete item confirmation -->
 <DeleteConfirmationModal
 	bind:open={deleteItemModalOpen}
 	entityName="inventory item"

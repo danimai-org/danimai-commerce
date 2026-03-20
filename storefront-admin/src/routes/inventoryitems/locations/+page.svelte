@@ -1,10 +1,10 @@
 <script lang="ts">
+	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
 		DeleteConfirmationModal,
-		LocationFormSheet,
 		PaginationTable,
 		TableHead,
 		TableBody,
@@ -12,10 +12,12 @@
 		type TableColumn
 	} from '$lib/components/organs/index.js';
 	import MapPin from '@lucide/svelte/icons/map-pin';
-	
+	import CreateLocation from '$lib/components/organs/location/create/CreateLocation.svelte';
+	import UpdateLocation from '$lib/components/organs/location/update/UpdateLocation.svelte';
 	import { client } from '$lib/client.js';
-	import { deleteStockLocations } from '$lib/stock-locations/api.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+
+	let { data }: { data: PageData } = $props();
 
 	type StockLocationAddress = {
 		address_1?: string | null;
@@ -94,6 +96,14 @@
 		}))
 	);
 
+	async function deleteStockLocations(ids: string[]) {
+		const res = await client['stock-locations'].delete({ ids });
+		if (res?.error) {
+			const err = res.error as { value?: { message?: string } };
+			throw new Error(String(err.value?.message ?? 'Failed to delete location'));
+		}
+	}
+
 	const tableColumns: TableColumn[] = [
 		{ label: 'Name', key: 'name', type: 'text' },
 		{ label: 'Address', key: 'address_display', type: 'text' },
@@ -170,18 +180,30 @@
 	</div>
 </div>
 
-<LocationFormSheet
-	bind:open={paginateState.formSheetOpen}
-	mode={formMode}
-	location={formItem as any}
-	onSuccess={refetch}
-/>
+{#if formMode === 'create'}
+	<CreateLocation
+		bind:open={paginateState.formSheetOpen}
+		stockLocationForm={data.stockLocationForm}
+		onSuccess={() => {
+			void refetch();
+		}}
+	/>
+{:else if formItem}
+	<UpdateLocation
+		bind:open={paginateState.formSheetOpen}
+		stockLocationForm={data.stockLocationForm}
+		// location={formItem as StockLocationRow}
+		onSuccess={() => {
+			void refetch();
+		}}
+	/>
+{/if}
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="location"
 	entityTitle={(deleteItem as any)?.name ?? (deleteItem as any)?.id ?? ''}
-	onConfirm={() => confirmDelete((loc: any) => deleteStockLocations([loc.id]))}
+	onConfirm={() => confirmDelete((loc) => deleteStockLocations([(loc as any).id]))}
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}
 	error={deleteError}
