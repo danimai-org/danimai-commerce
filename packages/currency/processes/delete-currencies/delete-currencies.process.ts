@@ -1,6 +1,7 @@
 import {
   InjectDB,
   InjectLogger,
+  NotFoundError,
   Process,
   ProcessContext,
   type ProcessContextType,
@@ -13,18 +14,18 @@ import {
   type DeleteCurrenciesProcessInput,
   DeleteCurrenciesSchema,
 } from "./delete-currencies.schema";
-import type { Database } from "@danimai/currency/db";
+import type { Database } from "../../db";
 
 export const DELETE_CURRENCIES_PROCESS = Symbol("DeleteCurrencies");
 
 @Process(DELETE_CURRENCIES_PROCESS)
-export class DeleteCurrenciesProcess implements ProcessContract<void> {
+export class DeleteCurrenciesProcess implements ProcessContract<typeof DeleteCurrenciesSchema, void> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
     @InjectLogger()
     private readonly logger: Logger
-  ) {}
+  ) { }
 
   async runOperations(
     @ProcessContext({ schema: DeleteCurrenciesSchema })
@@ -33,29 +34,21 @@ export class DeleteCurrenciesProcess implements ProcessContract<void> {
     const { input } = context;
     const rows = await this.db
       .selectFrom("currencies")
-      .where("id", "in", input.currency_ids)
+      .where("id", "in", input.ids ?? [])
       .where("deleted_at", "is", null)
       .selectAll()
       .execute();
-    if (rows.length !== input.currency_ids.length) {
-      const found = rows.map((r) => r.id);
-      const missing = input.currency_ids.filter((id) => !found.includes(id));
-      throw new ValidationError(
-        `Currencies not found: ${missing.join(", ")}`,
-        [
-          {
-            type: "not_found",
-            message: `Currencies not found: ${missing.join(", ")}`,
-            path: "currency_ids",
-          },
-        ]
+
+
+    if (rows.length !== input.ids?.length) {
+      throw new NotFoundError(
+        `Currencies not found`
       );
     }
+
     await this.db
-      .updateTable("currencies")
-      .set({ deleted_at: new Date().toISOString() })
-      .where("id", "in", input.currency_ids)
-      .where("deleted_at", "is", null)
+      .deleteFrom("currencies")
+      .where("id", "in", input.ids)
       .execute();
   }
 }
