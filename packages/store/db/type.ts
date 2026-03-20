@@ -1,7 +1,15 @@
 import type { Generated, Selectable, Insertable, Updateable } from "kysely";
+import type { CurrencyTable } from "@danimai/currency";
+import type { SalesChannelTable } from "@danimai/sales-channel";
+import type { RegionTable } from "@danimai/region";
+import type { StockLocationTable } from "@danimai/stock-location";
 
 export interface Database {
   stores: StoreTable;
+  currencies: CurrencyTable;
+  sales_channels: SalesChannelTable;
+  regions: RegionTable;
+  stock_locations: StockLocationTable;
 }
 
 export interface StoreTable {

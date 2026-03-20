@@ -15,6 +15,10 @@
   },
   "dependencies": {
     "@danimai/core": "../core",
+    "@danimai/currency": "../currency",
+    "@danimai/sales-channel": "../sales-channel",
+    "@danimai/region": "../region",
+    "@danimai/stock-location": "../stock-location",
     "kysely": "^0.28.9",
     "@sinclair/typebox": "^0.34.48"
   }
