@@ -17,37 +17,33 @@
 	} = $props();
 
 	let search = $state('');
-	let page = $state(1);
-	let limit = $state(10);
+	/** Fetch full catalog in one request (~123 ISO currencies); filter in the UI. */
+	const AVAILABLE_FETCH_LIMIT = 500;
 	let addSelected = $state<Map<string, boolean>>(new Map());
 	let addSubmitting = $state(false);
 	let addError = $state<string | null>(null);
 
 	const availableQuery = createQuery(() => ({
-		queryKey: ['add-currencies', page, limit, search] as const,
-		queryFn: () => listAvailableCurrencies({ page, limit, search }),
+		queryKey: ['add-currencies', 'full'] as const,
+		queryFn: () => listAvailableCurrencies({ page: 1, limit: AVAILABLE_FETCH_LIMIT }),
 		enabled: open
 	}));
 
 	const availableQueryData = $derived(availableQuery.data as AvailableCurrenciesResponse | undefined);
-	const availableList = $derived(availableQueryData?.data ?? []);
-	const availablePagination = $derived(availableQueryData?.pagination ?? null);
+	const availableRaw = $derived(availableQueryData?.data ?? []);
+	const availableList = $derived.by(() => {
+		const q = search.trim().toLowerCase();
+		if (!q) return availableRaw;
+		return availableRaw.filter(
+			(c) => c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
+		);
+	});
 	const availableLoading = $derived(availableQuery.isPending);
-	const availableStart = $derived(
-		availablePagination ? (availablePagination.page - 1) * availablePagination.limit + 1 : 0
-	);
-	const availableEnd = $derived(
-		availablePagination
-			? Math.min(availablePagination.page * availablePagination.limit, availablePagination.total)
-			: 0
-	);
 
 	const toAdd = $derived(availableList.filter((c) => !c.active && addSelected.has(c.code)));
 
 	$effect(() => {
 		if (open) {
-			page = 1;
-			limit = 10;
 			search = '';
 			addSelected = new Map();
 			addError = null;
@@ -60,10 +56,6 @@
 			addError = null;
 			addSelected = new Map();
 		}
-	}
-
-	function goToAvailablePage(pageNum: number) {
-		page = Math.max(1, pageNum);
 	}
 
 	function toggleAddSelect(item: AvailableCurrency) {
@@ -127,9 +119,8 @@
 						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 						<Input
 							type="search"
-							placeholder="Search by currency code"
+							placeholder="Search by code or name"
 							bind:value={search}
-							oninput={() => (page = 1)}
 							class="h-9 rounded-md pl-9"
 						/>
 					</div>
@@ -199,34 +190,6 @@
 							{/each}
 						</tbody>
 					</table>
-				{/if}
-				{#if availablePagination && availablePagination.total > 0}
-					<div class="mt-4 flex items-center justify-between border-t pt-4">
-						<p class="text-sm text-muted-foreground">
-							{availableStart} – {availableEnd} of {availablePagination.total} results
-						</p>
-						<div class="flex gap-2">
-							<Button
-								variant="outline"
-								size="sm"
-								disabled={!availablePagination.has_previous_page}
-								onclick={() => goToAvailablePage(availablePagination.page - 1)}
-							>
-								Prev
-							</Button>
-							<span class="text-sm text-muted-foreground">
-								{availablePagination.page} of {availablePagination.total_pages} pages
-							</span>
-							<Button
-								variant="outline"
-								size="sm"
-								disabled={!availablePagination.has_next_page}
-								onclick={() => goToAvailablePage(availablePagination.page + 1)}
-							>
-								Next
-							</Button>
-						</div>
-					</div>
 				{/if}
 			</div>
 			<div class="flex justify-end gap-2 border-t p-4">

@@ -6,7 +6,7 @@
 	import { DropdownMenu } from 'bits-ui';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import EditStore from './EditStore.svelte';
+	import EditStore from '$lib/components/organs/store/EditStore.svelte';
 	import { client } from '$lib/client.js';
 
 	type Store = {
@@ -132,15 +132,15 @@
 			<tbody>
 				{#if loading}
 					<tr>
-						<td colspan={3} class="px-4 py-8 text-center text-muted-foreground">Loading…</td>
+						<td colspan={6} class="px-4 py-8 text-center text-muted-foreground">Loading…</td>
 					</tr>
 				{:else if error}
 					<tr>
-						<td colspan={3} class="px-4 py-8 text-center text-destructive">{error}</td>
+						<td colspan={6} class="px-4 py-8 text-center text-destructive">{error}</td>
 					</tr>
 				{:else if rows.length === 0}
 					<tr>
-						<td colspan={3} class="px-4 py-8 text-center text-muted-foreground"
+						<td colspan={6} class="px-4 py-8 text-center text-muted-foreground"
 							>No stores found.</td
 						>
 					</tr>
@@ -153,6 +153,12 @@
 							</td>
 							<td class="px-4 py-3 text-muted-foreground">
 								{row.default_region_id ?? '—'}
+							</td>
+							<td class="px-4 py-3 text-muted-foreground">
+								{row.default_sales_channel_id ?? '—'}
+							</td>
+							<td class="px-4 py-3 text-muted-foreground">
+								{row.default_location_id ?? '—'}
 							</td>
 							<td class="px-4 py-3">
 								<DropdownMenu.Root>

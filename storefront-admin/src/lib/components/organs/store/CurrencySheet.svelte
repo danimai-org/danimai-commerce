@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import EditCurrencySheet from './EditCurrencySheet.svelte';
 	import Search from '@lucide/svelte/icons/search';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -10,14 +10,11 @@
 	import { DropdownMenu } from 'bits-ui';
 	import {
 		DeleteConfirmationModal,
-		AddCurrenciesSheet
+		
 	} from '$lib/components/organs/index.js';
-	import {
-		listCurrencies as listCurrenciesApi,
-		updateCurrency,
-		deleteCurrencies as deleteCurrenciesApi
-	} from '$lib/currencies/api.js';
-	import type { Currency, CurrenciesListResponse, Pagination } from '$lib/currencies/types.js';
+	import { client } from '$lib/client.js';
+	import type { Currency, Pagination } from '$lib/currencies/types.js';
+	import AddCurrenciesSheet from '$lib/components/organs/store/add-currencies-sheet.svelte';
 
 	let rows = $state<Currency[]>([]);
 	let pagination = $state<Pagination | null>(null);
@@ -51,13 +48,20 @@
 		loading = true;
 		error = null;
 		try {
-			const res = await listCurrenciesApi({
-				page: pageNum,
-				limit,
-				search: search.trim() || undefined
+			const res = await client.currencies.get({
+				query: {
+					page: pageNum,
+					limit,
+					...(search.trim() ? { search: search.trim() } : {})
+				} as Record<string, unknown>
 			});
-			rows = res.rows ?? [];
-			pagination = res.pagination ?? null;
+			if (res.error) {
+				const err = res.error as { value?: { message?: string } };
+				throw new Error(String(err?.value?.message ?? res.error));
+			}
+			const payload = res.data as unknown as { rows?: Currency[]; pagination?: Pagination } | undefined;
+			rows = payload?.rows ?? [];
+			pagination = payload?.pagination ?? null;
 		} catch (e) {
 			rows = [];
 			pagination = null;
@@ -89,7 +93,11 @@
 	async function removeSelected() {
 		if (selectedIds.size === 0) return;
 		try {
-			await deleteCurrenciesApi([...selectedIds]);
+			const res = await client.currencies.delete({ ids: [...selectedIds] });
+			if (res?.error) {
+				void loadCurrencies();
+				return;
+			}
 			selectedIds = new Set();
 			void loadCurrencies();
 		} catch {
@@ -120,7 +128,10 @@
 		deleteSubmitting = true;
 		deleteError = null;
 		try {
-			await deleteCurrenciesApi([deleteItem.id]);
+			const res = await client.currencies.delete({ ids: [deleteItem.id] });
+			if (res?.error) {
+				throw new Error(String(res?.error?.value?.message ?? 'Failed to delete currency'));
+			}
 			deleteConfirmOpen = false;
 			deleteItem = null;
 			void loadCurrencies();
@@ -138,34 +149,10 @@
 
 	let editSheetOpen = $state(false);
 	let editCurrency = $state<Currency | null>(null);
-	let taxInclusivePricing = $state(false);
-	let editError = $state<string | null>(null);
-	let submitting = $state(false);
 
 	function openEdit(item: Currency) {
 		editCurrency = item;
-		editError = null;
-		taxInclusivePricing = item.tax_inclusive_pricing;
 		editSheetOpen = true;
-	}
-
-	function closeEditSheet() {
-		if (!submitting) editSheetOpen = false;
-	}
-
-	async function submitEdit() {
-		if (!editCurrency) return;
-		editError = null;
-		submitting = true;
-		try {
-			await updateCurrency(editCurrency.id, { tax_inclusive_pricing: taxInclusivePricing });
-			editSheetOpen = false;
-			void loadCurrencies();
-		} catch (e) {
-			editError = e instanceof Error ? e.message : String(e);
-		} finally {
-			submitting = false;
-		}
 	}
 </script>
 
@@ -321,44 +308,11 @@
 	{/if}
 </div>
 
-<Sheet.Root bind:open={editSheetOpen}>
-	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-		<div class="flex h-full flex-col">
-			<div class="flex-1 overflow-auto p-6 pt-12">
-				<h2 class="text-lg font-semibold">Edit currency</h2>
-				<p class="mt-1 text-sm text-muted-foreground">
-					Update tax inclusive pricing for {editCurrency?.code ?? ''}.
-				</p>
-				{#if editError && !submitting}
-					<div
-						class="mt-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-					>
-						{editError}
-					</div>
-				{/if}
-				<div class="mt-6 flex flex-col gap-4">
-					<div class="flex items-center gap-2">
-						<input
-							type="checkbox"
-							id="currency-tax-inclusive"
-							bind:checked={taxInclusivePricing}
-							class="h-4 w-4 rounded border-input"
-						/>
-						<label for="currency-tax-inclusive" class="text-sm font-medium"
-							>Tax inclusive pricing</label
-						>
-					</div>
-				</div>
-			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeEditSheet}>Cancel</Button>
-				<Button onclick={submitEdit} disabled={submitting}>
-					{submitting ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
-	</Sheet.Content>
-</Sheet.Root>
+<EditCurrencySheet
+	bind:open={editSheetOpen}
+	currency={editCurrency}
+	onSuccess={() => void loadCurrencies()}
+/>
 
 <DeleteConfirmationModal
 	bind:open={deleteConfirmOpen}

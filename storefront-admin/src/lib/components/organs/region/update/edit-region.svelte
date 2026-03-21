@@ -91,6 +91,11 @@
 		paymentProviderIds = paymentProviderIds.filter((p) => p !== id);
 	}
 
+	function currencyParenContent(c: { code: string; symbol: string }) {
+		if (!c.symbol || c.symbol === c.code) return c.code;
+		return `${c.code} ${c.symbol}`;
+	}
+
 	const currencyOptions = $derived(
 		region?.currency_code && !BASE_CURRENCY_OPTIONS.some((c) => c.code === region!.currency_code)
 			? [
@@ -100,9 +105,6 @@
 			: BASE_CURRENCY_OPTIONS
 	);
 
-	const selectedProvidersLabel = $derived(
-		paymentProviderIds.length === 0 ? 'Select providers' : 'Selected'
-	);
 </script>
 
 <Sheet.Root bind:open>
@@ -139,21 +141,25 @@
 							<Select.Trigger
 								id="edit-currency"
 								class={cn(
-									'h-9 w-full',
+									'flex h-9 w-full items-center gap-2',
 									$errors.currency_code && 'border-destructive'
 								)}
 							>
 								{@const selected = currencyOptions.find((c) => c.code === $form.currency_code)}
-								{selected ? `${selected.name} (${selected.code})` : 'Select currency'}
-								<ChevronDown class="ml-auto size-4 opacity-50" />
+								<span class="min-w-0 flex-1 truncate text-left">
+									{selected ? `${selected.name} (${selected.code})` : 'Select currency'}
+								</span>
+								<ChevronDown class="size-4 shrink-0 opacity-50" />
 							</Select.Trigger>
 							<Select.Content>
 								{#each currencyOptions as currency (currency.code)}
 									<Select.Item
 										value={currency.code}
-										label={`${currency.name} (${currency.code})`}
+										label={`${currency.name} (${currencyParenContent(currency)})`}
 									>
-										{currency.name} ({currency.code} {currency.symbol})
+										<span class="min-w-0 flex-1 pr-2 text-left">
+											{currency.name} ({currencyParenContent(currency)})
+										</span>
 									</Select.Item>
 								{/each}
 							</Select.Content>
@@ -229,7 +235,10 @@
 								value={paymentProviderIds}
 								onValueChange={(v) => (paymentProviderIds = v ?? [])}
 							>
-								<Select.Trigger id="edit-payment-providers" class="h-auto min-h-9 w-full flex-wrap gap-1.5 py-1.5">
+								<Select.Trigger
+									id="edit-payment-providers"
+									class="h-auto min-h-9 w-full flex-wrap items-center gap-1.5 py-1.5"
+								>
 									{#if paymentProviderIds.length > 0}
 										{#each paymentProviderIds as id}
 											{@const provider = PAYMENT_PROVIDER_OPTIONS.find((p) => p.id === id)}
@@ -251,8 +260,9 @@
 												</button>
 											</span>
 										{/each}
+									{:else}
+										<span class="text-muted-foreground">Select providers</span>
 									{/if}
-									<span class="text-muted-foreground">{selectedProvidersLabel}</span>
 									<ChevronDown class="ml-auto size-4 shrink-0 opacity-50" />
 								</Select.Trigger>
 								<Select.Content>

@@ -44,7 +44,6 @@
 		}
 	}));
 
-	// isPending alone stays true when the query is disabled (e.g. SSR: global enabled: browser), which never clears.
 	const loading = $derived(listQuery.isPending && listQuery.isFetching);
 	const error = $derived(
 		listQuery.error != null ? (listQuery.error instanceof Error ? listQuery.error.message : String(listQuery.error)) : null

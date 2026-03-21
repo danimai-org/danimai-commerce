@@ -339,7 +339,7 @@
 		<table class="w-full text-sm">
 			<thead class="sticky top-0 z-10 border-b bg-muted/20 text-left backdrop-blur-sm">
 				<tr>
-					<th class="w-10 ">
+					<th class="w-10 px-4 py-3 align-middle">
 						<input
 							type="checkbox"
 							class="rounded border-muted-foreground/50"
@@ -371,7 +371,7 @@
 				{:else}
 					{#each rows as row (row.id)}
 						<tr class="border-b last:border-b-0">
-							<td class="px-4 py-3">
+							<td class="align-middle px-4 py-3">
 								<input
 									type="checkbox"
 									class="rounded border-muted-foreground/50"

@@ -132,7 +132,11 @@
 				<div class="grid gap-4 sm:grid-cols-2">
 					<JSONComponent product={region} options={[]} variants={[]} category={null} />
 					<MetadataComponent
-						productId={region?.id ?? null} metadata={region?.metadata as Record<string, unknown> | null} onSaved={loadRegion} />
+						productId={region?.id ?? null}
+						metadata={region?.metadata as Record<string, unknown> | null}
+						metadataEntity="region"
+						onSaved={loadRegion}
+					/>
 				</div>
 			</div>
 		</div>

@@ -3,22 +3,26 @@ import { Type, type Static, type StaticDecode } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   PAGINATED_CURRENCIES_PROCESS,
+  AVAILABLE_CURRENCIES_PROCESS,
   RETRIEVE_CURRENCY_PROCESS,
   CREATE_CURRENCY_PROCESS,
   UPDATE_CURRENCY_PROCESS,
   DELETE_CURRENCIES_PROCESS,
   PaginatedCurrenciesProcess,
+  AvailableCurrenciesProcess,
   RetrieveCurrencyProcess,
   CreateCurrencyProcess,
   UpdateCurrencyProcess,
   DeleteCurrenciesProcess,
   PaginatedCurrenciesSchema,
   PaginatedCurrenciesResponseSchema,
+  AvailableCurrenciesSchema,
+  AvailableCurrenciesResponseSchema,
   RetrieveCurrencySchema,
   CurrencyResponseSchema,
-  CreateCurrencySchema,
-  CreateCurrencyResponseSchema,
-  UpdateCurrencyBodySchema,
+  CreateCurrenciesSchema,
+  CreateCurrenciesResponseSchema,
+  UpdateCurrencyPatchBodySchema,
   UpdateCurrencyResponseSchema,
   DeleteCurrenciesSchema,
 } from "@danimai/currency";
@@ -29,12 +33,16 @@ import {
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
-const UpdateCurrencyRequestBodySchema = Type.Omit(UpdateCurrencyBodySchema, ["id"]);
-
 function asPaginatedInput(
   q: unknown
 ): StaticDecode<typeof PaginatedCurrenciesSchema> {
   return q as StaticDecode<typeof PaginatedCurrenciesSchema>;
+}
+
+function asAvailableInput(
+  q: unknown
+): StaticDecode<typeof AvailableCurrenciesSchema> {
+  return q as StaticDecode<typeof AvailableCurrenciesSchema>;
 }
 
 export const currencyRoutes = new Elysia({ prefix: "/currencies" })
@@ -58,6 +66,27 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
         tags: ["Currencies"],
         summary: "Get paginated active currencies",
         description: "Gets a paginated list of active (enabled) currencies",
+      },
+    }
+  )
+  .get(
+    "/available",
+    async ({ query }) => {
+      const process = getService<AvailableCurrenciesProcess>(AVAILABLE_CURRENCIES_PROCESS);
+      return process.runOperations({ input: asAvailableInput(query) });
+    },
+    {
+      query: AvailableCurrenciesSchema,
+      response: {
+        200: AvailableCurrenciesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Currencies"],
+        summary: "List available ISO currencies",
+        description:
+          "Fixed catalog merged with active store currencies (active flag, optional id). Paginated.",
       },
     }
   )
@@ -88,9 +117,9 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
       return process.runOperations({ input });
     },
     {
-      body: CreateCurrencySchema,
+      body: CreateCurrenciesSchema,
       response: {
-        200: CreateCurrencyResponseSchema,
+        200: CreateCurrenciesResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -112,7 +141,7 @@ export const currencyRoutes = new Elysia({ prefix: "/currencies" })
     },
     {
       params: Type.Object({ id: RetrieveCurrencySchema.properties.id }),
-      body: UpdateCurrencyRequestBodySchema,
+      body: UpdateCurrencyPatchBodySchema,
       response: {
         200: UpdateCurrencyResponseSchema,
         400: ValidationErrorResponseSchema,

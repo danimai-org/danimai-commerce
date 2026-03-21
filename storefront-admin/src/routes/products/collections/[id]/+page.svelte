@@ -150,6 +150,7 @@
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent
 						productId={collection?.id ?? null}
+						metadataEntity="collection"
 						metadata={collection?.metadata as Record<string, unknown> | null}
 						onSaved={loadCollection}
 					/>

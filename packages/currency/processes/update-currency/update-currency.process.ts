@@ -43,10 +43,11 @@ export class UpdateCurrencyProcess implements ProcessContract<typeof UpdateCurre
     if (!currency) {
       throw new NotFoundError("Currency not found");
     }
+    const { id, ...updates } = input;
     return this.db
       .updateTable("currencies")
-      .set({ ...input, updated_at: sql`now()` })
-      .where("id", "=", input.id)
+      .set({ ...updates, updated_at: sql`now()` })
+      .where("id", "=", id)
       .returningAll()
       .executeTakeFirstOrThrow();
   }

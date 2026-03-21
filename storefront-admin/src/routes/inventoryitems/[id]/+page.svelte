@@ -381,11 +381,6 @@
 		}
 	}
 
-	function openDeleteItemConfirm() {
-		deleteItemModalOpen = true;
-		deleteItemError = null;
-	}
-
 	function closeDeleteItemConfirm() {
 		if (!deleteItemSubmitting) {
 			deleteItemModalOpen = false;

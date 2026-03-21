@@ -101,6 +101,7 @@
 					<MetadataComponent
 						productId={group?.id ?? null}
 						metadata={group?.metadata as Record<string, unknown> | null}
+						metadataEntity="product-attribute-group"
 						onSaved={refetchGroupData}
 					/>
 

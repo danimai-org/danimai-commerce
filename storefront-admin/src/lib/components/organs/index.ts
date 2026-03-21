@@ -12,7 +12,7 @@ export { default as PriceListFormSheet } from './price-list-form-sheet/price-lis
 export { default as TaxRegionFormSheet } from './tax-region/create/taxCreate.svelte';
 export { default as CurrencyFormSheet } from './store/CurrencySheet.svelte';
 export { default as StoreListingCard } from './store/StoreListingCard.svelte';
-export { AddCurrenciesSheet } from './add-currencies-sheet/index.js';
+export { default as AddCurrenciesSheet } from './store/add-currencies-sheet.svelte';
 export { default as PaginationTable } from './pagination-table/pagination-table.svelte';
 export { Combobox } from './combobox/index.js';
 export type { ComboboxOption } from './combobox/index.js';

@@ -130,6 +130,7 @@
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent
 						productId={channel.id}
+						metadataEntity="sales-channel"
 						metadata={(channel.metadata ?? {}) as Record<string, unknown>}
 						onSaved={loadChannel}
 					/>

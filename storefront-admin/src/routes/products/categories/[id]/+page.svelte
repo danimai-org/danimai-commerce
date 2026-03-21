@@ -109,6 +109,7 @@
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent
 						productId={category?.id ?? null}
+						metadataEntity="product-category"
 						metadata={category?.metadata as Record<string, unknown> | null}
 						onSaved={loadCategory}
 					/>

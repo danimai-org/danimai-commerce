@@ -94,7 +94,12 @@
               />
 
 				<div class="grid gap-4 sm:grid-cols-2">
-					<MetadataComponent productId={attribute?.id ?? null} metadata={attribute?.metadata ?? {}} onSaved={refetchAttributeData} />
+					<MetadataComponent
+						productId={attribute?.id ?? null}
+						metadata={attribute?.metadata ?? {}}
+						metadataEntity="product-attribute"
+						onSaved={refetchAttributeData}
+					/>
 					<JSONComponent product={attribute} options={[]} variants={[]} category={null} />
 
 				</div>

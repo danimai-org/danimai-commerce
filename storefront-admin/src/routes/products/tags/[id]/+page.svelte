@@ -3,7 +3,6 @@
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
-	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import { TagHeroCard } from '$lib/components/organs/index.js';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
@@ -20,11 +19,8 @@
 	const tagId = $derived($page.params.id);
 	let selectedIds = $state<Set<string>>(new Set());
 	let tag = $state<ProductTag | null>(null);
-	let productsData = $state<{ data: Record<string, unknown>[]; pagination: PaginationMeta } | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let productPage = $state(1);
-	let productLimit = $state(10);
 	
 
 	async function loadTag() {
@@ -50,28 +46,6 @@
 
 	async function handleTagUpdated() {
 		await loadTag();
-		await loadProducts();
-	}
-
-	async function loadProducts() {
-		if (!tagId) return;
-		try {
-			const result = (await (client as any)['product-tags-products']({ id: tagId }).get({
-				query: {
-					page: productPage,
-					limit: productLimit,
-					sorting_field: 'created_at',
-					sorting_direction: 'desc'
-				}
-			})) as { products: any[]; pagination: PaginationMeta } | { data: any[]; pagination: PaginationMeta };
-
-			productsData =
-				'products' in result
-					? { data: result.products, pagination: result.pagination }
-					: { data: result.data, pagination: result.pagination };
-		} catch (e) {
-			productsData = null;
-		}
 	}
 
 	$effect(() => {
@@ -79,17 +53,6 @@
 		loadTag();
 	});
 
-	$effect(() => {
-		if (tagId) {
-			productPage;
-			productLimit;
-			loadProducts();
-		} else {
-			productsData = null;
-		}
-	});
-
-	const pagination = $derived(productsData?.pagination ?? null);
 	
 </script>
 
@@ -165,7 +128,12 @@
 				/>
 
 				<div class="grid gap-4 sm:grid-cols-2">
-					<MetadataComponent productId={(tag?.id as string | undefined) ?? null} metadata={tag?.metadata as Record<string, unknown> | null} onSaved={() => void loadTag()} />
+					<MetadataComponent
+						productId={(tag?.id as string | undefined) ?? null}
+						metadata={tag?.metadata as Record<string, unknown> | null}
+						metadataEntity="product-tag"
+						onSaved={() => void loadTag()}
+					/>
 					<JSONComponent product={tag as any} options={[]} variants={[]} category={null} />
 				</div>
 			</div>

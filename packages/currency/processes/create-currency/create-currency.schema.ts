@@ -1,15 +1,19 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { CurrencyResponseSchema } from "../retrieve-currency/retrieve-currency.schema";
 
-export const CreateCurrencySchema = Type.Object({
-  name: Type.String(),
+export const CreateCurrencyItemSchema = Type.Object({
   code: Type.String(),
-  tax_inclusive_pricing: Type.Boolean({ default: false }),
+  tax_inclusive_pricing: Type.Boolean(),
 });
 
+export const CreateCurrenciesSchema = Type.Object({
+  currencies: Type.Array(CreateCurrencyItemSchema),
+});
 
-export type CreateCurrencyInput = Static<typeof CreateCurrencySchema>;
+export type CreateCurrenciesInput = Static<typeof CreateCurrenciesSchema>;
 
-export const CreateCurrencyResponseSchema = CurrencyResponseSchema;
+export const CreateCurrenciesResponseSchema = Type.Object({
+  data: Type.Array(CurrencyResponseSchema),
+});
 
-export type CreateCurrencyProcessOutput = Static<typeof CreateCurrencyResponseSchema>;
+export type CreateCurrencyProcessOutput = Static<typeof CreateCurrenciesResponseSchema>;
