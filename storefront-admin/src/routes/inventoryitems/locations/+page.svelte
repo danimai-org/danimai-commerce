@@ -16,6 +16,8 @@
 	import UpdateLocation from '$lib/components/organs/location/update/UpdateLocation.svelte';
 	import { client } from '$lib/client.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
 	let { data }: { data: PageData } = $props();
 
@@ -43,16 +45,15 @@
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
 	const paginateState = createPagination(
-		async () => {
-			return client['stock-locations'].get({ query: paginationQuery });
-		},
-		['stock-locations']
+		async () => client['stock-locations'].get({ query: paginationQuery }),
+		['stock-locations'],
+		paginationQuery
 	);
 
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
 	function formatAddress(addr: StockLocationAddress | null | undefined): string {
@@ -69,7 +70,7 @@
 	}
 
 	const rows = $derived(
-		(paginateState.query.data?.data?.rows ?? []) as unknown as StockLocationRow[]
+		(paginateState.query.data?.data?.rows ?? []) 
 	);
 	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
 	const start = $derived(paginateState.start);
@@ -78,8 +79,6 @@
 	const formItem = $derived(paginateState.formItem);
 	const openCreate = $derived(paginateState.openCreate);
 	const openEdit = $derived(paginateState.openEdit);
-	const closeForm = $derived(paginateState.closeForm);
-	const deleteConfirmOpen = $derived(paginateState.deleteConfirmOpen);
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
 	const deleteItem = $derived(paginateState.deleteItem);
 	const deleteError = $derived(paginateState.deleteError);
@@ -89,7 +88,7 @@
 	const refetch = $derived(paginateState.refetch);
 
 	const rowsForTable = $derived(
-		(rows as StockLocationRow[]).map((loc) => ({
+		rows.map((loc) => ({
 			...loc,
 			address_display: formatAddress(loc.address),
 			phone_display: loc.address?.phone ?? '–'

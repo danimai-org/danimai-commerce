@@ -5,6 +5,7 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import type { TableColumn, TableColumnAction } from './type.js';
+	import { resolve } from '$app/paths';
 
 	let {
 		rows = [],
@@ -56,10 +57,7 @@
 		const linkLabel = (column as { linkLabel?: string }).linkLabel;
 		if (linkLabel) return linkLabel;
 		const textKey = (column as { textKey?: string }).textKey ?? column.key;
-		const v = row[textKey];
-		if (v != null && v !== '') return String(v);
-		const id = row.id;
-		return id != null ? String(id) : '—';
+		return String(row[textKey] ?? '-');
 	}
 
 	function getThumbUrl(column: TableColumn, row: Record<string, unknown>): string | null {
@@ -137,11 +135,11 @@
 						/>
 					</td>
 				{/if}
-				{#each columns as column, colIndex}
+				{#each columns as column, colIndex (column.key)}
 					{#if isLinkColumn(column)}
-						<td class="px-4 py-3">
+						<td class="px-4 py-3" >
 							<a
-								href={linkHref(column, row)}
+								href={resolve(linkHref(column, row), {})}
 								class="flex items-center gap-3 hover:opacity-80 font-medium"
 							>
 								{#if getThumbUrl(column, row)}
@@ -174,7 +172,7 @@
 										class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
 										sideOffset={4}
 									>
-										{#each column.actions as action}
+										{#each column.actions as action (action.key)}
 											<DropdownMenu.Item
 												textValue={action.label}
 												class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 {action.key === 'delete' ? 'text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive' : ''}"

@@ -1,8 +1,6 @@
 <script lang="ts">
-	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { createQuery } from '@tanstack/svelte-query';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
 		CreateInventoryItemSheet,
@@ -15,62 +13,56 @@
 	} from '$lib/components/organs/index.js';
 	import Package from '@lucide/svelte/icons/package';
 	import { client } from '$lib/client.js';
-	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
+	import { createPagination, createPaginationQuery } from '$lib/api';
 
-	let { data }: { data: PageData } = $props();
 
-	const pageNum = $derived(Math.max(1, parseInt(page.url.searchParams.get('page') ?? '1', 10) || 1));
-	const pageLimit = $derived(Math.max(1, Math.min(100, parseInt(page.url.searchParams.get('limit') ?? '10', 10) || 10)));
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
-	type ListPayload = { data: { rows: any[]; pagination: PaginationMeta | null } };
-
-	const listQuery = createQuery(() => ({
-		queryKey: ['inventory-items', String(pageNum), String(pageLimit)],
-		queryFn: async (): Promise<ListPayload> => {
-			const res = await client.inventory.items.get({
-				query: { page: pageNum, limit: pageLimit } as Record<string, string | number>
-			});
-			if (res?.error) {
-				throw new Error(String(res?.error?.value?.message ?? 'Failed to fetch inventory items'));
-			}
-			const raw = res?.data as Record<string, unknown> | null | undefined;
-			if (!raw) {
-				return { data: { rows: [], pagination: null } };
-			}
-			const inner = raw.data as { rows?: any[]; pagination?: PaginationMeta } | undefined;
-			const rows = (inner?.rows ?? raw.rows ?? []) as any[];
-			const pagination = (inner?.pagination ?? raw.pagination ?? null) as PaginationMeta | null;
-			return { data: { rows, pagination } };
-		}
-	}));
-
-	const loading = $derived(listQuery.isPending && listQuery.isFetching);
-	const error = $derived(
-		listQuery.error != null ? (listQuery.error instanceof Error ? listQuery.error.message : String(listQuery.error)) : null
+	const paginateState = createPagination(
+		async () => client.inventory.items.get({ query: paginationQuery }),
+		['inventory-items'],
+		paginationQuery
 	);
-	const rows = $derived((listQuery.data?.data?.rows ?? []) as any[]);
-	const pagination = $derived((listQuery.data?.data?.pagination ?? null) as PaginationMeta | null);
+
+	const {query} = paginateState;
+
+<<<<<<< HEAD
+	const loading = $derived(listQuery.isPending && listQuery.isFetching);
+=======
+	// isPending alone stays true when the query is disabled (e.g. SSR: global enabled: browser), which never clears.
+	const loading = $derived(query.isPending && query.isFetching);
+>>>>>>> c0e4d9faf8beff83096977381d826e304384a459
+	const error = $derived(
+		query.error != null ? (query.error instanceof Error ? query.error.message : String(query.error)) : null
+	);
+	const rows = $derived(query.data?.data?.rows ?? []);
+	type InventoryItemRow = typeof rows[number];
+
+	const pagination = $derived(query.data?.data?.pagination ?? null);
 	const start = $derived(pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0);
 	const end = $derived(pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0);
+	const deleteItem = $derived(rows.find((item) => item.id === deleteItemId) ?? null);
 
 	let createSheetOpen = $state(false);
 	let deleteConfirmOpen = $state(false);
 	let deleteSubmitting = $state(false);
 	let deleteError = $state<string | null>(null);
-	let deleteItem = $state<any | null>(null);
+	let deleteItemId = $state<string | null>(null);
 
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
 	function openCreateSheet() {
 		createSheetOpen = true;
 	}
 
-	function openDeleteConfirm(item: any) {
-		deleteItem = item;
+	function openDeleteConfirm(itemId: string) {
+		deleteItemId = itemId;
 		deleteError = null;
 		deleteConfirmOpen = true;
 	}
@@ -78,25 +70,25 @@
 	function closeDeleteConfirm() {
 		if (!deleteSubmitting) {
 			deleteConfirmOpen = false;
-			deleteItem = null;
+			deleteItemId = null;
 			deleteError = null;
 		}
 	}
 
 	async function confirmDeleteItem() {
-		if (!deleteItem?.id) return;
+		if (!deleteItemId) return;
 		deleteSubmitting = true;
 		deleteError = null;
 		try {
 			const res = await client.inventory.items.delete({
-				ids: [deleteItem.id]
+				ids: [deleteItemId]
 			});
 			if (res?.error) {
 				throw new Error(String(res?.error?.value?.message ?? 'Failed to delete inventory item'));
 			}
 			deleteConfirmOpen = false;
-			deleteItem = null;
-			listQuery.refetch();
+			deleteItemId = null;
+			query.refetch();
 		} catch (e) {
 			deleteError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -113,20 +105,20 @@
 	}
 
 	const rowsForTable = $derived(
-		(rows as any[]).map((item) => ({
+		rows.map((item) => ({
 			...item,
-			created_at_display: formatDate(item.created_at),
-			updated_at_display: formatDate(item.updated_at),
+			created_at_display: formatDate(item.created_at.toISOString()),
+			updated_at_display: formatDate(item.updated_at.toISOString()),
 			requires_shipping_display: item.requires_shipping ? 'Yes' : 'No'
 		}))
 	);
 
-	const tableColumns: TableColumn[] = [
+	const tableColumns: TableColumn<InventoryItemRow>[] = [
 		{
 			label: 'SKU',
 			key: 'sku',
 			type: 'link',
-			cellHref: (row) => `/inventoryitems/${String(row.id ?? '')}`,
+			cellHref: (row) => resolve(`/inventoryitems/${String(row.id ?? '')}`, {}),
 			textKey: 'sku'
 		},
 		{ label: 'Requires shipping', key: 'requires_shipping_display', type: 'text' },
@@ -141,13 +133,13 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => goto(`/inventoryitems/${(item as any).id}`)
+					onClick: (item) => goto(resolve(`/inventoryitems/${item.id}`, {}))
 				},
 				{
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => openDeleteConfirm(item as any)
+					onClick: (item) => openDeleteConfirm(item.id)
 				}
 			]
 		}
@@ -205,7 +197,7 @@
 <CreateInventoryItemSheet
 	bind:open={createSheetOpen}
 	onSuccess={() => {
-		void listQuery.refetch();
+		void query.refetch();
 	}}
 />
 

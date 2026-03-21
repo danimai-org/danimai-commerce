@@ -9,8 +9,8 @@ const MetadataSchema = Type.Optional(
 );
 
 export const CreateInventoryItemSchema = Type.Object({
-  sku: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-  requires_shipping: Type.Optional(Type.Boolean()),
+  sku: Type.String(),
+  requires_shipping: Type.Boolean({ default: false }),
   metadata: MetadataSchema,
 });
 
