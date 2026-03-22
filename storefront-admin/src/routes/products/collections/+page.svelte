@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
 		DeleteConfirmationModal,
@@ -10,59 +11,62 @@
 		TablePagination,
 		type TableColumn,
 		CollectionFormSheet
-
 	} from '$lib/components/organs/index.js';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import GripVertical from '@lucide/svelte/icons/grip-vertical';
-	import { client } from '$lib/client';
-	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import { client } from '$lib/client.js';
+	import { createPagination, createPaginationQuery } from '$lib/api';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
+	import { toast } from 'svelte-sonner';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
 	const paginateState = createPagination(
-		async () => {
-			return client['collections'].get({ query: paginationQuery });
-		},
-		['collections']
+		async () => client['collections'].get({ query: paginationQuery }),
+		['collections'],
+		paginationQuery
 	);
 
-async function deleteCollections(ids: string[]): Promise<void> {
-	await client['collections'].delete({ collection_ids: ids });
-}
+	const { query } = paginateState;
+
+	const loading = $derived(paginateState.loading);
+	const error = $derived(paginateState.error);
+	const rows = $derived(query.data?.data?.rows ?? []);
+	type CollectionRow = (typeof rows)[number];
+
+	const pagination = $derived(query.data?.data?.pagination ?? null);
+	const start = $derived(
+		pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0
+	);
+	const end = $derived(
+		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	);
+	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
+	const deleteItem = $derived(paginateState.deleteItem);
+
+	let createSheetOpen = $state(false);
 
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
-
-	const rows = $derived(
-		(paginateState.query.data?.data?.rows as any[] | undefined)?.map((c) => ({
+	function openCreateSheet() {
+		createSheetOpen = true;
+	}
+	const rowsForTable = $derived(
+		rows.map((c) => ({
 			...c,
 			handle_display: c.handle.startsWith('/') ? c.handle : `/${c.handle}`
-		})) ?? []
+		}))
 	);
-	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
-	const start = $derived(paginateState.start);
-	const end = $derived(paginateState.end);
-	const formMode = $derived(paginateState.formMode);
-	const formItem = $derived(paginateState.formItem);
-	const openCreate = $derived(paginateState.openCreate);
-	const openEdit = $derived(paginateState.openEdit);
-	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
-	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
-	const confirmDelete = $derived(paginateState.confirmDelete);
-	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
-	const deleteItem = $derived(paginateState.deleteItem);
-	const deleteError = $derived(paginateState.deleteError);
-	const refetch = $derived(paginateState.refetch);
 
-	const tableColumns: TableColumn[] = [
+	const tableColumns: TableColumn<CollectionRow>[] = [
 		{
 			label: 'Title',
 			key: 'title',
 			type: 'link',
-			cellHref: (row) => `/products/collections/${row.id}`,
+			cellHref: (row) => resolve(`/products/collections/${String(row.id ?? '')}`, {}),
 			textKey: 'title'
 		},
 		{ label: 'Handle', key: 'handle_display', type: 'text' },
@@ -76,13 +80,14 @@ async function deleteCollections(ids: string[]): Promise<void> {
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => goto(`/products/collections/${(item as any).id}`)
+					onClick: (item) => goto(resolve(`/products/collections/${item.id}`, {}))
 				},
 				{
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => openDeleteConfirm(item as Parameters<typeof openDeleteConfirm>[0])
+					onClick: (item) =>
+						(openDeleteConfirm as unknown as (row: CollectionRow) => void)(item as CollectionRow)
 				}
 			]
 		}
@@ -106,17 +111,17 @@ async function deleteCollections(ids: string[]): Promise<void> {
 					<GripVertical class="mr-1.5 size-4" />
 					Edit ranking
 				</Button>
-				<Button size="sm" onclick={openCreate}>Create</Button>
+				<Button size="sm" onclick={openCreateSheet}>Create</Button>
 			</div>
 		</div>
 		<PaginationTable>
-			{#if paginateState.error}
+			{#if error}
 				<div
 					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 				>
-					{paginateState.error}
+					{error}
 				</div>
-			{:else if paginateState.loading}
+			{:else if loading}
 				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
 					<p class="text-muted-foreground">Loading…</p>
 				</div>
@@ -125,48 +130,40 @@ async function deleteCollections(ids: string[]): Promise<void> {
 					<table class="w-full text-sm">
 						<TableHead columns={tableColumns} />
 						<TableBody
-							rows={rows}
-							columns={tableColumns}
+							rows={rowsForTable}
+							columns={tableColumns as TableColumn[]}
 							emptyMessage="No collections found."
 						/>
 					</table>
 				</div>
 
-				<TablePagination
-					{pagination}
-					{start}
-					{end}
-					onPageChange={goToPage}
-				/>
+				<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
 			{/if}
 		</PaginationTable>
 	</div>
 </div>
 
-
 <CollectionFormSheet
-	bind:open={paginateState.formSheetOpen}
-	onSuccess={() => refetch().then(() => {
-		paginateState.formSheetOpen = false;
-	})}
-	
+	bind:open={createSheetOpen}
+	onSuccess={() => {
+		void query.refetch();
+	}}
 />
 
-<!-- Delete collection confirmation -->
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="collection"
-	entityTitle={(deleteItem as unknown as any)?.title ?? (deleteItem as unknown as any)?.handle ?? (deleteItem as unknown as any)?.id ?? ''}
-	onConfirm={() => confirmDelete(async (item: any) => {
-		await deleteCollections([item.id]);
-	})}
-	onCancel={closeDeleteConfirm}
-	submitting={deleteSubmitting}
+	entityTitle={(deleteItem as CollectionRow | null)?.title ??
+		(deleteItem as CollectionRow | null)?.handle ??
+		(deleteItem as CollectionRow | null)?.id ??
+		''}
+	onConfirm={() =>
+		paginateState.confirmDelete(async (item) => {
+			const row = item as unknown as CollectionRow;
+			await client['collections'].delete({ collection_ids: [row.id] });
+			toast.success('Collection deleted successfully');
+		})}
+	onCancel={paginateState.closeDeleteConfirm}
+	submitting={paginateState.deleteSubmitting}
+	error={paginateState.deleteError}
 />
-{#if deleteError}
-	<div
-		class="mt-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-	>
-		{deleteError}
-	</div>
-{/if}

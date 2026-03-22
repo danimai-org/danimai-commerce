@@ -1,109 +1,109 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
-	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { client } from '$lib/client';
-	import {
-		AttributeHeroCard
-	} from '$lib/components/organs/attribute/detail/index.js';
+	import { client } from '$lib/client.js';
+	import { resolve } from '$app/paths';
+	import { AttributeHeroCard } from '$lib/components/organs/attribute/detail/index.js';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 	import { ProductListingCard } from '$lib/components/organs/index.js';
-	const attributeId = $derived(page.params.id);
-	
 
-	const attributeQuery = $derived(
-		createQuery(() => ({
-			queryKey: ['product-attributes', attributeId],
-			queryFn: async () => {
-				return client['product-attributes']({ id: attributeId }).get();
+	const attributeId = $derived(page.params?.id ?? '');
+
+	type AttributeDetail = {
+		id: string;
+		title: string;
+		type: string;
+		metadata?: unknown | null;
+	};
+
+	const attributeDetailQuery = createQuery(() => ({
+		queryKey: ['attribute-detail', attributeId],
+		queryFn: async (): Promise<AttributeDetail | null> => {
+			if (!attributeId) return null;
+			const res = await client['product-attributes']({ id: attributeId }).get();
+			if (res?.error) {
+				const err = res.error as { status?: number; value?: { message?: string } };
+				if (err?.status === 404) {
+					throw new Error('Attribute not found');
+				}
+				throw new Error(String(err?.value?.message ?? res.error));
 			}
-		}))
+			return (res?.data ?? null) as AttributeDetail | null;
+		},
+		enabled: !!attributeId,
+		refetchOnWindowFocus: false
+	}));
+
+	const attribute = $derived(attributeDetailQuery.data ?? null);
+	const loading = $derived(attributeDetailQuery.isPending && attributeDetailQuery.isFetching);
+	const error = $derived(
+		attributeDetailQuery.error != null
+			? attributeDetailQuery.error instanceof Error
+				? attributeDetailQuery.error.message
+				: String(attributeDetailQuery.error)
+			: attribute === null && attributeDetailQuery.isSuccess && attributeId
+				? 'Attribute not found'
+				: null
 	);
 
-	const attribute = $derived((attributeQuery.data?.data ?? null) as any | null);
-	const loading = $derived(attributeQuery.isPending);
-	const error = $derived(
-		attributeQuery.error != null
-			? attributeQuery.error instanceof Error
-				? attributeQuery.error.message
-				: String(attributeQuery.error)
-			: null
-	);
-	async function refetchAttributeData() {
-		await attributeQuery.refetch();
-	}
+	const displayName = $derived(attribute?.title ?? attributeId ?? 'Attribute');
 
 	let selectedIds = $state<Set<string>>(new Set());
+
+	async function refetchAttribute() {
+		await attributeDetailQuery.refetch();
+	}
 </script>
 
 <svelte:head>
-	<title>{attribute ? attribute.title : 'Attribute'} | Attributes | Danimai Store</title>
+	<title>{displayName} | Attributes | Danimai Store</title>
 	<meta name="description" content="Manage product attributes." />
 </svelte:head>
 
 <div class="flex h-full flex-col">
-	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
-		<nav class="flex items-center gap-[5px] text-sm pl-[10px]">
-			<button
-				type="button"
-				class="flex items-center gap-1 text-muted-foreground hover:text-foreground"
-				onclick={() => goto('/products')}
-			>
-				<ChevronLeft class="size-4" />
-				Products
-			</button>
-			<span class="text-muted-foreground">/</span>
-			<button
-				type="button"
-				class="text-muted-foreground hover:text-foreground"
-				onclick={() => goto('/products/attributes')}
-			>
-				Attributes
-			</button>
-			<span class="text-muted-foreground">/</span>
-			<span class="font-medium">{attribute?.title ?? attributeId ?? '…'}</span>
-		</nav>
-	</div>
+	<div class="flex min-h-0 flex-1 flex-col p-6">
+		<div
+			class="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-b pb-4 text-sm text-muted-foreground"
+		>
+			<a href={resolve('/products/attributes', {})} class="hover:text-foreground">Attributes</a>
+			<span>/</span>
+			<span class="text-foreground">{displayName}</span>
+		</div>
 
-	{#if loading}
-		<div class="flex flex-1 items-center justify-center p-6">
-			<p class="text-muted-foreground">Loading…</p>
-		</div>
-	{:else if error || !attribute}
-		<div class="flex flex-1 flex-col items-center justify-center gap-4 p-6">
-			<p class="text-destructive">{error ?? 'Attribute not found'}</p>
-			<Button variant="outline" onclick={() => goto('/products/attributes')}
-				>Back to Attributes</Button
+		{#if error}
+			<div
+				class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 			>
-		</div>
-	{:else}
-		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
-			<div class="flex flex-col gap-8 p-6">
+				{error}
+			</div>
+		{:else if loading}
+			<div class="flex min-h-0 flex-1 items-center justify-center">
+				<p class="text-muted-foreground">Loading…</p>
+			</div>
+		{:else if attribute}
+			<div class="flex flex-col gap-6">
 				<div class="flex gap-6">
-					<AttributeHeroCard {attribute} onUpdated={refetchAttributeData} />
+					<AttributeHeroCard {attribute} onUpdated={refetchAttribute} />
 				</div>
 
-				
 				<ProductListingCard
-              title="Products with this Attribute"
-             filter={{ attribute_ids: [attributeId] }} 
-              bind:selectedIds={selectedIds}
-              />
+					title="Products with this Attribute"
+					filter={{ attribute_ids: [attributeId] }}
+					pickerFilter={{}}
+					bind:selectedIds
+				/>
 
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent
-						productId={attribute?.id ?? null}
-						metadata={attribute?.metadata ?? {}}
+						productId={attribute.id}
 						metadataEntity="product-attribute"
-						onSaved={refetchAttributeData}
+						metadata={attribute.metadata as Record<string, unknown> | null}
+						onSaved={refetchAttribute}
 					/>
 					<JSONComponent product={attribute} options={[]} variants={[]} category={null} />
-
 				</div>
 			</div>
-		</div>
-	{/if}
+		{/if}
+	</div>
 </div>

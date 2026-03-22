@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
 		DeleteConfirmationModal,
@@ -13,39 +14,49 @@
 		type TableColumn
 	} from '$lib/components/organs/index.js';
 	import ListFilter from '@lucide/svelte/icons/list-filter';
-	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
-	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
-	import { client } from '$lib/client';
-
+	import { createPagination, createPaginationQuery } from '$lib/api';
+	import { client } from '$lib/client.js';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
+	import { toast } from 'svelte-sonner';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+
 	const paginateState = createPagination(
-		async () => {
-			
-			return client['product-attribute-groups'].get({ query: paginationQuery });
-		},
-		['product-attribute-groups']
+		async () => client['product-attribute-groups'].get({ query: paginationQuery }),
+		['product-attribute-groups'],
+		paginationQuery
 	);
 
+	const { query } = paginateState;
+
+	const loading = $derived(paginateState.loading);
+	const error = $derived(paginateState.error);
+	const rows = $derived(query.data?.data?.rows ?? []);
+	type AttributeGroupRow = (typeof rows)[number];
+
+	const pagination = $derived(query.data?.data?.pagination ?? null);
+	const start = $derived(
+		pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0
+	);
+	const end = $derived(
+		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	);
+	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
+	const deleteItem = $derived(paginateState.deleteItem);
+
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
-	const queryData = $derived(paginateState.query.data);
-	const rows = $derived((queryData?.data?.rows ?? []) as Record<string, unknown>[]);
-	const pagination = $derived((queryData?.data?.pagination ?? null) as PaginationMeta | null);
-	const start = $derived(paginateState.start);
-	const end = $derived(paginateState.end);
-
-	
-	const tableColumns: TableColumn[] = [
+	const tableColumns: TableColumn<AttributeGroupRow>[] = [
 		{
 			label: 'Title',
 			key: 'title',
 			type: 'link',
-			cellHref: (row) => `/products/attribute-groups/${row.id}`
+			cellHref: (row) => resolve(`/products/attribute-groups/${String(row.id ?? '')}`, {}),
+			textKey: 'title'
 		},
 		{ label: 'Created', key: 'created_at', type: 'date' },
 		{ label: 'Updated', key: 'updated_at', type: 'date' },
@@ -58,47 +69,55 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => goto(`/products/attribute-groups/${(item as any).id}`)
+					onClick: (item) => goto(resolve(`/products/attribute-groups/${item.id}`, {}))
 				},
 				{
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => paginateState.openDeleteConfirm(item as unknown as any)
+					onClick: (item) =>
+						(openDeleteConfirm as unknown as (row: AttributeGroupRow) => void)(
+							item as AttributeGroupRow
+						)
 				}
 			]
 		}
 	];
 
-	// Create sheet (local state)
 	let createOpen = $state(false);
 
-	let editGroup = $state<any | null>(null);
-
-	function openEdit(grp: any) {
-		editGroup = grp;
-	}
+	let editGroup = $state<{
+		id: string;
+		title: string;
+		attribute_ids: string[];
+		required: boolean;
+		rank: number;
+	} | null>(null);
 </script>
 
+<svelte:head>
+	<title>Attribute groups | Products | Danimai Store</title>
+	<meta name="description" content="Manage product attribute groups." />
+</svelte:head>
 
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
 			<div class="flex items-center gap-2">
 				<ListFilter class="size-4" />
-				<span class="font-semibold">Attribute Groups</span>
+				<span class="font-semibold">Attribute groups</span>
 			</div>
 			<Button size="sm" onclick={() => (createOpen = true)}>Create</Button>
 		</div>
 
 		<PaginationTable>
-			{#if paginateState.error}
+			{#if error}
 				<div
 					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 				>
-					{paginateState.error}
+					{error}
 				</div>
-			{:else if paginateState.loading}
+			{:else if loading}
 				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
 					<p class="text-muted-foreground">Loading…</p>
 				</div>
@@ -107,19 +126,14 @@
 					<table class="w-full text-sm">
 						<TableHead columns={tableColumns} />
 						<TableBody
-							rows={rows}
-							columns={tableColumns}
+							{rows}
+							columns={tableColumns as TableColumn[]}
 							emptyMessage="No attribute groups found."
 						/>
 					</table>
 				</div>
 
-				<TablePagination
-					{pagination}
-					{start}
-					{end}
-					onPageChange={goToPage}
-				/>
+				<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
 			{/if}
 		</PaginationTable>
 	</div>
@@ -127,14 +141,16 @@
 
 <CreateAttributeGroupSheet
 	bind:open={createOpen}
-	onSuccess={() => paginateState.refetch()}
+	onSuccess={() => {
+		void query.refetch();
+	}}
 />
 
 <EditAttributeGroupSheet
 	group={editGroup}
 	onSaved={async () => {
 		editGroup = null;
-		await paginateState.refetch();
+		await query.refetch();
 	}}
 	onClosed={() => {
 		editGroup = null;
@@ -144,18 +160,16 @@
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="attribute group"
-	entityTitle={(paginateState.deleteItem as unknown as any)?.title || (paginateState.deleteItem as unknown as any)?.id || ''}
-	onConfirm={() => paginateState.confirmDelete(async (item: any) => {
-		await client['product-attribute-groups'].delete({ attribute_group_ids: [item.id] });
-		paginateState.refetch();
-	})}
+	entityTitle={(deleteItem as AttributeGroupRow | null)?.title ??
+		(deleteItem as AttributeGroupRow | null)?.id ??
+		''}
+	onConfirm={() =>
+		paginateState.confirmDelete(async (item) => {
+			const row = item as unknown as AttributeGroupRow;
+			await client['product-attribute-groups'].delete({ attribute_group_ids: [row.id] });
+			toast.success('Attribute group deleted successfully');
+		})}
 	onCancel={paginateState.closeDeleteConfirm}
 	submitting={paginateState.deleteSubmitting}
+	error={paginateState.deleteError}
 />
-{#if paginateState.deleteError}
-	<div
-		class="mt-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-	>
-		{paginateState.deleteError}
-	</div>
-{/if}

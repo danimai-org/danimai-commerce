@@ -9,12 +9,54 @@ import {
 import { Kysely, sql } from "kysely";
 import {
   type RetrieveProductAttributeGroupProcessOutput,
-  RetrieveProductAttributeGroupResponseSchema,
   RetrieveProductAttributeGroupSchema,
 } from "./retrieve-product-attribute-group.schema";
 import type { Database } from "../../../db/type";
-import type { Static } from "@sinclair/typebox";
 
+function normalizeAttributesColumn(
+  raw: unknown
+): Array<{ id: string; title: string; type: string }> {
+  if (raw == null) return [];
+  let parsed: unknown = raw;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) return [];
+  const out: Array<{ id: string; title: string; type: string }> = [];
+  for (const item of parsed) {
+    if (item == null) continue;
+    if (typeof item === "string") {
+      try {
+        const o = JSON.parse(item) as Record<string, unknown>;
+        if (
+          typeof o.id === "string" &&
+          typeof o.title === "string" &&
+          typeof o.type === "string"
+        ) {
+          out.push({ id: o.id, title: o.title, type: o.type });
+        }
+      } catch {
+        /* skip */
+      }
+      continue;
+    }
+    if (typeof item === "object") {
+      const o = item as Record<string, unknown>;
+      if (
+        typeof o.id === "string" &&
+        typeof o.title === "string" &&
+        typeof o.type === "string"
+      ) {
+        out.push({ id: o.id, title: o.title, type: o.type });
+      }
+    }
+  }
+  return out;
+}
 
 export const RETRIEVE_PRODUCT_ATTRIBUTE_GROUP_PROCESS = Symbol("RetrieveProductAttributeGroup");
 
@@ -35,14 +77,6 @@ export class RetrieveProductAttributeGroupProcess
       .selectFrom("product_attribute_groups")
       .where("product_attribute_groups.id", "=", input.id)
       .where("product_attribute_groups.deleted_at", "is", null)
-      .leftJoin("product_attribute_group_relations", (join) =>
-        join
-          .onRef("product_attribute_group_relations.attribute_group_id", "=", "product_attribute_groups.id")
-      ).leftJoin("product_attributes", (join) =>
-        join
-          .onRef("product_attributes.id", "=", "product_attribute_group_relations.product_attribute_id")
-          .on("product_attributes.deleted_at", "is", null)
-      )
       .select([
         "product_attribute_groups.id",
         "product_attribute_groups.title",
@@ -50,26 +84,26 @@ export class RetrieveProductAttributeGroupProcess
         "product_attribute_groups.created_at",
         "product_attribute_groups.updated_at",
         "product_attribute_groups.deleted_at",
-        () => sql<Static<typeof RetrieveProductAttributeGroupResponseSchema["properties"]["attributes"]>>`
-          CASE
-            WHEN count(product_attributes.id) = 0 THEN ARRAY[]::json[]
-            ELSE array_agg(
-              DISTINCT jsonb_build_object(
-                'id', product_attributes.id,
-                'title', product_attributes.title,
-                'type', product_attributes.type
+        () => sql`
+          COALESCE(
+            (
+              SELECT json_agg(
+                json_build_object(
+                  'id', pa.id,
+                  'title', pa.title,
+                  'type', pa.type
+                )
+                ORDER BY pa.title
               )
-            )::json[]
-          END
-        `.as('attributes'),
-      ])
-      .groupBy([
-        "product_attribute_groups.id",
-        "product_attribute_groups.title",
-        "product_attribute_groups.metadata",
-        "product_attribute_groups.created_at",
-        "product_attribute_groups.updated_at",
-        "product_attribute_groups.deleted_at",
+              FROM product_attribute_group_relations pagr
+              INNER JOIN product_attributes pa
+                ON pa.id = pagr.product_attribute_id
+                AND pa.deleted_at IS NULL
+              WHERE pagr.attribute_group_id = product_attribute_groups.id
+            ),
+            '[]'::json
+          )
+        `.as("attributes"),
       ])
       .executeTakeFirst();
 
@@ -77,7 +111,10 @@ export class RetrieveProductAttributeGroupProcess
       throw new NotFoundError("Product attribute group not found");
     }
 
-
-    return group;
+    const row = group as Record<string, unknown>;
+    return {
+      ...group,
+      attributes: normalizeAttributesColumn(row.attributes),
+    } as RetrieveProductAttributeGroupProcessOutput;
   }
 }

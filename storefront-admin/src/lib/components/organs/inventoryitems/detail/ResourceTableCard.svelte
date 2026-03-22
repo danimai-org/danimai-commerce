@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
-	import { PaginationTable, TableHead, TableBody, TablePagination, type TableColumn } from '$lib/components/organs/index.js';
+	import {
+		PaginationTable,
+		TableHead,
+		TableBody,
+		TablePagination,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
 
 	let {
 		title,

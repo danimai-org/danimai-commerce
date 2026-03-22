@@ -4,6 +4,7 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import { resolve } from '$app/paths';
 	import {
 		DeleteConfirmationModal,
 		PaginationTable,
@@ -101,7 +102,9 @@
 		}
 		levelStockEdit = Object.fromEntries(levels.map((l) => [l.id, String(l.stocked_quantity)]));
 		levelReservedEdit = Object.fromEntries(levels.map((l) => [l.id, String(l.reserved_quantity)]));
-		levelAvailableEdit = Object.fromEntries(levels.map((l) => [l.id, String(l.available_quantity)]));
+		levelAvailableEdit = Object.fromEntries(
+			levels.map((l) => [l.id, String(l.available_quantity)])
+		);
 	}
 
 	$effect(() => {
@@ -219,7 +222,9 @@
 							<div
 								class="rounded-lg border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground"
 							>
-								No stock at any location yet. Use <span class="font-medium text-foreground">Add stock</span> below.
+								No stock at any location yet. Use <span class="font-medium text-foreground"
+									>Add stock</span
+								> below.
 							</div>
 						{:else}
 							<div class="overflow-auto rounded-lg border">
@@ -236,7 +241,9 @@
 									<tbody>
 										{#each detail.levels as level (level.id)}
 											<tr class="border-b last:border-0">
-												<td class="px-3 py-2 text-xs">{level.location?.name ?? level.location_id}</td>
+												<td class="px-3 py-2 text-xs"
+													>{level.location?.name ?? level.location_id}</td
+												>
 												<td class="px-3 py-2">
 													<Input
 														type="number"
@@ -247,7 +254,10 @@
 															const v = (e.currentTarget as HTMLInputElement).value;
 															const sid = level.id;
 															const stock =
-																parseInt(levelStockEdit[sid] ?? String(level.stocked_quantity), 10) || 0;
+																parseInt(
+																	levelStockEdit[sid] ?? String(level.stocked_quantity),
+																	10
+																) || 0;
 															levelReservedEdit = { ...levelReservedEdit, [sid]: v };
 															levelAvailableEdit = {
 																...levelAvailableEdit,
@@ -266,8 +276,10 @@
 															const v = (e.currentTarget as HTMLInputElement).value;
 															const sid = level.id;
 															const res =
-																parseInt(levelReservedEdit[sid] ?? String(level.reserved_quantity), 10) ||
-																0;
+																parseInt(
+																	levelReservedEdit[sid] ?? String(level.reserved_quantity),
+																	10
+																) || 0;
 															levelStockEdit = { ...levelStockEdit, [sid]: v };
 															levelAvailableEdit = {
 																...levelAvailableEdit,
@@ -286,8 +298,10 @@
 															const v = (e.currentTarget as HTMLInputElement).value;
 															const sid = level.id;
 															const res =
-																parseInt(levelReservedEdit[sid] ?? String(level.reserved_quantity), 10) ||
-																0;
+																parseInt(
+																	levelReservedEdit[sid] ?? String(level.reserved_quantity),
+																	10
+																) || 0;
 															levelAvailableEdit = { ...levelAvailableEdit, [sid]: v };
 															levelStockEdit = {
 																...levelStockEdit,
@@ -399,7 +413,9 @@
 									oninput={(e) => {
 										const v = (e.currentTarget as HTMLInputElement).value;
 										addAvailableQty = v;
-										addStockedQty = String((parseInt(v, 10) || 0) + (parseInt(addReservedQty, 10) || 0));
+										addStockedQty = String(
+											(parseInt(v, 10) || 0) + (parseInt(addReservedQty, 10) || 0)
+										);
 									}}
 								/>
 							</div>
@@ -415,8 +431,9 @@
 						{#if !stockLocationsLoading && stockLocationsPagination && stockLocationsPagination.total === 0}
 							<p class="text-xs text-muted-foreground">
 								No store locations exist yet.
-								<a href="/inventoryitems/locations" class="font-medium text-primary underline underline-offset-2"
-									>Create a location</a
+								<a
+									href={resolve('/inventoryitems/locations', {})}
+									class="font-medium text-primary underline underline-offset-2">Create a location</a
 								>
 								first, then return here.
 							</p>

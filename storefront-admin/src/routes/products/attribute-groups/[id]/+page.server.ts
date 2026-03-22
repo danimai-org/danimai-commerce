@@ -5,7 +5,6 @@ import { superValidate, message } from 'sveltekit-superforms';
 import { client } from '$lib/client';
 import type { Actions, PageServerLoad } from './$types';
 
-
 const AttributeGroupUpdateSchema = z.object({
 	id: z.string(),
 	title: z.string().min(3, 'Title must be at least 3 characters').max(50, 'Title is too long'),
@@ -14,14 +13,12 @@ const AttributeGroupUpdateSchema = z.object({
 	rank: z.number().default(0)
 });
 
-
 export const load: PageServerLoad = async () => {
 	const attributeGroupUpdateForm = await superValidate(zod4(AttributeGroupUpdateSchema));
 	return { attributeGroupUpdateForm };
 };
 
 export const actions = {
-
 	update: async ({ request }) => {
 		const attributeGroupUpdateForm = await superValidate(request, zod4(AttributeGroupUpdateSchema));
 
@@ -33,9 +30,11 @@ export const actions = {
 			id,
 			title: attributeGroupUpdateForm.data.title.trim(),
 			metadata: {
-				rank: attributeGroupUpdateForm.data.rank,
-			} as Record<string, any>,
-			attributes: attributeGroupUpdateForm.data.attribute_ids.map((attribute_id) => ({ attribute_id })),
+				rank: attributeGroupUpdateForm.data.rank
+			} as Record<string, un>,
+			attributes: attributeGroupUpdateForm.data.attribute_ids.map((attribute_id) => ({
+				attribute_id
+			}))
 		});
 
 		if (!attributeGroup || attributeGroup.error) {
@@ -46,7 +45,5 @@ export const actions = {
 			});
 		}
 		return message(attributeGroupUpdateForm, 'Attribute group updated successfully');
-	},
-	
-	
+	}
 } satisfies Actions;

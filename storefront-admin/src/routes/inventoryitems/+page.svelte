@@ -16,7 +16,7 @@
 	import { resolve } from '$app/paths';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { createPagination, createPaginationQuery } from '$lib/api';
-
+	import { toast } from 'svelte-sonner';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
@@ -26,30 +26,24 @@
 		paginationQuery
 	);
 
-	const {query} = paginateState;
+	const { query } = paginateState;
 
-<<<<<<< HEAD
-	const loading = $derived(listQuery.isPending && listQuery.isFetching);
-=======
-	// isPending alone stays true when the query is disabled (e.g. SSR: global enabled: browser), which never clears.
-	const loading = $derived(query.isPending && query.isFetching);
->>>>>>> c0e4d9faf8beff83096977381d826e304384a459
-	const error = $derived(
-		query.error != null ? (query.error instanceof Error ? query.error.message : String(query.error)) : null
-	);
+	const loading = $derived(paginateState.loading);
+	const error = $derived(paginateState.error);
 	const rows = $derived(query.data?.data?.rows ?? []);
-	type InventoryItemRow = typeof rows[number];
+	type InventoryItemRow = (typeof rows)[number];
 
 	const pagination = $derived(query.data?.data?.pagination ?? null);
-	const start = $derived(pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0);
-	const deleteItem = $derived(rows.find((item) => item.id === deleteItemId) ?? null);
+	const start = $derived(
+		pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0
+	);
+	const end = $derived(
+		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	);
+	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
+	const deleteItem = $derived(paginateState.deleteItem);
 
 	let createSheetOpen = $state(false);
-	let deleteConfirmOpen = $state(false);
-	let deleteSubmitting = $state(false);
-	let deleteError = $state<string | null>(null);
-	let deleteItemId = $state<string | null>(null);
 
 	function goToPage(pageNum: number) {
 		const params = new SvelteURLSearchParams(page.url.searchParams);
@@ -59,41 +53,6 @@
 
 	function openCreateSheet() {
 		createSheetOpen = true;
-	}
-
-	function openDeleteConfirm(itemId: string) {
-		deleteItemId = itemId;
-		deleteError = null;
-		deleteConfirmOpen = true;
-	}
-
-	function closeDeleteConfirm() {
-		if (!deleteSubmitting) {
-			deleteConfirmOpen = false;
-			deleteItemId = null;
-			deleteError = null;
-		}
-	}
-
-	async function confirmDeleteItem() {
-		if (!deleteItemId) return;
-		deleteSubmitting = true;
-		deleteError = null;
-		try {
-			const res = await client.inventory.items.delete({
-				ids: [deleteItemId]
-			});
-			if (res?.error) {
-				throw new Error(String(res?.error?.value?.message ?? 'Failed to delete inventory item'));
-			}
-			deleteConfirmOpen = false;
-			deleteItemId = null;
-			query.refetch();
-		} catch (e) {
-			deleteError = e instanceof Error ? e.message : String(e);
-		} finally {
-			deleteSubmitting = false;
-		}
 	}
 
 	function formatDate(iso: string) {
@@ -112,7 +71,6 @@
 			requires_shipping_display: item.requires_shipping ? 'Yes' : 'No'
 		}))
 	);
-
 	const tableColumns: TableColumn<InventoryItemRow>[] = [
 		{
 			label: 'SKU',
@@ -139,7 +97,10 @@
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => openDeleteConfirm(item.id)
+					onClick: (item) =>
+						(openDeleteConfirm as unknown as (row: InventoryItemRow) => void)(
+							item as InventoryItemRow
+						)
 				}
 			]
 		}
@@ -177,18 +138,13 @@
 						<TableHead columns={tableColumns} />
 						<TableBody
 							rows={rowsForTable}
-							columns={tableColumns}
+							columns={tableColumns as TableColumn[]}
 							emptyMessage="No inventory items found."
 						/>
 					</table>
 				</div>
 
-				<TablePagination
-					{pagination}
-					{start}
-					{end}
-					onPageChange={goToPage}
-				/>
+				<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
 			{/if}
 		</PaginationTable>
 	</div>
@@ -202,11 +158,18 @@
 />
 
 <DeleteConfirmationModal
-	bind:open={deleteConfirmOpen}
+	bind:open={paginateState.deleteConfirmOpen}
 	entityName="inventory item"
-	entityTitle={(deleteItem as any | null)?.sku ?? (deleteItem as any | null)?.id ?? ''}
-	onConfirm={confirmDeleteItem}
-	onCancel={closeDeleteConfirm}
-	submitting={deleteSubmitting}
-	error={deleteError}
+	entityTitle={(deleteItem as InventoryItemRow | null)?.sku ??
+		(deleteItem as InventoryItemRow | null)?.id ??
+		''}
+	onConfirm={() =>
+		paginateState.confirmDelete(async (item) => {
+			const row = item as unknown as InventoryItemRow;
+			await client.inventory.items.delete({ ids: [row.id] });
+			toast.success('Inventory item deleted successfully');
+		})}
+	onCancel={paginateState.closeDeleteConfirm}
+	submitting={paginateState.deleteSubmitting}
+	error={paginateState.deleteError}
 />

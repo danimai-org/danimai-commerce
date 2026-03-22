@@ -1,7 +1,7 @@
-
- <script lang="ts">
+<script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
 		DeleteConfirmationModal,
@@ -14,25 +14,43 @@
 	} from '$lib/components/organs/index.js';
 	import EditTag from '$lib/components/organs/tag/update/EditTag.svelte';
 	import Tag from '@lucide/svelte/icons/tag';
-	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
-	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
-	import { client } from '$lib/client';
+	import { createPagination, createPaginationQuery } from '$lib/api';
+	import { client } from '$lib/client.js';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
+	import { toast } from 'svelte-sonner';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+
 	const paginateState = createPagination(
-		async () => {
-			return client['product-tags'].get({ query: paginationQuery });
-		},
-		['product-tags']
+		async () => client['product-tags'].get({ query: paginationQuery }),
+		['product-tags'],
+		paginationQuery
 	);
 
-	async function deleteTags(ids: string[]): Promise<void> {
-		await client['product-tags'].delete({ tag_ids: ids });
-	}
+	const { query } = paginateState;
+
+	const loading = $derived(paginateState.loading);
+	const error = $derived(paginateState.error);
+	const rows = $derived(query.data?.data?.rows ?? []);
+	type TagRow = (typeof rows)[number];
+
+	const pagination = $derived(query.data?.data?.pagination ?? null);
+	const start = $derived(
+		pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0
+	);
+	const end = $derived(
+		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	);
+	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
+	const deleteItem = $derived(paginateState.deleteItem);
+
+	const formMode = $derived(paginateState.formMode);
+	const formItem = $derived(paginateState.formItem);
+	const openCreate = $derived(paginateState.openCreate);
 
 	async function handleFormSaved() {
 		paginateState.closeForm();
-		await paginateState.refetch();
+		void query.refetch();
 	}
 
 	function handleEditClosed() {
@@ -40,35 +58,18 @@
 	}
 
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
-	const queryData = $derived(paginateState.query.data as any | undefined);
-	const rows = $derived((queryData?.data?.rows ?? []) as any[]);
-	const pagination = $derived((queryData?.data?.pagination ?? null) as PaginationMeta | null);
-	const start = $derived(paginateState.start);
-	const end = $derived(paginateState.end);
-	const formMode = $derived(paginateState.formMode);
-	const formItem = $derived(paginateState.formItem);
-	const openCreate = $derived(paginateState.openCreate);
-	const openEdit = $derived(paginateState.openEdit);
-	const deleteConfirmOpen = $derived(paginateState.deleteConfirmOpen);
-	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
-	const deleteItem = $derived(paginateState.deleteItem);
-	const deleteError = $derived(paginateState.deleteError);
-	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
-	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
-	const confirmDelete = $derived(paginateState.confirmDelete);
-	const refetch = $derived(paginateState.refetch);
-
-	const tableColumns: TableColumn[] = [
+	const tableColumns: TableColumn<TagRow>[] = [
 		{
 			label: 'Value',
 			key: 'value',
 			type: 'link',
-			cellHref: (row) => `/products/tags/${row.id}`
+			cellHref: (row) => resolve(`/products/tags/${String(row.id ?? '')}`, {}),
+			textKey: 'value'
 		},
 		{ label: 'Created', key: 'created_at', type: 'date' },
 		{ label: 'Updated', key: 'updated_at', type: 'date' },
@@ -77,8 +78,19 @@
 			key: 'actions',
 			type: 'actions',
 			actions: [
-				{ label: 'Edit', key: 'edit', type: 'button', onClick: (item) => goto(`/products/tags/${(item as any).id}`) },
-				{ label: 'Delete', key: 'delete', type: 'button', onClick: (item) => openDeleteConfirm(item as Parameters<typeof openDeleteConfirm>[0]) }
+				{
+					label: 'Edit',
+					key: 'edit',
+					type: 'button',
+					onClick: (item) => goto(resolve(`/products/tags/${item.id}`, {}))
+				},
+				{
+					label: 'Delete',
+					key: 'delete',
+					type: 'button',
+					onClick: (item) =>
+						(openDeleteConfirm as unknown as (row: TagRow) => void)(item as TagRow)
+				}
 			]
 		}
 	];
@@ -100,13 +112,13 @@
 		</div>
 
 		<PaginationTable>
-			{#if paginateState.error}
+			{#if error}
 				<div
 					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 				>
-					{paginateState.error}
+					{error}
 				</div>
-			{:else if paginateState.loading}
+			{:else if loading}
 				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
 					<p class="text-muted-foreground">Loading…</p>
 				</div>
@@ -115,19 +127,14 @@
 					<table class="w-full text-sm">
 						<TableHead columns={tableColumns} />
 						<TableBody
-							rows={rows}
-							columns={tableColumns}
+							{rows}
+							columns={tableColumns as TableColumn[]}
 							emptyMessage="No tags found."
 						/>
 					</table>
 				</div>
 
-				<TablePagination
-					{pagination}
-					{start}
-					{end}
-					onPageChange={goToPage}
-				/>
+				<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
 			{/if}
 		</PaginationTable>
 	</div>
@@ -139,7 +146,7 @@
 	onSuccess={handleFormSaved}
 />
 <EditTag
-	tag={paginateState.formMode === 'edit' ? ((paginateState.formItem as any) ?? null) : null}
+	tag={formMode === 'edit' ? ((formItem as TagRow | null) ?? null) : null}
 	onSaved={handleFormSaved}
 	onClosed={handleEditClosed}
 />
@@ -147,17 +154,14 @@
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="tag"
-	entityTitle={(deleteItem as any)?.value ?? (deleteItem as any)?.id ?? ''}
-	onConfirm={() => confirmDelete(async (item: any) => {
-		await deleteTags([item.id]);
-	})}
-	onCancel={closeDeleteConfirm}
-	submitting={deleteSubmitting}
+	entityTitle={(deleteItem as TagRow | null)?.value ?? (deleteItem as TagRow | null)?.id ?? ''}
+	onConfirm={() =>
+		paginateState.confirmDelete(async (item) => {
+			const row = item as unknown as TagRow;
+			await client['product-tags'].delete({ tag_ids: [row.id] });
+			toast.success('Tag deleted successfully');
+		})}
+	onCancel={paginateState.closeDeleteConfirm}
+	submitting={paginateState.deleteSubmitting}
+	error={paginateState.deleteError}
 />
-{#if deleteError}
-	<div
-		class="mt-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-	>
-		{deleteError}
-	</div>
-{/if}

@@ -4,10 +4,9 @@
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { cn } from '$lib/utils.js';
-	import type { SuperValidated } from 'sveltekit-superforms';
-	import { toast, Toaster } from 'svelte-sonner';
+	import { Toaster } from 'svelte-sonner';
+	import { toast } from 'svelte-sonner';
 
-	
 	let {
 		open = $bindable(false),
 		onSuccess = () => {}
@@ -18,29 +17,33 @@
 
 	let apiError = $state<string | null>(null);
 
-	const { form, errors, enhance, delayed, reset } = superForm({ sku: '', requires_shipping: true }, {
-		resetForm: true,
-		invalidateAll: false,
-		onResult: async ({ result }) => {
-			if (result.type === 'failure') {
-				const d = result.data as { error?: string } | undefined;
-				apiError = d?.error ?? null;
-				return;
-			}
-			if (result.type === 'error') {
-				apiError =
-					result.error instanceof Error
-						? result.error.message
-						: String(result.error ?? 'Something went wrong');
-				return;
-			}
-			if (result.type === 'success') {
-				apiError = null;
-				open = false;
-				await onSuccess();
+	const { form, errors, enhance, delayed, reset } = superForm(
+		{ sku: '', requires_shipping: true },
+		{
+			resetForm: true,
+			invalidateAll: false,
+			onResult: async ({ result }) => {
+				if (result.type === 'failure') {
+					const d = result.data as { error?: string } | undefined;
+					apiError = d?.error ?? null;
+					return;
+				}
+				if (result.type === 'error') {
+					apiError =
+						result.error instanceof Error
+							? result.error.message
+							: String(result.error ?? 'Something went wrong');
+					return;
+				}
+				if (result.type === 'success') {
+					apiError = null;
+					open = false;
+					toast.success('Inventory item created successfully');
+					await onSuccess();
+				}
 			}
 		}
-	});
+	);
 
 	let initialized = $state(false);
 
@@ -95,7 +98,9 @@
 							bind:checked={$form.requires_shipping}
 							class="size-4 rounded border-input"
 						/>
-						<label for="create-requires-shipping" class="text-sm font-medium">Requires shipping</label>
+						<label for="create-requires-shipping" class="text-sm font-medium"
+							>Requires shipping</label
+						>
 					</div>
 					{#if apiError}
 						<div
@@ -107,9 +112,7 @@
 				</div>
 			</div>
 			<div class="flex justify-end gap-2 border-t p-4">
-				<Button type="button" variant="outline" onclick={close} disabled={$delayed}>
-					Cancel
-				</Button>
+				<Button type="button" variant="outline" onclick={close} disabled={$delayed}>Cancel</Button>
 				<Button type="submit" disabled={$delayed}>
 					{$delayed ? 'Creating…' : 'Create'}
 				</Button>

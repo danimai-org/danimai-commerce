@@ -46,19 +46,25 @@
 			<div>
 				<dt class="text-muted-foreground">In stock</dt>
 				<dd class="font-medium">
-					{totals.inStock} across {totals.locationCount} location{totals.locationCount === 1 ? '' : 's'}
+					{totals.inStock} across {totals.locationCount} location{totals.locationCount === 1
+						? ''
+						: 's'}
 				</dd>
 			</div>
 			<div>
 				<dt class="text-muted-foreground">Reserved</dt>
 				<dd class="font-medium">
-					{totals.reserved} across {totals.locationCount} location{totals.locationCount === 1 ? '' : 's'}
+					{totals.reserved} across {totals.locationCount} location{totals.locationCount === 1
+						? ''
+						: 's'}
 				</dd>
 			</div>
 			<div>
 				<dt class="text-muted-foreground">Available</dt>
 				<dd class="font-medium">
-					{totals.available} across {totals.locationCount} location{totals.locationCount === 1 ? '' : 's'}
+					{totals.available} across {totals.locationCount} location{totals.locationCount === 1
+						? ''
+						: 's'}
 				</dd>
 			</div>
 		</dl>
@@ -73,9 +79,7 @@
 				</p>
 			</div>
 			{#if sku}
-				<Button variant="outline" size="sm" onclick={onAddVariant}>
-					Add variant
-				</Button>
+				<Button variant="outline" size="sm" onclick={onAddVariant}>Add variant</Button>
 			{:else}
 				<p class="text-xs text-muted-foreground">Set SKU in Edit details to link variants.</p>
 			{/if}

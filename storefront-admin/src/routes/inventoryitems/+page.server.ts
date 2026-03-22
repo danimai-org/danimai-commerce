@@ -6,11 +6,13 @@ import { superValidate, message } from 'sveltekit-superforms';
 import { client } from '$lib/client';
 
 const InventoryItemCreateSchema = z.object({
-	sku: z.string().max(500),
+	sku: z.string().min(4, 'SKU must be at least 4 characters'),
 	requires_shipping: z.boolean().optional().default(true),
-	metadata: z.record(z.string(), z.any()).optional().default({}),
+	metadata: z.record(z.string(), z.any()).optional().default({})
 });
-
+const DeleteInventoryItemsSchema = z.object({
+	ids: z.array(z.string()).min(1, 'At least one inventory item must be selected')
+});
 export const load: PageServerLoad = async () => {
 	const inventoryItemCreateForm = await superValidate(
 		{ sku: '', requires_shipping: undefined },
@@ -18,7 +20,6 @@ export const load: PageServerLoad = async () => {
 	);
 	return { inventoryItemCreateForm };
 };
-	
 export const actions = {
 	create: async ({ request }) => {
 		const inventoryItemCreateForm = await superValidate(request, zod4(InventoryItemCreateSchema));
@@ -26,13 +27,11 @@ export const actions = {
 		if (!inventoryItemCreateForm.valid) {
 			return fail(400, { inventoryItemCreateForm });
 		}
-
 		const res = await client.inventory.items.post({
 			metadata: inventoryItemCreateForm.data.metadata,
-			sku: inventoryItemCreateForm.data.sku.trim() || null,
+			sku: inventoryItemCreateForm.data.sku.trim(),
 			requires_shipping: inventoryItemCreateForm.data.requires_shipping
 		});
-
 		if (res?.error) {
 			const err = res.error as { value?: { message?: string } };
 			return fail(400, {
@@ -40,7 +39,17 @@ export const actions = {
 				error: String(err.value?.message ?? 'Failed to create inventory item')
 			});
 		}
-		
 		return message(inventoryItemCreateForm, 'Inventory item created successfully');
+	},
+	delete: async ({ request }) => {
+		const inventoryItemDeleteForm = await superValidate(request, zod4(DeleteInventoryItemsSchema));
+		if (!inventoryItemDeleteForm.valid) {
+			return fail(400, { inventoryItemDeleteForm });
+		}
+		const res = await client.inventory.items.delete({ ids: inventoryItemDeleteForm.data.ids });
+		if (res?.error) {
+			return fail(400, { inventoryItemDeleteForm });
+		}
+		return message(inventoryItemDeleteForm, 'Inventory items deleted successfully');
 	}
 } satisfies Actions;

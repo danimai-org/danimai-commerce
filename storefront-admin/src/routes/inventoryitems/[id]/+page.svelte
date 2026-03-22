@@ -11,8 +11,14 @@
 		ManageLocationsSheet
 	} from '$lib/components/organs/inventoryitems/detail/index.js';
 	import { DeleteConfirmationModal, type TableColumn } from '$lib/components/organs/index.js';
-	import { createPaginationQuery, createPagination, type PaginationMeta } from '$lib/api/pagination.svelte.js';
+	import {
+		createPaginationQuery,
+		createPagination,
+		type PaginationMeta
+	} from '$lib/api/pagination.svelte.js';
 	import { client } from '$lib/client.js';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
 	const itemId = $derived(page.params?.id ?? '');
 
@@ -127,7 +133,9 @@
 			if (!itemId) return null;
 			const res = await client.inventory.items({ id: itemId }).get();
 			if (res?.error) {
-				throw new Error(String(res?.error?.value?.message ?? 'Failed to get inventory item detail'));
+				throw new Error(
+					String(res?.error?.value?.message ?? 'Failed to get inventory item detail')
+				);
 			}
 			return mapRetrieveBodyToDetailData(res?.data);
 		}
@@ -168,9 +176,7 @@
 		}, 0);
 	}
 
-	const displayName = $derived(
-		data?.item?.sku ?? data?.item?.id?.slice(0, 8) ?? 'Inventory Item'
-	);
+	const displayName = $derived(data?.item?.sku ?? data?.item?.id?.slice(0, 8) ?? 'Inventory Item');
 
 	const totals = $derived.by(() => {
 		if (!data?.levels?.length) {
@@ -193,15 +199,32 @@
 		)
 	);
 
-	const levelsPage = $derived(Math.max(1, parseInt(page.url.searchParams.get('levels_page') ?? '1', 10) || 1));
-	const levelsLimit = $derived(Math.max(1, Math.min(100, parseInt(page.url.searchParams.get('levels_limit') ?? '10', 10) || 10)));
-	const variantsPage = $derived(Math.max(1, parseInt(page.url.searchParams.get('variants_page') ?? '1', 10) || 1));
-	const variantsLimit = $derived(Math.max(1, Math.min(100, parseInt(page.url.searchParams.get('variants_limit') ?? '10', 10) || 10)));
+	const levelsPage = $derived(
+		Math.max(1, parseInt(page.url.searchParams.get('levels_page') ?? '1', 10) || 1)
+	);
+	const levelsLimit = $derived(
+		Math.max(
+			1,
+			Math.min(100, parseInt(page.url.searchParams.get('levels_limit') ?? '10', 10) || 10)
+		)
+	);
+	const variantsPage = $derived(
+		Math.max(1, parseInt(page.url.searchParams.get('variants_page') ?? '1', 10) || 1)
+	);
+	const variantsLimit = $derived(
+		Math.max(
+			1,
+			Math.min(100, parseInt(page.url.searchParams.get('variants_limit') ?? '10', 10) || 10)
+		)
+	);
 	const locationsSheetPage = $derived(
 		Math.max(1, parseInt(page.url.searchParams.get('locations_sheet_page') ?? '1', 10) || 1)
 	);
 	const locationsSheetLimit = $derived(
-		Math.max(1, Math.min(100, parseInt(page.url.searchParams.get('locations_sheet_limit') ?? '10', 10) || 10))
+		Math.max(
+			1,
+			Math.min(100, parseInt(page.url.searchParams.get('locations_sheet_limit') ?? '10', 10) || 10)
+		)
 	);
 
 	const levelsTotal = $derived(data?.levels?.length ?? 0);
@@ -212,13 +235,15 @@
 	const levelsEnd = $derived(Math.min(levelsOffset + levelsLimit, levelsTotal));
 
 	function goToLevelsPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('levels_page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
 	const variantsTotal = $derived((data?.associated_variants ?? []).length);
-	const variantsPaginationMeta = $derived(clientPaginationMeta(variantsTotal, variantsPage, variantsLimit));
+	const variantsPaginationMeta = $derived(
+		clientPaginationMeta(variantsTotal, variantsPage, variantsLimit)
+	);
 	const variantsOffset = $derived((variantsPaginationMeta.page - 1) * variantsLimit);
 	const variantsRows = $derived(
 		(data?.associated_variants ?? []).slice(variantsOffset, variantsOffset + variantsLimit)
@@ -227,22 +252,22 @@
 	const variantsEnd = $derived(Math.min(variantsOffset + variantsLimit, variantsTotal));
 
 	function goToVariantsPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('variants_page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
 	function goToLocationsSheetPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('locations_sheet_page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
 	const stockLocationsPaginateState = createPagination(
 		async () =>
 			client['stock-locations'].get({
 				query: createPaginationQuery(
-					new URLSearchParams({
+					new SvelteURLSearchParams({
 						page: String(locationsSheetPage),
 						limit: String(locationsSheetLimit)
 					})
@@ -252,9 +277,6 @@
 	);
 
 	$effect(() => {
-		manageLocationsSheetOpen;
-		locationsSheetPage;
-		locationsSheetLimit;
 		if (manageLocationsSheetOpen) {
 			stockLocationsPaginateState.refetch();
 		}
@@ -263,7 +285,9 @@
 	const stockLocationsRows = $derived(
 		(stockLocationsPaginateState.query.data?.data?.rows ?? []) as unknown as StockLocation[]
 	);
-	const stockLocationsPagination = $derived(stockLocationsPaginateState.query.data?.data?.pagination ?? null);
+	const stockLocationsPagination = $derived(
+		stockLocationsPaginateState.query.data?.data?.pagination ?? null
+	);
 	const stockLocationsStart = $derived(stockLocationsPaginateState.start);
 	const stockLocationsEnd = $derived(stockLocationsPaginateState.end);
 	const stockLocationsLoading = $derived(stockLocationsPaginateState.loading);
@@ -370,7 +394,9 @@
 				requires_shipping: editDetailsRequiresShipping
 			});
 			if (res?.error) {
-				throw new Error(String(res?.error?.value?.message ?? 'Failed to save inventory item details'));
+				throw new Error(
+					String(res?.error?.value?.message ?? 'Failed to save inventory item details')
+				);
 			}
 			editDetailsSheetOpen = false;
 			await itemDetailQuery.refetch();
@@ -398,7 +424,7 @@
 				throw new Error(String(res?.error?.value?.message ?? 'Failed to delete inventory item'));
 			}
 			deleteItemModalOpen = false;
-			goto('/inventoryitems');
+			goto(resolve('/inventoryitems', {}), { replaceState: true });
 		} catch (e) {
 			deleteItemError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -414,8 +440,10 @@
 
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div class="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-b pb-4 text-sm text-muted-foreground">
-			<a href="/inventoryitems" class="hover:text-foreground">Inventory</a>
+		<div
+			class="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-b pb-4 text-sm text-muted-foreground"
+		>
+			<a href={resolve('/inventoryitems', {})} class="hover:text-foreground">Inventory</a>
 			<span>/</span>
 			<span class="text-foreground">{displayName}</span>
 			{#if data && !loading}
@@ -438,7 +466,7 @@
 		{:else if data}
 			<div class="flex flex-col gap-6">
 				<DetailHeaderCards
-					displayName={displayName}
+					{displayName}
 					sku={data.item.sku}
 					{totals}
 					onEditDetails={openEditDetailsSheet}
@@ -475,7 +503,6 @@
 	</div>
 </div>
 
-
 <AddVariantSheet
 	bind:open={addVariantSheetOpen}
 	sku={data?.item?.sku}
@@ -501,10 +528,10 @@
 	detail={data ? { item: { id: data.item.id }, levels: data.levels } : null}
 	{displayName}
 	{stockLocationsRows}
-	stockLocationsPagination={stockLocationsPagination}
-	stockLocationsStart={stockLocationsStart}
-	stockLocationsEnd={stockLocationsEnd}
-	stockLocationsLoading={stockLocationsLoading}
+	{stockLocationsPagination}
+	{stockLocationsStart}
+	{stockLocationsEnd}
+	{stockLocationsLoading}
 	onStockLocationsPageChange={goToLocationsSheetPage}
 	onDetailRefetch={async () => {
 		await itemDetailQuery.refetch();

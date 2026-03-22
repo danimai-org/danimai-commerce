@@ -32,7 +32,7 @@
 				/>
 			</th>
 		{/if}
-		{#each columns as column}
+		{#each columns as column, colIndex (colIndex)}
 			<th class="px-4 py-3 text-left font-medium">{column.label}</th>
 		{/each}
 	</tr>

@@ -2,7 +2,7 @@ import { fail } from '@sveltejs/kit';
 import { z } from 'zod';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { superValidate, message } from 'sveltekit-superforms';
-import { client } from '$lib/client';
+import { client } from '$lib/client.js';
 import type { Actions, PageServerLoad } from './$types';
 
 const AttributeGroupCreateSchema = z.object({
@@ -13,10 +13,6 @@ const AttributeGroupCreateSchema = z.object({
 	rank: z.number().default(0)
 });
 
-
-
-
-
 export const load: PageServerLoad = async () => {
 	const attributeGroupCreateForm = await superValidate(zod4(AttributeGroupCreateSchema));
 	return { attributeGroupCreateForm };
@@ -24,23 +20,23 @@ export const load: PageServerLoad = async () => {
 
 export const actions = {
 	create: async ({ request }) => {
-		const form = await superValidate(request, zod4(AttributeGroupCreateSchema));
+		const attributeGroupCreateForm = await superValidate(request, zod4(AttributeGroupCreateSchema));
 
-		if (!form.valid) {
-			return fail(400, { form });
+		if (!attributeGroupCreateForm.valid) {
+			return fail(400, { attributeGroupCreateForm });
 		}
-		const attributeGroup = await client['product-attribute-groups'].post({
-			title: form.data.title.trim(),
-			attributes: form.data.attribute_ids.map((attribute_id) => ({ attribute_id })),
+		const res = await client['product-attribute-groups'].post({
+			title: attributeGroupCreateForm.data.title.trim(),
+			attributes: attributeGroupCreateForm.data.attribute_ids.map((attribute_id) => ({
+				attribute_id
+			})),
 			metadata: {
-				rank: form.data.rank,
+				rank: attributeGroupCreateForm.data.rank
 			}
-		});	
-		if (!attributeGroup || attributeGroup.error) {
-			return fail(400, { form, error: 'Failed to create attribute group' });
+		});
+		if (res.error) {
+			return fail(400, { attributeGroupCreateForm, error: 'Failed to create attribute group' });
 		}
-		return message(form, 'Attribute group created successfully');
-	},
-
-	
+		return message(attributeGroupCreateForm, 'Attribute group created successfully');
+	}
 } satisfies Actions;
