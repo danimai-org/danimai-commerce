@@ -18,17 +18,13 @@
 	import { client } from '$lib/client.js';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
-
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
-
 	const paginateState = createPagination(
 		async () => client['product-tags'].get({ query: paginationQuery }),
 		['product-tags'],
 		paginationQuery
 	);
-
 	const { query } = paginateState;
-
 	const loading = $derived(paginateState.loading);
 	const error = $derived(paginateState.error);
 	const rows = $derived(query.data?.data?.rows ?? []);
@@ -43,7 +39,6 @@
 	);
 	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
 	const deleteItem = $derived(paginateState.deleteItem);
-
 	const formMode = $derived(paginateState.formMode);
 	const formItem = $derived(paginateState.formItem);
 	const openCreate = $derived(paginateState.openCreate);
@@ -52,17 +47,14 @@
 		paginateState.closeForm();
 		void query.refetch();
 	}
-
 	function handleEditClosed() {
 		paginateState.closeForm();
 	}
-
 	function goToPage(pageNum: number) {
 		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
 		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
-
 	const tableColumns: TableColumn<TagRow>[] = [
 		{
 			label: 'Value',
@@ -88,8 +80,7 @@
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) =>
-						(openDeleteConfirm as unknown as (row: TagRow) => void)(item as TagRow)
+					onClick: (item) => (openDeleteConfirm as unknown as (row: TagRow) => void)(item as TagRow)
 				}
 			]
 		}
@@ -140,11 +131,7 @@
 	</div>
 </div>
 
-<TagFormSheet
-	bind:open={paginateState.formSheetOpen}
-	mode="create"
-	onSuccess={handleFormSaved}
-/>
+<TagFormSheet bind:open={paginateState.formSheetOpen} mode="create" onSuccess={handleFormSaved} />
 <EditTag
 	tag={formMode === 'edit' ? ((formItem as TagRow | null) ?? null) : null}
 	onSaved={handleFormSaved}

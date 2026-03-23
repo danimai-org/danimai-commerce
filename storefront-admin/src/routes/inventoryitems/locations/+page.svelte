@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -11,15 +10,51 @@
 		TablePagination,
 		type TableColumn
 	} from '$lib/components/organs/index.js';
-	import MapPin from '@lucide/svelte/icons/map-pin';
 	import CreateLocation from '$lib/components/organs/location/create/CreateLocation.svelte';
-	import UpdateLocation from '$lib/components/organs/location/update/UpdateLocation.svelte';
+	import MapPin from '@lucide/svelte/icons/map-pin';
 	import { client } from '$lib/client.js';
-	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import { createPaginationQuery, createPagination } from '$lib/api';
 	import { resolve } from '$app/paths';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
+	import { toast } from 'svelte-sonner';
 
-	let { data }: { data: PageData } = $props();
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+
+	const paginateState = createPagination(
+		async () => client['stock-locations'].get({ query: paginationQuery }),
+		['stock-locations'],
+		paginationQuery
+	);
+
+	const { query } = paginateState;
+
+	const loading = $derived(paginateState.loading);
+	const error = $derived(paginateState.error);
+	const rows = $derived(query.data?.data?.rows ?? []);
+	type LocationRow = (typeof rows)[number];
+
+	const pagination = $derived(query.data?.data?.pagination ?? null);
+	const start = $derived(
+		pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0
+	);
+	const end = $derived(
+		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	);
+
+	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
+	const deleteItem = $derived(paginateState.deleteItem);
+
+	let createSheetOpen = $state(false);
+
+	function goToPage(pageNum: number) {
+		const params = new SvelteURLSearchParams(page.url.searchParams);
+		params.set('page', String(Math.max(1, pageNum)));
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
+	}
+
+	function openCreateSheet() {
+		createSheetOpen = true;
+	}
 
 	type StockLocationAddress = {
 		address_1?: string | null;
@@ -31,30 +66,6 @@
 		country_code?: string | null;
 		phone?: string | null;
 	};
-
-	type StockLocationRow = {
-
-		id: string;
-		
-		name: string | null;
-		address?: StockLocationAddress | null;
-		created_at: string;
-		updated_at: string;
-	};
-
-	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
-
-	const paginateState = createPagination(
-		async () => client['stock-locations'].get({ query: paginationQuery }),
-		['stock-locations'],
-		paginationQuery
-	);
-
-	function goToPage(pageNum: number) {
-		const params = new SvelteURLSearchParams(page.url.searchParams);
-		params.set('page', String(Math.max(1, pageNum)));
-		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
-	}
 
 	function formatAddress(addr: StockLocationAddress | null | undefined): string {
 		if (!addr) return '–';
@@ -69,24 +80,6 @@
 		return parts.length ? parts.join(' · ') : '–';
 	}
 
-	const rows = $derived(
-		(paginateState.query.data?.data?.rows ?? []) 
-	);
-	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
-	const start = $derived(paginateState.start);
-	const end = $derived(paginateState.end);
-	const formMode = $derived(paginateState.formMode);
-	const formItem = $derived(paginateState.formItem);
-	const openCreate = $derived(paginateState.openCreate);
-	const openEdit = $derived(paginateState.openEdit);
-	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
-	const deleteItem = $derived(paginateState.deleteItem);
-	const deleteError = $derived(paginateState.deleteError);
-	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
-	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
-	const confirmDelete = $derived(paginateState.confirmDelete);
-	const refetch = $derived(paginateState.refetch);
-
 	const rowsForTable = $derived(
 		rows.map((loc) => ({
 			...loc,
@@ -95,16 +88,14 @@
 		}))
 	);
 
-	async function deleteStockLocations(ids: string[]) {
-		const res = await client['stock-locations'].delete({ ids });
-		if (res?.error) {
-			const err = res.error as { value?: { message?: string } };
-			throw new Error(String(err.value?.message ?? 'Failed to delete location'));
-		}
-	}
-
-	const tableColumns: TableColumn[] = [
-		{ label: 'Name', key: 'name', type: 'text' },
+	const tableColumns: TableColumn<LocationRow>[] = [
+		{
+			label: 'Name',
+			key: 'name',
+			type: 'link',
+			cellHref: (row) => resolve(`/inventoryitems/locations/${String(row.id ?? '')}`, {}),
+			textKey: 'name'
+		},
 		{ label: 'Address', key: 'address_display', type: 'text' },
 		{ label: 'Phone', key: 'phone_display', type: 'text' },
 		{ label: 'Created', key: 'created_at', type: 'date' },
@@ -118,13 +109,14 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => openEdit(item as Parameters<typeof openEdit>[0])
+					onClick: (item) => goto(resolve(`/inventoryitems/locations/${item.id}`, {}))
 				},
 				{
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => openDeleteConfirm(item as Parameters<typeof openDeleteConfirm>[0])
+					onClick: (item) =>
+						(openDeleteConfirm as unknown as (row: LocationRow) => void)(item as LocationRow)
 				}
 			]
 		}
@@ -143,16 +135,16 @@
 				<MapPin class="size-4" />
 				<span class="font-semibold">Locations</span>
 			</div>
-			<Button size="sm" onclick={openCreate}>Create</Button>
+			<Button size="sm" onclick={openCreateSheet}>Create</Button>
 		</div>
 		<PaginationTable>
-			{#if paginateState.error}
+			{#if error}
 				<div
 					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 				>
-					{paginateState.error}
+					{error}
 				</div>
-			{:else if paginateState.loading}
+			{:else if loading}
 				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
 					<p class="text-muted-foreground">Loading…</p>
 				</div>
@@ -162,48 +154,42 @@
 						<TableHead columns={tableColumns} />
 						<TableBody
 							rows={rowsForTable}
-							columns={tableColumns}
+							columns={tableColumns as TableColumn[]}
 							emptyMessage="No locations found."
 						/>
 					</table>
 				</div>
 
-				<TablePagination
-					{pagination}
-					{start}
-					{end}
-					onPageChange={goToPage}
-				/>
+				<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
 			{/if}
 		</PaginationTable>
 	</div>
 </div>
 
-{#if formMode === 'create'}
-	<CreateLocation
-		bind:open={paginateState.formSheetOpen}
-		stockLocationForm={data.stockLocationForm}
-		onSuccess={() => {
-			void refetch();
-		}}
-	/>
-{:else if formItem}
-	<UpdateLocation
-		bind:open={paginateState.formSheetOpen}
-		stockLocationForm={data.stockLocationForm}
-		// location={formItem as StockLocationRow}
-		onSuccess={() => {
-			void refetch();
-		}}
-	/>
-{/if}
+<CreateLocation
+	bind:open={createSheetOpen}
+	onSuccess={() => {
+		void query.refetch();
+	}}
+/>
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="location"
-	entityTitle={(deleteItem as any)?.name ?? (deleteItem as any)?.id ?? ''}
-	onConfirm={() => confirmDelete((loc) => deleteStockLocations([(loc as any).id]))}
-	onCancel={closeDeleteConfirm}
-	submitting={deleteSubmitting}
-	error={deleteError}
+	entityTitle={(deleteItem as LocationRow | null)?.name ??
+		(deleteItem as LocationRow | null)?.id ??
+		''}
+	onConfirm={() =>
+		paginateState.confirmDelete(async (item) => {
+			const row = item as unknown as LocationRow;
+			const res = await client['stock-locations'].delete({ ids: [row.id] });
+			if (res?.error) {
+				const err = res.error as { value?: { message?: string } };
+				throw new Error(String(err.value?.message ?? 'Failed to delete location'));
+			}
+			toast.success('Location deleted successfully');
+		})}
+	onCancel={paginateState.closeDeleteConfirm}
+	submitting={paginateState.deleteSubmitting}
+	error={paginateState.deleteError}
 />

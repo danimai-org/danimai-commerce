@@ -1,4 +1,3 @@
-
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -6,8 +5,8 @@
 	import { cn } from '$lib/utils.js';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { Toaster, toast } from 'svelte-sonner';
-	
-	type Mode = 'update' ;
+
+	type Mode = 'update';
 
 	interface Props {
 		category?: {
@@ -60,7 +59,7 @@
 				handle: (category?.handle ?? metadata?.handle ?? '').replace(/^\//, ''),
 				description: category?.description ?? metadata?.description ?? '',
 				visibility: category?.visibility ?? 'public',
-				status: category?.status ?? 'active',
+				status: category?.status ?? 'active'
 			}
 		});
 		message.set('');
@@ -93,7 +92,7 @@
 					handle: '',
 					description: '',
 					visibility: 'public',
-					status: 'active',
+					status: 'active'
 				}
 			});
 		}
@@ -102,7 +101,7 @@
 
 <Toaster richColors position="top-center" />
 
-<Sheet.Root bind:open={open} onOpenChange={onOpenChange}>
+<Sheet.Root bind:open {onOpenChange}>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
 		<form action="?/update" method="POST" use:enhance class="flex h-full flex-col">
 			<input type="hidden" name="id" bind:value={$form.id} />
@@ -114,12 +113,12 @@
 				{/if}
 				<div class="mt-6 flex flex-col gap-4">
 					<div class="flex flex-col gap-2">
-						<label for="edit-title" class="text-sm font-medium">Title</label>   
+						<label for="edit-title" class="text-sm font-medium">Title</label>
 						<Input
 							id="edit-title"
 							name="title"
 							bind:value={$form.title}
-							    placeholder="e.g. Color"
+							placeholder="e.g. Color"
 							aria-invalid={$errors.title ? 'true' : undefined}
 							class={cn('h-9', $errors.title && 'border-destructive')}
 						/>
@@ -134,7 +133,6 @@
 							name="handle"
 							bind:value={$form.handle}
 							placeholder="e.g. category-name"
-						
 							class={cn('h-9', $errors.handle && 'border-destructive')}
 						/>
 						{#if $errors.handle}
@@ -195,7 +193,6 @@
 						{/if}
 					</div>
 				</div>
-			
 			</div>
 			<div class="flex justify-end gap-2 border-t p-4">
 				<Button variant="outline" type="button" onclick={closeSheet}>Cancel</Button>

@@ -52,17 +52,14 @@
 		paginateState.closeForm();
 		void query.refetch();
 	}
-
 	function handleEditClosed() {
 		paginateState.closeForm();
 	}
-
 	function goToPage(pageNum: number) {
 		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
 		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
-
 	const tableColumns: TableColumn<AttributeRow>[] = [
 		{
 			label: 'Title',
@@ -148,7 +145,9 @@
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="attribute"
-	entityTitle={(deleteItem as AttributeRow | null)?.title ?? (deleteItem as AttributeRow | null)?.id ?? ''}
+	entityTitle={(deleteItem as AttributeRow | null)?.title ??
+		(deleteItem as AttributeRow | null)?.id ??
+		''}
 	onConfirm={() =>
 		paginateState.confirmDelete(async (item) => {
 			const row = item as unknown as AttributeRow;

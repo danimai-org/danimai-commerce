@@ -43,11 +43,15 @@
 </script>
 
 <div class="rounded-lg border bg-card p-4 shadow-sm">
-	<div class="flex items-center justify-between gap-2">
-		<h3 class="font-medium">JSON</h3>
-		<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-			{jsonKeysCount} keys
-		</span>
+	<div class="flex items-center justify-between gap-3">
+		<div class="flex min-w-0 flex-1 items-center gap-2">
+			<h3 class="shrink-0 font-medium">JSON</h3>
+			<span
+				class="shrink-0 whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+			>
+				{jsonKeysCount} keys
+			</span>
+		</div>
 		<Button
 			variant="ghost"
 			size="icon"

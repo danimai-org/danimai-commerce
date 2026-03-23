@@ -3,37 +3,34 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { superForm } from 'sveltekit-superforms/client';
-	import type { SuperValidated } from 'sveltekit-superforms';
 	import { cn } from '$lib/utils.js';
-
-	type StockLocationFormData = {
-		id: string;
-		name: string;
-		address_1: string;
-		address_2: string;
-		company: string;
-		city: string;
-		province: string;
-		postal_code: string;
-		country_code: string;
-		phone: string;
-	};
+	import { Toaster } from 'svelte-sonner';
+	import { toast } from 'svelte-sonner';
 
 	let {
 		open = $bindable(false),
-		stockLocationForm,
 		onSuccess = () => {}
 	}: {
 		open?: boolean;
-		stockLocationForm: SuperValidated<StockLocationFormData>;
 		onSuccess?: () => void | Promise<void>;
 	} = $props();
 
 	let apiError = $state<string | null>(null);
 
-	// SuperValidated from `load` is stable for this route; superForm only needs the initial snapshot.
-	// svelte-ignore state_referenced_locally
-	const { form, errors, enhance, delayed, reset } = superForm(stockLocationForm, {
+	const emptyData = {
+		id: '',
+		name: '',
+		address_1: '',
+		address_2: '',
+		company: '',
+		city: '',
+		province: '',
+		postal_code: '',
+		country_code: '',
+		phone: ''
+	};
+
+	const { form, errors, enhance, delayed, reset } = superForm(emptyData, {
 		resetForm: true,
 		invalidateAll: false,
 		onResult: async ({ result }) => {
@@ -52,23 +49,11 @@
 			if (result.type === 'success') {
 				apiError = null;
 				open = false;
+				toast.success('Location created successfully');
 				await onSuccess();
 			}
 		}
 	});
-
-	const emptyData: StockLocationFormData = {
-		id: '',
-		name: '',
-		address_1: '',
-		address_2: '',
-		company: '',
-		city: '',
-		province: '',
-		postal_code: '',
-		country_code: '',
-		phone: ''
-	};
 
 	let initializedCreate = $state(false);
 
@@ -89,6 +74,8 @@
 
 	const submitLabel = $derived($delayed ? 'Creating…' : 'Create');
 </script>
+
+<Toaster richColors position="top-center" />
 
 <Sheet.Root bind:open>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">

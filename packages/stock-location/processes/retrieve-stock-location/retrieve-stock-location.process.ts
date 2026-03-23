@@ -38,8 +38,8 @@ export class RetrieveStockLocationProcess
 
     const stockLocation = await this.db
       .selectFrom("stock_locations")
-      .where("id", "=", input.id)
-      .where("deleted_at", "is", null)
+      .where("stock_locations.id", "=", input.id)
+      .where("stock_locations.deleted_at", "is", null)
       .leftJoin(
         "stock_location_addresses",
         "stock_locations.address_id",

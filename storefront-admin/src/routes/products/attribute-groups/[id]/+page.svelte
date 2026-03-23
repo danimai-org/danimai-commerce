@@ -23,12 +23,7 @@
 	function parseAttributeGroupPayload(raw: unknown): AttributeGroupDetail | null {
 		if (raw == null || typeof raw !== 'object') return null;
 		let o = raw as Record<string, unknown>;
-		if (
-			'data' in o &&
-			o.data != null &&
-			typeof o.data === 'object' &&
-			!('title' in o)
-		) {
+		if ('data' in o && o.data != null && typeof o.data === 'object' && !('title' in o)) {
 			o = o.data as Record<string, unknown>;
 		}
 		const id = o.id;
@@ -48,11 +43,7 @@
 		for (const a of attrsRaw) {
 			if (a != null && typeof a === 'object') {
 				const r = a as Record<string, unknown>;
-				if (
-					typeof r.id === 'string' &&
-					typeof r.title === 'string' &&
-					typeof r.type === 'string'
-				) {
+				if (typeof r.id === 'string' && typeof r.title === 'string' && typeof r.type === 'string') {
 					attributes.push({ id: r.id, title: r.title, type: r.type });
 				}
 			} else if (typeof a === 'string') {

@@ -6,7 +6,7 @@
 	import { client } from '$lib/client.js';
 
 	type CategoryGetResponse = Awaited<
-		ReturnType<ReturnType<typeof client['product-categories']>['get']>
+		ReturnType<ReturnType<(typeof client)['product-categories']>['get']>
 	>;
 	type Category = CategoryGetResponse extends { data: infer Data } ? Data : never;
 
@@ -45,7 +45,8 @@
 					<span
 						class={cn(
 							'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-							selectedCategory.visibility === 'public' && 'bg-green-500/10 text-green-700 dark:text-green-400',
+							selectedCategory.visibility === 'public' &&
+								'bg-green-500/10 text-green-700 dark:text-green-400',
 							selectedCategory.visibility === 'private' && 'bg-muted text-muted-foreground'
 						)}
 					>

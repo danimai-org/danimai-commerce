@@ -12,63 +12,73 @@ const ProductCreateSchema = z.object({
 	description: z.string().max(4000, 'Description is too long').optional(),
 	status: z.enum(['draft', 'published']),
 	discountable: z.coerce.boolean().default(true),
-	collection_ids: z.preprocess((value) => {
-		if (Array.isArray(value)) return value;
-		if (typeof value !== 'string') return [];
-		try {
-			const parsed = JSON.parse(value) as unknown;
-			return Array.isArray(parsed) ? parsed : [];
-		} catch {
-			return [];
-		}
-	}, z.array(z.string().uuid('Collection ID must be a valid UUID'))),
+	collection_ids: z.preprocess(
+		(value) => {
+			if (Array.isArray(value)) return value;
+			if (typeof value !== 'string') return [];
+			try {
+				const parsed = JSON.parse(value) as unknown;
+				return Array.isArray(parsed) ? parsed : [];
+			} catch {
+				return [];
+			}
+		},
+		z.array(z.string().uuid('Collection ID must be a valid UUID'))
+	),
 	category_id: z.string().uuid('Category ID must be a valid UUID').optional().or(z.literal('')),
-	tag_ids: z.preprocess((value) => {
-		if (Array.isArray(value)) return value;
-		if (typeof value !== 'string') return [];
-		try {
-			const parsed = JSON.parse(value) as unknown;
-			return Array.isArray(parsed) ? parsed : [];
-		} catch {
-			return [];
-		}
-	}, z.array(z.string().uuid('Tag ID must be a valid UUID'))),
-	sales_channel_ids: z.preprocess((value) => {
-		if (Array.isArray(value)) return value;
-		if (typeof value !== 'string') return [];
-		try {
-			const parsed = JSON.parse(value) as unknown;
-			return Array.isArray(parsed) ? parsed : [];
-		} catch {
-			return [];
-		}
-	}, z.array(z.string().uuid('Sales channel ID must be a valid UUID'))),
+	tag_ids: z.preprocess(
+		(value) => {
+			if (Array.isArray(value)) return value;
+			if (typeof value !== 'string') return [];
+			try {
+				const parsed = JSON.parse(value) as unknown;
+				return Array.isArray(parsed) ? parsed : [];
+			} catch {
+				return [];
+			}
+		},
+		z.array(z.string().uuid('Tag ID must be a valid UUID'))
+	),
+	sales_channel_ids: z.preprocess(
+		(value) => {
+			if (Array.isArray(value)) return value;
+			if (typeof value !== 'string') return [];
+			try {
+				const parsed = JSON.parse(value) as unknown;
+				return Array.isArray(parsed) ? parsed : [];
+			} catch {
+				return [];
+			}
+		},
+		z.array(z.string().uuid('Sales channel ID must be a valid UUID'))
+	),
 	has_variants: z.coerce.boolean().default(true),
-	options: 
-		z
-			.array(
-				z.object({
-					title: z.string().min(1, 'Option title is required'),
-					values: z.array(z.string().min(1, 'Option value is required')).min(1)
-				})
-			)
-			.default([]),
-	variants: 
-		z
-			.array(
-				z.object({
-					title: z.string().min(1, 'Variant title is required'),
-					options: z.record(z.string(), z.string()),
-					sku: z.string().optional(),
-					available_count: z.number().int().min(0).optional(),
-					allow_backorder: z.boolean().default(false),
-					variant_rank: z.number().int().min(0),
-					price_amount: z.string().optional()
-				})
-			)
-			.default([])
-	,
-	attribute_group_id: z.string().uuid('Attribute group ID must be a valid UUID').optional().or(z.literal('')),
+	options: z
+		.array(
+			z.object({
+				title: z.string().min(1, 'Option title is required'),
+				values: z.array(z.string().min(1, 'Option value is required')).min(1)
+			})
+		)
+		.default([]),
+	variants: z
+		.array(
+			z.object({
+				title: z.string().min(1, 'Variant title is required'),
+				options: z.record(z.string(), z.string()),
+				sku: z.string().optional(),
+				available_count: z.number().int().min(0).optional(),
+				allow_backorder: z.boolean().default(false),
+				variant_rank: z.number().int().min(0),
+				price_amount: z.string().optional()
+			})
+		)
+		.default([]),
+	attribute_group_id: z
+		.string()
+		.uuid('Attribute group ID must be a valid UUID')
+		.optional()
+		.or(z.literal('')),
 	attributes: z.preprocess(
 		(value) => {
 			if (Array.isArray(value)) return value;
@@ -108,8 +118,13 @@ export const actions = {
 			const cleanHandle = data.handle?.trim() ? data.handle.trim() : undefined;
 			const cleanDescription = data.description?.trim() ? data.description.trim() : undefined;
 			const cleanCategoryId = data.category_id?.trim() ? data.category_id : undefined;
-			const cleanCollectionIds = data.collection_ids.length > 0 ? Array.from(new Set(data.collection_ids.map((id) => id.trim()).filter(Boolean))) : undefined;
-			const cleanAttributeGroupId = data.attribute_group_id?.trim() ? data.attribute_group_id : undefined;
+			const cleanCollectionIds =
+				data.collection_ids.length > 0
+					? Array.from(new Set(data.collection_ids.map((id) => id.trim()).filter(Boolean)))
+					: undefined;
+			const cleanAttributeGroupId = data.attribute_group_id?.trim()
+				? data.attribute_group_id
+				: undefined;
 
 			const optionsForApi = data.has_variants
 				? data.options
@@ -170,7 +185,10 @@ export const actions = {
 				options: optionsForApi,
 				variants: variantsForApi && variantsForApi.length > 0 ? variantsForApi : undefined,
 				attributes: attributesForApi,
-				collection_ids: cleanCollectionIds.length > 0 ? cleanCollectionIds : undefined
+				collection_ids:
+					cleanCollectionIds?.length && cleanCollectionIds.length > 0
+						? cleanCollectionIds
+						: undefined
 			};
 
 			const productResponse = await client.products.post(payload as never);
@@ -185,7 +203,10 @@ export const actions = {
 			return message(productCreateForm, 'Product created successfully');
 		} catch (error) {
 			const errorMessage =
-				error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+				error &&
+				typeof error === 'object' &&
+				'message' in error &&
+				typeof error.message === 'string'
 					? error.message
 					: 'Failed to create product';
 

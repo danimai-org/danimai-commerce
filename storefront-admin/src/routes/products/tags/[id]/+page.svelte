@@ -7,9 +7,7 @@
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
 	import { ProductListingCard } from '$lib/components/organs/index.js';
-
 	const tagId = $derived(page.params?.id ?? '');
-
 	type TagDetail = {
 		id: string;
 		value: string;
@@ -47,9 +45,7 @@
 	);
 
 	const displayName = $derived(tag?.value ?? tagId ?? 'Tag');
-
 	let selectedIds = $state<Set<string>>(new Set());
-
 	async function refetchTag() {
 		await tagDetailQuery.refetch();
 	}
@@ -110,7 +106,6 @@
 						}
 					}}
 				/>
-
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent
 						productId={tag.id}

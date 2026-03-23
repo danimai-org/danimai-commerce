@@ -46,11 +46,8 @@
 				? 'Attribute not found'
 				: null
 	);
-
 	const displayName = $derived(attribute?.title ?? attributeId ?? 'Attribute');
-
 	let selectedIds = $state<Set<string>>(new Set());
-
 	async function refetchAttribute() {
 		await attributeDetailQuery.refetch();
 	}
@@ -70,7 +67,6 @@
 			<span>/</span>
 			<span class="text-foreground">{displayName}</span>
 		</div>
-
 		{#if error}
 			<div
 				class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
@@ -93,7 +89,6 @@
 					pickerFilter={{}}
 					bind:selectedIds
 				/>
-
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent
 						productId={attribute.id}

@@ -11,6 +11,7 @@
 		TablePagination,
 		type TableColumn
 	} from '$lib/components/organs/index.js';
+	import { resolve } from '$app/paths';
 	import Package from '@lucide/svelte/icons/package';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import type { Product, PaginationMeta } from '$lib/components/organs/product/create/types.js';
@@ -35,7 +36,11 @@
 		await client.products.delete({ product_ids: ids });
 	}
 
-	const queryData = $derived(paginateState.query.data as { data: { rows: Product[]; pagination: PaginationMeta } } | undefined);
+	const queryData = $derived(
+		paginateState.query.data as
+			| { data: { rows: Product[]; pagination: PaginationMeta } }
+			| undefined
+	);
 	const rawRows = $derived(queryData?.data?.rows ?? []);
 	const rows = $derived(
 		rawRows.map((p: Product) => ({
@@ -92,7 +97,7 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => goto(`/products/${item.id}`)
+					onClick: (item) => goto(resolve(`/products/${item.id}`, {}))
 				},
 				{
 					label: 'Delete',

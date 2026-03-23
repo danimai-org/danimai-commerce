@@ -85,7 +85,6 @@
 				<div class="flex gap-6">
 					<CollectionHeroCard {collection} onUpdated={refetchCollection} />
 				</div>
-
 				<ProductListingCard
 					title="Collection Products"
 					filter={{ collection_ids: [collectionId] }}

@@ -76,7 +76,7 @@
 					>
 						<DropdownMenu.Item
 							textValue="Edit"
-							class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+							class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
 							onSelect={openEdit}
 							disabled={!group}
 						>
@@ -85,7 +85,7 @@
 						</DropdownMenu.Item>
 						<DropdownMenu.Item
 							textValue="Delete"
-							class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
+							class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
 							onSelect={openDeleteConfirm}
 							disabled={!group}
 						>
@@ -138,4 +138,3 @@
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}
 />
-

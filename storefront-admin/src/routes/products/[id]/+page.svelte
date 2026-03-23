@@ -21,18 +21,8 @@
 	let { data }: { data: PageData } = $props();
 
 	const productId = $derived(page.params?.id ?? '');
-	// $effect(() => {
-	// 	loadProductDetail(productId);
-	// });
 	loadProductDetail(productId);
-	const {
-		data: product,
-		error,
-		isPending
-	} = $derived(getProductDetail());
-
-	// Variant state and logic are in ProductVariant component
-
+	const { data: product, error, isPending } = $derived(getProductDetail());
 </script>
 
 <svelte:head>
@@ -41,13 +31,12 @@
 </svelte:head>
 
 <div class="flex h-full flex-col">
-	<!-- Breadcrumb + actions -->
 	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
 		<nav class="flex items-center gap-[5px] pl-[10px] text-sm">
 			<button
 				type="button"
 				class="text-muted-foreground hover:text-foreground"
-				onclick={() => goto(('/products'))}
+				onclick={() => goto(resolve('/products', {}))}
 			>
 				Products
 			</button>
@@ -63,7 +52,9 @@
 	{:else if error || !product}
 		<div class="flex flex-1 flex-col items-center justify-center gap-4 p-6">
 			<p class="text-destructive">{error ?? 'Product not found'}</p>
-			<Button variant="outline" onclick={() => goto(('/products'))}>Back to products</Button>
+			<Button variant="outline" onclick={() => goto(resolve('/products', {}))}
+				>Back to products</Button
+			>
 		</div>
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
@@ -72,18 +63,17 @@
 					class="grid gap-6"
 					style="grid-template-columns: 1fr 24rem; grid-auto-rows: minmax(0, auto); align-items: start;"
 				>
-				
 					<ProductHero productUpdateForm={data.productUpdateForm} />
 
 					<!-- Right: Status, Visibility, Organisation, Sales Channels, Attributes, Shipping -->
 					<div class="row-span-2 flex w-80 flex-col gap-6 self-start">
-						<ProductStatus/>
-						<ProductOrganisation productOrganisationForm={data.productOrganisationForm} />
+						<ProductStatus />
+						<ProductOrganisation productOrganisationForm={data.productUpdateForm} />
 						<ProductSalesChannel />
-						<ProductAttribute productAttributesForm={data.productAttributesForm} />
+						<ProductAttribute productAttributesForm={data.productUpdateForm} />
 					</div>
 
-					<!-- Media + Options (row 2, column 1) --> 
+					<!-- Media + Options (row 2, column 1) -->
 					<div class="flex min-w-0 flex-col gap-6">
 						<div class="rounded-lg border bg-card p-6 shadow-sm">
 							<div class="flex items-center justify-between">
@@ -117,21 +107,20 @@
 							{/if}
 						</div>
 
-						<ProductVariant	/>
+						<ProductVariant />
+					</div>
 
-						<!-- Metadata / JSON -->
-						<div class="grid gap-4 sm:grid-cols-2">
-							<MetadataComponent
-								productId={product?.id}
-								metadata={product?.metadata ?? {}}
-								onSaved={() => {}}
-							/>
-							<JSONComponent product={product} options={[]} variants={[]} category={null} />
-						</div>
+					<!-- Metadata / JSON — full width of main grid -->
+					<div class="col-span-2 grid w-full min-w-0 gap-4 sm:grid-cols-2">
+						<MetadataComponent
+							productId={product?.id}
+							metadata={product?.metadata ?? {}}
+							onSaved={() => {}}
+						/>
+						<JSONComponent {product} options={[]} variants={[]} category={null} />
 					</div>
 				</div>
 			</div>
 		</div>
-
 	{/if}
 </div>

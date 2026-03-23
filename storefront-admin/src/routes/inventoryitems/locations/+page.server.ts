@@ -1,22 +1,9 @@
-import type { Actions, PageServerLoad } from './$types';
+import type { Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 import { z } from 'zod';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { superValidate, message } from 'sveltekit-superforms';
 import { client } from '$lib/client';
-
-const emptyForm = {
-	id: '',
-	name: '',
-	address_1: '',
-	address_2: '',
-	company: '',
-	city: '',
-	province: '',
-	postal_code: '',
-	country_code: '',
-	phone: ''
-};
 
 const StockLocationFormSchema = z.object({
 	id: z.string().optional().default(''),
@@ -46,11 +33,6 @@ function addressFromForm(data: z.infer<typeof StockLocationFormSchema>) {
 	return hasAddress ? addressFields : undefined;
 }
 
-export const load: PageServerLoad = async () => {
-	const stockLocationForm = await superValidate(emptyForm, zod4(StockLocationFormSchema));
-	return { stockLocationForm };
-};
-
 export const actions = {
 	create: async ({ request }) => {
 		const stockLocationForm = await superValidate(request, zod4(StockLocationFormSchema));
@@ -70,31 +52,5 @@ export const actions = {
 			});
 		}
 		return message(stockLocationForm, 'Location created successfully');
-	},
-	update: async ({ request }) => {
-		const stockLocationForm = await superValidate(request, zod4(StockLocationFormSchema));
-		if (!stockLocationForm.valid) {
-			return fail(400, { stockLocationForm });
-		}
-		const id = stockLocationForm.data.id.trim();
-		if (!id) {
-			return fail(400, {
-				stockLocationForm,
-				error: 'Missing location id'
-			});
-		}
-		const addr = addressFromForm(stockLocationForm.data);
-		const updateRes = await client['stock-locations']({ id }).put({
-			name: stockLocationForm.data.name.trim() || null,
-			...(addr !== undefined ? { address: addr } : {})
-		});
-		if (updateRes?.error) {
-			const err = updateRes.error as { value?: { message?: string } };
-			return fail(400, {
-				stockLocationForm,
-				error: String(err.value?.message ?? 'Failed to update stock location')
-			});
-		}
-		return message(stockLocationForm, 'Location updated successfully');
 	}
 } satisfies Actions;
