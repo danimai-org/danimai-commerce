@@ -9,12 +9,7 @@ const CategoryUpdateSchema = z.object({
 	id: z.string(),
 	title: z.string().min(3, 'Title must be at least 3 characters').max(50, 'Title is too long'),
 	handle: z.string().min(3, 'Handle must be at least 3 characters').max(50, 'Handle is too long'),
-	description: z
-		.string()
-		.min(3, 'Description must be at least 3 characters')
-		.max(200, 'Description is too long'),
-	visibility: z.enum(['public', 'private']),
-	status: z.enum(['active', 'inactive'])
+	visibility: z.enum(['public', 'private'])
 });
 
 export const load: PageServerLoad = async () => {

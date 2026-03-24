@@ -3,8 +3,17 @@
 	import { client } from '$lib/client.js';
 	import { cn } from '$lib/utils.js';
 
+	type CategoryGetResponse = Awaited<
+		ReturnType<ReturnType<(typeof client)['product-categories']>['get']>
+	>;
+	type Category = CategoryGetResponse extends { data: infer Data } ? Data : never;
+
+	type CategoryResource = ReturnType<(typeof client)['product-categories']>;
+	type ProductCategoryPutBody = NonNullable<Parameters<CategoryResource['put']>[0]>;
+	type ProductCategoryPutStatus = NonNullable<ProductCategoryPutBody['status']>;
+
 	interface Props {
-		category: any | null;
+		category: Category | null;
 		onUpdated?: () => void | Promise<void>;
 	}
 
@@ -23,8 +32,8 @@
 		statusUpdating = true;
 		try {
 			const res = await client['product-categories']({ id: category.id }).put({
-				status: newStatus as any
-			} as any);
+				status: newStatus as ProductCategoryPutStatus
+			});
 			if (!res.error) {
 				await onUpdated();
 			}
@@ -36,8 +45,8 @@
 	}
 </script>
 
-<div class="rounded-lg border bg-card p-6 self-start w-72 h-full shadow-sm">
-	<h2 class="font-semibold mb-4">Status</h2>
+<div class="h-full w-72 self-start rounded-lg border bg-card p-6 shadow-sm">
+	<h2 class="mb-4 font-semibold">Status</h2>
 	<Select.Root
 		type="single"
 		value={category?.status ?? 'inactive'}
@@ -52,8 +61,7 @@
 			<span
 				class={cn(
 					'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-					category?.status === 'active' &&
-						'bg-green-500/10 text-green-700 dark:text-green-400',
+					category?.status === 'active' && 'bg-green-500/10 text-green-700 dark:text-green-400',
 					category?.status === 'inactive' && 'bg-red-500/10 text-red-700 dark:text-red-400'
 				)}
 			>

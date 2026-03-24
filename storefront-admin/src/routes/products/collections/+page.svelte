@@ -19,12 +19,13 @@
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 
-	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
-
 	const paginateState = createPagination(
-		async () => client['collections'].get({ query: paginationQuery }),
+		async () =>
+			client['collections'].get({
+				query: createPaginationQuery(page.url.searchParams)
+			}),
 		['collections'],
-		paginationQuery
+		createPaginationQuery(page.url.searchParams)
 	);
 
 	const { query } = paginateState;

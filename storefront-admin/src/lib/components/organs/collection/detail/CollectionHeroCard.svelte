@@ -4,17 +4,15 @@
 	import EditCollectionHero from '$lib/components/organs/collection/update/EditCollectionHero.svelte';
 
 	interface Props {
-		collection: any | null;
+		collection: Record<string, unknown> | null;
 		onUpdated?: () => void | Promise<void>;
 	}
-
 	let { collection, onUpdated = () => {} }: Props = $props();
-
 	let editOpen = $state(false);
 
-	function getHandle(c: any | null): string {
+	function getHandle(c: { handle?: string | undefined } | null): string {
 		if (!c) return '';
-		return c.handle.startsWith('/') ? c.handle : `/${c.handle}`;
+		return (c.handle as string)?.startsWith('/') ? (c.handle as string) : `/${c.handle as string}`;
 	}
 
 	function openEdit() {
@@ -26,7 +24,9 @@
 <div class="flex-1 rounded-lg border bg-card p-6 shadow-sm">
 	<section class="flex flex-col gap-6 pb-8">
 		<div class="flex items-center justify-between gap-4">
-			<h1 class="text-2xl font-semibold tracking-tight">{collection?.title ?? 'Collection'}</h1>
+			<h1 class="text-2xl font-semibold tracking-tight">
+				{(collection?.title as string | undefined) ?? 'Collection'}
+			</h1>
 			<Button
 				variant="ghost"
 				size="icon"
@@ -39,9 +39,8 @@
 			</Button>
 		</div>
 		<div class="flex items-center gap-3">
-			<label
-				for="collection-handle"
-				class="shrink-0 text-sm font-medium text-muted-foreground">Handle</label
+			<label for="collection-handle" class="shrink-0 text-sm font-medium text-muted-foreground"
+				>Handle</label
 			>
 			<input
 				id="collection-handle"
@@ -52,14 +51,20 @@
 			/>
 		</div>
 	</section>
-
 </div>
 
 <EditCollectionHero
-	collection={editOpen ? collection : null}
+	collection={editOpen
+		? (collection as unknown as {
+				id: string;
+				title?: string | undefined;
+				value?: string | undefined;
+				handle?: string | undefined;
+				metadata?: { handle?: string | undefined } | null | undefined;
+			} | null)
+		: null}
 	onSaved={onUpdated}
 	onClosed={() => {
 		editOpen = false;
 	}}
 />
-

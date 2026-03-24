@@ -5,7 +5,6 @@
 	import { cn } from '$lib/utils.js';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { toast, Toaster } from 'svelte-sonner';
-
 	let {
 		open = $bindable(false),
 		onSuccess = () => {}
@@ -75,13 +74,11 @@
 							<span class="text-xs text-destructive">{$errors.handle}</span>
 						{/if}
 						<p class="text-xs text-muted-foreground">
-							Shown in URLs; use lowercase and hyphens. A leading "/" will be added when
-							displayed.
+							Shown in URLs; use lowercase and hyphens. A leading "/" will be added when displayed.
 						</p>
 					</div>
 				</div>
 			</div>
-
 			<div class="flex justify-end gap-2 border-t p-4">
 				<Button variant="outline" type="button" onclick={close}>Cancel</Button>
 				<Button type="submit" disabled={$delayed}>
