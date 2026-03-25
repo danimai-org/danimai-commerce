@@ -5,6 +5,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { DropdownMenu } from 'bits-ui';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { client } from '$lib/client.js';
 
 	interface Props {
@@ -51,8 +52,8 @@
 	let error = $state<string | null>(null);
 
 	$effect(() => {
-		regionId;
-		refreshNonce;
+		void regionId;
+		void refreshNonce;
 		const id = regionId;
 		if (!id) {
 			countries = [];
@@ -64,8 +65,7 @@
 		loading = true;
 		error = null;
 		client['regions']({ id: id as string })
-			.countries
-			.get({ query: { limit: 1000 } })
+			.countries.get({ query: { limit: 1000 } })
 			.then((res) => {
 				if (!active) return;
 				if (res.error) {
@@ -100,7 +100,7 @@
 		);
 	});
 
-	let selectedIds = $state<Set<string>>(new Set());
+	let selectedIds = new SvelteSet<string>();
 
 	const allSelected = $derived(
 		filteredCountries.length > 0 && filteredCountries.every((c) => selectedIds.has(c.id))
@@ -108,20 +108,21 @@
 
 	function toggleAll() {
 		if (allSelected) {
-			selectedIds = new Set();
+			selectedIds.clear();
 		} else {
-			selectedIds = new Set(filteredCountries.map((c) => c.id));
+			selectedIds.clear();
+			for (const c of filteredCountries) {
+				selectedIds.add(c.id);
+			}
 		}
 	}
 
 	function toggleOne(id: string) {
-		const next = new Set(selectedIds);
-		if (next.has(id)) {
-			next.delete(id);
+		if (selectedIds.has(id)) {
+			selectedIds.delete(id);
 		} else {
-			next.add(id);
+			selectedIds.add(id);
 		}
-		selectedIds = next;
 	}
 </script>
 
@@ -135,11 +136,11 @@
 
 	<div class="border-b px-6 py-3">
 		<div class="relative">
-			<Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+			<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 			<Input
 				placeholder="Search countries…"
 				bind:value={searchQuery}
-				class="h-9 w-56 pl-9 rounded-md"
+				class="h-9 w-56 rounded-md pl-9"
 			/>
 		</div>
 	</div>
@@ -149,70 +150,70 @@
 	{:else if error}
 		<div class="px-6 py-8 text-center text-destructive">{error}</div>
 	{:else}
-	<div class="overflow-auto">
-		<table class="w-full text-sm">
-			<thead>
-				<tr class="border-b text-left">
-					<th class="w-10 px-6 py-3">
-						<input
-							type="checkbox"
-							checked={allSelected}
-							onchange={toggleAll}
-							class="size-4 rounded border-input"
-						/>
-					</th>
-					<th class="px-4 py-3 font-medium text-muted-foreground">Country</th>
-					<th class="px-4 py-3 font-medium text-muted-foreground">Code</th>
-					<th class="w-12 px-4 py-3"></th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each filteredCountries as country (country.id)}
-					<tr class="border-b last:border-b-0 hover:bg-muted/50">
-						<td class="px-6 py-3">
+		<div class="overflow-auto">
+			<table class="w-full text-sm">
+				<thead>
+					<tr class="border-b text-left">
+						<th class="w-10 px-6 py-3">
 							<input
 								type="checkbox"
-								checked={selectedIds.has(country.id)}
-								onchange={() => toggleOne(country.id)}
+								checked={allSelected}
+								onchange={toggleAll}
 								class="size-4 rounded border-input"
 							/>
-						</td>
-						<td class="px-4 py-3">{country.name}</td>
-						<td class="px-4 py-3 font-mono text-muted-foreground">{country.code}</td>
-						<td class="px-4 py-3">
-							<DropdownMenu.Root>
-								<DropdownMenu.Trigger
-									class="flex size-7 items-center justify-center rounded-md hover:bg-muted"
-									aria-label="Row actions for {country.name}"
-								>
-									<MoreHorizontal class="size-4" />
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Portal>
-									<DropdownMenu.Content
-										class="z-50 min-w-32 rounded-xl border bg-popover p-1 text-popover-foreground shadow-md"
-										sideOffset={4}
+						</th>
+						<th class="px-4 py-3 font-medium text-muted-foreground">Country</th>
+						<th class="px-4 py-3 font-medium text-muted-foreground">Code</th>
+						<th class="w-12 px-4 py-3"></th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each filteredCountries as country (country.id)}
+						<tr class="border-b last:border-b-0 hover:bg-muted/50">
+							<td class="px-6 py-3">
+								<input
+									type="checkbox"
+									checked={selectedIds.has(country.id)}
+									onchange={() => toggleOne(country.id)}
+									class="size-4 rounded border-input"
+								/>
+							</td>
+							<td class="px-4 py-3">{country.name}</td>
+							<td class="px-4 py-3 font-mono text-muted-foreground">{country.code}</td>
+							<td class="px-4 py-3">
+								<DropdownMenu.Root>
+									<DropdownMenu.Trigger
+										class="flex size-7 items-center justify-center rounded-md hover:bg-muted"
+										aria-label="Row actions for {country.name}"
 									>
-										<DropdownMenu.Item
-											textValue="Remove"
-											class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive"
+										<MoreHorizontal class="size-4" />
+									</DropdownMenu.Trigger>
+									<DropdownMenu.Portal>
+										<DropdownMenu.Content
+											class="z-50 min-w-32 rounded-xl border bg-popover p-1 text-popover-foreground shadow-md"
+											sideOffset={4}
 										>
-											Remove
-										</DropdownMenu.Item>
-									</DropdownMenu.Content>
-								</DropdownMenu.Portal>
-							</DropdownMenu.Root>
-						</td>
-					</tr>
-				{:else}
-					<tr>
-						<td colspan="4" class="px-6 py-8 text-center text-muted-foreground">
-							No countries found.
-						</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	</div>
+											<DropdownMenu.Item
+												textValue="Remove"
+												class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive"
+											>
+												Remove
+											</DropdownMenu.Item>
+										</DropdownMenu.Content>
+									</DropdownMenu.Portal>
+								</DropdownMenu.Root>
+							</td>
+						</tr>
+					{:else}
+						<tr>
+							<td colspan="4" class="px-6 py-8 text-center text-muted-foreground">
+								No countries found.
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
 	{/if}
 </div>
 
@@ -223,7 +224,9 @@
 			<Sheet.Description>Select countries to assign to this region.</Sheet.Description>
 		</Sheet.Header>
 		<Sheet.Footer class="mt-auto flex justify-end gap-2 border-t p-4">
-			<Button type="button" variant="outline" onclick={() => (addCountriesOpen = false)}>Close</Button>
+			<Button type="button" variant="outline" onclick={() => (addCountriesOpen = false)}
+				>Close</Button
+			>
 		</Sheet.Footer>
 	</Sheet.Content>
 </Sheet.Root>

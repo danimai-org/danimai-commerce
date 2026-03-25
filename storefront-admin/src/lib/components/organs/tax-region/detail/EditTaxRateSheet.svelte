@@ -5,21 +5,19 @@
 
 	interface Props {
 		open?: boolean;
-		regionId?: string;
 		title?: string;
-		onSave?: (data: { name: string; code: string; rate: string }) => void;
+		onSave?: (data: { name: string; code: string; rate: number }) => void;
 	}
 
-	let { open = $bindable(false), regionId: _regionId, title = 'Edit Tax Rate', onSave }: Props = $props();
-
+	let { open = $bindable(false), title = 'Edit Tax Rate', onSave }: Props = $props();
+	let rate = $state<number>(0.0);
 	let name = $state('');
 	let code = $state('');
-	let rate = $state('0.00');
 
 	function resetForm() {
 		name = '';
 		code = '';
-		rate = '0.00';
+		rate = 0.0;
 	}
 
 	function handleSave() {

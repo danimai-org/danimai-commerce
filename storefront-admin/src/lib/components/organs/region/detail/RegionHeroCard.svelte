@@ -6,7 +6,7 @@
 	import { client } from '$lib/client.js';
 
 	interface Props {
-		region: { id: string; name: string; currency_code: string; metadata?: Record<string, unknown> };
+		region: { name: string; currency_code: string };
 		onEdit: () => void;
 		onDelete: () => void;
 	}
@@ -34,12 +34,16 @@
 				if (cancelled) return;
 				currencyLoading = false;
 				if (res.error) {
-					currencyError = String((res.error as { value?: { message?: string } })?.value?.message ?? res.error);
+					currencyError = String(
+						(res.error as { value?: { message?: string } })?.value?.message ?? res.error
+					);
 					return;
 				}
 				const raw = res.data as unknown;
-				const rows = Array.isArray(raw) ? raw : (raw as { rows?: unknown[] })?.rows ?? [];
-				const c = (rows[0] as { code?: string; name?: string; tax_inclusive_pricing?: boolean } | undefined);
+				const rows = Array.isArray(raw) ? raw : ((raw as { rows?: unknown[] })?.rows ?? []);
+				const c = rows[0] as
+					| { code?: string; name?: string; tax_inclusive_pricing?: boolean }
+					| undefined;
 				if (c) {
 					currencyData = {
 						name: c.name ?? code,
@@ -83,7 +87,7 @@
 					>
 						<DropdownMenu.Item
 							textValue="Edit"
-							class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+							class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
 							onSelect={onEdit}
 						>
 							<Pencil class="size-4" />
@@ -91,7 +95,7 @@
 						</DropdownMenu.Item>
 						<DropdownMenu.Item
 							textValue="Delete"
-							class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
+							class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
 							onSelect={onDelete}
 						>
 							<Trash2 class="size-4" />
@@ -121,7 +125,7 @@
 					{#if currencyLoading}
 						<span class="text-muted-foreground">—</span>
 					{:else}
-						{currencyData?.tax_inclusive_pricing ?? false ? 'True' : 'False'}
+						{(currencyData?.tax_inclusive_pricing ?? false) ? 'True' : 'False'}
 					{/if}
 				</dd>
 			</div>

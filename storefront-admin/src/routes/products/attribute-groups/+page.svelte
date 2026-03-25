@@ -19,16 +19,16 @@
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 
-	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
-
 	const paginateState = createPagination(
-		async () => client['product-attribute-groups'].get({ query: paginationQuery }),
+		async () =>
+			client['product-attribute-groups'].get({
+				query: createPaginationQuery(page.url.searchParams)
+			}),
 		['product-attribute-groups'],
-		paginationQuery
+		createPaginationQuery(page.url.searchParams)
 	);
-
 	const { query } = paginateState;
-
+	const refetch = $derived(paginateState.refetch);
 	const loading = $derived(paginateState.loading);
 	const error = $derived(paginateState.error);
 	const rows = $derived(query.data?.data?.rows ?? []);
@@ -142,21 +142,19 @@
 <CreateAttributeGroupSheet
 	bind:open={createOpen}
 	onSuccess={() => {
-		void query.refetch();
+		void refetch();
 	}}
 />
-
 <EditAttributeGroupSheet
 	group={editGroup}
 	onSaved={async () => {
 		editGroup = null;
-		await query.refetch();
+		await refetch();
 	}}
 	onClosed={() => {
 		editGroup = null;
 	}}
 />
-
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="attribute group"

@@ -5,6 +5,11 @@ import { sveltekit } from '@sveltejs/kit/vite';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
+	optimizeDeps: {
+		// Pre-bundle per-icon Lucide entrypoints so route code-splitting does not race
+		// with dep optimization (avoids intermittent NetworkError on dynamic import in dev).
+		include: ['@lucide/svelte/icons/map-pin']
+	},
 	ssr: {
 		// This tells Vite: "Don't let Node handle these, compile them first"
 		noExternal: ['sveltekit-superforms']
@@ -16,6 +21,9 @@ export default defineConfig({
 				changeOrigin: true,
 				rewrite: (p) => p.replace(/^\/api/, '')
 			}
+		},
+		warmup: {
+			clientFiles: ['./src/routes/**/*.svelte']
 		}
 	},
 	test: {

@@ -11,18 +11,22 @@
 
 	import EditSaleChannel from '$lib/components/organs/sales-channel/update/EditSaleChannel.svelte';
 	import SalesChannelHeroCard from '$lib/components/organs/sales-channel/detail/SalesChannelHeroCard.svelte';
+	import { resolve } from '$app/paths';
 
+	type SalesChannel = {
+		id: string;
+		name: string;
+		description: string;
+		metadata: Record<string, unknown>;
+	};
 	const channelId = $derived(page.params?.id ?? '');
-
-	let channel = $state<any | null>(null);
+	let channel = $state<SalesChannel | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let formSheetOpen = $state(false);
 	let deleteConfirmOpen = $state(false);
 	let deleteSubmitting = $state(false);
 	let deleteError = $state<string | null>(null);
-	let selectedIds = $state<Set<string>>(new Set());
-
 
 	const channelHandle = $derived.by(() => {
 		const source = channel?.name?.trim() ?? '';
@@ -51,7 +55,7 @@
 				channel = null;
 				return;
 			}
-			channel = (res.data ?? null) as any | null;
+			channel = (res.data ?? null) as SalesChannel | null;
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			channel = null;
@@ -61,17 +65,13 @@
 	}
 
 	$effect(() => {
-		channelId;
-		loadChannel();
+		if (channelId) {
+			loadChannel();
+		}
 	});
 
 	function openEdit() {
 		formSheetOpen = true;
-	}
-
-	function openDelete() {
-		deleteError = null;
-		deleteConfirmOpen = true;
 	}
 
 	async function confirmDelete() {
@@ -81,7 +81,7 @@
 		try {
 			await client['sales-channels'].delete({ sales_channel_ids: [channel.id] });
 			deleteConfirmOpen = false;
-			goto('/sales-channels');
+			goto(resolve('/sales-channels', {}), { replaceState: true });
 		} catch (e) {
 			deleteError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -101,7 +101,7 @@
 			<button
 				type="button"
 				class="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-				onclick={() => goto('/sales-channels')}
+				onclick={() => goto(resolve('/sales-channels', {}), { replaceState: true })}
 			>
 				<Share2 class="size-4 shrink-0" />
 				<span>Sales Channels</span>
@@ -118,14 +118,21 @@
 	{:else if error || !channel}
 		<div class="flex flex-1 flex-col items-center justify-center gap-4 p-6">
 			<p class="text-destructive">{error ?? 'Sales channel not found'}</p>
-			<Button variant="outline" onclick={() => goto('/sales-channels')}>Back to Sales Channels</Button>
+			<Button
+				variant="outline"
+				onclick={() => goto(resolve('/sales-channels', {}), { replaceState: true })}
+				>Back to Sales Channels</Button
+			>
 		</div>
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<SalesChannelHeroCard {channel} {channelHandle} onEdit={openEdit} onSaved={loadChannel} />
 
 			<div class="flex flex-col gap-8 p-6">
-				<ProductListingCard filter={{ sales_channel_id: channel.id }} title="Products Sales Channel" />
+				<ProductListingCard
+					filter={{ sales_channel_id: channel.id }}
+					title="Products Sales Channel"
+				/>
 
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent
@@ -139,15 +146,9 @@
 			</div>
 		</div>
 	{/if}
-	
 </div>
 
-<EditSaleChannel
-	bind:open={formSheetOpen}
-	mode="edit"
-	{channel}
-	onSuccess={loadChannel}
-/>
+<EditSaleChannel bind:open={formSheetOpen} mode="edit" {channel} onSuccess={loadChannel} />
 
 <DeleteConfirmationModal
 	bind:open={deleteConfirmOpen}

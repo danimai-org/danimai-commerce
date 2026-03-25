@@ -19,16 +19,16 @@
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 
-	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
-
 	const paginateState = createPagination(
-		async () => client['product-attributes'].get({ query: paginationQuery }),
+		async () =>
+			client['product-attributes'].get({
+				query: createPaginationQuery(page.url.searchParams)
+			}),
 		['product-attributes'],
-		paginationQuery
+		createPaginationQuery(page.url.searchParams)
 	);
-
 	const { query } = paginateState;
-
+	const refetch = $derived(paginateState.refetch);
 	const loading = $derived(paginateState.loading);
 	const error = $derived(paginateState.error);
 	const rows = $derived(query.data?.data?.rows ?? []);
@@ -47,10 +47,9 @@
 	const formMode = $derived(paginateState.formMode);
 	const formItem = $derived(paginateState.formItem);
 	const openCreate = $derived(paginateState.openCreate);
-
 	async function handleFormSaved() {
 		paginateState.closeForm();
-		void query.refetch();
+		void refetch();
 	}
 	function handleEditClosed() {
 		paginateState.closeForm();
@@ -97,7 +96,6 @@
 	<title>Attributes | Products | Danimai Store</title>
 	<meta name="description" content="Manage product attributes." />
 </svelte:head>
-
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
@@ -134,14 +132,12 @@
 		</PaginationTable>
 	</div>
 </div>
-
 <AttributeFormSheet bind:open={paginateState.formSheetOpen} onSuccess={handleFormSaved} />
 <EditAttribute
 	attribute={formMode === 'edit' ? ((formItem as AttributeRow | null) ?? null) : null}
 	onSaved={handleFormSaved}
 	onClosed={handleEditClosed}
 />
-
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="attribute"

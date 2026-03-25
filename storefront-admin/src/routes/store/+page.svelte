@@ -2,6 +2,16 @@
 	import StoreIcon from '@lucide/svelte/icons/store';
 	import { StoreListingCard } from '$lib/components/organs/index.js';
 	import CurrencySheet from '$lib/components/organs/store/CurrencySheet.svelte';
+
+	import { client } from '$lib/client.js';
+	import { createPagination } from '$lib/api/pagination.svelte.js';
+	const paginateState = createPagination(async () => {
+		return client.stores.get({ query: { page: 1, limit: 10 } });
+	}, ['stores']);
+
+	$effect(() => {
+		paginateState.refetch();
+	});
 </script>
 
 <svelte:head>

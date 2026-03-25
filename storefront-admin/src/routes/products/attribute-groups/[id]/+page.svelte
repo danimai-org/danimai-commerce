@@ -2,16 +2,14 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { createQuery } from '@tanstack/svelte-query';
 	import { client } from '$lib/client.js';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 	import AttributeGroupHeroCard from '$lib/components/organs/attribute-group/detail/AttributeGroupHeroCard.svelte';
 	import AttributeGroupAttributesCard from '$lib/components/organs/attribute-group/detail/AttributeGroupAttributesCard.svelte';
 	import { ProductListingCard } from '$lib/components/organs/index.js';
-
+	import { createPagination, createPaginationQuery } from '$lib/api';
 	const groupId = $derived(page.params?.id ?? '');
-
 	type GroupAttribute = { id: string; title: string; type: string };
 	type AttributeGroupDetail = {
 		id: string;
@@ -19,7 +17,6 @@
 		metadata: unknown | null;
 		attributes: GroupAttribute[];
 	};
-
 	function parseAttributeGroupPayload(raw: unknown): AttributeGroupDetail | null {
 		if (raw == null || typeof raw !== 'object') return null;
 		let o = raw as Record<string, unknown>;
@@ -40,7 +37,7 @@
 		}
 		if (!Array.isArray(attrsRaw)) attrsRaw = [];
 		const attributes: GroupAttribute[] = [];
-		for (const a of attrsRaw) {
+		for (const a of attrsRaw as unknown[]) {
 			if (a != null && typeof a === 'object') {
 				const r = a as Record<string, unknown>;
 				if (typeof r.id === 'string' && typeof r.title === 'string' && typeof r.type === 'string') {
@@ -61,51 +58,31 @@
 				}
 			}
 		}
+		const metadata = o.metadata;
 		return {
 			id,
 			title,
-			metadata: (o.metadata ?? null) as unknown,
+			metadata: metadata === undefined ? null : metadata,
 			attributes
 		};
 	}
-
-	const groupDetailQuery = createQuery(() => ({
-		queryKey: ['attribute-group-detail', groupId],
-		queryFn: async (): Promise<AttributeGroupDetail | null> => {
-			if (!groupId) return null;
-			const res = await client['product-attribute-groups']({ id: groupId }).get();
-			if (res?.error) {
-				const err = res.error as { status?: number; value?: { message?: string } };
-				if (err?.status === 404) {
-					throw new Error('Attribute group not found');
-				}
-				throw new Error(String(err?.value?.message ?? res.error));
-			}
-			return parseAttributeGroupPayload(res?.data as unknown);
-		},
-		enabled: !!groupId,
-		refetchOnWindowFocus: false
-	}));
-
-	const group = $derived(groupDetailQuery.data ?? null);
-	const attributes = $derived(group?.attributes ?? []);
-	const loading = $derived(groupDetailQuery.isPending && groupDetailQuery.isFetching);
-	const error = $derived(
-		groupDetailQuery.error != null
-			? groupDetailQuery.error instanceof Error
-				? groupDetailQuery.error.message
-				: String(groupDetailQuery.error)
-			: group === null && groupDetailQuery.isSuccess && groupId
-				? 'Attribute group not found'
-				: null
+	const paginateState = createPagination(
+		async () => client['product-attribute-groups']({ id: groupId }).get(),
+		['attribute-group-detail', groupId],
+		createPaginationQuery(page.url.searchParams)
 	);
+
+	const { query } = paginateState;
+	const refetch = $derived(paginateState.refetch);
+	const group = $derived(parseAttributeGroupPayload(query.data));
+	const attributes = $derived(group?.attributes ?? []);
+	const loading = $derived(paginateState.loading);
+	const error = $derived(paginateState.error);
 
 	const displayName = $derived(group?.title ?? groupId ?? 'Attribute group');
 
-	let selectedIds = $state<Set<string>>(new Set());
-
 	async function refetchGroupData() {
-		await groupDetailQuery.refetch();
+		await refetch();
 	}
 </script>
 
@@ -146,12 +123,12 @@
 					/>
 				</div>
 
-				<AttributeGroupAttributesCard {group} {attributes} />
+				<AttributeGroupAttributesCard {attributes} />
 				<ProductListingCard
 					title="Products with this attribute group"
 					filter={{ attribute_group_ids: [groupId] }}
 					pickerFilter={{}}
-					bind:selectedIds
+					selectedIds={new Set()}
 				/>
 				<div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
 					<MetadataComponent

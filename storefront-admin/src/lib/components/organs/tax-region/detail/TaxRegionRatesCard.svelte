@@ -3,19 +3,10 @@
 	import EditTaxRateSheet from './EditTaxRateSheet.svelte';
 
 	interface Props {
-		regionId?: string;
-		rates?: any[];
+		rates?: unknown[];
 	}
 
-	type TaxRateRow = {
-		id: string;
-		name: string;
-		code: string;
-		rate: string;
-		createdAt: string;
-	};
-
-	let { regionId: _regionId, rates = [] }: Props = $props();
+	let { rates = [] }: Props = $props();
 
 	let sheetOpen = $state(false);
 
@@ -32,17 +23,23 @@
 
 	function formatRate(value: unknown): string {
 		if (typeof value === 'number') return `${value}%`;
-		if (typeof value === 'string' && value.trim() !== '') return `${value}%`;
-		return '—';
+		if (typeof value === 'string' && Number(value.trim()) > 0) return `${value}%`;
+		return '0.00%';
 	}
 
 	const rows = $derived.by(() =>
 		(rates ?? []).map((item) => ({
-			id: String(item?.id ?? ''),
-			name: String(item?.name ?? item?.code ?? '—'),
-			code: String(item?.code ?? '—'),
-			rate: formatRate(item?.rate),
-			createdAt: formatDate(item?.created_at)
+			id: String((item as { id?: string })?.id ?? ''),
+			name: String(
+				(item as { name?: string; code?: string })?.name ?? (item as { code?: string })?.code ?? '—'
+			),
+			code: String((item as { code?: string })?.code ?? '—'),
+			rate: Number(formatRate((item as { rate?: string | number })?.rate ?? '0.00')),
+			createdAt: formatDate((item as { created_at?: string | Date })?.created_at) as
+				| string
+				| Date
+				| null
+				| undefined
 		}))
 	);
 </script>
@@ -66,7 +63,9 @@
 			<tbody>
 				{#if rows.length === 0}
 					<tr>
-						<td colspan={4} class="px-6 py-8 text-center text-muted-foreground">No tax rates found.</td>
+						<td colspan={4} class="px-6 py-8 text-center text-muted-foreground"
+							>No tax rates found.</td
+						>
 					</tr>
 				{:else}
 					{#each rows as row (row.id)}
@@ -83,4 +82,4 @@
 	</div>
 </div>
 
-<EditTaxRateSheet bind:open={sheetOpen} regionId={_regionId} title="Add Tax Rate" />
+<EditTaxRateSheet bind:open={sheetOpen} title="Add Tax Rate" />

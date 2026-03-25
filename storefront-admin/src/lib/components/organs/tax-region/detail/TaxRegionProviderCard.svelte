@@ -13,8 +13,13 @@
 		<h2 class="text-lg font-semibold">Tax Provider</h2>
 		<Button size="sm" variant="outline" disabled>Configure</Button>
 	</div>
-	<div class="px-6 py-6">
-		<p class="text-sm text-muted-foreground">Provider ID</p>
-		<p class="mt-1 text-sm font-medium">{providerId ?? 'Not set'}</p>
+	<div class="px-6 py-10 text-center">
+		{#if providerId === null}
+			<p class="text-sm font-medium text-muted-foreground">Not set</p>
+			<p class="mt-1 text-sm text-muted-foreground">There is no tax provider set for this region</p>
+		{:else}
+			<p class="text-sm font-medium text-muted-foreground">Provider ID</p>
+			<p class="mt-1 text-sm font-medium">{providerId ?? 'Not set'}</p>
+		{/if}
 	</div>
 </div>

@@ -14,45 +14,38 @@
 	import EditRegion from '$lib/components/organs/region/update/edit-region.svelte';
 	import Globe from '@lucide/svelte/icons/globe';
 	import { client } from '$lib/client.js';
-	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
-
-
-	
-
-	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+	import { createPagination, createPaginationQuery } from '$lib/api';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
 	const paginateState = createPagination(
-		async () =>
-			client.regions.get({
-				query: paginationQuery as Record<string, unknown>
-			}),
-		['regions']
+		async () => client['regions'].get({ query: createPaginationQuery(page.url.searchParams) }),
+		['regions'],
+		createPaginationQuery(page.url.searchParams)
 	);
+	const { query } = paginateState;
 
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
-	function openRegionDetails(region: any) {
-		goto(`/regions/${region.id}`);
+	function openRegionDetails(region: { id: string }) {
+		goto(resolve(`/regions/${region.id}`, {}));
 	}
 
-	const rows = $derived(paginateState.query.data?.data?.rows ?? []);
-	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
-	const start = $derived(
-		pagination ? (pagination.page - 1) * pagination.limit + 1 : 0
-	);
+	const rows = $derived(query.data?.data?.rows ?? []);
+	const pagination = $derived(query.data?.data?.pagination ?? null);
+	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
 	const end = $derived(
 		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
 	);
 
 	const closeForm = $derived(paginateState.closeForm);
-	const deleteConfirmOpen = $derived(paginateState.deleteConfirmOpen);
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
 	const deleteItem = $derived(paginateState.deleteItem);
-	const deleteError = $derived(paginateState.deleteError);
+	const deleteError = $derived(paginateState.error);
 	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
 	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
 	const confirmDelete = $derived(paginateState.confirmDelete);
@@ -72,7 +65,7 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => openRegionDetails(item as any)
+					onClick: (item) => openRegionDetails(item as { id: string })
 				},
 				{
 					label: 'Delete',
@@ -98,8 +91,12 @@
 
 	// Edit sheet
 	let editOpen = $state(false);
-	let editRegion = $state<any | null>(null);
-
+	let editRegion = $state<{
+		id: string;
+		name: string;
+		currency_code: string;
+		metadata?: Record<string, unknown>;
+	} | null>(null);
 
 	function closeEdit() {
 		editOpen = false;
@@ -118,7 +115,7 @@
 	}
 
 	async function deleteRegions(ids: string[]) {
-		const res = await client['regions'].delete({ region_ids: ids });
+		const res = await client['regions'].delete({ ids });
 		if (res?.error) {
 			throw new Error(String(res.error.value?.message ?? 'Failed to delete region'));
 		}
@@ -151,40 +148,32 @@
 					<table class="w-full text-sm">
 						<TableHead columns={tableColumns} />
 						<TableBody
-							rows={rows}
+							{rows}
 							columns={tableColumns}
 							emptyMessage="No regions found."
-							onRowClick={(row) => openRegionDetails(row as any)}
+							onRowClick={(row) => openRegionDetails(row as { id: string })}
 						/>
 					</table>
 				</div>
 
-				<TablePagination
-					{pagination}
-					{start}
-					{end}
-					onPageChange={goToPage}
-				/>
+				<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
 			{/if}
 		</PaginationTable>
 	</div>
 </div>
 
-<CreateRegion
-	bind:open={createOpen}
-	onSuccess={handleCreateSuccess}
-/>
+<CreateRegion bind:open={createOpen} onSuccess={handleCreateSuccess} />
 
-<EditRegion
-	bind:open={editOpen}
-	region={editRegion}
-	onSuccess={handleEditSuccess}
-/>
+<EditRegion bind:open={editOpen} region={editRegion} onSuccess={handleEditSuccess} />
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="region"
-	entityTitle={String((deleteItem as Record<string, unknown>)?.name ?? (deleteItem as Record<string, unknown>)?.id ?? '')}
+	entityTitle={String(
+		(deleteItem as Record<string, unknown>)?.name ??
+			(deleteItem as Record<string, unknown>)?.id ??
+			''
+	)}
 	onConfirm={() => confirmDelete((r: unknown) => deleteRegions([(r as { id: string }).id]))}
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}

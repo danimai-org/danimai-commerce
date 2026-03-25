@@ -8,6 +8,11 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import EditStore from '$lib/components/organs/store/EditStore.svelte';
 	import { client } from '$lib/client.js';
+	import { page } from '$app/state';
+	import { createPagination } from '$lib/api/pagination.svelte.js';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
 	type Store = {
 		id: string;
@@ -16,71 +21,48 @@
 		default_sales_channel_id: string | null;
 		default_region_id: string | null;
 		default_location_id: string | null;
-		metadata: unknown | null;
-		created_at: string | Date;
-		updated_at: string | Date;
-		deleted_at: string | Date | null;
 	};
 
-	type StoreListPagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
-
-	type StoresListResponse = { rows: Store[]; pagination: StoreListPagination };
-
-	let rows = $state<Store[]>([]);
-	let pagination = $state<StoreListPagination | null>(null);
-	let pageNum = $state(1);
-	let limit = $state(10);
-	let search = $state('');
-	let loading = $state(false);
-	let error = $state<string | null>(null);
-
-	const count = $derived(pagination?.total ?? 0);
-	const totalPages = $derived(Math.max(1, pagination?.total_pages ?? 1));
-	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(pagination ? Math.min(pagination.page * pagination.limit, count) : 0);
+	const paginateState = createPagination(async () => {
+		return client.stores.get({
+			query: {
+				page: Number(page.url.searchParams.get('page') ?? 1),
+				limit: Number(page.url.searchParams.get('limit') ?? 10)
+			}
+		});
+	}, ['stores']);
 
 	$effect(() => {
-		pageNum;
-		limit;
-		search;
-		void loadStores();
+		page.url.searchParams.toString();
+		paginateState.refetch();
 	});
 
-	async function loadStores() {
-		loading = true;
-		error = null;
-		try {
-			const res = await client.stores.get({
-				query: {
-					page: pageNum,
-					limit,
-					search: search.trim() || undefined
-				} as Record<string, unknown>
-			});
-			if (res?.error) {
-				throw new Error(String(res.error.value?.message ?? 'Failed to list stores'));
-			}
-			const data = res.data as StoresListResponse;
-			rows = data.rows ?? [];
-			pagination = data.pagination ?? null;
-		} catch (e) {
-			rows = [];
-			pagination = null;
-			error = e instanceof Error ? e.message : String(e);
-		} finally {
-			loading = false;
-		}
-	}
+	const listPayload = $derived(paginateState.query.data?.data ?? null);
+	const pagination = $derived(listPayload?.pagination ?? null);
+	const rowsRaw = $derived(listPayload?.rows ?? []);
+	let search = $state('');
+	const rows = $derived.by(() => {
+		const q = search.trim().toLowerCase();
+		if (!q) return rowsRaw;
+		return rowsRaw.filter((r) => r.name.toLowerCase().includes(q));
+	});
+	const loading = $derived(paginateState.loading);
+	const error = $derived(paginateState.error);
+
+	const count = $derived(pagination?.total ?? 0);
+	const pageNum = $derived(pagination?.page ?? 1);
+	const totalPages = $derived(Math.max(1, pagination?.total_pages ?? 1));
+	const start = $derived(
+		pagination ? (pagination.page - 1) * pagination.limit + 1 : 0
+	);
+	const end = $derived(
+		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	);
 
 	function goToPage(nextPage: number) {
-		pageNum = Math.min(totalPages, Math.max(1, nextPage));
+		const params = new SvelteURLSearchParams(page.url.searchParams);
+		params.set('page', String(Math.max(1, nextPage)));
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
 	let editStoreOpen = $state(false);
@@ -102,14 +84,9 @@
 			</Button>
 			<div class="relative">
 				<Search
-					class="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+					class="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-muted-foreground"
 				/>
-				<Input
-					class="h-9 w-56 pl-8"
-					placeholder="Search"
-					bind:value={search}
-					oninput={() => (pageNum = 1)}
-				/>
+				<Input class="h-9 w-56 pl-8" placeholder="Search" bind:value={search} />
 			</div>
 			<Button size="icon" variant="outline" class="size-9">
 				<SlidersHorizontal class="size-4" />
@@ -140,9 +117,9 @@
 					</tr>
 				{:else if rows.length === 0}
 					<tr>
-						<td colspan={6} class="px-4 py-8 text-center text-muted-foreground"
-							>No stores found.</td
-						>
+						<td colspan={6} class="px-4 py-8 text-center text-muted-foreground">
+							{search.trim() ? 'No matching stores.' : 'No stores found.'}
+						</td>
 					</tr>
 				{:else}
 					{#each rows as row (row.id)}
@@ -218,8 +195,4 @@
 	{/if}
 </div>
 
-<EditStore
-	bind:open={editStoreOpen}
-	store={storeToEdit}
-	onSuccess={() => void loadStores()}
-/>
+<EditStore bind:open={editStoreOpen} store={storeToEdit} onSuccess={() => void paginateState.refetch()} />

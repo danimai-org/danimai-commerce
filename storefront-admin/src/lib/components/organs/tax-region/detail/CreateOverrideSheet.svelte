@@ -8,7 +8,6 @@
 
 	interface Props {
 		open: boolean;
-		regionId?: string;
 		onSave?: (data: OverrideFormData) => void;
 	}
 
@@ -34,7 +33,7 @@
 		product_tags: 'Product Tags'
 	};
 
-	let { open = $bindable(false), regionId: _regionId, onSave }: Props = $props();
+	let { open = $bindable(false), onSave }: Props = $props();
 
 	let name = $state('');
 	let rate = $state('0.00');
@@ -118,16 +117,16 @@
 
 					<div class="mt-2 rounded-lg border bg-muted/30 px-4 py-3">
 						<div class="flex items-start gap-3">
-						<button
-							type="button"
-							role="switch"
-							aria-checked={isCombable}
-							aria-label="Toggle combinable"
-							class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {isCombable
-								? 'bg-primary'
-								: 'bg-input'}"
-							onclick={() => (isCombable = !isCombable)}
-						>
+							<button
+								type="button"
+								role="switch"
+								aria-checked={isCombable}
+								aria-label="Toggle combinable"
+								class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none {isCombable
+									? 'bg-primary'
+									: 'bg-input'}"
+								onclick={() => (isCombable = !isCombable)}
+							>
 								<span
 									class="pointer-events-none block size-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out {isCombable
 										? 'translate-x-4'
@@ -162,7 +161,7 @@
 						</button>
 					</div>
 
-					{#each targets as target, i}
+					{#each targets as target, i (target.type + '-' + i)}
 						<div class="mt-3 rounded-lg border p-3">
 							<div class="flex items-center gap-2">
 								<Select.Root
@@ -186,8 +185,7 @@
 										<Select.Item value="product_collections" label="Product Collections"
 											>Product Collections</Select.Item
 										>
-										<Select.Item value="product_tags" label="Product Tags"
-											>Product Tags</Select.Item
+										<Select.Item value="product_tags" label="Product Tags">Product Tags</Select.Item
 										>
 									</Select.Content>
 								</Select.Root>
@@ -196,7 +194,7 @@
 							<div class="mt-2 flex items-center gap-2">
 								<div class="relative flex-1">
 									<Search
-										class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+										class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
 									/>
 									<Input
 										bind:value={targets[i].search}

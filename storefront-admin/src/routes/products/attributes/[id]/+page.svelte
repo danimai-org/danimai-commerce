@@ -1,55 +1,34 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { createQuery } from '@tanstack/svelte-query';
 	import { client } from '$lib/client.js';
 	import { resolve } from '$app/paths';
 	import { AttributeHeroCard } from '$lib/components/organs/attribute/detail/index.js';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 	import { ProductListingCard } from '$lib/components/organs/index.js';
-
+	import { createPagination } from '$lib/api';
+	import { createPaginationQuery } from '$lib/api';
 	const attributeId = $derived(page.params?.id ?? '');
 
-	type AttributeDetail = {
-		id: string;
-		title: string;
-		type: string;
-		metadata?: unknown | null;
-	};
+	const paginateState = createPagination(
+		async () => client['product-attributes']({ id: attributeId }).get(),
+		['attribute-detail', attributeId],
+		createPaginationQuery(page.url.searchParams)
+	);
 
-	const attributeDetailQuery = createQuery(() => ({
-		queryKey: ['attribute-detail', attributeId],
-		queryFn: async (): Promise<AttributeDetail | null> => {
-			if (!attributeId) return null;
-			const res = await client['product-attributes']({ id: attributeId }).get();
-			if (res?.error) {
-				const err = res.error as { status?: number; value?: { message?: string } };
-				if (err?.status === 404) {
-					throw new Error('Attribute not found');
-				}
-				throw new Error(String(err?.value?.message ?? res.error));
-			}
-			return (res?.data ?? null) as AttributeDetail | null;
-		},
-		enabled: !!attributeId,
-		refetchOnWindowFocus: false
-	}));
-
-	const attribute = $derived(attributeDetailQuery.data ?? null);
-	const loading = $derived(attributeDetailQuery.isPending && attributeDetailQuery.isFetching);
+	const attribute = $derived(paginateState.query.data?.data ?? null);
+	const loading = $derived(paginateState.loading);
 	const error = $derived(
-		attributeDetailQuery.error != null
-			? attributeDetailQuery.error instanceof Error
-				? attributeDetailQuery.error.message
-				: String(attributeDetailQuery.error)
-			: attribute === null && attributeDetailQuery.isSuccess && attributeId
-				? 'Attribute not found'
-				: null
+		paginateState.query.error != null
+			? paginateState.query.error instanceof Error
+				? paginateState.query.error.message
+				: String(paginateState.query.error)
+			: null
 	);
 	const displayName = $derived(attribute?.title ?? attributeId ?? 'Attribute');
-	let selectedIds = $state<Set<string>>(new Set());
+
 	async function refetchAttribute() {
-		await attributeDetailQuery.refetch();
+		await paginateState.refetch();
 	}
 </script>
 
@@ -87,7 +66,7 @@
 					title="Products with this Attribute"
 					filter={{ attribute_ids: [attributeId] }}
 					pickerFilter={{}}
-					bind:selectedIds
+					selectedIds={new Set()}
 				/>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent

@@ -2,42 +2,43 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { DeleteConfirmationModal, PaginationTable, SalesChannelFormSheet, TableHead, TableBody, TablePagination, type TableColumn } from '$lib/components/organs/index.js';
+	import {
+		DeleteConfirmationModal,
+		PaginationTable,
+		SalesChannelFormSheet,
+		TableHead,
+		TableBody,
+		TablePagination,
+		type TableColumn
+	} from '$lib/components/organs/index.js';
 	import Share2 from '@lucide/svelte/icons/share-2';
 	import { client } from '$lib/client.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
-
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
-	const paginateState = createPagination(
-		async () => {
-			return client['sales-channels'].get({ query: paginationQuery });
-		},
-		['sales-channels']
-	);
-
+	const paginateState = createPagination(async () => {
+		return client['sales-channels'].get({ query: paginationQuery });
+	}, ['sales-channels']);
 
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
 	const rows = $derived(paginateState.query.data?.data?.rows ?? []);
+	type SalesChannelRow = (typeof rows)[number];
 	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
-	const formMode = $derived(paginateState.formMode);
-	const formItem = $derived(paginateState.formItem);
 	const openCreate = $derived(paginateState.openCreate);
-	const closeForm = $derived(paginateState.closeForm);
-	const deleteConfirmOpen = $derived(paginateState.deleteConfirmOpen);
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
 	const deleteItem = $derived(paginateState.deleteItem);
 	const deleteError = $derived(paginateState.deleteError);
 	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
 	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
-	const confirmDelete = $derived(paginateState.confirmDelete);
 	const refetch = $derived(paginateState.refetch);
 
 	async function handleFormSaved() {
@@ -46,31 +47,39 @@
 	}
 
 	const tableColumns: TableColumn[] = [
-	{ label: 'Name', key: 'name', type: 'link', cellHref: '/sales-channels/{{id}}' },
-	{ label: 'Description', key: 'description', type: 'text' },
-	{ label: 'Default', key: 'is_default', type: 'boolean' },
-	{ label: 'Created', key: 'created_at', type: 'date' },
-	{ label: 'Updated', key: 'updated_at', type: 'date' },
-	{
-		label: 'Actions',
-		key: 'actions',
-		type: 'actions',
-		actions: [
-			{
-				label: 'Edit',
-				key: 'edit',
-				type: 'button',
-				onClick: (item) => goto(`/sales-channels/${String((item as { id?: string }).id ?? '')}`)
-			},
-			{ label: 'Delete', key: 'delete', type: 'button', onClick: (item) => openDeleteConfirm(item as Parameters<typeof openDeleteConfirm>[0]) },
-		],
-	},
-];
+		{ label: 'Name', key: 'name', type: 'link', cellHref: '/sales-channels/{{id}}' },
+		{ label: 'Description', key: 'description', type: 'text' },
+		{ label: 'Default', key: 'is_default', type: 'boolean' },
+		{ label: 'Created', key: 'created_at', type: 'date' },
+		{ label: 'Updated', key: 'updated_at', type: 'date' },
+		{
+			label: 'Actions',
+			key: 'actions',
+			type: 'actions',
+			actions: [
+				{
+					label: 'Edit',
+					key: 'edit',
+					type: 'button',
+					onClick: (item) =>
+						goto(resolve(`/sales-channels/${String((item as { id?: string }).id ?? '')}`, {}), {
+							replaceState: true
+						})
+				},
+				{
+					label: 'Delete',
+					key: 'delete',
+					type: 'button',
+					onClick: (item) => openDeleteConfirm(item as Parameters<typeof openDeleteConfirm>[0])
+				}
+			]
+		}
+	];
 </script>
 
 <svelte:head>
-    <title>Sales Channels</title>
-    <meta name="description" content="Manage sales channels." />
+	<title>Sales Channels</title>
+	<meta name="description" content="Manage sales channels." />
 </svelte:head>
 
 <div class="flex h-full flex-col">
@@ -84,34 +93,25 @@
 		</div>
 		<PaginationTable>
 			{#if paginateState.error}
-			<div
-				class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-			>
-				{paginateState.error}
-			</div>
-		{:else if paginateState.loading}
-			<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
-				<p class="text-muted-foreground">Loading…</p>
-			</div>
-		{:else}
-			<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-				<table class="w-full text-sm">
-					<TableHead columns={tableColumns} />
-					<TableBody
-						rows={rows}
-						columns={tableColumns}
-						emptyMessage="No sales channels found."
-					/>
-				</table>
-			</div>
+				<div
+					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+				>
+					{paginateState.error}
+				</div>
+			{:else if paginateState.loading}
+				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
+					<p class="text-muted-foreground">Loading…</p>
+				</div>
+			{:else}
+				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+					<table class="w-full text-sm">
+						<TableHead columns={tableColumns} />
+						<TableBody {rows} columns={tableColumns} emptyMessage="No sales channels found." />
+					</table>
+				</div>
 
-			<TablePagination
-				{pagination}
-				{start}
-				{end}
-				onPageChange={goToPage}
-			/>
-		{/if}
+				<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
+			{/if}
 		</PaginationTable>
 	</div>
 </div>
@@ -122,16 +122,18 @@
 	onSuccess={handleFormSaved}
 />
 
-
-
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="sales channel"
-	entityTitle={(deleteItem as any)?.name ?? (deleteItem as any)?.id ?? ''}
-	onConfirm={() => confirmDelete(async (ch: any) => {
-		await client['sales-channels'].delete({ sales_channel_ids: [ch.id] });
-		refetch();
-	})}
+	entityTitle={(deleteItem as SalesChannelRow | null)?.name ??
+		(deleteItem as SalesChannelRow | null)?.id ??
+		''}
+	onConfirm={() =>
+		paginateState.confirmDelete(async (item) => {
+			const row = item as unknown as SalesChannelRow;
+			await client['sales-channels'].delete({ sales_channel_ids: [row.id] });
+			refetch();
+		})}
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}
 />
