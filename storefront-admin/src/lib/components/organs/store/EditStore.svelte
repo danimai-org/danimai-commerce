@@ -34,6 +34,37 @@
 		deleted_at: string | Date | null;
 	};
 
+	type StoreUpdateRequestBody = {
+		name?: string;
+		default_currency_code?: string | null;
+		default_region_id?: string | null;
+		default_sales_channel_id?: string | null;
+		default_location_id?: string | null;
+	};
+
+	type StorePutEdenResponse = {
+		error?: { value?: { message?: string } };
+		data?: unknown;
+	};
+
+	/** Eden `App` types omit dynamic `/:id` routes; narrow for `stores[':id'].put` only. */
+	type AdminClientWithStorePut = {
+		stores: {
+			':id': {
+				put: (args: {
+					params: { id: string };
+					body: StoreUpdateRequestBody;
+				}) => Promise<StorePutEdenResponse>;
+			};
+		};
+	};
+
+	type AdminClientWithCurrencies = {
+		currencies: {
+			get: (args: { query: { limit: number } }) => Promise<{ data?: { rows?: Currency[] } }>;
+		};
+	};
+
 	let {
 		open = $bindable(false),
 		store = null as Store | null,
@@ -86,7 +117,7 @@
 				client.regions.get({ query: { limit: 100 } as Record<string, unknown> }),
 				client['sales-channels'].get({ query: { limit: 100 } as Record<string, unknown> }),
 				client['stock-locations'].get({ query: { limit: 100 } as Record<string, unknown> }),
-				(client as any).currencies.get({ query: { limit: 100 } })
+				(client as unknown as AdminClientWithCurrencies).currencies.get({ query: { limit: 100 } })
 			]);
 
 			if (regionsRes?.data) {
@@ -120,13 +151,7 @@
 		error = null;
 		submitting = true;
 		try {
-			const body: {
-				name?: string;
-				default_currency_code?: string | null;
-				default_region_id?: string | null;
-				default_sales_channel_id?: string | null;
-				default_location_id?: string | null;
-			} = {};
+			const body: StoreUpdateRequestBody = {};
 			if (name.trim() !== store.name) body.name = name.trim();
 			if (defaultCurrency !== (store.default_currency_code?.toLowerCase() ?? ''))
 				body.default_currency_code = defaultCurrency || null;
@@ -137,7 +162,7 @@
 			if (defaultLocation !== (store.default_location_id ?? ''))
 				body.default_location_id = defaultLocation || null;
 
-			const res = await (client as any).stores[":id"].put({
+			const res = await (client as unknown as AdminClientWithStorePut).stores[':id'].put({
 				params: { id: store.id },
 				body
 			});

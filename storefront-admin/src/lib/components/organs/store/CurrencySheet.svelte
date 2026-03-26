@@ -8,100 +8,100 @@
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import { DropdownMenu } from 'bits-ui';
-	import {
-		DeleteConfirmationModal,
-		
-	} from '$lib/components/organs/index.js';
+	import { DeleteConfirmationModal } from '$lib/components/organs/index.js';
 	import { client } from '$lib/client.js';
-	import type { Currency, Pagination } from '$lib/currencies/types.js';
+	import type { Currency, CurrenciesListResponse } from '$lib/currencies/types.js';
 	import AddCurrenciesSheet from '$lib/components/organs/store/add-currencies-sheet.svelte';
+	import { createPagination } from '$lib/api/pagination.svelte.js';
+	import { SvelteSet } from 'svelte/reactivity';
 
-	let rows = $state<Currency[]>([]);
-	let pagination = $state<Pagination | null>(null);
+	type ApiErrorShape = { value?: { message?: string } };
+
+	function getErrorMessage(err: unknown): string {
+		if (err != null && typeof err === 'object' && 'value' in err) {
+			const v = (err as ApiErrorShape).value?.message;
+			if (typeof v === 'string') return v;
+		}
+		return String(err);
+	}
+
 	let pageNum = $state(1);
 	let limit = $state(10);
 	let search = $state('');
-	let loading = $state(false);
-	let error = $state<string | null>(null);
+
+	const paginateState = createPagination(async () => {
+		const res = await client.currencies.get({
+			query: {
+				page: pageNum,
+				limit,
+				...(search.trim() ? { search: search.trim() } : {})
+			}
+		});
+		if (res.error) {
+			throw new Error(getErrorMessage(res.error));
+		}
+		return res;
+	}, ['currencies']);
+
+	$effect(() => {
+		void pageNum;
+		void limit;
+		void search;
+		void paginateState.refetch();
+	});
+
+	const listPayload = $derived(
+		(paginateState.query.data?.data ?? null) as CurrenciesListResponse | null
+	);
+	const pagination = $derived(listPayload?.pagination ?? null);
+	const rows = $derived(listPayload?.rows ?? []);
+	const loading = $derived(paginateState.loading);
+	const error = $derived(paginateState.error);
 
 	const count = $derived(pagination?.total ?? 0);
 	const totalPages = $derived(Math.max(1, pagination?.total_pages ?? 1));
-	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(pagination ? Math.min(pagination.page * pagination.limit, count) : 0);
-	const allVisibleSelected = $derived(rows.length > 0 && rows.every((r) => selectedIds.has(r.id)));
+	const start = $derived(
+		pagination ? (pagination.page - 1) * pagination.limit + 1 : 0
+	);
+	const end = $derived(
+		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	);
 
-	let selectedIds = $state<Set<string>>(new Set());
+	let selectedIds = new SvelteSet<string>();
+	const allVisibleSelected = $derived(
+		rows.length > 0 && rows.every((r) => selectedIds.has(r.id))
+	);
 
 	let deleteConfirmOpen = $state(false);
 	let deleteSubmitting = $state(false);
 	let deleteItem = $state<Currency | null>(null);
 	let deleteError = $state<string | null>(null);
 
-	$effect(() => {
-		pageNum;
-		limit;
-		search;
-		void loadCurrencies();
-	});
-
-	async function loadCurrencies() {
-		loading = true;
-		error = null;
-		try {
-			const res = await client.currencies.get({
-				query: {
-					page: pageNum,
-					limit,
-					...(search.trim() ? { search: search.trim() } : {})
-				} as Record<string, unknown>
-			});
-			if (res.error) {
-				const err = res.error as { value?: { message?: string } };
-				throw new Error(String(err?.value?.message ?? res.error));
-			}
-			const payload = res.data as unknown as { rows?: Currency[]; pagination?: Pagination } | undefined;
-			rows = payload?.rows ?? [];
-			pagination = payload?.pagination ?? null;
-		} catch (e) {
-			rows = [];
-			pagination = null;
-			error = e instanceof Error ? e.message : String(e);
-		} finally {
-			loading = false;
-		}
-	}
-
 	function toggleSelect(id: string) {
-		const next = new Set(selectedIds);
-		if (next.has(id)) next.delete(id);
-		else next.add(id);
-		selectedIds = next;
+		if (selectedIds.has(id)) selectedIds.delete(id);
+		else selectedIds.add(id);
 	}
 
 	function toggleSelectAll() {
 		if (allVisibleSelected) {
-			const next = new Set(selectedIds);
-			for (const row of rows) next.delete(row.id);
-			selectedIds = next;
+			for (const row of rows) selectedIds.delete(row.id);
 			return;
 		}
-		const next = new Set(selectedIds);
-		for (const row of rows) next.add(row.id);
-		selectedIds = next;
+		for (const row of rows) selectedIds.add(row.id);
 	}
 
 	async function removeSelected() {
 		if (selectedIds.size === 0) return;
 		try {
-			const res = await client.currencies.delete({ ids: [...selectedIds] });
+			const res = await client.currencies.delete({ ids: Array.from(selectedIds) });
 			if (res?.error) {
-				void loadCurrencies();
+				void paginateState.refetch();
 				return;
 			}
-			selectedIds = new Set();
-			void loadCurrencies();
+			selectedIds.clear();
+			void paginateState.refetch();
 		} catch {
-			void loadCurrencies();
+			void paginateState.refetch();
 		}
 	}
 
@@ -130,11 +130,11 @@
 		try {
 			const res = await client.currencies.delete({ ids: [deleteItem.id] });
 			if (res?.error) {
-				throw new Error(String(res?.error?.value?.message ?? 'Failed to delete currency'));
+				throw new Error(getErrorMessage(res.error) || 'Failed to delete currency');
 			}
 			deleteConfirmOpen = false;
 			deleteItem = null;
-			void loadCurrencies();
+			void paginateState.refetch();
 		} catch (e) {
 			deleteError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -167,7 +167,7 @@
 			</Button>
 			<div class="relative">
 				<Search
-					class="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+					class="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-muted-foreground"
 				/>
 				<Input
 					class="h-9 w-56 pl-8"
@@ -291,7 +291,12 @@
 		<div class="flex items-center justify-between gap-4 border-t px-4 py-3">
 			<p class="text-sm text-muted-foreground">{start} - {end} of {count} results</p>
 			<div class="flex items-center gap-2">
-				<Button size="sm" variant="outline" onclick={() => goToPage(pageNum - 1)} disabled={pageNum <= 1}>
+				<Button
+					size="sm"
+					variant="outline"
+					onclick={() => goToPage(pageNum - 1)}
+					disabled={pageNum <= 1}
+				>
 					Prev
 				</Button>
 				<span class="text-sm text-muted-foreground">{pageNum} of {totalPages}</span>
@@ -311,7 +316,7 @@
 <EditCurrencySheet
 	bind:open={editSheetOpen}
 	currency={editCurrency}
-	onSuccess={() => void loadCurrencies()}
+	onSuccess={() => void paginateState.refetch()}
 />
 
 <DeleteConfirmationModal
@@ -327,4 +332,4 @@
 		: undefined}
 />
 
-<AddCurrenciesSheet bind:open={addOpen} onSuccess={() => void loadCurrencies()} />
+<AddCurrenciesSheet bind:open={addOpen} onSuccess={() => void paginateState.refetch()} />
