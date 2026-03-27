@@ -1,5 +1,4 @@
-const API_BASE =
-	(import.meta.env?.VITE_API_BASE as string | undefined) ?? 'http://localhost:8000';
+import { API_BASE, firstVariantIdByProductIds, rowsFromPaginated } from '$lib/api/storefront-api';
 
 type ApiProductList = {
 	id: string;
@@ -31,16 +30,16 @@ async function fetchProductByHandle(handle: string): Promise<ApiProductList | nu
 	if (decoded) searchParams.set('search', decoded);
 	const res = await fetch(`${API_BASE}/products?${searchParams}`, { cache: 'no-store' });
 	if (!res.ok) return null;
-	const data = (await res.json()) as { products?: ApiProductList[] };
-	const list = data.products ?? [];
+	const data = await res.json();
+	const { rows: list } = rowsFromPaginated<ApiProductList>(data);
 	const found = list.find((p) => p.handle === decoded || p.handle === handle);
 	if (found) return found;
 	// Fallback: fetch first page with higher limit and find by handle
 	const fallbackParams = new URLSearchParams({ limit: '200', page: '1' });
 	const res2 = await fetch(`${API_BASE}/products?${fallbackParams}`, { cache: 'no-store' });
 	if (!res2.ok) return null;
-	const data2 = (await res2.json()) as { products?: ApiProductList[] };
-	const list2 = data2.products ?? [];
+	const data2 = await res2.json();
+	const { rows: list2 } = rowsFromPaginated<ApiProductList>(data2);
 	return list2.find((p) => p.handle === decoded || p.handle === handle) ?? null;
 }
 
@@ -67,8 +66,11 @@ export async function load({ params }) {
 		}
 
 		const product = (await productRes.json()) as ApiProduct;
-		const variantsPayload = (await variantsRes.json()) as { data?: ApiVariant[] };
-		const allVariants = variantsPayload.data ?? [];
+		const variantsPayload = (await variantsRes.json()) as {
+			rows?: ApiVariant[];
+			data?: ApiVariant[];
+		};
+		const allVariants = variantsPayload.rows ?? variantsPayload.data ?? [];
 		const variants = allVariants.filter((v) => v.product_id === listProduct.id);
 
 		// Fetch price for each variant
@@ -98,11 +100,16 @@ export async function load({ params }) {
 
 		// Load other products for "You May Also Like" (exclude current, take 4)
 		const listRes2 = await fetch(`${API_BASE}/products?limit=20&page=1`, { cache: 'no-store' });
-		const listData2 = (await listRes2.json()) as { products?: ApiProductList[] };
-		const others = (listData2.products ?? []).filter((p) => p.id !== listProduct.id).slice(0, 4);
+		const listData2 = await listRes2.json();
+		const { rows: listRows } = rowsFromPaginated<ApiProductList>(listData2);
+		const others = listRows.filter((p) => p.id !== listProduct.id).slice(0, 4);
+		const otherVariantMap = await firstVariantIdByProductIds(
+			API_BASE,
+			others.map((p) => p.id)
+		);
 		const otherProducts = await Promise.all(
 			others.map(async (p, i) => {
-				const vId = p.variants?.[0]?.id;
+				const vId = p.variants?.[0]?.id ?? otherVariantMap.get(p.id);
 				let priceStr = '—';
 				if (vId) {
 					try {

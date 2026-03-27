@@ -1,5 +1,4 @@
-const API_BASE =
-	(import.meta.env?.VITE_API_BASE as string | undefined) ?? 'http://localhost:8000';
+import { API_BASE, firstVariantIdByProductIds, rowsFromPaginated } from '$lib/api/storefront-api';
 
 export type ProductGridItem = {
 	name: string;
@@ -13,8 +12,8 @@ type ApiProduct = {
 	id: string;
 	title: string;
 	handle: string;
-	thumbnail: string | null;
-	variants: Array<{ id: string }>;
+	thumbnail?: string | null;
+	variants?: Array<{ id: string }>;
 };
 
 type ApiVariant = {
@@ -52,19 +51,21 @@ export async function load() {
 		const params = new URLSearchParams({ limit: '8', page: '1' });
 		const res = await fetch(`${API_BASE}/products?${params}`, { cache: 'no-store' });
 		if (!res.ok) return { products };
-		const data = (await res.json()) as {
-			products?: ApiProduct[];
-		};
-		const list = data.products ?? [];
+		const data = await res.json();
+		const { rows: list } = rowsFromPaginated<ApiProduct>(data);
+		const variantMap = await firstVariantIdByProductIds(
+			API_BASE,
+			list.map((p) => p.id)
+		);
 		const variantIds = list
-			.map((p) => p.variants?.[0]?.id)
+			.map((p) => p.variants?.[0]?.id ?? variantMap.get(p.id))
 			.filter((id): id is string => !!id);
 		const pricePromises = variantIds.map((id) => fetchVariantPrice(API_BASE, id));
 		const prices = await Promise.all(pricePromises);
 		let priceIndex = 0;
 		for (let i = 0; i < list.length; i++) {
 			const p = list[i];
-			const firstVariantId = p.variants?.[0]?.id;
+			const firstVariantId = p.variants?.[0]?.id ?? variantMap.get(p.id);
 			let priceStr = '—';
 			if (firstVariantId && priceIndex < prices.length) {
 				const pr = prices[priceIndex];

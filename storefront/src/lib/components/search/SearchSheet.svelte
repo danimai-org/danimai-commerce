@@ -1,10 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { API_BASE, firstVariantIdByProductIds, rowsFromPaginated } from '$lib/api/storefront-api';
 	import { search } from '$lib/stores/search';
-
-	const API_BASE =
-		(typeof import.meta.env !== 'undefined' && (import.meta.env?.VITE_API_BASE as string)) ||
-		'http://localhost:8000';
 
 	type SearchProduct = {
 		name: string;
@@ -64,18 +61,20 @@
 				results = [];
 				return;
 			}
-			const data = (await res.json()) as {
-				products?: Array<{
-					id: string;
-					title: string;
-					handle: string;
-					thumbnail: string | null;
-					variants?: Array<{ id: string }>;
-				}>;
-			};
-			const list = data.products ?? [];
+			const raw = await res.json();
+			const { rows: list } = rowsFromPaginated<{
+				id: string;
+				title: string;
+				handle: string;
+				thumbnail?: string | null;
+				variants?: Array<{ id: string }>;
+			}>(raw);
+			const variantMap = await firstVariantIdByProductIds(
+				API_BASE,
+				list.map((p) => p.id)
+			);
 			const variantIds = list
-				.map((p) => p.variants?.[0]?.id)
+				.map((p) => p.variants?.[0]?.id ?? variantMap.get(p.id))
 				.filter((id): id is string => !!id);
 			type PriceObj = { amount: string; currency_code: string } | null;
 			const prices: PriceObj[] = await Promise.all(

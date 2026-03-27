@@ -1,5 +1,4 @@
-const API_BASE =
-	(import.meta.env?.VITE_API_BASE as string | undefined) ?? 'http://localhost:8000';
+import { API_BASE, firstVariantIdByProductIds, rowsFromPaginated } from '$lib/api/storefront-api';
 
 export type ProductGridItem = {
 	name: string;
@@ -19,8 +18,8 @@ type ApiProduct = {
 	id: string;
 	title: string;
 	handle: string;
-	thumbnail: string | null;
-	variants: Array<{ id: string }>;
+	thumbnail?: string | null;
+	variants?: Array<{ id: string }>;
 };
 
 type ApiVariant = {
@@ -107,8 +106,8 @@ export async function load({
 	try {
 		const catRes = await fetch(`${API_BASE}/product-categories?limit=100&page=1`, { cache: 'no-store' });
 		if (!catRes.ok) return { category: null, products: [], productCount: 0, error: 'Failed to load categories', sort: sortParam, availability, price, color };
-		const catData = (await catRes.json()) as { data?: ApiCategory[] };
-		const categories = catData.data ?? [];
+		const catData = (await catRes.json()) as { rows?: ApiCategory[]; data?: ApiCategory[] };
+		const categories = catData.rows ?? catData.data ?? [];
 
 		const aggregateConfig =
 			handle === 'tops'
@@ -147,22 +146,23 @@ export async function load({
 			sorting_field,
 			sorting_direction
 		});
-		if (categoryIds.length === 1) {
-			productsQuery.set('category_id', categoryIds[0]);
-		} else {
-			productsQuery.set('category_ids', categoryIds.join(','));
-		}
+		productsQuery.set('filters[category_ids]', categoryIds.join(','));
 		const productsRes = await fetch(
 			`${API_BASE}/products?${productsQuery.toString()}`,
 			{ cache: 'no-store' }
 		);
 		if (!productsRes.ok) return { category: { ...category }, products: [], productCount: 0, error: null, sort: sortParam, availability, price, color };
-		const productsData = (await productsRes.json()) as { products?: ApiProduct[]; count?: number };
-		const list = productsData.products ?? [];
-		productCount = productsData.count ?? list.length;
+		const productsData = await productsRes.json();
+		const { rows: list, total: listTotal } = rowsFromPaginated<ApiProduct>(productsData);
+		productCount = listTotal ?? list.length;
+
+		const variantMap = await firstVariantIdByProductIds(
+			API_BASE,
+			list.map((p) => p.id)
+		);
 
 		const variantIds = list
-			.map((p) => p.variants?.[0]?.id)
+			.map((p) => p.variants?.[0]?.id ?? variantMap.get(p.id))
 			.filter((id): id is string => !!id);
 		const pricePromises = variantIds.map((id) => fetchVariantPrice(API_BASE, id));
 		const prices = await Promise.all(pricePromises);
@@ -170,7 +170,7 @@ export async function load({
 		let priceIndex = 0;
 		for (let i = 0; i < list.length; i++) {
 			const p = list[i];
-			const firstVariantId = p.variants?.[0]?.id;
+			const firstVariantId = p.variants?.[0]?.id ?? variantMap.get(p.id);
 			let priceStr = '—';
 			if (firstVariantId && priceIndex < prices.length) {
 				const pr = prices[priceIndex];

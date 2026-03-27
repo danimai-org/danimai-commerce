@@ -1,5 +1,4 @@
-const API_BASE =
-	(import.meta.env?.VITE_API_BASE as string | undefined) ?? 'http://localhost:8000';
+import { API_BASE, firstVariantIdByProductIds, rowsFromPaginated } from '$lib/api/storefront-api';
 
 export type ProductGridItem = {
 	name: string;
@@ -20,8 +19,8 @@ type ApiProduct = {
 	id: string;
 	title: string;
 	handle: string;
-	thumbnail: string | null;
-	variants: Array<{ id: string }>;
+	thumbnail?: string | null;
+	variants?: Array<{ id: string }>;
 };
 
 type ApiVariant = {
@@ -77,7 +76,7 @@ export async function load({ params }: { params: { handle: string } }) {
 		if (Array.isArray(body)) return body as ApiCollection[];
 		if (body && typeof body === 'object') {
 			const o = body as Record<string, unknown>;
-			const arr = (o.data ?? o.collections ?? o.items) as unknown;
+			const arr = (o.rows ?? o.data ?? o.collections ?? o.items) as unknown;
 			if (Array.isArray(arr)) return arr as ApiCollection[];
 		}
 		return [];
@@ -95,7 +94,11 @@ export async function load({ params }: { params: { handle: string } }) {
 				{ cache: 'no-store' }
 			);
 			if (!listRes.ok) return { collection: null, products: [], error: 'Failed to load collections' };
-			const listData = (await listRes.json()) as { data?: ApiCollection[]; pagination?: { total_pages?: number } };
+			const listData = (await listRes.json()) as {
+				rows?: ApiCollection[];
+				data?: ApiCollection[];
+				pagination?: { total_pages?: number };
+			};
 			const chunk = parseCollectionsList(listData);
 			collections = collections.concat(chunk);
 			totalPages = listData.pagination?.total_pages ?? 1;
@@ -112,16 +115,25 @@ export async function load({ params }: { params: { handle: string } }) {
 			return { collection: null, products: [], error: 'Collection not found' };
 		}
 
-		const productsRes = await fetch(
-			`${API_BASE}/collections/${collection.id}/products?limit=50&page=1`,
-			{ cache: 'no-store' }
-		);
+		const productsQuery = new URLSearchParams({
+			limit: '50',
+			page: '1'
+		});
+		productsQuery.set('filters[collection_ids]', collection.id);
+		const productsRes = await fetch(`${API_BASE}/products?${productsQuery}`, {
+			cache: 'no-store'
+		});
 		if (!productsRes.ok) return { collection: { ...collection }, products: [], error: null };
-		const productsData = (await productsRes.json()) as { products?: ApiProduct[]; data?: ApiProduct[] };
-		const list = productsData.products ?? productsData.data ?? [];
+		const productsData = await productsRes.json();
+		const { rows: list } = rowsFromPaginated<ApiProduct>(productsData);
+
+		const variantMap = await firstVariantIdByProductIds(
+			API_BASE,
+			list.map((p) => p.id)
+		);
 
 		const variantIds = list
-			.map((p) => p.variants?.[0]?.id)
+			.map((p) => p.variants?.[0]?.id ?? variantMap.get(p.id))
 			.filter((id): id is string => !!id);
 		const pricePromises = variantIds.map((id) => fetchVariantPrice(API_BASE, id));
 		const prices = await Promise.all(pricePromises);
@@ -129,7 +141,7 @@ export async function load({ params }: { params: { handle: string } }) {
 		let priceIndex = 0;
 		for (let i = 0; i < list.length; i++) {
 			const p = list[i];
-			const firstVariantId = p.variants?.[0]?.id;
+			const firstVariantId = p.variants?.[0]?.id ?? variantMap.get(p.id);
 			let priceStr = '—';
 			if (firstVariantId && priceIndex < prices.length) {
 				const pr = prices[priceIndex];
