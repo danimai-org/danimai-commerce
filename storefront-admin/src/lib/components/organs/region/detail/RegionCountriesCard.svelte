@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Search from '@lucide/svelte/icons/search';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
@@ -10,24 +11,23 @@
 
 	interface Props {
 		regionId: string;
-		onAddCountries?: () => void;
-		refreshNonce?: number;
 	}
 
-	let { regionId, onAddCountries, refreshNonce = 0 }: Props = $props();
+	let { regionId }: Props = $props();
 
 	let addCountriesOpen = $state(false);
-
-	function handleAddCountriesClick() {
-		if (onAddCountries) {
-			onAddCountries();
-			return;
-		}
-		addCountriesOpen = true;
-	}
+	let countries = $state<CountryRow[]>([]);
+	let loading = $state(false);
+	let error = $state<string | null>(null);
+	let searchQuery = $state('');
+	let selectedIds = new SvelteSet<string>();
 
 	type CountryRow = { id: string; name: string; code: string };
 
+	/**
+	 * STEP 1: API Mapping Logic
+	 * Converts Medusa ISO_2 and display_name into table rows
+	 */
 	function mapApiCountries(data: unknown): CountryRow[] {
 		const list = Array.isArray(data)
 			? data
@@ -47,50 +47,52 @@
 			.filter((row) => row.id.length > 0);
 	}
 
-	let countries = $state<CountryRow[]>([]);
-	let loading = $state(false);
-	let error = $state<string | null>(null);
-
+	/**
+	 * STEP 2: Reactive Fetching
+	 * Runs whenever regionId or refreshNonce changes
+	 */
 	$effect(() => {
-		void regionId;
-		void refreshNonce;
-		const id = regionId;
-		if (!id) {
-			countries = [];
-			error = null;
-			loading = false;
-			return;
-		}
+		if (!regionId) return;
+
 		let active = true;
 		loading = true;
 		error = null;
-		client['regions']({ id: id as string })
+
+		client
+			.regions({ id: regionId })
 			.countries.get({ query: { limit: 1000 } })
 			.then((res) => {
 				if (!active) return;
-				if (res.error) {
-					error = String(
-						(res.error as { value?: { message?: string } })?.value?.message ?? res.error
-					);
-					countries = [];
-					return;
-				}
+				if (res.error) throw res.error;
 				countries = mapApiCountries(res.data);
 			})
 			.catch((e) => {
 				if (!active) return;
-				error = e instanceof Error ? e.message : String(e);
-				countries = [];
+				error = e.message || String(e);
 			})
 			.finally(() => {
 				if (active) loading = false;
 			});
-		return () => {
-			active = false;
-		};
+
+		return () => (active = false);
 	});
 
-	let searchQuery = $state('');
+	/**
+	 * STEP 3: Remove Logic
+	 */
+	async function handleRemoveCountry(id: string) {
+		try {
+			const res = await client
+				.regions({ id: regionId as string })
+				.countries.delete({ ids: [id] as string[] });
+			if (res.error) throw new Error(res.error.value?.message ?? 'Failed to remove country');
+			countries = countries.filter((c) => c.id !== id);
+			selectedIds.delete(id);
+		} catch (e: unknown) {
+			const error = e instanceof Error ? e : new Error(String(e));
+			console.error(error.message);
+		}
+	}
 
 	const filteredCountries = $derived.by(() => {
 		const q = searchQuery.trim().toLowerCase();
@@ -100,8 +102,6 @@
 		);
 	});
 
-	let selectedIds = new SvelteSet<string>();
-
 	const allSelected = $derived(
 		filteredCountries.length > 0 && filteredCountries.every((c) => selectedIds.has(c.id))
 	);
@@ -110,94 +110,105 @@
 		if (allSelected) {
 			selectedIds.clear();
 		} else {
-			selectedIds.clear();
-			for (const c of filteredCountries) {
-				selectedIds.add(c.id);
-			}
-		}
-	}
-
-	function toggleOne(id: string) {
-		if (selectedIds.has(id)) {
-			selectedIds.delete(id);
-		} else {
-			selectedIds.add(id);
+			filteredCountries.forEach((c) => selectedIds.add(c.id));
 		}
 	}
 </script>
 
-<div class="rounded-lg border bg-card shadow-sm">
+<div class="rounded-xl border bg-card shadow-sm">
 	<div class="flex items-center justify-between gap-4 border-b px-6 py-4">
-		<h2 class="text-lg font-semibold">Countries</h2>
-		<Button type="button" variant="outline" size="sm" onclick={handleAddCountriesClick}>
-			Add countries
-		</Button>
+		<div>
+			<h2 class="text-lg font-semibold text-foreground">Countries</h2>
+			<p class="text-sm text-muted-foreground">Countries assigned to this region</p>
+		</div>
+		<Button type="button" variant="outline" size="sm" onclick={() => (addCountriesOpen = true)}
+			>Add countries</Button
+		>
 	</div>
 
-	<div class="border-b px-6 py-3">
+	<div class="border-b bg-muted/5 px-6 py-3">
 		<div class="relative">
 			<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 			<Input
-				placeholder="Search countries…"
+				placeholder="Search by name or ISO code..."
 				bind:value={searchQuery}
-				class="h-9 w-56 rounded-md pl-9"
+				class="h-9 w-64 rounded-md bg-background pl-9"
 			/>
 		</div>
 	</div>
 
 	{#if loading}
-		<div class="px-6 py-8 text-center text-muted-foreground">Loading…</div>
+		<div class="flex items-center justify-center px-6 py-12">
+			<div
+				class="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent"
+			></div>
+			<span class="ml-3 text-sm text-muted-foreground">Fetching countries...</span>
+		</div>
 	{:else if error}
-		<div class="px-6 py-8 text-center text-destructive">{error}</div>
+		<div class="px-6 py-12 text-center text-destructive">
+			<p class="text-sm font-medium">{error}</p>
+		</div>
 	{:else}
 		<div class="overflow-auto">
-			<table class="w-full text-sm">
-				<thead>
-					<tr class="border-b text-left">
-						<th class="w-10 px-6 py-3">
+			<table class="w-full text-left text-sm">
+				<thead
+					class="border-b bg-muted/20 text-[10px] font-bold tracking-wider text-muted-foreground uppercase"
+				>
+					<tr>
+						<th class="w-12 px-6 py-3">
 							<input
 								type="checkbox"
 								checked={allSelected}
 								onchange={toggleAll}
-								class="size-4 rounded border-input"
+								class="size-4 cursor-pointer rounded border-input accent-primary"
 							/>
 						</th>
-						<th class="px-4 py-3 font-medium text-muted-foreground">Country</th>
-						<th class="px-4 py-3 font-medium text-muted-foreground">Code</th>
-						<th class="w-12 px-4 py-3"></th>
+						<th class="px-4 py-3">Country Name</th>
+						<th class="px-4 py-3">ISO Code</th>
+						<th class="w-16 px-4 py-3 text-right">Actions</th>
 					</tr>
 				</thead>
-				<tbody>
+				<tbody class="divide-y">
 					{#each filteredCountries as country (country.id)}
-						<tr class="border-b last:border-b-0 hover:bg-muted/50">
+						<tr class="transition-colors hover:bg-muted/30">
 							<td class="px-6 py-3">
 								<input
 									type="checkbox"
 									checked={selectedIds.has(country.id)}
-									onchange={() => toggleOne(country.id)}
-									class="size-4 rounded border-input"
+									onchange={() =>
+										selectedIds.has(country.id)
+											? selectedIds.delete(country.id)
+											: selectedIds.add(country.id)}
+									class="size-4 cursor-pointer rounded border-input accent-primary"
 								/>
 							</td>
-							<td class="px-4 py-3">{country.name}</td>
-							<td class="px-4 py-3 font-mono text-muted-foreground">{country.code}</td>
+							<td class="px-4 py-3 font-medium text-foreground">{country.name}</td>
 							<td class="px-4 py-3">
+								<span
+									class="rounded bg-muted px-2 py-0.5 font-mono text-xs font-bold text-muted-foreground uppercase"
+								>
+									{country.code}
+								</span>
+							</td>
+							<td class="px-4 py-3 text-right">
 								<DropdownMenu.Root>
 									<DropdownMenu.Trigger
-										class="flex size-7 items-center justify-center rounded-md hover:bg-muted"
-										aria-label="Row actions for {country.name}"
+										class="inline-flex size-8 items-center justify-center rounded-md hover:bg-muted"
 									>
 										<MoreHorizontal class="size-4" />
 									</DropdownMenu.Trigger>
 									<DropdownMenu.Portal>
 										<DropdownMenu.Content
-											class="z-50 min-w-32 rounded-xl border bg-popover p-1 text-popover-foreground shadow-md"
-											sideOffset={4}
+											class="z-50 min-w-32 rounded-lg border bg-popover p-1 shadow-lg"
+											sideOffset={5}
+											align="end"
 										>
 											<DropdownMenu.Item
-												textValue="Remove"
-												class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive"
+												onSelect={() => handleRemoveCountry(country.id)}
+												class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive outline-none hover:bg-destructive/10"
 											>
-												Remove
+												<Trash2 class="size-4" />
+												Remove from Region
 											</DropdownMenu.Item>
 										</DropdownMenu.Content>
 									</DropdownMenu.Portal>
@@ -206,9 +217,9 @@
 						</tr>
 					{:else}
 						<tr>
-							<td colspan="4" class="px-6 py-8 text-center text-muted-foreground">
-								No countries found.
-							</td>
+							<td colspan="4" class="px-6 py-12 text-center text-muted-foreground"
+								>No countries found.</td
+							>
 						</tr>
 					{/each}
 				</tbody>
@@ -219,14 +230,18 @@
 
 <Sheet.Root bind:open={addCountriesOpen}>
 	<Sheet.Content side="right" class="flex w-full flex-col sm:max-w-lg">
-		<Sheet.Header class="flex flex-col gap-1.5 border-b px-6 py-4">
+		<Sheet.Header class="border-b px-6 py-4">
 			<Sheet.Title>Add countries</Sheet.Title>
-			<Sheet.Description>Select countries to assign to this region.</Sheet.Description>
+			<Sheet.Description>Select the countries that belong to this region.</Sheet.Description>
 		</Sheet.Header>
+
+		<div class="flex-1 p-6 text-center">
+			<p class="text-sm text-muted-foreground">Country selection list goes here...</p>
+		</div>
+
 		<Sheet.Footer class="mt-auto flex justify-end gap-2 border-t p-4">
-			<Button type="button" variant="outline" onclick={() => (addCountriesOpen = false)}
-				>Close</Button
-			>
+			<Button variant="outline" onclick={() => (addCountriesOpen = false)}>Cancel</Button>
+			<Button onclick={() => (addCountriesOpen = false)}>Save Changes</Button>
 		</Sheet.Footer>
 	</Sheet.Content>
 </Sheet.Root>

@@ -5,29 +5,37 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { cn } from '$lib/utils.js';
 
+	type SalesChannelForEdit = {
+		id: string;
+		name: string;
+		description?: string | null;
+		is_default?: boolean;
+	};
+
 	let {
 		open = $bindable(false),
 		mode = 'edit',
-		channel = null as any | null,
-		salesChannelUpdateForm = { id: '', name: '', description: '', is_default: false },
+		channel = null as SalesChannelForEdit | null,
 		onSuccess = () => {}
 	}: {
 		open?: boolean;
-		mode?: 'edit';
-		channel?: any | null;
-		salesChannelUpdateForm?: any;
+		mode?: 'edit' | 'create';
+		channel?: SalesChannelForEdit | null;
 		onSuccess?: () => void;
 	} = $props();
 
-	const { form, errors, enhance, delayed } = superForm(salesChannelUpdateForm, {
-		resetForm: false,
-		onResult: ({ result }) => {
-			if (result.status === 200) {
-				open = false;
-				onSuccess();
+	const { form, errors, enhance, delayed } = superForm(
+		{ id: '', name: '', description: '', is_default: false },
+		{
+			resetForm: false,
+			onResult: ({ result }) => {
+				if (result.status === 200) {
+					open = false;
+					onSuccess();
+				}
 			}
 		}
-	});
+	);
 
 	let initializedForId = $state<string | null>(null);
 
@@ -113,7 +121,7 @@
 			<div class="flex justify-end gap-2 border-t p-4">
 				<Button variant="outline" type="button" onclick={close}>Cancel</Button>
 				<Button type="submit" disabled={$delayed}>
-					{$delayed ? 'Saving...' : 'Save'}
+					{submitLabel}
 				</Button>
 			</div>
 		</form>

@@ -7,12 +7,14 @@ import {
   UPDATE_REGION_PROCESS,
   DELETE_REGIONS_PROCESS,
   LIST_COUNTRIES_PROCESS,
+  REMOVE_COUNTRIES_FROM_REGION_PROCESS,
   RETRIEVE_REGION_PROCESS,
   PaginatedRegionsProcess,
   CreateRegionsProcess,
   UpdateRegionProcess,
   DeleteRegionsProcess,
   ListCountriesProcess,
+  RemoveCountriesFromRegionProcess,
   RetrieveRegionProcess,
   PaginatedRegionsSchema,
   PaginatedRegionsResponseSchema,
@@ -31,12 +33,21 @@ import {
   NotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
-import { StaticDecode } from "@sinclair/typebox";
+import type { StaticDecode } from "@sinclair/typebox";
 
 const UpdateRegionBodySchema = Type.Object({
   name: Type.Optional(Type.String()),
   currency_code: Type.Optional(Type.String()),
-  metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()]))),
+  metadata: Type.Optional(
+    Type.Record(
+      Type.String(),
+      Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()]),
+    ),
+  ),
+});
+
+const RemoveRegionCountriesBodySchema = Type.Object({
+  ids: Type.Array(Type.String()),
 });
 
 export const regionRoutes = new Elysia({ prefix: "/regions" })
@@ -44,8 +55,12 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
   .get(
     "/",
     async ({ query: input }) => {
-      const process = getService<PaginatedRegionsProcess>(PAGINATED_REGIONS_PROCESS);
-      return process.runOperations({ input: input as StaticDecode<typeof PaginatedRegionsSchema> });
+      const process = getService<PaginatedRegionsProcess>(
+        PAGINATED_REGIONS_PROCESS,
+      );
+      return process.runOperations({
+        input: input as StaticDecode<typeof PaginatedRegionsSchema>,
+      });
     },
     {
       query: PaginatedRegionsSchema,
@@ -59,7 +74,7 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
         summary: "Get paginated regions",
         description: "Gets a paginated list of regions",
       },
-    }
+    },
   )
   .post(
     "/",
@@ -79,12 +94,14 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
         summary: "Create a region",
         description: "Creates a region",
       },
-    }
+    },
   )
   .get(
     "/:id",
     async ({ params }) => {
-      const process = getService<RetrieveRegionProcess>(RETRIEVE_REGION_PROCESS);
+      const process = getService<RetrieveRegionProcess>(
+        RETRIEVE_REGION_PROCESS,
+      );
       return process.runOperations({ input: { id: params.id } });
     },
     {
@@ -100,7 +117,7 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
         summary: "Retrieve a region",
         description: "Gets a region by ID",
       },
-    }
+    },
   )
   .get(
     "/:id/countries",
@@ -122,7 +139,35 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
         summary: "List countries in region",
         description: "Gets the list of countries assigned to a region",
       },
-    }
+    },
+  )
+  .delete(
+    "/:id/countries",
+    async ({ params, body, set }) => {
+      const process = getService<RemoveCountriesFromRegionProcess>(
+        REMOVE_COUNTRIES_FROM_REGION_PROCESS,
+      );
+      await process.runOperations({
+        input: { region_id: params.id, ids: body.ids },
+      });
+      set.status = 204;
+      return undefined;
+    },
+    {
+      params: Type.Object({ id: Type.String() }),
+      body: RemoveRegionCountriesBodySchema,
+      response: {
+        204: NoContentResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Regions"],
+        summary: "Remove countries from region",
+        description:
+          "Detaches countries from a region by clearing their region assignment",
+      },
+    },
   )
   .put(
     "/:id",
@@ -145,7 +190,7 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
         summary: "Update a region",
         description: "Updates an existing region by ID",
       },
-    }
+    },
   )
   .delete(
     "/",
@@ -167,5 +212,5 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
         summary: "Delete regions",
         description: "Deletes multiple regions by their IDs",
       },
-    }
+    },
   );

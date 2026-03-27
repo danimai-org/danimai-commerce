@@ -29,13 +29,20 @@ export const createPaginationQuery = <T extends Static<typeof PaginationSchema>>
 export type CreatePaginationOptions = {
 	enabled?: () => boolean;
 	queryKeyPart?: () => unknown[];
+	/**
+	 * When set, these values are appended to the TanStack query key (read inside createQuery for reactivity).
+	 * Use instead of mutating searchText for list params that are not the legacy `searchText` field.
+	 */
+	keySuffix?: () => unknown[];
 };
 
 export const createPagination = <T>(
 	queryFn: QueryFunction<T>,
 	queryKey: string[],
-	initialSearchQuery?: ReturnType<typeof createPaginationQuery>
+	initialSearchQuery?: ReturnType<typeof createPaginationQuery>,
+	options?: CreatePaginationOptions
 	) => {
+	const keySuffix = options?.keySuffix;
 	let searchText = $state<string>(initialSearchQuery?.search ?? "");
 	const form = $state({
 		sheetOpen: false,
@@ -50,7 +57,9 @@ export const createPagination = <T>(
 	});
 
 	const query = createQuery(() => ({
-		queryKey: ["pagination", ...queryKey, searchText],
+		queryKey: keySuffix
+			? (["pagination", ...queryKey, ...keySuffix()] as const)
+			: (["pagination", ...queryKey, searchText] as const),
 		queryFn,
 		refetchOnWindowFocus: false,
 	}));

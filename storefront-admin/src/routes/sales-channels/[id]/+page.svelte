@@ -17,6 +17,7 @@
 		id: string;
 		name: string;
 		description: string;
+		is_default: boolean;
 		metadata: Record<string, unknown>;
 	};
 	const channelId = $derived(page.params?.id ?? '');
@@ -55,7 +56,10 @@
 				channel = null;
 				return;
 			}
-			channel = (res.data ?? null) as SalesChannel | null;
+			const data = res.data as SalesChannel | null | undefined;
+			channel = data
+				? { ...data, is_default: Boolean(data.is_default) }
+				: null;
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			channel = null;
@@ -126,24 +130,25 @@
 		</div>
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
-			<SalesChannelHeroCard {channel} {channelHandle} onEdit={openEdit} onSaved={loadChannel} />
-
-			<div class="flex flex-col gap-8 p-6">
-				<ProductListingCard
-					filter={{ sales_channel_id: channel.id }}
-					title="Products Sales Channel"
-				/>
-
-				<div class="grid gap-4 sm:grid-cols-2">
-					<MetadataComponent
-						productId={channel.id}
-						metadataEntity="sales-channel"
-						metadata={(channel.metadata ?? {}) as Record<string, unknown>}
-						onSaved={loadChannel}
+			<SalesChannelHeroCard {channel} {channelHandle} onEdit={openEdit} />
+			{#if channel}
+				<div class="flex flex-col gap-8 p-6">
+					<ProductListingCard
+						filter={{ sales_channel_id: channel.id }}
+						title="Products Sales Channel"
 					/>
-					<JSONComponent product={channel} options={[]} variants={[]} category={null} />
+
+					<div class="grid gap-4 sm:grid-cols-2">
+						<MetadataComponent
+							productId={channel.id}
+							metadataEntity="sales-channel"
+							metadata={(channel.metadata ?? {}) as Record<string, unknown>}
+							onSaved={loadChannel}
+						/>
+						<JSONComponent product={channel} options={[]} variants={[]} category={null} />
+					</div>
 				</div>
-			</div>
+			{/if}
 		</div>
 	{/if}
 </div>

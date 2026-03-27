@@ -2,16 +2,6 @@
 	import StoreIcon from '@lucide/svelte/icons/store';
 	import { StoreListingCard } from '$lib/components/organs/index.js';
 	import CurrencySheet from '$lib/components/organs/store/CurrencySheet.svelte';
-
-	import { client } from '$lib/client.js';
-	import { createPagination } from '$lib/api/pagination.svelte.js';
-	const paginateState = createPagination(async () => {
-		return client.stores.get({ query: { page: 1, limit: 10 } });
-	}, ['stores']);
-
-	$effect(() => {
-		paginateState.refetch();
-	});
 </script>
 
 <svelte:head>
@@ -21,10 +11,10 @@
 
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div class="mb-4 flex items-center justify-between border-b pb-4">
+		<div class="mb-4 flex items-center justify-start border-b pb-4">
 			<div class="flex items-center gap-2">
 				<StoreIcon class="size-5 text-foreground" />
-				<span class="text-lg font-semibold text-foreground">Store</span>
+				<h1 class="text-lg font-semibold text-foreground">Store</h1>
 			</div>
 		</div>
 

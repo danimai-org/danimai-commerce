@@ -82,7 +82,7 @@
 				</div>
 			</div>
 			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeSheet}>Cancel</Button>
+				<Button variant="outline" onclick={closeSheet} disabled={submitting}>Cancel</Button>
 				<Button onclick={submitEdit} disabled={submitting || !currency}>
 					{submitting ? 'Saving…' : 'Save'}
 				</Button>

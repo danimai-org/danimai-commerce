@@ -116,11 +116,7 @@
 	</div>
 </div>
 
-<SalesChannelFormSheet
-	bind:open={paginateState.formSheetOpen}
-	mode="create"
-	onSuccess={handleFormSaved}
-/>
+<SalesChannelFormSheet bind:open={paginateState.formSheetOpen} onSuccess={handleFormSaved} />
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}

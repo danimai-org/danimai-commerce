@@ -10,10 +10,22 @@
 	import TaxRegionProviderCard from '$lib/components/organs/tax-region/detail/TaxRegionProviderCard.svelte';
 	import TaxRegionRatesCard from '$lib/components/organs/tax-region/detail/TaxRegionRatesCard.svelte';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
+	import { resolve } from '$app/paths';
 
 	const taxRegionId = $derived(page.params?.id ?? '');
 
-	let taxRegion = $state<any | null>(null);
+	type TaxRegionLoaded = {
+		id: string;
+		name?: string;
+		tax_provider_id?: string;
+		tax_rates?: unknown[];
+		tax_overrides?: unknown[];
+		tax_provider?: unknown[];
+		created_at?: string | Date | null;
+		updated_at?: string | Date | null;
+	};
+
+	let taxRegion = $state<TaxRegionLoaded | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
@@ -28,18 +40,20 @@
 				}
 			});
 			if (res.error) {
-				error = String((res.error as any)?.value?.message ?? res.error);
+				error = String(
+					(res.error as { value?: { message?: string } })?.value?.message ?? res.error
+				);
 				taxRegion = null;
 				return;
 			}
-			const rows = ((res.data as any)?.rows ?? []) as any[];
-			const found = rows.find((row) => row.id === taxRegionId) ?? null;
+			const rows = ((res.data as { rows?: unknown[] })?.rows ?? []) as unknown[];
+			const found = rows.find((row) => (row as { id?: string })?.id === taxRegionId) ?? null;
 			if (!found) {
 				error = 'Tax region not found';
 				taxRegion = null;
 				return;
 			}
-			taxRegion = found;
+			taxRegion = { ...(found as Record<string, unknown>), id: taxRegionId } as TaxRegionLoaded;
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			taxRegion = null;
@@ -49,7 +63,6 @@
 	}
 
 	$effect(() => {
-		taxRegionId;
 		loadTaxRegion();
 	});
 </script>
@@ -65,7 +78,7 @@
 			<button
 				type="button"
 				class="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-				onclick={() => goto('/tax-regions')}
+				onclick={() => goto(resolve('/tax-regions', {}))}
 			>
 				<Receipt class="size-4 shrink-0" />
 				<span>Tax Regions</span>
@@ -82,16 +95,20 @@
 	{:else if error || !taxRegion}
 		<div class="flex flex-1 flex-col items-center justify-center gap-4 p-6">
 			<p class="text-destructive">{error ?? 'Tax region not found'}</p>
-			<Button variant="outline" onclick={() => goto('/tax-regions')}>Back to Tax Regions</Button>
+			<Button
+				variant="outline"
+				onclick={() => goto(resolve('/tax-regions', {}), { replaceState: true })}
+				>Back to Tax Regions</Button
+			>
 		</div>
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="flex flex-col gap-6 p-6">
-				<TaxRegionHeroCard region={taxRegion} onUpdated={loadTaxRegion} />
-				<TaxRegionRatesCard regionId={taxRegion.id} rates={taxRegion.tax_rates ?? []} />
-				<TaxRegionOverridesCard regionId={taxRegion.id} />
-				<TaxRegionProviderCard providerId={taxRegion.tax_provider_id} />
-				<JSONComponent product={taxRegion} options={[]} variants={[]} category={null} />
+				<TaxRegionHeroCard {taxRegion} onUpdated={loadTaxRegion} />
+				<TaxRegionRatesCard rates={taxRegion.tax_rates ?? []} />
+				<TaxRegionOverridesCard overrides={taxRegion.tax_overrides ?? []} />
+				<TaxRegionProviderCard providerId={taxRegion.tax_provider_id ?? null} />
+				<JSONComponent product={taxRegion as Record<string, unknown>} options={[]} variants={[]} category={null} />
 			</div>
 		</div>
 	{/if}

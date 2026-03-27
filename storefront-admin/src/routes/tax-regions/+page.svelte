@@ -12,46 +12,60 @@
 	} from '$lib/components/organs/index.js';
 	import TaxCreate from '$lib/components/organs/tax-region/create/taxCreate.svelte';
 	import Receipt from '@lucide/svelte/icons/receipt';
-	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import {
+		createPaginationQuery,
+		createPagination,
+		type PaginationMeta
+	} from '$lib/api/pagination.svelte.js';
 	import { client } from '$lib/client.js';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
 	const paginateState = createPagination(
-		async () => client['tax-regions'].get({
-			query: paginationQuery as Record<string, unknown>
-		}),
-		['tax-regions']
+		async () =>
+			client['tax-regions'].get({
+				query: paginationQuery as Record<string, unknown>
+			}),
+		['tax-regions'],
+		undefined,
+		{ keySuffix: () => [page.url.searchParams.toString()] }
 	);
 
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
-	const queryData = $derived(paginateState.query.data as any | undefined);
-	const rows = $derived((queryData?.data?.rows ?? []) as any[]);
-	const pagination = $derived((queryData?.data?.pagination ?? null) as any);
-	const start = $derived(paginateState.start);
-	const end = $derived(paginateState.end);
+	const queryData = $derived(
+		paginateState.query.data as
+			| { data?: { rows?: unknown[]; pagination?: PaginationMeta } }
+			| undefined
+	);
+	const rows = $derived((queryData?.data?.rows ?? []) as Record<string, unknown>[]);
+	const pagination = $derived((queryData?.data?.pagination ?? null) as PaginationMeta | null);
+	const start = $derived(
+		pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0
+	);
+	const end = $derived(
+		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	);
 	const openCreate = $derived(paginateState.openCreate);
-	const closeForm = $derived(paginateState.closeForm);
-	const deleteConfirmOpen = $derived(paginateState.deleteConfirmOpen);
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
 	const deleteItem = $derived(paginateState.deleteItem);
 	const deleteError = $derived(paginateState.deleteError);
 	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
 	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
 	const confirmDelete = $derived(paginateState.confirmDelete);
-	const refetch = $derived(paginateState.refetch);
 
 	async function handleFormSaved() {
 		paginateState.closeForm();
 		await paginateState.refetch();
 	}
 
-const tableColumns: TableColumn[] = [
+	const tableColumns: TableColumn[] = [
 		{
 			label: 'Name',
 			key: 'name',
@@ -70,7 +84,8 @@ const tableColumns: TableColumn[] = [
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => goto(`/tax-regions/${String((item as { id?: string }).id ?? '')}`)
+					onClick: (item) =>
+						goto(resolve(`/tax-regions/${String((item as { id?: string }).id ?? '')}`, {}))
 				},
 				{
 					label: 'Delete',
@@ -84,8 +99,8 @@ const tableColumns: TableColumn[] = [
 </script>
 
 <svelte:head>
-    <title>Tax Regions</title>
-    <meta name="description" content="Manage tax regions." />
+	<title>Tax Regions</title>
+	<meta name="description" content="Manage tax regions." />
 </svelte:head>
 
 <div class="flex h-full flex-col">
@@ -112,20 +127,11 @@ const tableColumns: TableColumn[] = [
 				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
 					<table class="w-full text-sm">
 						<TableHead columns={tableColumns} />
-						<TableBody
-							rows={rows}
-							columns={tableColumns}
-							emptyMessage="No tax regions found."
-						/>
+						<TableBody {rows} columns={tableColumns} emptyMessage="No tax regions found." />
 					</table>
 				</div>
 
-				<TablePagination
-					{pagination}
-					{start}
-					{end}
-					onPageChange={goToPage}
-				/>
+				<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
 			{/if}
 		</PaginationTable>
 	</div>
@@ -136,12 +142,14 @@ const tableColumns: TableColumn[] = [
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="tax region"
-	entityTitle={(deleteItem as any | null)?.name ?? (deleteItem as any | null)?.id ?? ''}
+	entityTitle={(deleteItem as { name?: string; id?: string } | null)?.name ??
+		(deleteItem as { id?: string } | null)?.id ??
+		''}
 	onConfirm={() =>
 		confirmDelete(async (item) => {
-			await client['tax-regions'].delete({
-				tax_region_ids: [((item as { data?: { id?: string } }).data?.id ?? (item as { id?: string }).id)!]
-			});
+			const id = (item as { id?: string }).id;
+			if (!id) throw new Error('Missing tax region id');
+			await client['tax-regions'].delete({ tax_region_ids: [id] });
 		})}
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}

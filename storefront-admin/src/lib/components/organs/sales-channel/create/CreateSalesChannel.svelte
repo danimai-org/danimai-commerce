@@ -7,11 +7,9 @@
 
 	let {
 		open = $bindable(false),
-		mode = 'create',
 		onSuccess = () => {}
 	}: {
 		open?: boolean;
-		mode?: 'create';
 		onSuccess?: () => void;
 	} = $props();
 

@@ -1,15 +1,18 @@
 <script lang="ts">
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import { Button } from '$lib/components/ui/button/index.js';
-	
+
 	interface Props {
-		channel: any;
+		channel: {
+			name: string;
+			description: string;
+			is_default: boolean;
+		};
 		channelHandle: string;
 		onEdit: () => void;
-		onSaved: () => void | Promise<void>;
 	}
 
-	let { channel, channelHandle, onEdit, onSaved }: Props = $props();
+	let { channel, channelHandle, onEdit }: Props = $props();
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col overflow-auto">
@@ -49,7 +52,5 @@
 				</div>
 			</div>
 		</div>
-
-		
 	</div>
 </div>
