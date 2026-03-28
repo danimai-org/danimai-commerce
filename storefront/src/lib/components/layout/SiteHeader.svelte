@@ -2,9 +2,25 @@
 	import { cart } from '$lib/stores/cart';
 	import { search } from '$lib/stores/search';
 	import SearchSheet from '$lib/components/search/SearchSheet.svelte';
+	import { createPagination, createPaginationQuery, type PaginationMeta } from '$lib/api/pagination.svelte';
+	import { client } from '$lib/api/client.js';
+
+	type CategoryRow = {
+		id: string;
+		value: string;
+		handle: string;
+		parent_id: string | null;
+	};
+
+	type CollectionRow = {
+		id: string;
+		title: string;
+		handle: string;
+	};
 
 	let cartCount = $state(0);
 	let searchOpen = $state(false);
+
 	$effect(() => {
 		const unsub = cart.subscribe((s) => {
 			cartCount = s.items.reduce((n, i) => n + i.quantity, 0);
@@ -17,6 +33,93 @@
 		});
 		return unsub;
 	});
+
+	const NAV_PARAMS = new URLSearchParams({ page: '1', limit: '100' });
+
+	function emptyPagination(): PaginationMeta {
+		return {
+			total: 0,
+			page: 1,
+			limit: 100,
+			total_pages: 0,
+			has_next_page: false,
+			has_previous_page: false
+		};
+	}
+
+	function unwrapRows<T>(data: unknown): T[] {
+		if (!data || typeof data !== 'object') return [];
+		const o = data as Record<string, unknown>;
+		if (Array.isArray(o.rows)) return o.rows as T[];
+		if (o.data && typeof o.data === 'object') {
+			const inner = o.data as Record<string, unknown>;
+			if (Array.isArray(inner.rows)) return inner.rows as T[];
+		}
+		return [];
+	}
+
+	function unwrapPagination(data: unknown): PaginationMeta | null {
+		if (!data || typeof data !== 'object') return null;
+		const o = data as Record<string, unknown>;
+		if (o.pagination && typeof o.pagination === 'object') return o.pagination as PaginationMeta;
+		if (o.data && typeof o.data === 'object') {
+			const inner = o.data as Record<string, unknown>;
+			if (inner.pagination && typeof inner.pagination === 'object') return inner.pagination as PaginationMeta;
+		}
+		return null;
+	}
+
+	const productCategoriesState = createPagination(
+		async () => {
+			const res = await client['product-categories'].get({
+				query: createPaginationQuery(NAV_PARAMS)
+			});
+			if (res.error) {
+				return { rows: [] as CategoryRow[], pagination: emptyPagination() };
+			}
+			const body = res.data as unknown;
+			return {
+				rows: unwrapRows<CategoryRow>(body),
+				pagination: unwrapPagination(body) ?? emptyPagination()
+			};
+		},
+		['product-categories'],
+		createPaginationQuery(NAV_PARAMS),
+		{ keySuffix: () => ['nav'] }
+	);
+
+	const collectionsState = createPagination(
+		async () => {
+			const res = await client['collections'].get({
+				query: createPaginationQuery(NAV_PARAMS)
+			});
+			if (res.error) {
+				return { rows: [] as CollectionRow[], pagination: emptyPagination() };
+			}
+			const body = res.data as unknown;
+			return {
+				rows: unwrapRows<CollectionRow>(body),
+				pagination: unwrapPagination(body) ?? emptyPagination()
+			};
+		},
+		['collections'],
+		createPaginationQuery(NAV_PARAMS),
+		{ keySuffix: () => ['nav'] }
+	);
+
+	const { query: productCategoriesQuery } = productCategoriesState;
+	const { query: collectionsQuery } = collectionsState;
+
+	const productCategories = $derived((productCategoriesQuery.data?.rows ?? []) as CategoryRow[]);
+	const navCollections = $derived((collectionsQuery.data?.rows ?? []) as CollectionRow[]);
+
+	const childCategories = $derived(productCategories.filter((c) => c.parent_id !== null));
+	const bottoms = $derived(
+		childCategories.filter((c) => /pants|trousers|shorts|skirts|denim/i.test(c.value))
+	);
+	const tops = $derived(
+		childCategories.filter((c) => !/pants|trousers|shorts|skirts|denim/i.test(c.value))
+	);
 </script>
 
 <header class="site-header">
@@ -25,35 +128,24 @@
 		<a href="/" class="brand">ESSENTIALS</a>
 		<ul class="nav-links">
 			<li class="nav-dropdown">
-				<a class="nav-dropdown-item">Tops <span class="caret">▼</span></a>
+				<button type="button" class="nav-dropdown-item">
+					Shop <span class="caret">▼</span>
+				</button>
 				<div class="dropdown-menu" aria-hidden="true">
-					<a href="/categories/tops">All Tops</a>
-					<a href="/categories/sweatshirts">Sweatshirts</a>
-					<a href="/categories/long-sleeves">Long Sleeves</a>
-					<a href="/categories/t-shirts">T-Shirts</a>
-					<a href="/categories/jackets">Jackets</a>
-					<a href="/categories/hoodies">Hoodies</a>
+					<a href="/categories/all-tops">All Tops</a>
+					{#each tops as top}
+						<a href="/categories/{top.handle}">{top.value}</a>
+					{/each}
+					<a href="/categories/all-bottoms">All Bottoms</a>
+					{#each bottoms as bottom}
+						<a href="/categories/{bottom.handle}">{bottom.value}</a>
+					{/each}
+					<a href="/store">Shop all</a>
+					{#each navCollections as col}
+						<a href="/collections/{col.handle}">{col.title}</a>
+					{/each}
 				</div>
 			</li>
-			<li class="nav-dropdown">
-				<a class="nav-dropdown-item">Bottoms <span class="caret">▼</span></a>
-				<div class="dropdown-menu" aria-hidden="true">
-					<a href="/categories/bottoms">All Bottoms</a>
-					<a href="/categories/leggings">Leggings</a>
-					<a href="/categories/shorts">Shorts</a>
-					<a href="/categories/joggers">Joggers</a>
-				</div>
-			</li>
-			<li class="nav-dropdown">
-				<a class="nav-dropdown-item">Collections <span class="caret">▼</span></a>
-				<div class="dropdown-menu" aria-hidden="true">
-					<a href="/store">Shop All</a>
-					<a href="/collections/core-essentials">Core Essentials</a>
-					<a href="/collections/studio-training">Studio & Training</a>
-					<a href="/collections/outer-layers">Outer Layers</a>
-				</div>
-			</li>
-			<li><a href="/about">About</a></li>
 		</ul>
 		<div class="nav-actions">
 			{#if searchOpen}
@@ -128,6 +220,18 @@
 	}
 	.nav-dropdown {
 		position: relative;
+	}
+	button.nav-dropdown-item {
+		font: inherit;
+		background: none;
+		border: none;
+		cursor: pointer;
+		color: #1a1a1a;
+		font-size: 0.9375rem;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0;
 	}
 	.nav-dropdown .dropdown-menu {
 		position: absolute;

@@ -1,6 +1,6 @@
-import { createQuery, type QueryFunction } from "@tanstack/svelte-query";
-import { PaginationSchema } from "@danimai/backend";
-import { type Static } from "@sinclair/typebox";
+import { createQuery, type QueryFunction } from '@tanstack/svelte-query';
+import { PaginationSchema } from '@danimai/backend';
+import { type Static } from '@sinclair/typebox';
 
 /**
  * Pagination meta returned by list APIs. Use createPaginationQuery(url.searchParams)
@@ -21,7 +21,9 @@ const searchParamsToObject = (searchParams: URLSearchParams) => {
 	return Object.fromEntries(searchParams.entries());
 };
 
-export const createPaginationQuery = <T extends Static<typeof PaginationSchema>>(data: URLSearchParams | T) => {
+export const createPaginationQuery = <T extends Static<typeof PaginationSchema>>(
+	data: URLSearchParams | T
+) => {
 	const searchParams = data instanceof URLSearchParams ? searchParamsToObject(data) : data;
 	return searchParams;
 };
@@ -29,10 +31,7 @@ export const createPaginationQuery = <T extends Static<typeof PaginationSchema>>
 export type CreatePaginationOptions = {
 	enabled?: () => boolean;
 	queryKeyPart?: () => unknown[];
-	/**
-	 * When set, these values are appended to the TanStack query key (read inside createQuery for reactivity).
-	 * Use instead of mutating searchText for list params that are not the legacy `searchText` field.
-	 */
+
 	keySuffix?: () => unknown[];
 };
 
@@ -41,49 +40,53 @@ export const createPagination = <T>(
 	queryKey: string[],
 	initialSearchQuery?: ReturnType<typeof createPaginationQuery>,
 	options?: CreatePaginationOptions
-	) => {
+) => {
 	const keySuffix = options?.keySuffix;
-	let searchText = $state<string>(initialSearchQuery?.search ?? "");
+	let searchText = $state<string>(initialSearchQuery?.search ?? '');
 	const form = $state({
 		sheetOpen: false,
-		mode: "create" as "create" | "edit",
-		item: null as T | null,
+		mode: 'create' as 'create' | 'edit',
+		item: null as T | null
 	});
 	const deleteState = $state({
 		confirmOpen: false,
 		submitting: false,
 		item: null as T | null,
-		error: null as string | null,
+		error: null as string | null
 	});
 
 	const query = createQuery(() => ({
 		queryKey: keySuffix
-			? (["pagination", ...queryKey, ...keySuffix()] as const)
-			: (["pagination", ...queryKey, searchText] as const),
+			? (['pagination', ...queryKey, ...keySuffix()] as const)
+			: (['pagination', ...queryKey, searchText] as const),
 		queryFn,
-		refetchOnWindowFocus: false,
+		refetchOnWindowFocus: false
 	}));
 
-	const pagination = $derived((query.data as unknown as { pagination?: PaginationMeta })?.pagination ?? null);
+	const pagination = $derived(
+		(query.data as unknown as { pagination?: PaginationMeta })?.pagination ?? null
+	);
 	const loading = $derived(query.isPending);
 	const error = $derived(
-		query.error != null ? (query.error instanceof Error ? query.error.message : String(query.error)) : null
+		query.error != null
+			? query.error instanceof Error
+				? query.error.message
+				: String(query.error)
+			: null
 	);
-	const start = $derived(
-		pagination ? (pagination.page - 1) * pagination.limit + 1 : 0
-	);
+	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
 	const end = $derived(
 		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
 	);
 
 	function openCreate() {
-		form.mode = "create";
+		form.mode = 'create';
 		form.item = null;
 		form.sheetOpen = true;
 	}
 
 	function openEdit(item: T) {
-		form.mode = "edit";
+		form.mode = 'edit';
 		form.item = item;
 		form.sheetOpen = true;
 	}
@@ -122,7 +125,6 @@ export const createPagination = <T>(
 			deleteState.submitting = false;
 		}
 	}
-
 
 	return {
 		get query() {
@@ -178,13 +180,13 @@ export const createPagination = <T>(
 		},
 		get deleteError() {
 			return deleteState.error;
-        },
-        get searchText() {
-            return searchText;
-        },
-        set searchText(value: string) {
-            searchText = value;
-        },
+		},
+		get searchText() {
+			return searchText;
+		},
+		set searchText(value: string) {
+			searchText = value;
+		},
 		get openDeleteConfirm() {
 			return openDeleteConfirm;
 		},
@@ -196,6 +198,6 @@ export const createPagination = <T>(
 		},
 		get refetch() {
 			return query.refetch;
-		},
+		}
 	};
 };

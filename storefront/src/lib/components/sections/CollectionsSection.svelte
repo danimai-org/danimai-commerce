@@ -1,28 +1,28 @@
 <script lang="ts">
+	interface Collection {
+		title: string;
+		handle: string;
+		image: string;
+	}
+
 	let {
-		title = 'Shop Collections'
+		title = 'Shop Collections',
+		collections = []
 	}: {
 		title?: string;
+		collections?: Collection[];
 	} = $props();
 </script>
 
 <section class="section collections-section">
 	<h2 class="section-title">{title}</h2>
 	<div class="collections-grid">
-		<a href="/collections/core-essentials" class="collection-card collection-card-large">
-			<div class="collection-bg collection-core"></div>
-			<span class="collection-label">Core Essentials →</span>
-		</a>
-		<div class="collections-stack">
-			<a href="/collections/studio-training" class="collection-card">
-				<div class="collection-bg collection-studio"></div>
-				<span class="collection-label">Studio & Training →</span>
+		{#each collections as collection}
+			<a href={`/collections/${collection.handle}`} class="collection-card">
+				<div class="collection-bg" style="background-image: url({collection.image});"></div>
+				<span class="collection-label">{collection.title} →</span>
 			</a>
-			<a href="/collections/outer-layers" class="collection-card">
-				<div class="collection-bg collection-outer"></div>
-				<span class="collection-label">Outer Layers →</span>
-			</a>
-		</div>
+		{/each}
 	</div>
 </section>
 

@@ -2,23 +2,31 @@
 	import { SiteHeader, SiteFooter } from '$lib/components/layout';
 	import { ProductGridSection } from '$lib/components/sections';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
+	import {
+		createPagination,
+		createPaginationQuery,
+		type PaginationMeta
+	} from '$lib/api/pagination.svelte';
+	import { client } from '$lib/api/client.js';
+	
 
-	let { data } = $props();
-	const category = $derived(data?.category ?? null);
-	const products = $derived(data?.products ?? []);
-	const productCount = $derived(data?.productCount ?? 0);
-	const error = $derived(data?.error ?? null);
-	const currentSort = $derived(data?.sort ?? 'best-selling');
-	const currentAvailability = $derived(data?.availability ?? 'all');
-	const currentPrice = $derived(data?.price ?? 'all');
-	const currentColor = $derived(data?.color ?? 'all');
+	type ProductRow = { id: string; title: string; handle: string };
 
-	const categoryTitle = $derived(
-		category
-			? category.value.replace(/\b\w/g, (c) => c.toUpperCase())
-			: ''
-	);
+	type GridProduct = {
+		name: string;
+		price: string;
+		href: string;
+		bg: string;
+		image?: string | null;
+	};
+
+	type CategoryPageData = {
+		rows: GridProduct[];
+		pagination: PaginationMeta;
+		categoryTitle: string;
+		categoryNotFound: boolean;
+	};
 
 	const sortOptions = [
 		{ value: 'best-selling', label: 'Best selling' },
@@ -27,42 +35,166 @@
 		{ value: 'title-desc', label: 'Title Z–A' }
 	];
 
-	function updateUrl(updates: Record<string, string>) {
-		const url = new URL($page.url.href);
-		for (const [key, val] of Object.entries(updates)) {
-			if (val === 'all' || !val) url.searchParams.delete(key);
-			else url.searchParams.set(key, val);
+	
+
+	const FALLBACK_BGS = ['#e8e0d5', '#4a4a4a', '#f5f0eb', '#6b7c5c'];
+	function pickBg(i: number) {
+		return FALLBACK_BGS[i % FALLBACK_BGS.length];
+	}
+
+	function emptyPagination(): PaginationMeta {
+		return {
+			total: 0,
+			page: 1,
+			limit: 24,
+			total_pages: 0,
+			has_next_page: false,
+			has_previous_page: false
+		};
+	}
+
+	function productsListQuery(url: URL) {
+		const p = new URLSearchParams();
+		const pg = url.searchParams.get('page');
+		const limit = url.searchParams.get('limit') ?? '24';
+		if (pg) p.set('page', pg);
+		p.set('limit', limit);
+		return createPaginationQuery(p);
+	}
+
+	function gotoWithParams(updates: Record<string, string>) {
+		const u = new URL(page.url);
+		for (const [k, v] of Object.entries(updates)) {
+			if (v === 'all' || !v) u.searchParams.delete(k);
+			else u.searchParams.set(k, v);
 		}
-		goto(url.toString());
+		goto(u.pathname + u.search, { replaceState: true });
 	}
 
 	function applySort(e: Event) {
-		updateUrl({ sort: (e.currentTarget as HTMLSelectElement).value });
+		gotoWithParams({ sort: (e.currentTarget as HTMLSelectElement).value });
 	}
 	function applyAvailability(e: Event) {
-		updateUrl({ availability: (e.currentTarget as HTMLSelectElement).value });
+		gotoWithParams({ availability: (e.currentTarget as HTMLSelectElement).value });
 	}
 	function applyPrice(e: Event) {
-		updateUrl({ price: (e.currentTarget as HTMLSelectElement).value });
+		gotoWithParams({ price: (e.currentTarget as HTMLSelectElement).value });
 	}
 	function applyColor(e: Event) {
-		updateUrl({ color: (e.currentTarget as HTMLSelectElement).value });
+		gotoWithParams({ color: (e.currentTarget as HTMLSelectElement).value });
 	}
+
+	function goToPage(nextPage: number) {
+		const u = new URL(page.url);
+		u.searchParams.set('page', String(nextPage));
+		goto(u.toString());
+	}
+
+	const paginateState = createPagination(
+		async (): Promise<CategoryPageData> => {
+			const handle = page.params.handle ? decodeURIComponent(String(page.params.handle)).trim() : '';
+			if (!handle) {
+				return {
+					rows: [],
+					pagination: emptyPagination(),
+					categoryTitle: '',
+					categoryNotFound: true
+				};
+			}
+
+			const catRes = await client['product-categories'].get({
+				query: createPaginationQuery(new URLSearchParams({ page: '1', limit: '200' }))
+			});
+			if (catRes.error) {
+				const err = catRes.error as { value?: { message?: string } };
+				throw new Error(err?.value?.message ?? String(catRes.error));
+			}
+			const catPayload = catRes.data as
+				| { rows?: Array<{ id: string; handle: string; value: string }> }
+				| undefined;
+			const categories = catPayload?.rows ?? [];
+			const category = categories.find((c) => c.handle === handle);
+			if (!category) {
+				return {
+					rows: [],
+					pagination: emptyPagination(),
+					categoryTitle: handle,
+					categoryNotFound: true
+				};
+			}
+
+			const sortParam = page.url.searchParams.get('sort') ?? 'best-selling';
+			const sort = { sorting_field: 'products.title', sorting_direction: 'desc' };
+
+			const pq = productsListQuery(page.url);
+			const pres = await client.products.get({
+				query: {
+					...pq,
+					sorting_field: sort.sorting_field,
+					sorting_direction: sort.sorting_direction,
+					filters: { category_ids: [category.id] }
+				}
+			});
+			if (pres.error) {
+				const err = pres.error as { value?: { message?: string } };
+				throw new Error(err?.value?.message ?? String(pres.error));
+			}
+			const pdata = pres.data as { rows?: ProductRow[]; pagination?: PaginationMeta } | undefined;
+			const productRows = pdata?.rows ?? [];
+			const grid: GridProduct[] = productRows.map((p, i) => ({
+				name: p.title,
+				price: '—',
+				href: `/products/${p.handle}`,
+				bg: pickBg(i),
+				image: null
+			}));
+			return {
+				rows: grid,
+				pagination: pdata?.pagination ?? emptyPagination(),
+				categoryTitle: category.value,
+				categoryNotFound: false
+			};
+		},
+		['category-products'],
+		createPaginationQuery(productsListQuery(page.url)),
+		{ keySuffix: () => [page.params.handle ?? '', page.url.search] }
+	);
+
+	const { query } = paginateState;
+	const loading = $derived(paginateState.loading);
+	const fetchError = $derived(paginateState.error);
+	const pagination = $derived(paginateState.pagination);
+	const start = $derived(paginateState.start);
+	const end = $derived(paginateState.end);
+
+	const products = $derived((query.data?.rows ?? []) as GridProduct[]);
+	const productCount = $derived(pagination?.total ?? 0);
+	const categoryNotFound = $derived(query.data?.categoryNotFound === true);
+	const categoryTitle = $derived(
+		query.data?.categoryTitle ?? page.params.handle ?? 'Category'
+	);
+
+	const currentSort = $derived(page.url.searchParams.get('sort') ?? 'best-selling');
+	const currentAvailability = $derived(page.url.searchParams.get('availability') ?? 'all');
+	const currentPrice = $derived(page.url.searchParams.get('price') ?? 'all');
+	const currentColor = $derived(page.url.searchParams.get('color') ?? 'all');
 </script>
 
 <svelte:head>
-	{#if categoryTitle}
-		<title>{categoryTitle} – ESSENTIALS</title>
-	{/if}
+	<title>{categoryTitle} – ESSENTIALS</title>
 </svelte:head>
 
 <SiteHeader />
 
-{#if error && !category}
+{#if fetchError}
 	<main class="category-main">
-		<p class="category-error">{error}</p>
+		<p class="category-error">{fetchError}</p>
 	</main>
-{:else if category}
+{:else if categoryNotFound}
+	<main class="category-main">
+		<p class="category-error">Category not found</p>
+	</main>
+{:else}
 	<main class="category-main">
 		<section class="category-hero" aria-label={categoryTitle}>
 			<h1 class="category-hero-title">{categoryTitle}</h1>
@@ -103,14 +235,36 @@
 			</div>
 			<span class="product-count">{productCount} {productCount === 1 ? 'product' : 'products'}</span>
 		</div>
-		{#if error}
-			<p class="category-error">{error}</p>
-		{/if}
-		<ProductGridSection
-			products={products}
-			title=""
-			subtitle=""
-		/>
+		<div class="category-toolbar-meta" aria-live="polite">
+			{#if loading}
+				<span class="category-loading">Loading…</span>
+			{/if}
+			{#if pagination && pagination.total > 0}
+				<span class="category-range">{start}–{end} of {pagination.total}</span>
+			{/if}
+			{#if pagination && pagination.total_pages > 1}
+				<div class="category-pagination">
+					<button
+						type="button"
+						class="category-page-btn"
+						disabled={loading || !pagination.has_previous_page}
+						onclick={() => goToPage(pagination.page - 1)}
+					>
+						Previous
+					</button>
+					<span class="category-page-num">Page {pagination.page} of {pagination.total_pages}</span>
+					<button
+						type="button"
+						class="category-page-btn"
+						disabled={loading || !pagination.has_next_page}
+						onclick={() => goToPage(pagination.page + 1)}
+					>
+						Next
+					</button>
+				</div>
+			{/if}
+		</div>
+		<ProductGridSection products={products} title="" subtitle="" />
 	</main>
 {/if}
 
@@ -150,6 +304,44 @@
 		margin: 0 auto;
 		padding: 1rem 1.5rem 2rem;
 		border-bottom: 1px solid #eee;
+	}
+	.category-toolbar-meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: center;
+		gap: 1rem 1.5rem;
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0 1.5rem 1rem;
+		font-size: 0.875rem;
+		color: #555;
+	}
+	.category-loading {
+		color: #666;
+	}
+	.category-range {
+		margin: 0 auto;
+	}
+	.category-pagination {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+	.category-page-btn {
+		padding: 0.35rem 0.75rem;
+		font-size: 0.875rem;
+		border: 1px solid #ccc;
+		border-radius: 6px;
+		background: #fff;
+		cursor: pointer;
+	}
+	.category-page-btn:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+	.category-page-num {
+		color: #666;
 	}
 	.toolbar-filters {
 		display: flex;

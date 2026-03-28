@@ -1,32 +1,122 @@
 <script lang="ts">
 	import { SiteHeader, SiteFooter } from '$lib/components/layout';
 	import { ProductGridSection } from '$lib/components/sections';
+	import {
+		createPagination,
+		createPaginationQuery,
+		type PaginationMeta
+	} from '$lib/api/pagination.svelte';
+	import { client } from '$lib/api/client.js';
+	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 
-	let { data } = $props();
-	const collection = $derived(data?.collection ?? null);
-	const products = $derived(data?.products ?? []);
-	const error = $derived(data?.error ?? null);
+	type ProductRow = { id: string; title: string; handle: string };
+
+	const FALLBACK_BGS = ['#e8e0d5', '#4a4a4a', '#f5f0eb', '#6b7c5c'];
+	function pickBg(index: number) {
+		return FALLBACK_BGS[index % FALLBACK_BGS.length];
+	}
+
+	function emptyPagination(): PaginationMeta {
+		return {
+			total: 0,
+			page: 1,
+			limit: 10,
+			total_pages: 0,
+			has_next_page: false,
+			has_previous_page: false
+		};
+	}
+
+	const paginateState = createPagination(
+		async () => {
+			const res = await client['collections'].get({
+				query: createPaginationQuery(page.url.searchParams)
+			});
+			if (res.error) {
+				const err = res.error as { value?: { message?: string } };
+				throw new Error(err?.value?.message ?? String(res.error));
+			}
+			const payload = res.data as { rows?: ProductRow[]; pagination?: PaginationMeta } | undefined;
+			return {
+				rows: payload?.rows ?? [],
+				pagination: payload?.pagination ?? emptyPagination()
+			};
+		},
+		['collection-products'],
+		createPaginationQuery(page.url.searchParams),
+		{
+			keySuffix: () => [page.params.handle ?? '']
+		}
+	);
+
+	const { query } = paginateState;
+
+	const loading = $derived(paginateState.loading);
+	const fetchError = $derived(paginateState.error);
+	const rows = $derived((query.data?.rows ?? []) as ProductRow[]);
+	const pagination = $derived(paginateState.pagination);
+	const start = $derived(paginateState.start);
+	const end = $derived(paginateState.end);
+
+	const gridProducts = $derived(
+		rows.map((p, i) => ({
+			name: p.title,
+			price: '—',
+			href: `/products/${p.handle}`,
+			bg: pickBg(i),
+			image: null as string | null
+		}))
+	);
+
+	function goToPage(nextPage: number) {
+		const u = new URL(page.url);
+		u.searchParams.set('page', String(nextPage));
+		goto(u.toString());
+	}
 </script>
 
 <SiteHeader />
 
-{#if error && !collection}
+{#if fetchError}
 	<main class="collection-main">
-		<p class="collection-error">{error}</p>
+		<p class="collection-error">{fetchError}</p>
 	</main>
-{:else if collection}
+{:else}
 	<main class="collection-main">
 		<section class="collection-hero">
-			<h1 class="collection-hero-title">{collection.title}</h1>
+			<h1 class="collection-hero-title">{query.data?.rows?.[0]?.title}</h1>
 		</section>
-		{#if error}
-			<p class="collection-error">{error}</p>
-		{/if}
-		<ProductGridSection
-			products={products}
-			title=""
-			subtitle=""
-		/>
+		<div class="collection-toolbar" aria-live="polite">
+			{#if loading}
+				<span class="collection-loading">Loading…</span>
+			{/if}
+			{#if pagination && pagination.total > 0}
+				<span class="collection-range">{start}–{end} of {pagination.total}</span>
+			{/if}
+			{#if pagination && pagination.total_pages > 1}
+				<div class="collection-pagination">
+					<button
+						type="button"
+						class="collection-page-btn"
+						disabled={loading || !pagination.has_previous_page}
+						onclick={() => goToPage(pagination.page - 1)}
+					>
+						Previous
+					</button>
+					<span class="collection-page-num">Page {pagination.page} of {pagination.total_pages}</span>
+					<button
+						type="button"
+						class="collection-page-btn"
+						disabled={loading || !pagination.has_next_page}
+						onclick={() => goToPage(pagination.page + 1)}
+					>
+						Next
+					</button>
+				</div>
+			{/if}
+		</div>
+		<ProductGridSection products={gridProducts} title="" subtitle="" />
 	</main>
 {/if}
 
@@ -58,5 +148,43 @@
 		padding: 0 1.5rem;
 		color: #c00;
 		text-align: center;
+	}
+	.collection-toolbar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: center;
+		gap: 1rem 1.5rem;
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 1rem 1.5rem 0;
+		font-size: 0.875rem;
+		color: #555;
+	}
+	.collection-loading {
+		color: #666;
+	}
+	.collection-range {
+		margin: 0 auto;
+	}
+	.collection-pagination {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+	.collection-page-btn {
+		padding: 0.35rem 0.75rem;
+		font-size: 0.875rem;
+		border: 1px solid #ccc;
+		border-radius: 6px;
+		background: #fff;
+		cursor: pointer;
+	}
+	.collection-page-btn:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+	.collection-page-num {
+		color: #666;
 	}
 </style>
