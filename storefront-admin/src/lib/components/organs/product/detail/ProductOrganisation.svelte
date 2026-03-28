@@ -15,7 +15,11 @@
 	let {
 		productOrganisationForm
 	}: {
-		productOrganisationForm: SuperValidated<ProductOrganisationFormData>;
+		productOrganisationForm: SuperValidated<
+			ProductOrganisationFormData,
+			string | unknown,
+			Record<string, unknown>
+		>;
 	} = $props();
 
 	const product = $derived(getProductDetail()?.data ?? null);
@@ -31,7 +35,6 @@
 			size="icon"
 			class="size-8 shrink-0"
 			onclick={() => {
-				
 				orgSheetOpen = true;
 			}}
 			aria-label="Edit organisation"
@@ -49,7 +52,9 @@
 			<dd class="mt-0.5">
 				{#if product?.collections?.length}
 					{product.collections.map((c) => c.title).join(', ')}
-				{product.collections.length > 0 ? product.collections.map((c) => c.title).join(', ') : '—'}
+					{product.collections.length > 0
+						? product.collections.map((c) => c.title).join(', ')
+						: '—'}
 				{/if}
 			</dd>
 		</div>

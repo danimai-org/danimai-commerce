@@ -15,17 +15,13 @@
 	import { createPagination, createPaginationQuery } from '$lib/api';
 	import { resolve } from '$app/paths';
 
-	// 1. Get ID from params (Reactive)
 	const regionId = $derived(page.params.id);
-
-	// 2. Initialize Pagination State
-	// Passing regionId inside the arrow function ensures it refetches when the ID changes
 	const paginateState = createPagination(
 		async () => {
 			if (!regionId) throw new Error('Missing Region ID');
 			return client.regions({ id: regionId }).get();
 		},
-		['regions', regionId], // Added regionId to keys to force refresh on route change
+		['regions', regionId],
 		createPaginationQuery(page.url.searchParams)
 	);
 
@@ -34,13 +30,11 @@
 	const loading = $derived(paginateState.loading);
 	const error = $derived(paginateState.error);
 
-	// UI States
 	let editOpen = $state(false);
 	let deleteConfirmOpen = $state(false);
 	let deleteSubmitting = $state(false);
 	let deleteError = $state<string | null>(null);
 
-	// Manual Refresh Helper
 	async function refreshData() {
 		await paginateState.refetch();
 	}
@@ -65,7 +59,6 @@
 			if (apiError) throw new Error(apiError.value?.message || 'Failed to delete');
 
 			deleteConfirmOpen = false;
-			// Use path helper to go back
 			goto(resolve('/regions', {}), { replaceState: true });
 		} catch (e) {
 			deleteError = e instanceof Error ? e.message : String(e);

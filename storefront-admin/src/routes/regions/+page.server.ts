@@ -6,12 +6,15 @@ import { superValidate, message } from 'sveltekit-superforms';
 import { client } from '$lib/client';
 
 const RegionCreateSchema = z.object({
-    name: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name is too long'),
-    currency_code: z.string().min(3, 'Currency code must be 3 characters (e.g. USD)').max(3, 'Currency code must be 3 characters (e.g. USD)')
+	name: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name is too long'),
+	currency_code: z
+		.string()
+		.min(3, 'Currency code must be 3 characters (e.g. USD)')
+		.max(3, 'Currency code must be 3 characters (e.g. USD)')
 });
 
 const RegionUpdateSchema = RegionCreateSchema.extend({
-    id: z.string().min(1, 'Region id is required')
+	id: z.string().min(1, 'Region id is required')
 });
 
 export const load: PageServerLoad = async () => {
@@ -36,7 +39,6 @@ export const load: PageServerLoad = async () => {
 };
 
 export const actions = {
-
 	create: async ({ request }) => {
 		const regionCreateForm = await superValidate(request, zod4(RegionCreateSchema));
 
@@ -45,12 +47,9 @@ export const actions = {
 		}
 
 		const region = await client['regions'].post({
-			regions: [
-				{
-					name: regionCreateForm.data.name.trim(),
-					currency_code: regionCreateForm.data.currency_code.trim().toUpperCase()
-				}
-			]
+			name: regionCreateForm.data.name.trim(),
+			currency_code: regionCreateForm.data.currency_code.trim().toUpperCase(),
+			metadata: {}
 		});
 
 		if (!region || region.error) {

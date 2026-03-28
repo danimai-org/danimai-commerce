@@ -18,7 +18,7 @@
 				{#if productJsonForView}
 				<div class="mt-4 rounded-md bg-[#0d1117] p-4 overflow-hidden">
 					<pre class="overflow-x-auto text-sm">
-						<code class="hljs">{@html highlightedJson}</code>
+						<code class="hljs">{highlightedJson as string}</code>
 					</pre>
 				</div>
 					

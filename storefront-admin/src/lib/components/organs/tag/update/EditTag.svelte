@@ -6,17 +6,13 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { Toaster, toast } from 'svelte-sonner';
 
-	type Mode = 'update';
-
 	let {
 		open = $bindable(false),
-		mode = 'update',
 		tag = null,
 		onSaved = async () => {},
 		onClosed = () => {}
 	}: {
 		open?: boolean;
-		mode?: Mode;
 		tag?: { id: string; value: string } | null;
 		onSaved?: () => void | Promise<void>;
 		onClosed?: () => void;

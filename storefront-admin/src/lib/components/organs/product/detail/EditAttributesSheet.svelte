@@ -1,17 +1,44 @@
 <script lang="ts">
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { superForm } from 'sveltekit-superforms/client';
+	import type { SuperValidated } from 'sveltekit-superforms';
+
+	type ProductAttributesFormData = {
+		id: string;
+		attributes: Array<{
+			attribute_group_id: string;
+			attribute_id: string;
+			value: string;
+		}>;
+	};
 
 	interface Props {
-		open: boolean;
+		open?: boolean;
+		productAttributesForm: SuperValidated<
+			ProductAttributesFormData,
+			string | unknown,
+			Record<string, unknown>
+		>;
+		onSaved?: () => void | Promise<void>;
 	}
 
-	let { open = $bindable(false),  }: Props = $props();
+	let {
+		open = $bindable(false),
+		productAttributesForm,
+		onSaved = async () => {}
+	}: Props = $props();
+
+	// svelte-ignore state_referenced_locally
+	const { form } = superForm(productAttributesForm, {
+		resetForm: true,
+		invalidateAll: false
+	});
 
 </script>
 
 <Sheet.Root bind:open>
-	<Sheet.Content class="flex w-full flex-col sm:max-w-lg" side="right">
+	<Sheet.Content class="flex w-full flex-col sm:max-w-lg" side="right" data-product-id={$form.id}>
 		<Sheet.Header class="flex flex-col items-center gap-1.5 text-center sm:text-center">
 			<Sheet.Title>Edit Attributes</Sheet.Title>
 		</Sheet.Header>
@@ -77,7 +104,12 @@
 			>
 				Cancel
 			</Button>
-			<Button onclick={() => open = false}>
+			<Button
+				onclick={async () => {
+					await onSaved();
+					open = false;
+				}}
+			>
 				Save
 			</Button>
 		</Sheet.Footer>

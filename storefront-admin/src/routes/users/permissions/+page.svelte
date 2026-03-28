@@ -14,6 +14,8 @@
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import { formatDate } from '$lib/utils';
 	import EditPermissionSheet from '../../../lib/components/organs/permissions/update/EditPermissionSheet.svelte';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
 	type Permission = {
 		id: string;
@@ -28,12 +30,9 @@
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
-	const paginateState = createPagination(
-		async () => {
-			return client['permissions'].get({ query: paginationQuery });
-		},
-		['permissions']
-	);
+	const paginateState = createPagination(async () => {
+		return client['permissions'].get({ query: paginationQuery });
+	}, ['permissions']);
 
 	const permissions = $derived(paginateState.query.data?.data?.rows ?? []);
 	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
@@ -43,9 +42,9 @@
 	const error = $derived(paginateState.error);
 
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
 	// Edit permission sheet
@@ -61,8 +60,8 @@
 </script>
 
 <svelte:head>
-    <title>Permissions</title>
-    <meta name="description" content="Manage permissions." />
+	<title>Permissions</title>
+	<meta name="description" content="Manage permissions." />
 </svelte:head>
 
 <div class="flex h-full flex-col">

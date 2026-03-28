@@ -6,17 +6,13 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { Toaster, toast } from 'svelte-sonner';
 
-	type Mode = 'update';
-
 	let {
 		open = $bindable(false),
-		mode = 'update',
 		attribute = null,
 		onSaved = async () => {},
 		onClosed = () => {}
 	}: {
 		open?: boolean;
-		mode?: Mode;
 		attribute?: { id: string; title: string; type: string } | null;
 		onSaved?: () => void | Promise<void>;
 		onClosed?: () => void | Promise<void>;
@@ -83,7 +79,7 @@
 
 <Toaster richColors position="top-center" />
 
-<Sheet.Root bind:open={open} onOpenChange={onOpenChange}>
+<Sheet.Root bind:open {onOpenChange}>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
 		<form action="?/update" method="POST" use:enhance class="flex h-full flex-col">
 			<input type="hidden" name="id" bind:value={$form.id} />

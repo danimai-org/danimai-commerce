@@ -11,16 +11,11 @@
 		createCategoryId = $bindable(''),
 		createTagIds = $bindable([] as string[]),
 		categoryError = null as string | null,
-		createSalesChannels = [] as { id: string; name: string }[],
 		createSalesChannelIds = $bindable([]),
 		collectionsList = $bindable([]),
 		categoriesList = $bindable([]),
 		tagsList = $bindable([]),
-		salesChannelsList = $bindable([]),
-		addTag = $bindable((tagIds: string[]) => {}),
-		removeTag = $bindable((tagId: string) => {}),
-		addSalesChannel = $bindable((ids: string[]) => {}),
-		removeSalesChannel = $bindable((id: string) => {}),
+		salesChannelsList = $bindable([])
 	} = $props();
 </script>
 
@@ -79,7 +74,9 @@
 					{#each createCollectionIds as collectionId (collectionId)}
 						{@const collection = collectionsList.find((col) => col.id === collectionId)}
 						{#if collection}
-							<span class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm">
+							<span
+								class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm"
+							>
 								{collection.title}
 								<button
 									type="button"
@@ -124,14 +121,18 @@
 				id="create-tags-select"
 				triggerClass="h-10 min-w-[10px] rounded-md border border-input bg-background px-3 py-1 text-sm"
 				bind:value={createTagIds}
-				options={tagsList.filter((t) => !createTagIds.includes(t.id)).map((t) => ({ id: t.id, value: t.value }))}
+				options={tagsList
+					.filter((t) => !createTagIds.includes(t.id))
+					.map((t) => ({ id: t.id, value: t.value }))}
 			/>
 			{#if createTagIds.length > 0}
 				<div class="flex flex-wrap items-center gap-2">
 					{#each createTagIds as tagId (tagId)}
 						{@const tag = tagsList.find((t) => t.id === tagId)}
 						{#if tag}
-							<span class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm">
+							<span
+								class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm"
+							>
 								{tag.value}
 								<button
 									type="button"
@@ -159,20 +160,26 @@
 				id="create-sales-channel-select"
 				triggerClass="h-10 min-w-[10px] rounded-md border border-input bg-background px-3 py-1 text-sm"
 				bind:value={createSalesChannelIds}
-				options={salesChannelsList.filter((ch) => !createSalesChannelIds.includes(ch.id)).map((ch) => ({ id: ch.id, value: ch.name }))}
+				options={salesChannelsList
+					.filter((ch) => !createSalesChannelIds.includes(ch.id))
+					.map((ch) => ({ id: ch.id, value: ch.name }))}
 			/>
 			{#if createSalesChannelIds.length > 0}
 				<div class="flex flex-wrap items-center gap-2">
 					{#each createSalesChannelIds as salesChannelId (salesChannelId)}
 						{@const salesChannel = salesChannelsList.find((ch) => ch.id === salesChannelId)}
 						{#if salesChannel}
-							<span class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm">
+							<span
+								class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-sm"
+							>
 								{salesChannel.name}
 								<button
 									type="button"
 									class="rounded p-0.5 hover:bg-muted"
 									onclick={() =>
-										(createSalesChannelIds = createSalesChannelIds.filter((id) => id !== salesChannelId))}
+										(createSalesChannelIds = createSalesChannelIds.filter(
+											(id) => id !== salesChannelId
+										))}
 									aria-label={`Remove ${salesChannel.name} sales channel`}
 								>
 									<X class="size-3.5" />

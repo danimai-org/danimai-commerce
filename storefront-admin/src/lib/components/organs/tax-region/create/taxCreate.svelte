@@ -29,16 +29,14 @@
 		{ id: 'stripe', value: 'Stripe' },
 		{ id: 'paypal', value: 'PayPal' },
 		{ id: 'shopify', value: 'Shopify' },
-		{ id: 'shopify-pay', value: 'Shopify Pay' },
+		{ id: 'shopify-pay', value: 'Shopify Pay' }
 	];
 
 	let {
 		open = $bindable(false),
-		mode = 'create',
 		onSuccess = () => {}
 	}: {
 		open?: boolean;
-		mode?: 'create';
 		onSuccess?: () => void;
 	} = $props();
 
@@ -117,9 +115,9 @@
 						<label for="tr-country" class="text-sm font-medium">Country</label>
 						<Combobox
 							id="tr-country"
-							bind:value={selectedCountry}	
+							bind:value={selectedCountry}
 							class={cn(
-								'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+								'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
 								$errors.name && 'border-destructive'
 							)}
 							options={COUNTRY_OPTIONS.map((opt) => ({ id: opt.value, value: opt.label }))}
@@ -134,7 +132,7 @@
 							id="tr-tax-provider"
 							bind:value={selectedTaxProvider}
 							class={cn(
-								'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+								'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
 								$errors.tax_provider_id && 'border-destructive'
 							)}
 							options={TAX_PROVIDER_OPTIONS.map((opt) => ({ id: opt.id, value: opt.value }))}

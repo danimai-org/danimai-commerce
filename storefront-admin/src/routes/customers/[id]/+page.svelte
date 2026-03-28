@@ -40,6 +40,7 @@
 		type CustomerAddress
 	} from '$lib/customers/api.js';
 	import { listCustomerGroups, type CustomerGroup } from '$lib/customer-groups/api.js';
+	import { resolve } from '$app/paths';
 
 	const customerId = $derived(page.params?.id ?? '');
 
@@ -72,7 +73,6 @@
 	}
 
 	$effect(() => {
-		customerId;
 		loadCustomer();
 	});
 
@@ -86,18 +86,23 @@
 	const breadcrumbLabel = $derived(
 		customer?.first_name || customer?.last_name
 			? `${customer?.first_name ?? ''} ${customer?.last_name ?? ''}`.trim()
-			: customer?.email ?? 'Customer'
+			: (customer?.email ?? 'Customer')
 	);
 
 	const createdDisplay = $derived(
-		customer?.created_at ? new Date(customer.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '–'
+		customer?.created_at
+			? new Date(customer.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })
+			: '–'
 	);
 
 	type CustomerGroupItem = { id: string | null; name: string };
 	const customerGroupsFromApi = $derived((): CustomerGroupItem[] => {
 		const meta = customer?.metadata;
 		if (!meta || typeof meta !== 'object' || meta === null) return [];
-		const m = meta as { customer_groups?: { id: string; name: string }[]; customer_group_name?: string };
+		const m = meta as {
+			customer_groups?: { id: string; name: string }[];
+			customer_group_name?: string;
+		};
 		if (Array.isArray(m.customer_groups) && m.customer_groups.length > 0) {
 			return m.customer_groups.map((g) => ({ id: g.id, name: g.name }));
 		}
@@ -118,7 +123,10 @@
 	const groupCardStart = $derived((groupCardPage - 1) * groupCardLimit + 1);
 	const groupCardEnd = $derived(Math.min(groupCardPage * groupCardLimit, groupCardTotal));
 	const groupCardPaginated = $derived(
-		customerGroupsForCard.slice((groupCardPage - 1) * groupCardLimit, groupCardPage * groupCardLimit)
+		customerGroupsForCard.slice(
+			(groupCardPage - 1) * groupCardLimit,
+			groupCardPage * groupCardLimit
+		)
 	);
 
 	$effect(() => {
@@ -129,7 +137,27 @@
 	let addToGroupModalOpen = $state(false);
 	let groupModalPage = $state(1);
 	let groupModalSearch = $state('');
-	let groupModalData = $state<{ data: { rows: CustomerGroup[]; pagination: { total: number; page: number; limit: number; total_pages: number; has_next_page: boolean; has_previous_page: boolean } }; pagination: { total: number; page: number; limit: number; total_pages: number; has_next_page: boolean; has_previous_page: boolean } } | null>(null);
+	let groupModalData = $state<{
+		data: {
+			rows: CustomerGroup[];
+			pagination: {
+				total: number;
+				page: number;
+				limit: number;
+				total_pages: number;
+				has_next_page: boolean;
+				has_previous_page: boolean;
+			};
+		};
+		pagination: {
+			total: number;
+			page: number;
+			limit: number;
+			total_pages: number;
+			has_next_page: boolean;
+			has_previous_page: boolean;
+		};
+	} | null>(null);
 	let groupModalLoading = $state(false);
 	let addToGroupSubmitting = $state(false);
 	let addToGroupError = $state<string | null>(null);
@@ -208,7 +236,9 @@
 	const groupModalPagination = $derived(groupModalData?.pagination ?? null);
 	const groupModalFiltered = $derived(
 		groupModalSearch.trim()
-			? groupModalGroups.filter((g) => g.name.toLowerCase().includes(groupModalSearch.toLowerCase()))
+			? groupModalGroups.filter((g) =>
+					g.name.toLowerCase().includes(groupModalSearch.toLowerCase())
+				)
 			: groupModalGroups
 	);
 	const groupModalStart = $derived(
@@ -250,7 +280,6 @@
 
 	$effect(() => {
 		if (!addToGroupModalOpen) return;
-		groupModalPage;
 		fetchGroupModalGroups();
 	});
 
@@ -280,7 +309,7 @@
 		try {
 			await deleteCustomer(customer.id);
 			closeDeleteModal();
-			goto('/customers');
+			goto(resolve('/customers', {}), { replaceState: true });
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -365,7 +394,9 @@
 
 	const deleteAddressTitle = $derived(
 		addressToDelete
-			? [addressToDelete.address_1, addressToDelete.city, addressToDelete.country_code].filter(Boolean).join(', ')
+			? [addressToDelete.address_1, addressToDelete.city, addressToDelete.country_code]
+					.filter(Boolean)
+					.join(', ')
 			: ''
 	);
 
@@ -477,13 +508,15 @@
 			<button
 				type="button"
 				class="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-				onclick={() => goto('/customers')}
+				onclick={() => goto(resolve('/customers', {}), { replaceState: true })}
 			>
 				<Users class="size-4 shrink-0" />
 				<span>Customers</span>
 			</button>
 			<ChevronRight class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-			<span class="font-medium text-foreground">{customer ? breadcrumbLabel : (customerId ?? '…')}</span>
+			<span class="font-medium text-foreground"
+				>{customer ? breadcrumbLabel : (customerId ?? '…')}</span
+			>
 		</nav>
 	</div>
 
@@ -494,7 +527,10 @@
 	{:else if error || !customer}
 		<div class="flex flex-1 flex-col items-center justify-center gap-4 p-6">
 			<p class="text-destructive">{error ?? 'Customer not found'}</p>
-			<Button variant="outline" onclick={() => goto('/customers')}>
+			<Button
+				variant="outline"
+				onclick={() => goto(resolve('/customers', {}), { replaceState: true })}
+			>
 				Back to Customers
 			</Button>
 		</div>
@@ -515,35 +551,35 @@
 										>
 									{/if}
 									<DropdownMenu.Root>
-									<DropdownMenu.Trigger
-										class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
-									>
-										<MoreHorizontal class="size-4" />
-										<span class="sr-only">Actions</span>
-									</DropdownMenu.Trigger>
-									<DropdownMenu.Portal>
-										<DropdownMenu.Content
-											class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-											sideOffset={4}
+										<DropdownMenu.Trigger
+											class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
 										>
-											<DropdownMenu.Item
-												textValue="Edit"
-												class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-												onSelect={openEdit}
+											<MoreHorizontal class="size-4" />
+											<span class="sr-only">Actions</span>
+										</DropdownMenu.Trigger>
+										<DropdownMenu.Portal>
+											<DropdownMenu.Content
+												class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+												sideOffset={4}
 											>
-												<Pencil class="size-4" />
-												Edit
-											</DropdownMenu.Item>
-											<DropdownMenu.Item
-												textValue="Delete"
-												class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-												onSelect={openDeleteModal}
-											>
-												<Trash2 class="size-4" />
-												Delete
-											</DropdownMenu.Item>
-										</DropdownMenu.Content>
-									</DropdownMenu.Portal>
+												<DropdownMenu.Item
+													textValue="Edit"
+													class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+													onSelect={openEdit}
+												>
+													<Pencil class="size-4" />
+													Edit
+												</DropdownMenu.Item>
+												<DropdownMenu.Item
+													textValue="Delete"
+													class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
+													onSelect={openDeleteModal}
+												>
+													<Trash2 class="size-4" />
+													Delete
+												</DropdownMenu.Item>
+											</DropdownMenu.Content>
+										</DropdownMenu.Portal>
 									</DropdownMenu.Root>
 								</div>
 							</div>
@@ -558,15 +594,21 @@
 										</td>
 									</tr>
 									<tr>
-										<th class="w-32 py-3 pr-4 text-left font-medium text-muted-foreground">Phone</th>
+										<th class="w-32 py-3 pr-4 text-left font-medium text-muted-foreground">Phone</th
+										>
 										<td class="py-3 font-medium">{customer.phone ?? '–'}</td>
 									</tr>
 									<tr>
-										<th class="w-32 py-3 pr-4 text-left font-medium text-muted-foreground">Account</th>
-										<td class="py-3 font-medium">{customer.has_account ? 'Registered' : 'Guest'}</td>
+										<th class="w-32 py-3 pr-4 text-left font-medium text-muted-foreground"
+											>Account</th
+										>
+										<td class="py-3 font-medium">{customer.has_account ? 'Registered' : 'Guest'}</td
+										>
 									</tr>
 									<tr>
-										<th class="w-32 py-3 pr-4 text-left font-medium text-muted-foreground">Created</th>
+										<th class="w-32 py-3 pr-4 text-left font-medium text-muted-foreground"
+											>Created</th
+										>
 										<td class="py-3 font-medium">{createdDisplay}</td>
 									</tr>
 								</tbody>
@@ -576,18 +618,16 @@
 				</div>
 
 				<!-- Customer group card -->
-				<section class="rounded-lg border bg-card shadow-sm overflow-hidden">
+				<section class="overflow-hidden rounded-lg border bg-card shadow-sm">
 					<div class="flex items-center justify-between gap-4 border-b px-6 py-4">
-						<h2 class="text-base font-semibold flex items-center gap-2">
+						<h2 class="flex items-center gap-2 text-base font-semibold">
 							<UsersRound class="size-4" />
 							Customer group
 						</h2>
 						<Button variant="outline" size="sm" onclick={openAddToGroupModal}>Add to group</Button>
 					</div>
 					{#if customerGroupsForCard.length === 0}
-						<div class="px-6 py-8 text-center text-sm text-muted-foreground">
-							No groups yet.
-						</div>
+						<div class="px-6 py-8 text-center text-sm text-muted-foreground">No groups yet.</div>
 					{:else}
 						<ul class="divide-y">
 							{#each groupCardPaginated as group (group.id ?? group.name)}
@@ -607,7 +647,7 @@
 											>
 												<DropdownMenu.Item
 													textValue="Edit"
-													class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+													class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
 													onSelect={openAddToGroupModal}
 												>
 													<Pencil class="size-4" />
@@ -615,7 +655,7 @@
 												</DropdownMenu.Item>
 												<DropdownMenu.Item
 													textValue="Delete"
-													class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
+													class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
 													onSelect={() => openRemoveFromGroupModal(group)}
 												>
 													<Trash2 class="size-4" />
@@ -659,22 +699,20 @@
 				</section>
 
 				<!-- Orders section (placeholder) -->
-				<section class="rounded-lg border bg-card shadow-sm overflow-hidden">
+				<section class="overflow-hidden rounded-lg border bg-card shadow-sm">
 					<div class="flex items-center justify-between gap-4 border-b px-6 py-4">
-						<h2 class="text-base font-semibold flex items-center gap-2">
+						<h2 class="flex items-center gap-2 text-base font-semibold">
 							<ShoppingBag class="size-4" />
 							Orders
 						</h2>
 					</div>
-					<div class="px-6 py-8 text-center text-sm text-muted-foreground">
-						No orders yet.
-					</div>
+					<div class="px-6 py-8 text-center text-sm text-muted-foreground">No orders yet.</div>
 				</section>
 
 				<!-- Addresses section -->
-				<section class="rounded-lg border bg-card shadow-sm overflow-hidden">
+				<section class="overflow-hidden rounded-lg border bg-card shadow-sm">
 					<div class="flex items-center justify-between gap-4 border-b px-6 py-4">
-						<h2 class="text-base font-semibold flex items-center gap-2">
+						<h2 class="flex items-center gap-2 text-base font-semibold">
 							<MapPin class="size-4" />
 							Addresses
 						</h2>
@@ -736,19 +774,19 @@
 	{/if}
 </div>
 
-<CustomerFormSheet bind:open={editOpen} customer={customer} onSuccess={loadCustomer} />
+<CustomerFormSheet bind:open={editOpen} {customer} onSuccess={loadCustomer} />
 
 <CustomerAddressFormSheet
 	bind:open={addAddressOpen}
 	mode="create"
-	customerId={customerId}
-	customer={customer}
+	{customerId}
+	{customer}
 	onSuccess={onAddressSuccess}
 />
 <CustomerAddressFormSheet
 	bind:open={editAddressOpen}
 	mode="edit"
-	customerId={customerId}
+	{customerId}
 	address={editingAddress}
 	onSuccess={onAddressSuccess}
 />
@@ -785,7 +823,7 @@
 <!-- Add to group modal (Sales Channels–style UI) -->
 <Dialog.Root bind:open={addToGroupModalOpen}>
 	<Dialog.Content
-		class="max-w-3xl h-auto max-h-[85vh] m-auto flex flex-col rounded-xl border shadow-lg"
+		class="m-auto flex h-auto max-h-[85vh] max-w-3xl flex-col rounded-xl border shadow-lg"
 	>
 		<div class="flex flex-1 flex-col overflow-hidden">
 			<Dialog.Header class="flex flex-row items-center justify-between border-b px-6 py-4">
@@ -798,9 +836,9 @@
 					<SlidersHorizontal class="mr-1.5 size-4" />
 					Add filter
 				</Button>
-				<div class="flex items-center gap-2 ml-auto">
+				<div class="ml-auto flex items-center gap-2">
 					<div class="relative w-64">
-						<Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 						<Input
 							type="search"
 							placeholder="Search"
@@ -820,7 +858,9 @@
 
 			<div class="flex flex-1 flex-col overflow-auto p-6">
 				{#if addToGroupError}
-					<div class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+					<div
+						class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+					>
 						{addToGroupError}
 					</div>
 				{/if}
@@ -855,8 +895,13 @@
 			</div>
 
 			<Dialog.Footer class="flex-row flex-wrap items-center justify-end gap-2 border-t px-6 py-4">
-				<Button variant="outline" onclick={closeAddToGroupModal} disabled={addToGroupSubmitting}>Cancel</Button>
-				<Button onclick={saveAddToGroup} disabled={addToGroupSubmitting || selectedGroupIds.length === 0}>
+				<Button variant="outline" onclick={closeAddToGroupModal} disabled={addToGroupSubmitting}
+					>Cancel</Button
+				>
+				<Button
+					onclick={saveAddToGroup}
+					disabled={addToGroupSubmitting || selectedGroupIds.length === 0}
+				>
 					{addToGroupSubmitting ? 'Saving...' : 'Save'}
 				</Button>
 			</Dialog.Footer>
@@ -891,7 +936,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each metadataRows as row, i}
+							{#each metadataRows as row, i (row.key)}
 								<tr class="border-b last:border-0">
 									<td class="px-4 py-2">
 										<Input bind:value={row.key} placeholder="Key" class="h-9 w-full" />
@@ -918,7 +963,9 @@
 				<Button variant="outline" size="sm" class="mt-4" onclick={addMetadataRow}>Add row</Button>
 			</div>
 			<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeMetadataSheet} disabled={metadataSubmitting}>Cancel</Button>
+				<Button variant="outline" onclick={closeMetadataSheet} disabled={metadataSubmitting}
+					>Cancel</Button
+				>
 				<Button onclick={submitCustomerMetadata} disabled={metadataSubmitting}>
 					{metadataSubmitting ? 'Saving…' : 'Save'}
 				</Button>
@@ -937,8 +984,9 @@
 			<div class="min-h-0 flex-1 overflow-auto p-6">
 				{#if customer}
 					<pre
-						class="rounded-md border bg-zinc-900 p-4 font-mono text-sm break-all whitespace-pre-wrap text-zinc-300"
-					><code>{JSON.stringify(customer, null, 2)}</code></pre>
+						class="rounded-md border bg-zinc-900 p-4 font-mono text-sm break-all whitespace-pre-wrap text-zinc-300"><code
+							>{JSON.stringify(customer, null, 2)}</code
+						></pre>
 				{:else}
 					<p class="text-sm text-muted-foreground">No data</p>
 				{/if}

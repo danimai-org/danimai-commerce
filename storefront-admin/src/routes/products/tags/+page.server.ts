@@ -10,7 +10,7 @@ const TagCreateSchema = z.object({
 });
 
 export const load: PageServerLoad = async () => {
-	const tagCreateForm = await superValidate(zod4(TagCreateSchema));
+	const tagCreateForm = await superValidate({ value: '' }, zod4(TagCreateSchema));
 	return { tagCreateForm };
 };
 
@@ -23,7 +23,10 @@ export const actions = {
 		}
 		const res = await client['product-tags'].post(tagCreateForm.data);
 		if (res.error) {
-			return fail(400, { error: 'Failed to create tag' });
+			return fail(400, {
+				tagCreateForm,
+				error: res.error.value?.message ?? 'Failed to create tag'
+			});
 		}
 		return message(tagCreateForm, 'Tag created successfully');
 	}

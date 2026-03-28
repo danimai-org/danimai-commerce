@@ -1,4 +1,9 @@
-import type { ProductVariant, ProductOption, ProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
+import type {
+	ProductVariant,
+	ProductOption,
+	ProductDetail
+} from '$lib/hooks/use-product-detail.svelte.js';
+import { SvelteMap } from 'svelte/reactivity';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
@@ -21,10 +26,10 @@ export function useProductVariant(
 	const loadOptionsAndVariants = () => getLoadOptionsAndVariants()();
 	const loadAvailableAttributes = () => getLoadAvailableAttributes()();
 	let variantsEditSheetOpen = $state(false);
-	let variantPricesMap = $state<Map<string, string>>(new Map());
+	let variantPricesMap = $state<SvelteMap<string, string>>();
 
 	async function loadVariantPrices() {
-		const newPricesMap = new Map<string, string>();
+		const newPricesMap = new SvelteMap<string, string>();
 		const v = variants();
 		if (v.length === 0) {
 			variantPricesMap = newPricesMap;
@@ -60,7 +65,7 @@ export function useProductVariant(
 		if (v.length > 0) {
 			loadVariantPrices();
 		} else {
-			variantPricesMap = new Map();
+			variantPricesMap = new SvelteMap();
 		}
 	});
 
@@ -109,7 +114,6 @@ export function useProductVariant(
 		editVariantSheetOpen = true;
 		loadAvailableAttributes();
 		editVariantPrice = '';
-		const p = product();
 		try {
 			const res = await fetch(`${API_BASE}/product-variants/${v.id}`, { cache: 'no-store' });
 			if (res.ok) {
@@ -119,8 +123,8 @@ export function useProductVariant(
 				if (opts.length === 1) {
 					const optionTitle = opts[0].title;
 					if (editVariantAttributes.length > 0) {
-						const matchingAttr = editVariantAttributes.find((a) =>
-							a.title.toLowerCase() === optionTitle.toLowerCase()
+						const matchingAttr = editVariantAttributes.find(
+							(a) => a.title.toLowerCase() === optionTitle.toLowerCase()
 						);
 						if (matchingAttr?.value) {
 							editVariantSize = matchingAttr.value;
@@ -143,7 +147,10 @@ export function useProductVariant(
 				editVariantAttributes = (productAttributes() ?? []).map((a) => ({
 					id: a.id,
 					title: a.title,
-					type: 'type' in a && typeof (a as EditVariantAttribute).type === 'string' ? (a as EditVariantAttribute).type : 'text',
+					type:
+						'type' in a && typeof (a as EditVariantAttribute).type === 'string'
+							? (a as EditVariantAttribute).type
+							: 'text',
 					value: a.value ?? ''
 				}));
 			}
@@ -217,8 +224,8 @@ export function useProductVariant(
 			const opts = options();
 			if (opts.length === 1) {
 				const optionTitle = opts[0].title;
-				const existingAttrIndex = editVariantAttributes.findIndex((a) =>
-					a.title.toLowerCase() === optionTitle.toLowerCase()
+				const existingAttrIndex = editVariantAttributes.findIndex(
+					(a) => a.title.toLowerCase() === optionTitle.toLowerCase()
 				);
 				if (existingAttrIndex >= 0) {
 					editVariantAttributes[existingAttrIndex] = {
@@ -226,13 +233,18 @@ export function useProductVariant(
 						value: editVariantSize.trim()
 					};
 				} else if (editVariantSize.trim()) {
-					const matchingAttr = availableAttributesList().find((a) =>
-						a.title.toLowerCase() === optionTitle.toLowerCase()
+					const matchingAttr = availableAttributesList().find(
+						(a) => a.title.toLowerCase() === optionTitle.toLowerCase()
 					);
 					if (matchingAttr) {
 						editVariantAttributes = [
 							...editVariantAttributes,
-							{ id: matchingAttr.id, title: matchingAttr.title, type: matchingAttr.type, value: editVariantSize.trim() }
+							{
+								id: matchingAttr.id,
+								title: matchingAttr.title,
+								type: matchingAttr.type,
+								value: editVariantSize.trim()
+							}
 						];
 					}
 				}
@@ -354,19 +366,74 @@ export function useProductVariant(
 		},
 		editingVariant: () => editingVariant,
 		editVariantAttributes: () => editVariantAttributes,
-		editVariantTitle: { get: () => editVariantTitle, set: (val: string) => { editVariantTitle = val; } },
-		editVariantSize: { get: () => editVariantSize, set: (val: string) => { editVariantSize = val; } },
-		editVariantMaterial: { get: () => editVariantMaterial, set: (val: string) => { editVariantMaterial = val; } },
-		editVariantSku: { get: () => editVariantSku, set: (val: string) => { editVariantSku = val; } },
-		editVariantEan: { get: () => editVariantEan, set: (val: string) => { editVariantEan = val; } },
-		editVariantUpc: { get: () => editVariantUpc, set: (val: string) => { editVariantUpc = val; } },
-		editVariantBarcode: { get: () => editVariantBarcode, set: (val: string) => { editVariantBarcode = val; } },
-		editVariantManageInventory: { get: () => editVariantManageInventory, set: (val: boolean) => { editVariantManageInventory = val; } },
-		editVariantAllowBackorder: { get: () => editVariantAllowBackorder, set: (val: boolean) => { editVariantAllowBackorder = val; } },
-		editVariantPrice: { get: () => editVariantPrice, set: (val: string) => { editVariantPrice = val; } },
+		editVariantTitle: {
+			get: () => editVariantTitle,
+			set: (val: string) => {
+				editVariantTitle = val;
+			}
+		},
+		editVariantSize: {
+			get: () => editVariantSize,
+			set: (val: string) => {
+				editVariantSize = val;
+			}
+		},
+		editVariantMaterial: {
+			get: () => editVariantMaterial,
+			set: (val: string) => {
+				editVariantMaterial = val;
+			}
+		},
+		editVariantSku: {
+			get: () => editVariantSku,
+			set: (val: string) => {
+				editVariantSku = val;
+			}
+		},
+		editVariantEan: {
+			get: () => editVariantEan,
+			set: (val: string) => {
+				editVariantEan = val;
+			}
+		},
+		editVariantUpc: {
+			get: () => editVariantUpc,
+			set: (val: string) => {
+				editVariantUpc = val;
+			}
+		},
+		editVariantBarcode: {
+			get: () => editVariantBarcode,
+			set: (val: string) => {
+				editVariantBarcode = val;
+			}
+		},
+		editVariantManageInventory: {
+			get: () => editVariantManageInventory,
+			set: (val: boolean) => {
+				editVariantManageInventory = val;
+			}
+		},
+		editVariantAllowBackorder: {
+			get: () => editVariantAllowBackorder,
+			set: (val: boolean) => {
+				editVariantAllowBackorder = val;
+			}
+		},
+		editVariantPrice: {
+			get: () => editVariantPrice,
+			set: (val: string) => {
+				editVariantPrice = val;
+			}
+		},
 		editVariantError: () => editVariantError,
 		editVariantSubmitting: () => editVariantSubmitting,
-		editVariantAddAttributeId: { get: () => editVariantAddAttributeId, set: (val: string) => { editVariantAddAttributeId = val; } },
+		editVariantAddAttributeId: {
+			get: () => editVariantAddAttributeId,
+			set: (val: string) => {
+				editVariantAddAttributeId = val;
+			}
+		},
 		openEditVariantSheet,
 		addEditVariantAttribute,
 		removeEditVariantAttribute,
@@ -387,7 +454,12 @@ export function useProductVariant(
 		confirmDeleteVariant,
 		// Variant image
 		variantImageVariant: () => variantImageVariant,
-		variantImageUrl: { get: () => variantImageUrl, set: (val: string) => { variantImageUrl = val; } },
+		variantImageUrl: {
+			get: () => variantImageUrl,
+			set: (val: string) => {
+				variantImageUrl = val;
+			}
+		},
 		get variantImageSheetOpen() {
 			return variantImageSheetOpen;
 		},

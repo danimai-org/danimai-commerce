@@ -5,12 +5,26 @@
 	import { cn } from '$lib/utils.js';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { Toaster, toast } from 'svelte-sonner';
-	type AttributeGroupItem = { id: string; title: string; attribute_ids: string[]; required: boolean; rank: number };
-	type Mode = 'update' ;
+	/** Listing rows use attribute_ids/required/rank; detail views use nested attributes. */
+	type AttributeGroupItem = {
+		id: string;
+		title: string;
+		attribute_ids?: string[];
+		attributes?: { id: string }[];
+		required?: boolean;
+		rank?: number;
+	};
+
+	type AttributeGroupFormData = {
+		id: string;
+		title: string;
+		attribute_ids: string[];
+		required: boolean;
+		rank: number;
+	};
 
 	interface Props {
 		group?: AttributeGroupItem | null;
-		mode?: Mode;
 		onSaved?: () => void | Promise<void>;
 		onClosed?: () => void | Promise<void>;
 	}
@@ -20,8 +34,15 @@
 	let open = $state(false);
 	let lastGroupId = $state<string | null>(null);
 
-	const { form, errors, enhance, delayed, message, reset } = superForm(
-		{ id: '', title: '', attribute_ids: [], required: false, rank: 0 },
+	const initialForm: AttributeGroupFormData = {
+		id: '',
+		title: '',
+		attribute_ids: [],
+		required: false,
+		rank: 0
+	};
+
+	const { form, errors, enhance, delayed, message, reset } = superForm(initialForm,
 		{
 			resetForm: true,
 			onResult: async ({ result }) => {
@@ -38,11 +59,12 @@
 		const groupId = group?.id ?? null;
 		if (!groupId || lastGroupId === groupId) return;
 		lastGroupId = groupId;
+		const attributeIds = group?.attribute_ids ?? group?.attributes?.map((a) => a.id) ?? [];
 		reset({
 			data: {
 				id: group?.id ?? '',
 				title: group?.title ?? '',
-				// attribute_ids: (group?.attribute_ids ?? []) as string[],
+				attribute_ids: attributeIds,
 				required: (group?.required ?? false) as boolean,
 				rank: (group?.rank ?? 0) as number
 			}
@@ -76,13 +98,13 @@
 
 <Toaster richColors position="top-center" />
 
-<Sheet.Root bind:open={open} onOpenChange={onOpenChange}>
+<Sheet.Root bind:open {onOpenChange}>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
 		<form method="POST" action="?/update" use:enhance class="flex h-full flex-col">
 			<input type="hidden" name="id" bind:value={$form.id} />
 			<input type="hidden" name="required" value={$form.required ? 'true' : 'false'} />
 			<input type="hidden" name="rank" value={String($form.rank)} />
-			{#each $form.attribute_ids as attributeId}
+			{#each $form.attribute_ids as attributeId (attributeId)}
 				<input type="hidden" name="attribute_ids" value={attributeId} />
 			{/each}
 			<div class="flex-1 overflow-auto p-6 pt-12">

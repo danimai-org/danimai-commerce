@@ -240,8 +240,8 @@
 									class="h-auto min-h-9 w-full flex-wrap items-center gap-1.5 py-1.5"
 								>
 									{#if paymentProviderIds.length > 0}
-										{#each paymentProviderIds as id}
-											{@const provider = PAYMENT_PROVIDER_OPTIONS.find((p) => p.id === id)}
+										{#each paymentProviderIds as id (id)}
+											{@const provider = PAYMENT_PROVIDER_OPTIONS.find((p) => p.id === id as string)}
 											<span
 												class="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs"
 											>

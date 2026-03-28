@@ -32,7 +32,6 @@
 		return Number.isFinite(n) && n > 0 ? n : fallback;
 	}
 
-	/** Eden returns `{ data: body }`; TanStack may expose the body once — support both. */
 	function unwrapPaginatedBody<T>(res: unknown): { rows: T[]; pagination: PaginationMeta } | null {
 		if (res == null || typeof res !== 'object') return null;
 		const o = res as Record<string, unknown>;

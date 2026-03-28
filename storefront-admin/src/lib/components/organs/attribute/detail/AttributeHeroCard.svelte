@@ -4,21 +4,20 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import EditAttributeHero from '../update/EditAttributeHero.svelte';
 
+	type AttributeDetail = { id: string; title: string; type: string };
+
 	interface Props {
-		attribute: any | null;
+		attribute: AttributeDetail | null;
 		onUpdated?: () => void | Promise<void>;
 	}
 
 	let { attribute, onUpdated = () => {} }: Props = $props();
-	let editAttribute = $state<{ id: string; title: string; type: string } | null>(null);
+
+	let editSheetOpen = $state(false);
 
 	function openEditSheet() {
 		if (!attribute) return;
-		editAttribute = {
-			id: attribute.id,
-				title: attribute.title ?? '',
-			type: attribute.type ?? ''
-		} as any as { id: string; title: string; type: string };
+		editSheetOpen = true;
 	}
 </script>
 
@@ -27,7 +26,9 @@
 		<div class="flex items-center justify-between gap-4">
 			<div class="flex items-center gap-2">
 				<ListFilter class="size-5 text-muted-foreground" />
-				<h1 class="text-2xl font-semibold tracking-tight">{attribute?.title ?? 'Attribute'}</h1>
+				<h1 class="text-2xl font-semibold tracking-tight">
+					{attribute?.title ?? 'Attribute'}
+				</h1>
 			</div>
 			<Button
 				variant="ghost"
@@ -51,9 +52,12 @@
 	</div>
 </div>
 <EditAttributeHero
-	attribute={editAttribute}
-	onSaved={onUpdated}
+	attribute={editSheetOpen ? attribute : null}
+	onSaved={async () => {
+		editSheetOpen = false;
+		await onUpdated();
+	}}
 	onClosed={() => {
-		editAttribute = null;
+		editSheetOpen = false;
 	}}
 />

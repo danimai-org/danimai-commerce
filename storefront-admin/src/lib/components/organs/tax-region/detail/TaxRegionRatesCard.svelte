@@ -3,7 +3,7 @@
 	import EditTaxRateSheet from './EditTaxRateSheet.svelte';
 
 	interface Props {
-		rates?: unknown[];
+		rates?: Record<string, unknown>[];
 	}
 
 	let { rates = [] }: Props = $props();

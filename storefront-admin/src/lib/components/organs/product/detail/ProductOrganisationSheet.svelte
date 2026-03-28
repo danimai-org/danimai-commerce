@@ -5,11 +5,27 @@
 	import Info from '@lucide/svelte/icons/info';
 	import { client } from '$lib/client.js';
 	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
-	
+
 	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
+	import { SvelteMap } from 'svelte/reactivity';
+	import { superForm } from 'sveltekit-superforms/client';
+	import type { SuperValidated } from 'sveltekit-superforms';
+
+	type ProductOrganisationFormData = {
+		id: string;
+		category_id: string;
+		collection_ids: string[];
+		tag_ids: string[];
+	};
 
 	type Props = {
-		open: boolean;
+		open?: boolean;
+		productOrganisationForm: SuperValidated<
+			ProductOrganisationFormData,
+			string | unknown,
+			Record<string, unknown>
+		>;
+		onSaved?: () => void | Promise<void>;
 	};
 
 	type Option = { id: string; value: string };
@@ -23,7 +39,7 @@
 	}
 
 	function uniqById(options: Option[]): Option[] {
-		const map = new Map<string, Option>();
+		const map = new SvelteMap<string, Option>();
 		for (const option of options) map.set(option.id, option);
 		return Array.from(map.values());
 	}
@@ -42,7 +58,9 @@
 
 	const productDetail = $derived(getProductDetail().data ?? null);
 
-	const selectedTags = $derived(productDetail?.tags?.map((t) => ({ id: t.id, value: t.value })) ?? []);
+	const selectedTags = $derived(
+		productDetail?.tags?.map((t) => ({ id: t.id, value: t.value })) ?? []
+	);
 	const selectedCollections = $derived(
 		productDetail?.collections?.map((c) => ({ id: c.id, value: c.title })) ?? []
 	);
@@ -59,12 +77,22 @@
 	const tagsOptions = $derived(uniqById([...fetchedTags, ...selectedTags]));
 	const collectionsOptions = $derived(uniqById([...fetchedCollections, ...selectedCollections]));
 	const categoriesOptions = $derived(uniqById([...fetchedCategories, ...selectedCategories]));
-	
+
 	const productCategoryId = $derived(productDetail?.category?.id ?? '');
 	const productCollectionIds = $derived(productDetail?.collections?.map((c) => c.id) ?? []);
 	const productTagIds = $derived(productDetail?.tags?.map((t) => t.id) ?? []);
-	
-	let { open = $bindable(false) }: Props = $props();
+
+	let {
+		open = $bindable(false),
+		productOrganisationForm,
+		onSaved = async () => {}
+	}: Props = $props();
+
+	// svelte-ignore state_referenced_locally
+	const { form } = superForm(productOrganisationForm, {
+		resetForm: true,
+		invalidateAll: false
+	});
 
 	let optionsLoaded = $state(false);
 
@@ -106,11 +134,10 @@
 	$effect(() => {
 		if (open) loadOptions();
 	});
-
 </script>
 
 <Sheet.Root bind:open>
-	<Sheet.Content class="flex w-full flex-col sm:max-w-lg" side="right">
+	<Sheet.Content class="flex w-full flex-col sm:max-w-lg" side="right" data-product-id={$form.id}>
 		<Sheet.Header class="flex flex-col gap-1.5 px-4 pt-4 text-left">
 			<div class="flex items-center gap-2">
 				<Sheet.Title>Product organization</Sheet.Title>
@@ -138,9 +165,9 @@
 				<h3 class="text-sm font-medium">Collections</h3>
 				<MultiSelectCombobox
 					id="org-collections"
-						value={productCollectionIds}
-						options={collectionsOptions}
-						placeholder="Search collections…"
+					value={productCollectionIds}
+					options={collectionsOptions}
+					placeholder="Search collections…"
 					emptyMessage="No collections yet."
 				/>
 			</div>
@@ -171,8 +198,15 @@
 			</div>
 		</div>
 		<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-			<Button variant="outline" onclick={() => open = false}>Cancel</Button>
-			<Button onclick={() => {}}>Save</Button>
+			<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
+			<Button
+				onclick={async () => {
+					await onSaved();
+					open = false;
+				}}
+			>
+				Save
+			</Button>
 		</Sheet.Footer>
 	</Sheet.Content>
 </Sheet.Root>

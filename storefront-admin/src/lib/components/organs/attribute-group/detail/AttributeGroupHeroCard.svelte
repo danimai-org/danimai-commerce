@@ -5,9 +5,20 @@
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import { DropdownMenu } from 'bits-ui';
 	import { client } from '$lib/client';
+	import { formatDate } from '$lib/utils';
+
+	type AttributeGroupDetail = {
+		id: string;
+		title: string;
+		metadata: unknown | null;
+		attributes: AttributeDetail[];
+		created_at?: string | Date;
+		updated_at?: string | Date;
+	};
+	type AttributeDetail = { id: string; title: string; type: string };
 
 	interface Props {
-		group: any | null;
+		group: AttributeGroupDetail | null;
 		onRefetch?: () => void | Promise<void>;
 		onUpdated?: () => void | Promise<void>;
 		onDeleted?: () => void | Promise<void>;
@@ -15,7 +26,7 @@
 
 	let { group, onRefetch = () => {}, onUpdated = () => {}, onDeleted = () => {} }: Props = $props();
 
-	let editGroup = $state<any | null>(null);
+	let editGroup = $state<AttributeGroupDetail | null>(null);
 
 	let deleteConfirmOpen = $state(false);
 	let deleteSubmitting = $state(false);
@@ -102,25 +113,13 @@
 				<div>
 					<dt class="text-muted-foreground">Created</dt>
 					<dd>
-						{new Date(group.created_at).toLocaleDateString('en-US', {
-							month: 'short',
-							day: 'numeric',
-							year: 'numeric',
-							hour: '2-digit',
-							minute: '2-digit'
-						})}
+						{formatDate(group.created_at ?? new Date())}
 					</dd>
 				</div>
 				<div>
 					<dt class="text-muted-foreground">Updated</dt>
 					<dd>
-						{new Date(group.updated_at).toLocaleDateString('en-US', {
-							month: 'short',
-							day: 'numeric',
-							year: 'numeric',
-							hour: '2-digit',
-							minute: '2-digit'
-						})}
+						{formatDate(group.updated_at ?? new Date())}
 					</dd>
 				</div>
 			</dl>

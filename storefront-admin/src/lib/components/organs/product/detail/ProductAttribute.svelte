@@ -15,9 +15,15 @@
 	};
 
 	let {
-		productAttributesForm
+		productAttributesForm = $bindable(
+			{} as SuperValidated<ProductAttributesFormData, string | unknown, Record<string, unknown>>
+		)
 	}: {
-		productAttributesForm: SuperValidated<ProductAttributesFormData>;
+		productAttributesForm: SuperValidated<
+			ProductAttributesFormData,
+			string | unknown,
+			Record<string, unknown>
+		>;
 	} = $props();
 
 	const attributes = $derived(getProductDetail().data?.attributes ?? []);
