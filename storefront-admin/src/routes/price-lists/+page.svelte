@@ -1,78 +1,55 @@
 <script lang="ts">
+	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
 		DeleteConfirmationModal,
 		PaginationTable,
-		PriceListFormSheet,
 		TableHead,
 		TableBody,
 		TablePagination,
 		type TableColumn
 	} from '$lib/components/organs/index.js';
+	import { CreatePriceList, EditPriceList } from '$lib/components/organs/index.js';
 	import ListChecks from '@lucide/svelte/icons/list-checks';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
-	import type { QueryFunction } from '@tanstack/svelte-query';
-	import { loadPriceLists, deletePriceList, type PriceList } from '$lib/price-lists/storage.js';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
+	import { client } from '$lib/client.js';
+
+	let { data }: { data: PageData } = $props();
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
-	const paginateState = createPagination<PriceList>(
-		(async () => {
-			const list = loadPriceLists();
-			const pageNum = Number(paginationQuery?.page) || 1;
-			const limitNum = Number(paginationQuery?.limit) || 10;
-			const total = list.length;
-			const totalPages = Math.max(1, Math.ceil(total / limitNum));
-			const startIdx = (pageNum - 1) * limitNum;
-			const rows = list.slice(startIdx, startIdx + limitNum);
-			const pagination = {
-				total,
-				page: pageNum,
-				limit: limitNum,
-				total_pages: totalPages,
-				has_next_page: pageNum < totalPages,
-				has_previous_page: pageNum > 1
-			};
-			return { data: { rows, pagination } } as unknown as PriceList;
-		}) as QueryFunction<PriceList>,
-		['price-lists']
-	);
+	type PriceListRow = (typeof rows)[number];
+	const paginateState = createPagination(async () => {
+		return client['price-lists'].get({ query: paginationQuery });
+	}, ['price-lists']);
 
 	$effect(() => {
 		page.url.searchParams.toString();
-		paginateState.refetch();
 	});
 
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
-	type QueryData = { data: { rows: PriceList[]; pagination: { total: number; page: number; limit: number; total_pages: number; has_next_page: boolean; has_previous_page: boolean } } };
-	const queryData = $derived(paginateState.query.data as unknown as QueryData | undefined);
-	const rows = $derived(queryData?.data?.rows ?? []) as Record<string, unknown>[];
-	const pagination = $derived(queryData?.data?.pagination ?? null);
-	const start = $derived(
-		pagination ? (pagination.page - 1) * pagination.limit + 1 : 0
-	);
+	const rows = $derived(paginateState.query.data?.data?.rows ?? []);
+	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
+	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
 	const end = $derived(
 		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
 	);
 	const formMode = $derived(paginateState.formMode);
 	const formItem = $derived(paginateState.formItem);
 	const openCreate = $derived(paginateState.openCreate);
-	const openEdit = $derived(paginateState.openEdit);
-	const closeForm = $derived(paginateState.closeForm);
-	const deleteConfirmOpen = $derived(paginateState.deleteConfirmOpen);
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
 	const deleteItem = $derived(paginateState.deleteItem);
 	const deleteError = $derived(paginateState.deleteError);
-	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
 	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
-	const confirmDelete = $derived(paginateState.confirmDelete);
 	const refetch = $derived(paginateState.refetch);
 
 	const tableColumns: TableColumn[] = [
@@ -87,8 +64,22 @@
 			key: 'actions',
 			type: 'actions',
 			actions: [
-				{ label: 'Edit', key: 'edit', type: 'button', onClick: (item) => openEdit(item as PriceList) },
-				{ label: 'Delete', key: 'delete', type: 'button', onClick: (item) => openDeleteConfirm(item as PriceList) }
+				{
+					label: 'Edit',
+					key: 'edit',
+					type: 'button',
+					onClick: (item) =>
+						paginateState.openEdit(item as Parameters<typeof paginateState.openEdit>[0])
+				},
+				{
+					label: 'Delete',
+					key: 'delete',
+					type: 'button',
+					onClick: (item) =>
+						paginateState.openDeleteConfirm(
+							item as Parameters<typeof paginateState.openDeleteConfirm>[0]
+						)
+				}
 			]
 		}
 	];
@@ -124,36 +115,46 @@
 					<table class="w-full text-sm">
 						<TableHead columns={tableColumns} />
 						<TableBody
-							rows={rows}
+							{rows}
 							columns={tableColumns}
 							emptyMessage="No price lists yet. Create one to define custom pricing (e.g. sales or overrides)."
 						/>
 					</table>
 				</div>
 
-				<TablePagination
-					{pagination}
-					{start}
-					{end}
-					onPageChange={goToPage}
-				/>
+				<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
 			{/if}
 		</PaginationTable>
 	</div>
 </div>
 
-<PriceListFormSheet
-	bind:open={paginateState.formSheetOpen}
-	mode={formMode}
-	list={formItem}
-	onSuccess={refetch}
-/>
+{#if formMode === 'edit' && formItem}
+	<EditPriceList
+		bind:open={paginateState.formSheetOpen}
+		priceListUpdateForm={data.priceListUpdateForm}
+		list={formItem as unknown as PriceListRow}
+		onSuccess={refetch}
+	/>
+{:else}
+	<CreatePriceList
+		bind:open={paginateState.formSheetOpen}
+		priceListCreateForm={data.priceListCreateForm}
+		onSuccess={refetch}
+	/>
+{/if}
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="price list"
-	entityTitle={deleteItem?.name ?? deleteItem?.id ?? ''}
-	onConfirm={() => confirmDelete((pl) => deletePriceList(pl))}
+	entityTitle={(deleteItem as PriceListRow | null)?.name ??
+		(deleteItem as PriceListRow | null)?.id ??
+		''}
+	onConfirm={() =>
+		paginateState.confirmDelete(async (item) => {
+			const row = item as unknown as PriceListRow;
+			await client['price-lists'].delete({ ids: [row.id] });
+			refetch();
+		})}
 	onCancel={closeDeleteConfirm}
 	submitting={deleteSubmitting}
 />
@@ -164,4 +165,3 @@
 		{deleteError}
 	</div>
 {/if}
-

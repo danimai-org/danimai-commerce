@@ -17,6 +17,7 @@
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { createPagination, createPaginationQuery } from '$lib/api';
 	import { toast } from 'svelte-sonner';
+	import { formatDate } from '$lib/utils';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
@@ -55,19 +56,11 @@
 		createSheetOpen = true;
 	}
 
-	function formatDate(iso: string) {
-		return new Date(iso).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: '2-digit'
-		});
-	}
-
 	const rowsForTable = $derived(
 		rows.map((item) => ({
 			...item,
-			created_at_display: formatDate(item.created_at.toISOString()),
-			updated_at_display: formatDate(item.updated_at.toISOString()),
+			created_at_display: formatDate(item.created_at),
+			updated_at_display: formatDate(item.updated_at),
 			requires_shipping_display: item.requires_shipping ? 'Yes' : 'No'
 		}))
 	);

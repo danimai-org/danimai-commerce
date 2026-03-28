@@ -5,6 +5,7 @@
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import { client } from '$lib/client.js';
 	import { page } from '$app/state';
+	import { formatDate } from '$lib/utils';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 	const paginateState = createPagination(
@@ -39,14 +40,6 @@
 	const rows = $derived((paginateState.query.data?.data?.rows ?? []) as unknown as InventoryLevel[]);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
-
-	function formatDate(iso: string) {
-		return new Date(iso).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: '2-digit'
-		});
-	}
 </script>
 
 <svelte:head>

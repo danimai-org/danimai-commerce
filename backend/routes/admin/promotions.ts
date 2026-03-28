@@ -103,6 +103,30 @@ export const promotionRoutes = new Elysia({ prefix: "/promotions" })
       },
     }
   )
+  .get(
+    "/:id",
+    async ({ params, set }) => {
+      const row = promotionsStore.find((p) => p.id === params.id);
+      if (!row) {
+        set.status = 404;
+        return { error: "NotFound", message: "Promotion not found" } as const;
+      }
+      return withCampaignName(row);
+    },
+    {
+      params: Type.Object({ id: Type.String() }),
+      response: {
+        200: PromotionSchema,
+        404: NotFoundResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Promotions"],
+        summary: "Get promotion by ID",
+        description: "Gets a single promotion by ID",
+      },
+    }
+  )
   .post(
     "/",
     async ({ body }) => {

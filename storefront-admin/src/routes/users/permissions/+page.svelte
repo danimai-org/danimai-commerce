@@ -12,6 +12,7 @@
 	import { DropdownMenu } from 'bits-ui';
 	import { client } from '$lib/client.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import { formatDate } from '$lib/utils';
 	import EditPermissionSheet from '../../../lib/components/organs/permissions/update/EditPermissionSheet.svelte';
 
 	type Permission = {
@@ -45,18 +46,6 @@
 		const params = new URLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
 		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
-	}
-
-	function formatDate(iso: string | Date) {
-		try {
-			return new Date(iso).toLocaleDateString('en-US', {
-				year: 'numeric',
-				month: 'short',
-				day: '2-digit'
-			});
-		} catch {
-			return iso;
-		}
 	}
 
 	// Edit permission sheet

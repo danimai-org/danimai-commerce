@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { StaticDecode, Type } from "@sinclair/typebox";
+import { type StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   ACCEPT_INVITE_PROCESS,
@@ -31,10 +31,16 @@ const toDateString = (v: string | Date | null): string | null =>
 function serializeInviteDates<T extends Record<string, unknown>>(invite: T): T {
   return {
     ...invite,
-    created_at: toDateString(invite.created_at as string | Date | null) ?? invite.created_at,
-    updated_at: toDateString(invite.updated_at as string | Date | null) ?? invite.updated_at,
+    created_at:
+      toDateString(invite.created_at as string | Date | null) ??
+      invite.created_at,
+    updated_at:
+      toDateString(invite.updated_at as string | Date | null) ??
+      invite.updated_at,
     deleted_at: toDateString(invite.deleted_at as string | Date | null),
-    expires_at: toDateString(invite.expires_at as string | Date | null) ?? invite.expires_at,
+    expires_at:
+      toDateString(invite.expires_at as string | Date | null) ??
+      invite.expires_at,
   } as T;
 }
 
@@ -43,7 +49,9 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
   .get(
     "/",
     async ({ query }) => {
-      const process = getService<PaginatedInvitesProcess>(PAGINATED_INVITES_PROCESS);
+      const process = getService<PaginatedInvitesProcess>(
+        PAGINATED_INVITES_PROCESS,
+      );
       const result = await process.runOperations({
         input: query as StaticDecode<typeof PaginatedInvitesSchema>,
       });
@@ -51,7 +59,7 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
         throw new Error("Failed to list invites");
       }
       const rows = result.rows.map(({ token: _t, ...invite }: any) =>
-        serializeInviteDates(invite as Record<string, unknown>)
+        serializeInviteDates(invite as Record<string, unknown>),
       );
       return { ...result, rows } as any;
     },
@@ -67,7 +75,7 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
         summary: "List invites",
         description: "Returns paginated list of invites",
       },
-    }
+    },
   )
   .post(
     "/",
@@ -89,7 +97,7 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
         summary: "Create invite",
         description: "Creates an invite for a new user by email",
       },
-    }
+    },
   )
   .post(
     "/accept",
@@ -110,9 +118,10 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
       detail: {
         tags: ["Invites"],
         summary: "Accept invite",
-        description: "Accepts an invite with token and creates user account with password",
+        description:
+          "Accepts an invite with token and creates user account with password",
       },
-    }
+    },
   )
   .post(
     "/:id/resend",
@@ -122,7 +131,7 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
       const result = await process.runOperations({ input });
       if (!result) throw new Error("Invite not found or resend failed");
       const { token: _t, ...invite } = result;
-      return invite as any;
+      return serializeInviteDates(invite as Record<string, unknown>) as any;
     },
     {
       params: Type.Object({ id: ResendInviteSchema.properties.id }),
@@ -136,5 +145,5 @@ export const inviteRoutes = new Elysia({ prefix: "/invites" })
         summary: "Resend invite",
         description: "Resends an invite email with a new token and expiry",
       },
-    }
+    },
   );

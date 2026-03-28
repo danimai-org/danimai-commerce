@@ -199,7 +199,8 @@
 				id: crypto.randomUUID(),
 				name: campaignName.trim(),
 				description: campaignDescription.trim() || null,
-				identifier: campaignIdentifier.trim() || campaignName.trim().toUpperCase().replace(/\s+/g, '_'),
+				identifier:
+					campaignIdentifier.trim() || campaignName.trim().toUpperCase().replace(/\s+/g, '_'),
 				start_date: campaignStartDate || null,
 				end_date: campaignEndDate || null
 			};
@@ -286,7 +287,9 @@
 						<span
 							class={cn(
 								'flex size-5 items-center justify-center rounded-full text-xs',
-								createStep >= 1 ? 'bg-primary text-primary-foreground' : 'border border-input bg-background'
+								createStep >= 1
+									? 'bg-primary text-primary-foreground'
+									: 'border border-input bg-background'
 							)}
 							aria-hidden="true"
 						>
@@ -296,14 +299,18 @@
 								<span class="size-2 rounded-full bg-current"></span>
 							{/if}
 						</span>
-						<span class={cn('text-sm', createStep === 1 ? 'font-medium' : 'text-muted-foreground')}>Type</span>
+						<span class={cn('text-sm', createStep === 1 ? 'font-medium' : 'text-muted-foreground')}
+							>Type</span
+						>
 					</div>
 					<div class="h-px flex-1 bg-border"></div>
 					<div class="flex items-center gap-1.5">
 						<span
 							class={cn(
 								'flex size-5 items-center justify-center rounded-full text-xs',
-								createStep >= 2 ? 'bg-primary text-primary-foreground' : 'border border-input bg-background'
+								createStep >= 2
+									? 'bg-primary text-primary-foreground'
+									: 'border border-input bg-background'
 							)}
 							aria-hidden="true"
 						>
@@ -315,14 +322,18 @@
 								2
 							{/if}
 						</span>
-						<span class={cn('text-sm', createStep === 2 ? 'font-medium' : 'text-muted-foreground')}>Details</span>
+						<span class={cn('text-sm', createStep === 2 ? 'font-medium' : 'text-muted-foreground')}
+							>Details</span
+						>
 					</div>
 					<div class="h-px flex-1 bg-border"></div>
 					<div class="flex items-center gap-1.5">
 						<span
 							class={cn(
 								'flex size-5 items-center justify-center rounded-full text-xs',
-								createStep >= 3 ? 'bg-primary text-primary-foreground' : 'border border-input bg-background'
+								createStep >= 3
+									? 'bg-primary text-primary-foreground'
+									: 'border border-input bg-background'
 							)}
 							aria-hidden="true"
 						>
@@ -332,7 +343,9 @@
 								3
 							{/if}
 						</span>
-						<span class={cn('text-sm', createStep === 3 ? 'font-medium' : 'text-muted-foreground')}>Campaign</span>
+						<span class={cn('text-sm', createStep === 3 ? 'font-medium' : 'text-muted-foreground')}
+							>Campaign</span
+						>
 					</div>
 				</div>
 			</Sheet.Header>
@@ -380,7 +393,9 @@
 								<label
 									class={cn(
 										'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-										detailMethod === 'promotion_code' ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/30'
+										detailMethod === 'promotion_code'
+											? 'border-primary bg-primary/5'
+											: 'border-input hover:bg-muted/30'
 									)}
 								>
 									<input
@@ -401,7 +416,9 @@
 								<label
 									class={cn(
 										'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-										detailMethod === 'automatic' ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/30'
+										detailMethod === 'automatic'
+											? 'border-primary bg-primary/5'
+											: 'border-input hover:bg-muted/30'
 									)}
 								>
 									<input
@@ -428,7 +445,9 @@
 								<label
 									class={cn(
 										'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-										detailStatus === 'draft' ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/30'
+										detailStatus === 'draft'
+											? 'border-primary bg-primary/5'
+											: 'border-input hover:bg-muted/30'
 									)}
 								>
 									<input
@@ -449,7 +468,9 @@
 								<label
 									class={cn(
 										'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-										detailStatus === 'active' ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/30'
+										detailStatus === 'active'
+											? 'border-primary bg-primary/5'
+											: 'border-input hover:bg-muted/30'
 									)}
 								>
 									<input
@@ -519,7 +540,8 @@
 						<div class="flex flex-col gap-2">
 							<span class="text-sm font-medium">Who can use this code?</span>
 							<p class="text-sm text-muted-foreground">
-								Which customer is allowed to use the promotion code? Promotion code can be used by all customers if left untouched.
+								Which customer is allowed to use the promotion code? Promotion code can be used by
+								all customers if left untouched.
 							</p>
 						</div>
 
@@ -550,18 +572,20 @@
 											bind:value={cond.value}
 										>
 											<option value="">Select value</option>
-											{#each CURRENCIES as cur}
+											{#each CURRENCIES as cur (cur.code)}
 												<option value={cur.code}>{cur.name}</option>
 											{/each}
 										</select>
 									{:else}
-										<Input
-											class="h-9 w-32"
-											placeholder="Select value"
-											bind:value={cond.value}
-										/>
+										<Input class="h-9 w-32" placeholder="Select value" bind:value={cond.value} />
 									{/if}
-									<Button type="button" variant="ghost" size="icon" class="size-9" onclick={() => removeCodeCondition(cond.id)}>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon"
+										class="size-9"
+										onclick={() => removeCodeCondition(cond.id)}
+									>
 										×
 									</Button>
 								</div>
@@ -577,75 +601,89 @@
 						</div>
 
 						{#if !isFreeShipping}
-						<div class="flex flex-col gap-2">
-							<label for="detail-value" class="flex items-center gap-1.5 text-sm font-medium">
-								Promotion Value
-								<span class="text-muted-foreground" title={isPercentageType ? 'The percentage to discount' : 'The amount to discount'}>ⓘ</span>
-							</label>
-							{#if isPercentageType}
-								<div class="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 shadow-xs focus-within:ring-2 focus-within:ring-ring">
-									<Input
-										id="detail-value"
-										type="number"
-										min="0"
-										max="100"
-										step="0.5"
-										bind:value={detailPromotionValue}
-										placeholder="0"
-										class="h-8 flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
-									/>
-									<span class="text-sm text-muted-foreground">%</span>
-								</div>
-								<p class="text-xs text-muted-foreground">The percentage to discount off the amount. e.g. 8%</p>
-							{:else}
-								<div class="flex h-9 w-full items-center gap-2 rounded-md border border-input bg-background px-3 shadow-xs focus-within:ring-2 focus-within:ring-ring">
-									<select
-										class="h-8 border-0 bg-transparent pr-2 text-sm outline-none focus:ring-0"
-										bind:value={detailValueCurrency}
+							<div class="flex flex-col gap-2">
+								<label for="detail-value" class="flex items-center gap-1.5 text-sm font-medium">
+									Promotion Value
+									<span
+										class="text-muted-foreground"
+										title={isPercentageType
+											? 'The percentage to discount'
+											: 'The amount to discount'}>ⓘ</span
 									>
-										{#each CURRENCIES as cur}
-											<option value={cur.code}>{cur.code}</option>
-										{/each}
-									</select>
-									<Input
-										id="detail-value-amount"
-										type="number"
-										min="0"
-										step="0.01"
-										bind:value={detailPromotionValue}
-										placeholder="0.00"
-										class="h-8 flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
-									/>
-									<span class="text-sm text-muted-foreground">
-										{CURRENCIES.find((c) => c.code === detailValueCurrency)?.symbol ?? '$'}
-									</span>
-								</div>
-								<p class="text-xs text-muted-foreground">The amount to be discounted. e.g. 100</p>
-							{/if}
-						</div>
+								</label>
+								{#if isPercentageType}
+									<div
+										class="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 shadow-xs focus-within:ring-2 focus-within:ring-ring"
+									>
+										<Input
+											id="detail-value"
+											type="number"
+											min="0"
+											max="100"
+											step="0.5"
+											bind:value={detailPromotionValue}
+											placeholder="0"
+											class="h-8 flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
+										/>
+										<span class="text-sm text-muted-foreground">%</span>
+									</div>
+									<p class="text-xs text-muted-foreground">
+										The percentage to discount off the amount. e.g. 8%
+									</p>
+								{:else}
+									<div
+										class="flex h-9 w-full items-center gap-2 rounded-md border border-input bg-background px-3 shadow-xs focus-within:ring-2 focus-within:ring-ring"
+									>
+										<select
+											class="h-8 border-0 bg-transparent pr-2 text-sm outline-none focus:ring-0"
+											bind:value={detailValueCurrency}
+										>
+											{#each CURRENCIES as cur (cur.code)}
+												<option value={cur.code}>{cur.code}</option>
+											{/each}
+										</select>
+										<Input
+											id="detail-value-amount"
+											type="number"
+											min="0"
+											step="0.01"
+											bind:value={detailPromotionValue}
+											placeholder="0.00"
+											class="h-8 flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
+										/>
+										<span class="text-sm text-muted-foreground">
+											{CURRENCIES.find((c) => c.code === detailValueCurrency)?.symbol ?? '$'}
+										</span>
+									</div>
+									<p class="text-xs text-muted-foreground">The amount to be discounted. e.g. 100</p>
+								{/if}
+							</div>
 						{/if}
 
 						{#if !isFreeShipping}
-						<div class="flex flex-col gap-2">
-							<label for="detail-max-qty" class="text-sm font-medium">Maximum Quantity</label>
-							<Input
-								id="detail-max-qty"
-								type="number"
-								min="1"
-								bind:value={detailMaxQuantity}
-								class="h-9 w-24"
-							/>
-							<p class="text-xs text-muted-foreground">
-								Maximum quantity of items this promotion applies to.
-							</p>
-						</div>
+							<div class="flex flex-col gap-2">
+								<label for="detail-max-qty" class="text-sm font-medium">Maximum Quantity</label>
+								<Input
+									id="detail-max-qty"
+									type="number"
+									min="1"
+									bind:value={detailMaxQuantity}
+									class="h-9 w-24"
+								/>
+								<p class="text-xs text-muted-foreground">
+									Maximum quantity of items this promotion applies to.
+								</p>
+							</div>
 						{/if}
 
 						{#if isFreeShipping}
 							<div class="flex flex-col gap-3">
-								<span class="text-sm font-medium">What shipping methods will the promotion be applied to?</span>
+								<span class="text-sm font-medium"
+									>What shipping methods will the promotion be applied to?</span
+								>
 								<p class="text-sm text-muted-foreground">
-									The promotion will be applied to shipping methods that match the following conditions.
+									The promotion will be applied to shipping methods that match the following
+									conditions.
 								</p>
 								{#each detailShippingConditions as cond, i (cond.id)}
 									{#if i > 0}
@@ -668,7 +706,13 @@
 										<Button type="button" variant="outline" size="sm" class="h-9">
 											Select Value
 										</Button>
-										<Button type="button" variant="ghost" size="icon" class="size-9" onclick={() => removeShippingCondition(cond.id)}>
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											class="size-9"
+											onclick={() => removeShippingCondition(cond.id)}
+										>
 											×
 										</Button>
 									</div>
@@ -686,7 +730,9 @@
 
 						{#if isBuyXGetY}
 							<div class="flex flex-col gap-3">
-								<span class="text-sm font-medium">What needs to be in the cart to unlock the promotion?</span>
+								<span class="text-sm font-medium"
+									>What needs to be in the cart to unlock the promotion?</span
+								>
 								<p class="text-sm text-muted-foreground">
 									If these conditions match, we enable the promotion on the target items.
 								</p>
@@ -710,18 +756,19 @@
 											<option value="equals">Equals</option>
 										</select>
 										{#if cond.field === 'minimum_quantity_of_items'}
-											<Input
-												type="number"
-												min="0"
-												bind:value={cond.value}
-												class="h-9 w-24"
-											/>
+											<Input type="number" min="0" bind:value={cond.value} class="h-9 w-24" />
 										{:else}
 											<Button type="button" variant="outline" size="sm" class="h-9">
 												Select Value
 											</Button>
 										{/if}
-										<Button type="button" variant="ghost" size="icon" class="size-9" onclick={() => removeCartCondition(cond.id)}>
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											class="size-9"
+											onclick={() => removeCartCondition(cond.id)}
+										>
 											×
 										</Button>
 									</div>
@@ -738,56 +785,60 @@
 						{/if}
 
 						{#if !isFreeShipping}
-						<div class="flex flex-col gap-3">
-							<span class="text-sm font-medium">What items will the promotion be applied to?</span>
-							<p class="text-sm text-muted-foreground">
-								The promotion will be applied to items that match the following conditions.
-							</p>
-							{#each detailItemConditions as cond, i (cond.id)}
-								{#if i > 0}
-									<span class="text-xs font-medium text-muted-foreground">AND</span>
-								{/if}
-								<div class="flex flex-wrap items-center gap-2">
-									<span class="text-xs text-muted-foreground">Required</span>
-									<select
-										class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-										bind:value={cond.field}
-									>
-										<option value="quantity_promotion_applies_to">Quantity of items promotion will apply to</option>
-										<option value="product">Product</option>
-									</select>
-									<select
-										class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-										bind:value={cond.op}
-									>
-										<option value="equals">Equals</option>
-									</select>
-									{#if cond.field === 'quantity_promotion_applies_to'}
-										<Input
-											type="number"
-											min="0"
-											bind:value={cond.value}
-											class="h-9 w-24"
-										/>
-									{:else}
-										<Button type="button" variant="outline" size="sm" class="h-9">
-											Select Value
-										</Button>
+							<div class="flex flex-col gap-3">
+								<span class="text-sm font-medium">What items will the promotion be applied to?</span
+								>
+								<p class="text-sm text-muted-foreground">
+									The promotion will be applied to items that match the following conditions.
+								</p>
+								{#each detailItemConditions as cond, i (cond.id)}
+									{#if i > 0}
+										<span class="text-xs font-medium text-muted-foreground">AND</span>
 									{/if}
-									<Button type="button" variant="ghost" size="icon" class="size-9" onclick={() => removeItemCondition(cond.id)}>
-										×
+									<div class="flex flex-wrap items-center gap-2">
+										<span class="text-xs text-muted-foreground">Required</span>
+										<select
+											class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											bind:value={cond.field}
+										>
+											<option value="quantity_promotion_applies_to"
+												>Quantity of items promotion will apply to</option
+											>
+											<option value="product">Product</option>
+										</select>
+										<select
+											class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+											bind:value={cond.op}
+										>
+											<option value="equals">Equals</option>
+										</select>
+										{#if cond.field === 'quantity_promotion_applies_to'}
+											<Input type="number" min="0" bind:value={cond.value} class="h-9 w-24" />
+										{:else}
+											<Button type="button" variant="outline" size="sm" class="h-9">
+												Select Value
+											</Button>
+										{/if}
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											class="size-9"
+											onclick={() => removeItemCondition(cond.id)}
+										>
+											×
+										</Button>
+									</div>
+								{/each}
+								<div class="flex gap-2">
+									<Button type="button" variant="outline" size="sm" onclick={addItemCondition}>
+										Add condition
+									</Button>
+									<Button type="button" variant="ghost" size="sm" onclick={clearItemConditions}>
+										Clear all
 									</Button>
 								</div>
-							{/each}
-							<div class="flex gap-2">
-								<Button type="button" variant="outline" size="sm" onclick={addItemCondition}>
-									Add condition
-								</Button>
-								<Button type="button" variant="ghost" size="sm" onclick={clearItemConditions}>
-									Clear all
-								</Button>
 							</div>
-						</div>
 						{/if}
 					</div>
 				{:else}
@@ -798,7 +849,9 @@
 								<label
 									class={cn(
 										'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-										campaignChoice === 'without' ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/30'
+										campaignChoice === 'without'
+											? 'border-primary bg-primary/5'
+											: 'border-input hover:bg-muted/30'
 									)}
 								>
 									<input
@@ -819,7 +872,9 @@
 								<label
 									class={cn(
 										'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-										campaignChoice === 'existing' ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/30'
+										campaignChoice === 'existing'
+											? 'border-primary bg-primary/5'
+											: 'border-input hover:bg-muted/30'
 									)}
 								>
 									<input
@@ -840,7 +895,9 @@
 								<label
 									class={cn(
 										'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-										campaignChoice === 'new' ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/30'
+										campaignChoice === 'new'
+											? 'border-primary bg-primary/5'
+											: 'border-input hover:bg-muted/30'
 									)}
 								>
 									<input
@@ -872,7 +929,9 @@
 
 								<div class="flex flex-col gap-4">
 									<div class="relative w-full">
-										<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+										<Search
+											class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+										/>
 										<Input
 											type="search"
 											placeholder="Search campaigns..."
@@ -902,7 +961,7 @@
 													{#each filteredCampaigns as campaign (campaign.id)}
 														<tr
 															class={cn(
-																'border-b transition-colors cursor-pointer',
+																'cursor-pointer border-b transition-colors',
 																selectedCampaignId === campaign.id
 																	? 'bg-primary/10 hover:bg-primary/15'
 																	: 'hover:bg-muted/30'
@@ -972,7 +1031,7 @@
 										id="campaign-description"
 										bind:value={campaignDescription}
 										rows="3"
-										class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
+										class="flex min-h-[80px] w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
 										placeholder="Campaign description"
 									></textarea>
 								</div>
@@ -982,7 +1041,9 @@
 											Start date <span class="font-normal text-muted-foreground">(Optional)</span>
 										</label>
 										<div class="relative">
-											<Clock class="absolute top-1/2 left-[3px] size-4 -translate-y-1/2 text-muted-foreground" />
+											<Clock
+												class="absolute top-1/2 left-[3px] size-4 -translate-y-1/2 text-muted-foreground"
+											/>
 											<Input
 												id="campaign-start"
 												type="datetime-local"
@@ -996,7 +1057,9 @@
 											End date <span class="font-normal text-muted-foreground">(Optional)</span>
 										</label>
 										<div class="relative">
-											<Clock class="absolute top-1/2 left-[3px] size-4 -translate-y-1/2 text-muted-foreground" />
+											<Clock
+												class="absolute top-1/2 left-[3px] size-4 -translate-y-1/2 text-muted-foreground"
+											/>
 											<Input
 												id="campaign-end"
 												type="datetime-local"
@@ -1010,7 +1073,9 @@
 								<div class="flex flex-col gap-4">
 									<div>
 										<h3 class="text-sm font-semibold">Campaign Budget</h3>
-										<p class="mt-0.5 text-sm text-muted-foreground">Create a budget for the campaign.</p>
+										<p class="mt-0.5 text-sm text-muted-foreground">
+											Create a budget for the campaign.
+										</p>
 									</div>
 									<div class="flex flex-col gap-2">
 										<span class="text-sm font-medium">Type</span>
@@ -1018,7 +1083,9 @@
 											<label
 												class={cn(
 													'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-													campaignBudgetType === 'usage' ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/30'
+													campaignBudgetType === 'usage'
+														? 'border-primary bg-primary/5'
+														: 'border-input hover:bg-muted/30'
 												)}
 											>
 												<input
@@ -1039,7 +1106,9 @@
 											<label
 												class={cn(
 													'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-													campaignBudgetType === 'spend' ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/30'
+													campaignBudgetType === 'spend'
+														? 'border-primary bg-primary/5'
+														: 'border-input hover:bg-muted/30'
 												)}
 											>
 												<input

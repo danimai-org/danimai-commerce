@@ -16,7 +16,7 @@
 		onSuccess = () => {}
 	}: {
 		open?: boolean;
-		formData: any;
+		formData: { email: string; role_ids: string[] };
 		onSuccess?: () => void;
 	} = $props();
 
@@ -39,7 +39,7 @@
 	let selectedRoleIds = $state<string[]>([]);
 	let initialized = $state(false);
 
-	function parseClientError(result: any, fallback: string) {
+	function parseClientError(result: { error: { value: { message: string } } }, fallback: string) {
 		const msg = result?.error?.value?.message;
 		return typeof msg === 'string' && msg.trim().length > 0 ? msg : fallback;
 	}
@@ -48,11 +48,18 @@
 		rolesLoading = true;
 		roleLoadError = null;
 		try {
-			const res = await client.roles.get({ query: { limit: 100 } as any });
-			if (res.error) {
-				throw new Error(parseClientError(res, 'Failed to load roles'));
+			const res = await client.roles.get({
+				query: { limit: 100 } as NonNullable<Parameters<typeof client.roles.get>[0]>['query']
+			});
+			if (res?.error) {
+				throw new Error(
+					parseClientError(
+						res as unknown as { error: { value: { message: string } } },
+						'Failed to load roles'
+					)
+				);
 			}
-			roles = ((res.data as { rows?: Role[] } | null)?.rows ?? []) as Role[];
+			roles = ((res?.data as { rows?: Role[] } | null)?.rows ?? []) as Role[];
 		} catch (e) {
 			roleLoadError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -95,7 +102,7 @@
 				</p>
 			</div>
 
-			<div class="min-h-0 flex-1 overflow-auto space-y-4 px-6 py-6">
+			<div class="min-h-0 flex-1 space-y-4 overflow-auto px-6 py-6">
 				<div class="space-y-2">
 					<label for="invite-email" class="block text-sm font-medium">Email</label>
 					<Input
@@ -138,9 +145,7 @@
 			</div>
 
 			<div class="flex shrink-0 justify-end gap-2 border-t p-4">
-				<Button type="button" variant="outline" onclick={close} disabled={$delayed}>
-					Cancel
-				</Button>
+				<Button type="button" variant="outline" onclick={close} disabled={$delayed}>Cancel</Button>
 				<Button type="submit" disabled={$delayed}>
 					{$delayed ? 'Sending...' : 'Send invite'}
 				</Button>

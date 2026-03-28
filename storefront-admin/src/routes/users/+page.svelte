@@ -13,6 +13,7 @@
 	} from '$lib/components/organs/index.js';
 	import { client } from '$lib/client.js';
 	import { createPagination, createPaginationQuery } from '$lib/api/pagination.svelte.js';
+	import { formatDate } from '$lib/utils';
 	import Users from '@lucide/svelte/icons/users';
 	import MultiSelectCombobox from '$lib/components/organs/multi-select-combobox/multi-select-combobox.svelte';
 
@@ -110,25 +111,6 @@
 			]
 		}
 	];
-
-	function formatDate(iso: string | Date) {
-		if (iso instanceof Date) {
-			return iso.toLocaleDateString('en-US', {
-				year: 'numeric',
-				month: 'short',
-				day: '2-digit'
-			});
-		}
-		try {
-			return new Date(iso).toLocaleDateString('en-US', {
-				year: 'numeric',
-				month: 'short',
-				day: '2-digit'
-			});
-		} catch {
-			return iso;
-		}
-	}
 
 	function parseClientError(result: any, fallback: string) {
 		const msg = result?.error?.value?.message;

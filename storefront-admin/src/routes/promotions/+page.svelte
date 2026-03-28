@@ -6,7 +6,6 @@
 		CreatePromotionSheet,
 		DeleteConfirmationModal,
 		EditPromotionSheet,
-		PromotionDetailsSheet,
 		PaginationTable,
 		TableHead,
 		TableBody,
@@ -18,6 +17,8 @@
 	import { client } from '$lib/client.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import Folder from '@lucide/svelte/icons/folder';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
 	let campaigns = $state<Campaign[]>([]);
 	let searchQuery = $state('');
@@ -36,6 +37,32 @@
 	);
 
 	let lastRefetchKey = $state<string | null>(null);
+	let lastEditQueryHandled = $state<string | null>(null);
+
+	$effect(() => {
+		const editId = page.url.searchParams.get('edit');
+		if (!editId) {
+			lastEditQueryHandled = null;
+			return;
+		}
+		if (editId === lastEditQueryHandled) return;
+		lastEditQueryHandled = editId;
+		void (async () => {
+			const res = await client['promotions']({ id: editId }).get();
+			const p = (res as { data?: Promotion })?.data;
+			const params = new SvelteURLSearchParams(page.url.searchParams);
+			params.delete('edit');
+			const q = params.toString();
+			const nextPath = `${page.url.pathname}${q ? `?${q}` : ''}`;
+			if (!p) {
+				lastEditQueryHandled = null;
+				goto(resolve(nextPath, {}), { replaceState: true });
+				return;
+			}
+			openEdit(p);
+			goto(resolve(nextPath, {}), { replaceState: true });
+		})();
+	});
 
 	$effect(() => {
 		const currentRefetchKey = `${searchQuery.trim()}::${page.url.searchParams.toString()}`;
@@ -63,28 +90,27 @@
 	});
 
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
 	const rows = $derived((paginateState.query.data?.data?.rows ?? []) as Record<string, unknown>[]);
 	const listPagination = $derived(paginateState.query.data?.data?.pagination ?? null);
-	const start = $derived(
-		listPagination ? (listPagination.page - 1) * listPagination.limit + 1 : 0
-	);
+	const start = $derived(listPagination ? (listPagination.page - 1) * listPagination.limit + 1 : 0);
 	const end = $derived(
 		listPagination ? Math.min(listPagination.page * listPagination.limit, listPagination.total) : 0
 	);
 
 	// Create promotion flow
 	let createOpen = $state(false);
-	let detailsOpen = $state(false);
-	let viewingPromotion = $state<Promotion | null>(null);
 	let editOpen = $state(false);
 	let editingPromotion = $state<Promotion | null>(null);
-	let deleteModalOpen = $state(false);
-	let promotionToDelete = $state<Promotion | null>(null);
+
+	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
+	const deleteItem = $derived(paginateState.deleteItem);
+	const deleteError = $derived(paginateState.deleteError);
+	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
 
 	function openCreate() {
 		createOpen = true;
@@ -114,14 +140,10 @@
 		await paginateState.refetch();
 	}
 
-	function openDetails(p: Promotion) {
-		viewingPromotion = p;
-		detailsOpen = true;
-	}
-
-	function closeDetails() {
-		detailsOpen = false;
-		viewingPromotion = null;
+	function goToPromotionDetails(row: Record<string, unknown>) {
+		const id = row.id;
+		if (typeof id !== 'string' || !id) return;
+		goto(resolve(`/promotions/${id}`, {}));
 	}
 
 	function openEdit(p: Promotion) {
@@ -143,22 +165,6 @@
 		if (!editOpen) editingPromotion = null;
 	});
 
-	function openDeleteModal(p: Promotion) {
-		promotionToDelete = p;
-		deleteModalOpen = true;
-	}
-
-	async function handleConfirmDelete() {
-		if (promotionToDelete) {
-			await client['promotions'].delete({
-				promotion_ids: [promotionToDelete.id]
-			});
-			promotionToDelete = null;
-			deleteModalOpen = false;
-			await paginateState.refetch();
-		}
-	}
-
 	const tableColumns: TableColumn[] = [
 		{ label: 'Code', key: 'code', type: 'text' },
 		{ label: 'Method', key: 'method', type: 'text' },
@@ -169,13 +175,20 @@
 			key: 'actions',
 			type: 'actions',
 			actions: [
-				{ label: 'View', key: 'view', type: 'button', onClick: (item) => openDetails(item as Promotion) },
-				{ label: 'Edit', key: 'edit', type: 'button', onClick: (item) => openEdit(item as Promotion) },
+				{
+					label: 'Edit',
+					key: 'edit',
+					type: 'button',
+					onClick: (item) => openEdit(item as Promotion)
+				},
 				{
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => openDeleteModal(item as Promotion)
+					onClick: (item) =>
+						paginateState.openDeleteConfirm(
+							item as Parameters<typeof paginateState.openDeleteConfirm>[0]
+						)
 				}
 			]
 		}
@@ -212,39 +225,34 @@
 					<table class="w-full text-sm">
 						<TableHead columns={tableColumns} />
 						<TableBody
-							rows={rows}
+							{rows}
 							columns={tableColumns}
 							emptyMessage="No promotions found."
+							onRowClick={goToPromotionDetails}
 						/>
 					</table>
 				</div>
 
-				<TablePagination
-					pagination={listPagination}
-					{start}
-					{end}
-					onPageChange={goToPage}
-				/>
+				<TablePagination pagination={listPagination} {start} {end} onPageChange={goToPage} />
 			{/if}
 		</PaginationTable>
 	</div>
 </div>
 
+<CreatePromotionSheet bind:open={createOpen} {campaigns} onSave={handleCreateSave} />
 
-<!-- Create Promotion Sheet -->
-<CreatePromotionSheet bind:open={createOpen} campaigns={campaigns} onSave={handleCreateSave} />
-
-<!-- Details Promotion Sheet -->
-<PromotionDetailsSheet bind:open={detailsOpen} promotion={viewingPromotion} campaigns={campaigns} onEdit={openEdit} />
-
-<!-- Edit Promotion Sheet -->
 <EditPromotionSheet bind:open={editOpen} promotion={editingPromotion} onSave={handleEditSave} />
 
-
 <DeleteConfirmationModal
-	bind:open={deleteModalOpen}
+	bind:open={paginateState.deleteConfirmOpen}
 	entityName="promotion"
-	entityTitle={promotionToDelete?.code ?? ''}
-	onConfirm={handleConfirmDelete}
-	onCancel={() => (promotionToDelete = null)}
+	entityTitle={(deleteItem as Promotion | null)?.code ?? ''}
+	onConfirm={() =>
+		paginateState.confirmDelete(async (item) => {
+			const promotion = item as unknown as Promotion;
+			await client['promotions'].delete({ promotion_ids: [promotion.id] });
+		})}
+	onCancel={closeDeleteConfirm}
+	submitting={deleteSubmitting}
+	error={deleteError}
 />

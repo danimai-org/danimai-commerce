@@ -5,6 +5,25 @@ export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
 }
 
+export function formatDate(iso: string | Date): string {
+	if (iso instanceof Date) {
+		return iso.toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'short',
+			day: '2-digit'
+		});
+	}
+	try {
+		return new Date(iso).toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'short',
+			day: '2-digit'
+		});
+	} catch {
+		return iso;
+	}
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type WithoutChild<T> = T extends { child?: any } ? Omit<T, "child"> : T;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
