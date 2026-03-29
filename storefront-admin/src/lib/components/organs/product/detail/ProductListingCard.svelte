@@ -244,6 +244,7 @@
 			await onAddProducts(Array.from(sheetSelectedIds));
 			addSheetOpen = false;
 			sheetSelectedIds = new Set();
+			await loadProducts();
 		} catch (e) {
 			sheetError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -261,6 +262,7 @@
 			const ids = Array.from(selectedIds);
 			await onRemoveProducts(ids);
 			selectedIds = new Set();
+			await loadProducts();
 		} catch (e) {
 			removeError = e instanceof Error ? e.message : String(e);
 		} finally {

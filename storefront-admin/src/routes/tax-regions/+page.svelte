@@ -137,7 +137,7 @@
 	</div>
 </div>
 
-<TaxCreate bind:open={paginateState.formSheetOpen} mode="create" onSuccess={handleFormSaved} />
+<TaxCreate bind:open={paginateState.formSheetOpen} onSuccess={handleFormSaved} />
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}

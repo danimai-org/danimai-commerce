@@ -15,14 +15,15 @@
 	import { createPagination, createPaginationQuery } from '$lib/api';
 	import { resolve } from '$app/paths';
 
-	const regionId = $derived(page.params.id);
 	const paginateState = createPagination(
 		async () => {
-			if (!regionId) throw new Error('Missing Region ID');
-			return client.regions({ id: regionId }).get();
+			const id = page.params.id;
+			if (!id) throw new Error('Missing Region ID');
+			return client.regions({ id }).get();
 		},
-		['regions', regionId],
-		createPaginationQuery(page.url.searchParams)
+		['regions', 'detail'],
+		createPaginationQuery(page.url.searchParams),
+		{ keySuffix: () => [page.params.id ?? ''] }
 	);
 
 	const { query } = paginateState;

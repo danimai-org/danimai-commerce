@@ -5,26 +5,21 @@
 	import { cn } from '$lib/utils.js';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { Toaster, toast } from 'svelte-sonner';
+	import type { Category } from '../type';
 
-	type CategoryMetadata = { handle?: string; description?: string };
+	type CategoryData = NonNullable<Category>;
 
-	interface Props {
-		category?: {
-			id: string;
-			title?: string;
-			value?: string;
-			handle?: string;
-			description?: string;
-			visibility?: 'public' | 'private';
-			metadata?: unknown | null;
-		} | null;
-		onSaved?: () => void;
-		onClosed?: () => void;
-	}
+	let {
+		open = $bindable(false),
+		category = null as CategoryData | null,
+		onSuccess = () => {}
+	}: {
+		open?: boolean;
+		category?: CategoryData | null;
+		onSuccess?: () => void | Promise<void>;
+	} = $props();
 
-	let { category = null, onSaved = () => {}, onClosed = () => {} }: Props = $props();
-
-	let open = $state(false);
+	let initializedForId = $state<string | null>(null);
 
 	const { form, errors, enhance, delayed, message, reset } = superForm(
 		{
@@ -35,73 +30,57 @@
 			visibility: 'public' as 'public' | 'private'
 		},
 		{
-			resetForm: true,
+			resetForm: false,
 			onResult: async ({ result }) => {
-				if (result.type === 'success') {
+				if (result.status === 200) {
 					toast.success('Category updated successfully');
-					onSaved(); // Notify parent to refresh data
-					open = false; // Trigger handleOpenChange
+					open = false;
+					if (onSuccess) await onSuccess();
 				}
 			}
 		}
 	);
 
-	// Watch for category prop. If it's provided, populate form and open sheet.
 	$effect(() => {
-		if (category) {
-			const metadata: CategoryMetadata =
-				category.metadata &&
-				typeof category.metadata === 'object' &&
-				!Array.isArray(category.metadata)
-					? (category.metadata as CategoryMetadata)
-					: {};
-
-			reset({
-				data: {
-					id: category.id,
-					title: category.title ?? category.value ?? '',
-					handle: (category.handle ?? metadata.handle ?? '').replace(/^\//, ''),
-					description: category.description ?? metadata.description ?? '',
-					visibility: category.visibility ?? 'public'
-				}
-			});
-
-			message.set('');
-			open = true;
-		} else {
-			// If parent passes null, ensure the sheet closes
-			open = false;
+		if (!open) {
+			initializedForId = null;
+			return;
 		}
+
+		const nextId = category?.id ?? '';
+		if (!nextId) return;
+		if (initializedForId === nextId) return;
+		initializedForId = nextId;
+
+		message.set('');
+		reset({
+			data: {
+				id: category!.id,
+				title: category!.value ?? '',
+				handle: (category!.handle ?? '').replace(/^\//, ''),
+				description: (category!.metadata as { description?: string })?.description ?? '',
+				visibility: category!.visibility
+			}
+		});
 	});
 
-	function handleOpenChange(isOpen: boolean) {
-		if (!isOpen) {
-			open = false;
-			onClosed(); // Crucial: Tell parent to reset its 'editSheetOpen' state
-			setTimeout(() => reset(), 300); // Reset form after slide-out
-		}
-	}
-
-	function cancel() {
-		if ($delayed) return;
-		handleOpenChange(false);
+	function close() {
+		open = false;
 	}
 </script>
 
 <Toaster richColors position="top-center" />
 
-<Sheet.Root bind:open onOpenChange={handleOpenChange}>
-	<Sheet.Content side="right" class="w-full max-w-md">
+<Sheet.Root bind:open>
+	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
 		<form action="?/update" method="POST" use:enhance class="flex h-full flex-col">
 			<input type="hidden" name="id" bind:value={$form.id} />
 
 			<div class="flex-1 overflow-auto p-6 pt-12">
-				<h2 class="text-lg font-semibold">Edit Category</h2>
-				<p class="mt-1 text-sm text-muted-foreground">Update the category details.</p>
-
-				{#if $message}
-					<p class="mt-4 text-sm font-medium text-destructive">{$message}</p>
-				{/if}
+				<Sheet.Header>
+					<Sheet.Title>Edit Category</Sheet.Title>
+					<Sheet.Description>Update the category details below.</Sheet.Description>
+				</Sheet.Header>
 
 				<div class="mt-6 flex flex-col gap-4">
 					<div class="flex flex-col gap-2">
@@ -150,12 +129,12 @@
 				</div>
 			</div>
 
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" type="button" onclick={cancel}>Cancel</Button>
+			<Sheet.Footer class="border-t p-4">
+				<Button variant="outline" type="button" onclick={close}>Cancel</Button>
 				<Button type="submit" disabled={$delayed}>
 					{$delayed ? 'Saving...' : 'Save'}
 				</Button>
-			</div>
+			</Sheet.Footer>
 		</form>
 	</Sheet.Content>
 </Sheet.Root>

@@ -6,45 +6,51 @@
 	import { cn } from '$lib/utils.js';
 	import Info from '@lucide/svelte/icons/info';
 	import { Combobox } from '$lib/components/organs/index.js';
+	import { Toaster } from 'svelte-sonner';
+	import { toast } from 'svelte-sonner';
 
 	const COUNTRY_OPTIONS = [
-		{ value: 'India', label: 'India' },
-		{ value: 'United States', label: 'United States' },
-		{ value: 'United Kingdom', label: 'United Kingdom' },
-		{ value: 'Germany', label: 'Germany' },
-		{ value: 'France', label: 'France' },
-		{ value: 'Canada', label: 'Canada' },
-		{ value: 'Australia', label: 'Australia' },
-		{ value: 'Japan', label: 'Japan' },
-		{ value: 'Spain', label: 'Spain' },
-		{ value: 'Italy', label: 'Italy' },
-		{ value: 'Brazil', label: 'Brazil' },
-		{ value: 'Mexico', label: 'Mexico' },
-		{ value: 'Netherlands', label: 'Netherlands' },
-		{ value: 'Singapore', label: 'Singapore' }
+		{ value: 'US', label: 'United States' },
+		{ value: 'CA', label: 'Canada' },
+		{ value: 'GB', label: 'United Kingdom' },
+		{ value: 'DE', label: 'Germany' },
+		{ value: 'FR', label: 'France' },
+		{ value: 'IT', label: 'Italy' },
+		{ value: 'ES', label: 'Spain' },
+		{ value: 'NL', label: 'Netherlands' },
+		{ value: 'BE', label: 'Belgium' },
+		{ value: 'CH', label: 'Switzerland' },
+		{ value: 'AT', label: 'Austria' },
+		{ value: 'SE', label: 'Sweden' },
+		{ value: 'NO', label: 'Norway' },
+		{ value: 'DK', label: 'Denmark' },
+		{ value: 'FI', label: 'Finland' },
+		{ value: 'IE', label: 'Ireland' },
+		{ value: 'PT', label: 'Portugal' },
+		{ value: 'PL', label: 'Poland' },
+		{ value: 'CZ', label: 'Czech Republic' },
+		{ value: 'SK', label: 'Slovakia' },
+		{ value: 'HU', label: 'Hungary' }
 	];
-
+	COUNTRY_OPTIONS.sort((a, b) => a.label.localeCompare(b.label));
 	const TAX_PROVIDER_OPTIONS = [
 		{ id: 'manual', value: 'Manual' },
-		{ id: 'stripe', value: 'Stripe' },
-		{ id: 'paypal', value: 'PayPal' },
-		{ id: 'shopify', value: 'Shopify' },
-		{ id: 'shopify-pay', value: 'Shopify Pay' }
+		{ id: 'stripe', value: 'Stripe Tax' },
+		{ id: 'avalara', value: 'Avalara' },
+		{ id: 'taxjar', value: 'TaxJar' },
+		{ id: 'taxcloud', value: 'TaxCloud' },
+		{ id: 'taxamo', value: 'Taxamo' },
+		{ id: 'taxbee', value: 'TaxBee' },
+		{ id: 'taxbit', value: 'TaxBit' },
+		{ id: 'taxbolt', value: 'TaxBolt' }
 	];
-
-	let {
-		open = $bindable(false),
-		onSuccess = () => {}
-	}: {
-		open?: boolean;
+	TAX_PROVIDER_OPTIONS.sort((a, b) => a.value.localeCompare(b.value));
+	interface Props {
+		open: boolean;
 		onSuccess?: () => void;
-	} = $props();
+	}
 
-	let selectedCountry = $state('');
-	let selectedTaxProvider = $state('');
-	let defaultRateName = $state('');
-	let defaultRateValue = $state('');
-	let defaultRateCode = $state('');
+	let { open = $bindable(false), onSuccess = () => {} }: Props = $props();
 
 	const { form, errors, enhance, delayed } = superForm(
 		{
@@ -54,8 +60,9 @@
 		{
 			resetForm: true,
 			onResult: ({ result }) => {
-				if (result.status === 200) {
+				if (result.type === 'success') {
 					open = false;
+					toast.success('Tax region created successfully');
 					onSuccess();
 				}
 			}
@@ -63,6 +70,9 @@
 	);
 
 	let initialized = $state(false);
+	let defaultRateName = $state('');
+	let defaultRateValue = $state('');
+	let defaultRateCode = $state('');
 
 	$effect(() => {
 		if (!open) {
@@ -72,8 +82,6 @@
 
 		if (initialized) return;
 		initialized = true;
-		selectedCountry = '';
-		selectedTaxProvider = '';
 		defaultRateName = '';
 		defaultRateValue = '';
 		defaultRateCode = '';
@@ -87,20 +95,12 @@
 		open = false;
 	}
 
-	$effect(() => {
-		const country = selectedCountry.trim();
-		$form.name = country;
-	});
-
-	$effect(() => {
-		$form.tax_provider_id = selectedTaxProvider;
-	});
-
 	const title = $derived('Create Tax Region');
 	const subtitle = $derived('Create a new tax region to define tax rates for a specific country.');
 	const submitLabel = $derived($delayed ? 'Creating...' : 'Save');
 </script>
 
+<Toaster richColors position="top-center" duration={3000} />
 <Sheet.Root bind:open>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-lg">
 		<form action="?/create" method="POST" use:enhance class="flex h-full flex-col">
@@ -115,7 +115,7 @@
 						<label for="tr-country" class="text-sm font-medium">Country</label>
 						<Combobox
 							id="tr-country"
-							bind:value={selectedCountry}
+							bind:value={$form.name}
 							class={cn(
 								'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
 								$errors.name && 'border-destructive'
@@ -130,7 +130,7 @@
 						<label for="tr-tax-provider" class="text-sm font-medium">Tax provider</label>
 						<Combobox
 							id="tr-tax-provider"
-							bind:value={selectedTaxProvider}
+							bind:value={$form.tax_provider_id}
 							class={cn(
 								'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
 								$errors.tax_provider_id && 'border-destructive'

@@ -79,11 +79,9 @@
 
 	// Create sheet
 	let createOpen = $state(false);
-
 	function handleOpenCreate() {
 		createOpen = true;
 	}
-
 	function closeCreate() {
 		createOpen = false;
 		closeForm();

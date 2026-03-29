@@ -4,7 +4,7 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import RegionAddCountriesSheet from './RegionAddCountriesSheet.svelte';
 	import { DropdownMenu } from 'bits-ui';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { client } from '$lib/client.js';
@@ -24,10 +24,6 @@
 
 	type CountryRow = { id: string; name: string; code: string };
 
-	/**
-	 * STEP 1: API Mapping Logic
-	 * Converts Medusa ISO_2 and display_name into table rows
-	 */
 	function mapApiCountries(data: unknown): CountryRow[] {
 		const list = Array.isArray(data)
 			? data
@@ -47,10 +43,6 @@
 			.filter((row) => row.id.length > 0);
 	}
 
-	/**
-	 * STEP 2: Reactive Fetching
-	 * Runs whenever regionId or refreshNonce changes
-	 */
 	$effect(() => {
 		if (!regionId) return;
 
@@ -77,9 +69,6 @@
 		return () => (active = false);
 	});
 
-	/**
-	 * STEP 3: Remove Logic
-	 */
 	async function handleRemoveCountry(id: string) {
 		try {
 			const res = await client
@@ -164,7 +153,7 @@
 							/>
 						</th>
 						<th class="px-4 py-3">Country Name</th>
-						<th class="px-4 py-3">ISO Code</th>
+						<th class="px-4 py-3">Country Code</th>
 						<th class="w-16 px-4 py-3 text-right">Actions</th>
 					</tr>
 				</thead>
@@ -228,20 +217,4 @@
 	{/if}
 </div>
 
-<Sheet.Root bind:open={addCountriesOpen}>
-	<Sheet.Content side="right" class="flex w-full flex-col sm:max-w-lg">
-		<Sheet.Header class="border-b px-6 py-4">
-			<Sheet.Title>Add countries</Sheet.Title>
-			<Sheet.Description>Select the countries that belong to this region.</Sheet.Description>
-		</Sheet.Header>
-
-		<div class="flex-1 p-6 text-center">
-			<p class="text-sm text-muted-foreground">Country selection list goes here...</p>
-		</div>
-
-		<Sheet.Footer class="mt-auto flex justify-end gap-2 border-t p-4">
-			<Button variant="outline" onclick={() => (addCountriesOpen = false)}>Cancel</Button>
-			<Button onclick={() => (addCountriesOpen = false)}>Save Changes</Button>
-		</Sheet.Footer>
-	</Sheet.Content>
-</Sheet.Root>
+<RegionAddCountriesSheet bind:open={addCountriesOpen} />

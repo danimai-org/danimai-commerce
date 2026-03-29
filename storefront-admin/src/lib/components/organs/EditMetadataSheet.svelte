@@ -66,7 +66,10 @@
 		id: string,
 		meta: Record<string, string | number>
 	) {
-		const c = client as Record<string, (args: { id: string }) => { put: (body: unknown) => Promise<unknown> }> &
+		const c = client as Record<
+			string,
+			(args: { id: string }) => { put: (body: unknown) => Promise<unknown> }
+		> &
 			typeof client;
 		switch (entity) {
 			case 'product':
@@ -145,7 +148,7 @@
 								</tr>
 							</thead>
 							<tbody>
-								{#each metadataRows as _, i}
+								{#each metadataRows as row, i (row.key)}
 									<tr class="border-b last:border-0">
 										<td class="px-4 py-2">
 											<Input

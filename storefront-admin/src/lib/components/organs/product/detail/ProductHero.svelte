@@ -4,6 +4,8 @@
 	import EditProductSheet from './EditProductSheet.svelte';
 	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
 	import type { SuperValidated } from 'sveltekit-superforms';
+	import { getDetailContext } from '$lib/hooks';
+	import type { Product } from '../type';
 
 	type ProductUpdateFormData = {
 		id: string;
@@ -21,7 +23,7 @@
 		productUpdateForm: SuperValidated<ProductUpdateFormData>;
 	} = $props();
 
-	const product = $derived(getProductDetail()?.data?? null);
+	const product = $derived(getDetailContext<Product>()?.data ?? null);
 
 	let editSheetOpen = $state(false);
 
@@ -63,7 +65,7 @@
 						: product?.discountable === false
 							? 'False'
 							: '—'} -->
-							True
+					True
 				</dd>
 			</div>
 		</dl>

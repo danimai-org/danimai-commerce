@@ -2,13 +2,16 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import Share2 from '@lucide/svelte/icons/share-2';
 	import ProductSalesChannelsSheet from './ProductSalesChannelsSheet.svelte';
-	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
+	import { getDetailContext } from '$lib/hooks';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { client } from '$lib/client.js';
 	import { createQuery } from '@tanstack/svelte-query';
+	import type { Product } from '../type';
 
-	const salesChannels = $derived(getProductDetail().data?.sales_channels ?? []);
+	const product = $derived(getDetailContext<Product>()?.data ?? null);
+
+	const salesChannels = $derived(product?.sales_channels ?? []);
 	const salesChannelsQuery = createQuery(() => ({
 		queryKey: ['sales-channels', 'product-detail-sheet'],
 		queryFn: async () =>

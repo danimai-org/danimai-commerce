@@ -6,10 +6,11 @@
 	import { client } from '$lib/client.js';
 	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
 
-	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { superForm } from 'sveltekit-superforms/client';
 	import type { SuperValidated } from 'sveltekit-superforms';
+	import { getDetailContext } from '$lib/hooks';
+	import type { Product } from '../type';
 
 	type ProductOrganisationFormData = {
 		id: string;
@@ -56,17 +57,15 @@
 		sorting_field?: string;
 	};
 
-	const productDetail = $derived(getProductDetail().data ?? null);
+	const product = $derived(getDetailContext<Product>()?.data ?? null);
 
-	const selectedTags = $derived(
-		productDetail?.tags?.map((t) => ({ id: t.id, value: t.value })) ?? []
-	);
+	const selectedTags = $derived(product?.tags?.map((t) => ({ id: t.id, value: t.value })) ?? []);
 	const selectedCollections = $derived(
-		productDetail?.collections?.map((c) => ({ id: c.id, value: c.title })) ?? []
+		product?.collections?.map((c) => ({ id: c.id, value: c.title })) ?? []
 	);
 	const selectedCategories = $derived<Option[]>(
-		productDetail?.category?.id && productDetail?.category?.value
-			? [{ id: productDetail.category.id, value: productDetail.category.value }]
+		product?.category?.id && product?.category?.value
+			? [{ id: product.category.id, value: product.category.value }]
 			: []
 	);
 
@@ -78,9 +77,9 @@
 	const collectionsOptions = $derived(uniqById([...fetchedCollections, ...selectedCollections]));
 	const categoriesOptions = $derived(uniqById([...fetchedCategories, ...selectedCategories]));
 
-	const productCategoryId = $derived(productDetail?.category?.id ?? '');
-	const productCollectionIds = $derived(productDetail?.collections?.map((c) => c.id) ?? []);
-	const productTagIds = $derived(productDetail?.tags?.map((t) => t.id) ?? []);
+	const productCategoryId = $derived(product?.category?.id ?? '');
+	const productCollectionIds = $derived(product?.collections?.map((c) => c.id) ?? []);
+	const productTagIds = $derived(product?.tags?.map((t) => t.id) ?? []);
 
 	let {
 		open = $bindable(false),

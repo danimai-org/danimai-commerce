@@ -42,18 +42,16 @@
 		rank: 0
 	};
 
-	const { form, errors, enhance, delayed, message, reset } = superForm(initialForm,
-		{
-			resetForm: true,
-			onResult: async ({ result }) => {
-				if (result.status === 200) {
-					toast.success('Attribute group updated successfully');
-					await onSaved();
-					open = false;
-				}
+	const { form, errors, enhance, delayed, message, reset } = superForm(initialForm, {
+		resetForm: true,
+		onResult: async ({ result }) => {
+			if (result.status === 200) {
+				toast.success('Attribute group updated successfully');
+				await onSaved();
+				open = false;
 			}
 		}
-	);
+	});
 
 	$effect(() => {
 		const groupId = group?.id ?? null;

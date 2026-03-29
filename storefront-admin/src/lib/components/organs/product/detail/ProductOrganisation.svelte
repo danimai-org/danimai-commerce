@@ -2,8 +2,9 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import ProductOrganisationSheet from './ProductOrganisationSheet.svelte';
-	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
+	import { getDetailContext } from '$lib/hooks';
 	import type { SuperValidated } from 'sveltekit-superforms';
+	import type { Product } from '../type';
 
 	type ProductOrganisationFormData = {
 		id: string;
@@ -22,7 +23,7 @@
 		>;
 	} = $props();
 
-	const product = $derived(getProductDetail()?.data ?? null);
+	const product = $derived(getDetailContext<Product>()?.data ?? null);
 
 	let orgSheetOpen = $state(false);
 </script>
@@ -74,5 +75,5 @@
 <ProductOrganisationSheet
 	bind:open={orgSheetOpen}
 	{productOrganisationForm}
-	onSaved={() => void getProductDetail()?.refetch?.()}
+	onSaved={() => void getDetailContext<Product>()?.refetch?.()}
 />

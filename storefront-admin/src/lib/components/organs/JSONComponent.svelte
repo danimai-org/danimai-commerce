@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
-	import ProductJsonSheet from '$lib/components/organs/product/detail/ProductJsonSheet.svelte';
 	import hljs from 'highlight.js';
 	import 'highlight.js/styles/github-dark.css';
-	import { onMount } from 'svelte';
 	interface Props {
 		product: Record<string, unknown> | null;
 		options: unknown[];
@@ -13,14 +12,6 @@
 	}
 
 	let { product, options = [], variants = [], category }: Props = $props();
-
-	$effect(() => {
-		onMount(() => {
-			if (productJsonForView) {
-				hljs.highlightAll();
-			}
-		});
-	});
 
 	let jsonSheetOpen = $state(false);
 
@@ -36,9 +27,8 @@
 	);
 	const jsonKeysCount = $derived(productJsonForView ? Object.keys(productJsonForView).length : 0);
 	const highlightedJson = $derived.by(() => {
-        if (!productJsonForView) return '';
-        const jsonString = JSON.stringify(productJsonForView, null, 2);
-		return hljs.highlight(jsonString, { language: 'json' }).value;
+		if (!productJsonForView) return '';
+		return hljs.highlight(JSON.stringify(productJsonForView, null, 2), { language: 'json' }).value;
 	});
 </script>
 
@@ -47,7 +37,7 @@
 		<div class="flex min-w-0 flex-1 items-center gap-2">
 			<h3 class="shrink-0 font-medium">JSON</h3>
 			<span
-				class="shrink-0 whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+				class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs whitespace-nowrap text-muted-foreground"
 			>
 				{jsonKeysCount} keys
 			</span>
@@ -64,4 +54,23 @@
 	</div>
 </div>
 
-<ProductJsonSheet bind:open={jsonSheetOpen} {productJsonForView} {jsonKeysCount} highlightedJson={highlightedJson} />
+<Sheet.Root bind:open={jsonSheetOpen}>
+	<Sheet.Content side="right" class="w-full max-w-2xl sm:max-w-2xl">
+		<div class="flex h-full flex-col">
+			<div class="shrink-0 border-b px-6 py-4">
+				<h2 class="text-lg font-semibold">JSON {jsonKeysCount} keys</h2>
+			</div>
+			<div class="min-h-0 flex-1 overflow-auto p-6">
+				{#if productJsonForView}
+					<div class="mt-4 overflow-hidden rounded-md bg-[#0d1117] p-4">
+						<pre class="overflow-x-auto text-sm">
+							<code class="hljs">{highlightedJson}</code>
+						</pre>
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">No data</p>
+				{/if}
+			</div>
+		</div>
+	</Sheet.Content>
+</Sheet.Root>

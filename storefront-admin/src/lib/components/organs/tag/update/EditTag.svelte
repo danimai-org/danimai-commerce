@@ -73,7 +73,7 @@
 
 <Toaster richColors position="top-center" />
 
-<Sheet.Root bind:open={open} onOpenChange={onOpenChange}>
+<Sheet.Root bind:open {onOpenChange}>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
 		<form method="POST" action="?/update" use:enhance class="flex h-full flex-col">
 			<div class="flex-1 overflow-auto p-6 pt-12">
