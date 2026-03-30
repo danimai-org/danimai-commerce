@@ -31,20 +31,19 @@
 			</Sheet.Header>
 			<div class="min-h-0 flex-1 overflow-auto p-6">
 				{#if error}
-					<div class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+					<div
+						class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+					>
 						{error}
 					</div>
 				{/if}
 				<div class="flex flex-col gap-4">
 					<div class="flex flex-col gap-2">
 						<label for="edit-details-sku" class="text-sm font-medium">SKU</label>
-						<Input
-							id="edit-details-sku"
-							bind:value={sku}
-							placeholder="e.g. SKU-001"
-							class="h-9"
-						/>
-						<p class="text-xs text-muted-foreground">Optional. Leave blank for non-shippable items.</p>
+						<Input id="edit-details-sku" bind:value={sku} placeholder="e.g. SKU-001" class="h-9" />
+						<p class="text-xs text-muted-foreground">
+							Optional. Leave blank for non-shippable items.
+						</p>
 					</div>
 					<div class="flex items-center gap-2">
 						<input
@@ -53,14 +52,14 @@
 							bind:checked={requiresShipping}
 							class="h-4 w-4 rounded border-input"
 						/>
-						<label for="edit-details-requires-shipping" class="text-sm font-medium">Requires shipping</label>
+						<label for="edit-details-requires-shipping" class="text-sm font-medium"
+							>Requires shipping</label
+						>
 					</div>
 				</div>
 			</div>
 			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={() => (open = false)} disabled={saving}>
-					Cancel
-				</Button>
+				<Button variant="outline" onclick={() => (open = false)} disabled={saving}>Cancel</Button>
 				<Button onclick={onSave} disabled={saving}>
 					{saving ? 'Saving…' : 'Save'}
 				</Button>

@@ -60,6 +60,7 @@ export const createPagination = <T>(
 			? (['pagination', ...queryKey, ...keySuffix()] as const)
 			: (['pagination', ...queryKey, searchText] as const),
 		queryFn,
+		enabled: options?.enabled?.() ?? true,
 		refetchOnWindowFocus: false
 	}));
 

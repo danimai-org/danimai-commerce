@@ -3,14 +3,12 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { getDetailContext } from '$lib/hooks';
 	import type { Collection } from '../type.js';
+	import EditCollectionHero from '$lib/components/organs/collection/update/EditCollectionHero.svelte';
+	let formSheetOpen = $state(false);
 
-	interface Props {
-		onEdit: () => void;
-	}
+	const detailQuery = getDetailContext<Collection>();
 
-	let { onEdit }: Props = $props();
-
-	const collection = $derived(getDetailContext<Collection>()?.data ?? null);
+	const collection = $derived(detailQuery?.data ?? null);
 
 	function getHandle(c: Collection | null): string {
 		if (!c) return '';
@@ -35,7 +33,7 @@
 					variant="ghost"
 					size="icon"
 					class="size-8 shrink-0"
-					onclick={onEdit}
+					onclick={() => (formSheetOpen = true)}
 					aria-label="Edit collection"
 				>
 					<Pencil class="size-4" />
@@ -44,3 +42,11 @@
 		</div>
 	</div>
 </div>
+
+<EditCollectionHero
+	bind:open={formSheetOpen}
+	{collection}
+	onSuccess={() => {
+		void detailQuery?.refetch?.();
+	}}
+/>

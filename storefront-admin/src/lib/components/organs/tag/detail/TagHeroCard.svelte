@@ -1,25 +1,13 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
-	import EditTag from '$lib/components/organs/tag/update/EditTag.svelte';
 	import Pencil from '@lucide/svelte/icons/pencil';
+	import type { Tag } from '$lib/components/organs/tag/type.js';
+	import EditTag from '$lib/components/organs/tag/update/EditTag.svelte';
+	import { getDetailContext } from '$lib/hooks';
 
-	type ProductTag = {
-		id: string;
-		value: string;
-	};
-
-	interface Props {
-		tag: ProductTag | null;
-		onUpdated?: () => void | Promise<void>;
-	}
-
-	let { tag, onUpdated = () => {} }: Props = $props();
-	let editingTag = $state<ProductTag | null>(null);
-
-	function openEditTagSheet() {
-		if (!tag) return;
-		editingTag = tag;
-	}
+	const detailQuery = getDetailContext<Tag>();
+	let formSheetOpen = $state(false);
+	const tag = $derived(detailQuery?.data ?? null);
 </script>
 
 <div class="shrink-0 rounded-lg border bg-card p-6 shadow-sm">
@@ -34,7 +22,7 @@
 			variant="ghost"
 			size="icon"
 			class="size-8 shrink-0"
-			onclick={openEditTagSheet}
+			onclick={() => (formSheetOpen = true)}
 			aria-label="Edit tag"
 			disabled={!tag}
 		>
@@ -43,12 +31,9 @@
 	</div>
 </div>
 <EditTag
-	tag={editingTag}
-	onSaved={async () => {
-		editingTag = null;
-		await onUpdated();
-	}}
-	onClosed={() => {
-		editingTag = null;
+	bind:open={formSheetOpen}
+	{tag}
+	onSaved={() => {
+		void detailQuery?.refetch?.();
 	}}
 />

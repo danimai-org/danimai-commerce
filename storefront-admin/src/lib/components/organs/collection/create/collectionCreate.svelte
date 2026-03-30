@@ -1,36 +1,39 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { cn } from '$lib/utils.js';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { toast, Toaster } from 'svelte-sonner';
+
 	let {
 		open = $bindable(false),
 		onSuccess = () => {}
 	}: {
 		open?: boolean;
-		onSuccess?: () => void;
+		onSuccess?: () => void | Promise<void>;
 	} = $props();
 
-	const { form, errors, enhance, delayed } = superForm(
-		{ title: '', handle: '' },
-		{
-			resetForm: true,
-			onResult: ({ result }) => {
-				if (result.status === 200) {
-					toast.success('Collection has been created successfully');
-					open = false;
-					onSuccess();
-				}
+	const { form, errors, enhance, delayed } = superForm(page.data.collectionCreateForm, {
+		resetForm: true,
+		onResult: ({ result }) => {
+			if (result.type === 'failure') {
+				const d = result.data as { error?: string } | undefined;
+				if (d?.error) toast.error(d.error);
+				return;
+			}
+			if (result.status === 200) {
+				toast.success('Collection has been created successfully');
+				open = false;
+				void onSuccess();
 			}
 		}
-	);
+	});
 
 	function close() {
 		if (!$delayed) open = false;
 	}
-
 	const sheetTitle = $derived('Create collection');
 	const subtitle = $derived('Add a new collection.');
 </script>
@@ -39,7 +42,7 @@
 
 <Sheet.Root bind:open>
 	<Sheet.Content side="right" class="w-full max-w-md">
-		<form method="POST" action="?/create" use:enhance class="flex h-full flex-col">
+		<form method="POST" use:enhance action="?/create" class="flex h-full flex-col">
 			<div class="flex-1 overflow-auto p-6 pt-12">
 				<h2 class="text-lg font-semibold">{sheetTitle}</h2>
 				<p class="mt-1 text-sm text-muted-foreground">{subtitle}</p>

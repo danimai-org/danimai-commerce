@@ -73,7 +73,6 @@
 				>
 					<ProductHero productUpdateForm={data.productUpdateForm} />
 
-					<!-- Right: Status, Visibility, Organisation, Sales Channels, Attributes, Shipping -->
 					<div class="row-span-2 flex w-80 flex-col gap-6 self-start">
 						<ProductStatus />
 						<ProductOrganisation productOrganisationForm={data.productUpdateForm} />
@@ -81,7 +80,6 @@
 						<ProductAttribute productAttributesForm={data.productUpdateForm} />
 					</div>
 
-					<!-- Media + Options (row 2, column 1) -->
 					<div class="flex min-w-0 flex-col gap-6">
 						<div class="rounded-lg border bg-card p-6 shadow-sm">
 							<div class="flex items-center justify-between">
@@ -118,7 +116,6 @@
 						<ProductVariant />
 					</div>
 
-					<!-- Metadata / JSON — full width of main grid -->
 					<div class="col-span-2 grid w-full min-w-0 gap-4 sm:grid-cols-2">
 						<MetadataComponent
 							productId={product?.id}

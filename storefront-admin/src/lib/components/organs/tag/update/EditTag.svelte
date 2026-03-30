@@ -9,11 +9,13 @@
 	let {
 		open = $bindable(false),
 		tag = null,
+		openOnTag = false,
 		onSaved = async () => {},
 		onClosed = () => {}
 	}: {
 		open?: boolean;
 		tag?: { id: string; value: string } | null;
+		openOnTag?: boolean;
 		onSaved?: () => void | Promise<void>;
 		onClosed?: () => void;
 	} = $props();
@@ -45,17 +47,10 @@
 		}
 	}
 
-	function resetForm() {
-		message.set('');
-		reset({
-			data: {
-				value: ''
-			}
-		});
-	}
+	let initializedForId = $state<string | null>(null);
 
 	$effect(() => {
-		if (tag) {
+		if (tag && openOnTag) {
 			reset({
 				data: {
 					value: tag.value
@@ -66,8 +61,20 @@
 		}
 
 		if (!open) {
-			resetForm();
+			initializedForId = null;
+			return;
 		}
+
+		const nextId = tag?.id ?? '';
+		if (!nextId) return;
+		if (initializedForId === nextId) return;
+		initializedForId = nextId;
+
+		reset({
+			data: {
+				value: tag!.value
+			}
+		});
 	});
 </script>
 

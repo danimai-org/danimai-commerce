@@ -8,16 +8,11 @@
 	import { CollectionHeroCard, ProductListingCard } from '$lib/components/organs/index.js';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
-	import EditCollectionHero from '$lib/components/organs/collection/update/EditCollectionHero.svelte';
+
 	import { resolve } from '$app/paths';
 	import { setDetailContext, useDetailQuery } from '$lib/hooks';
 
 	const collectionId = $derived(page.params?.id ?? '');
-	let formSheetOpen = $state(false);
-
-	function openEdit() {
-		formSheetOpen = true;
-	}
 
 	const detailQuery = useDetailQuery(async () => {
 		const res = await client['collections']({ id: collectionId }).get();
@@ -29,8 +24,8 @@
 	const collection = $derived(detailQuery?.data ?? null);
 	const error = $derived(detailQuery?.error);
 	const isPending = $derived(detailQuery?.isPending);
-
 	let selectedIds = $state<Set<string>>(new Set());
+	const productListingFilter = $derived({ collection_ids: [collectionId] });
 </script>
 
 <svelte:head>
@@ -69,12 +64,12 @@
 		</div>
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
-			<CollectionHeroCard onEdit={openEdit} />
+			<CollectionHeroCard />
 
 			<div class="flex flex-col gap-8 p-6">
 				<ProductListingCard
+					filter={productListingFilter}
 					title="Collection Products"
-					filter={{ collection_ids: [collectionId] }}
 					pickerFilter={{}}
 					bind:selectedIds
 					onAddProducts={async (ids) => {
@@ -99,7 +94,7 @@
 
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent
-						productId={collection.id}
+						productId={collection?.id ?? ''}
 						metadataEntity="collection"
 						metadata={collection.metadata as Record<string, unknown> | null}
 						onSaved={() => {
@@ -112,9 +107,3 @@
 		</div>
 	{/if}
 </div>
-
-<EditCollectionHero
-	bind:open={formSheetOpen}
-	{collection}
-	onSuccess={() => void detailQuery?.refetch()}
-/>

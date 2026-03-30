@@ -12,19 +12,6 @@
 		return client.inventory.levels.get({ query: paginationQuery });
 	}, ['inventory-levels']);
 
-	type InventoryLevel = {
-		id: string;
-		inventory_item_id: string;
-		location_id: string;
-		stocked_quantity: number;
-		reserved_quantity: number;
-		available_quantity: number;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
 	let searchQuery = $state('');
 
 	$effect(() => {
@@ -32,9 +19,7 @@
 		paginateState.refetch();
 	});
 	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
-	const rows = $derived(
-		(paginateState.query.data?.data?.rows ?? []) as unknown as InventoryLevel[]
-	);
+	const rows = $derived(paginateState.query.data?.data?.rows ?? []);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
 </script>

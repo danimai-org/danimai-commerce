@@ -132,12 +132,17 @@
 		</PaginationTable>
 	</div>
 </div>
-<AttributeFormSheet bind:open={paginateState.formSheetOpen} onSuccess={handleFormSaved} />
-<EditAttribute
-	attribute={formMode === 'edit' ? ((formItem as AttributeRow | null) ?? null) : null}
-	onSaved={handleFormSaved}
-	onClosed={handleEditClosed}
-/>
+{#if formMode === 'create'}
+	<AttributeFormSheet bind:open={paginateState.formSheetOpen} onSuccess={handleFormSaved} />
+{/if}
+{#if formMode === 'edit'}
+	<EditAttribute
+		bind:open={paginateState.formSheetOpen}
+		attribute={(formItem as AttributeRow | null) ?? null}
+		onSuccess={handleFormSaved}
+		onClosed={handleEditClosed}
+	/>
+{/if}
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="attribute"

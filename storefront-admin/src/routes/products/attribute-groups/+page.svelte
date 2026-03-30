@@ -85,6 +85,7 @@
 	];
 
 	let createOpen = $state(false);
+	let groupEditOpen = $state(false);
 
 	let editGroup = $state<{
 		id: string;
@@ -146,11 +147,9 @@
 	}}
 />
 <EditAttributeGroupSheet
+	bind:open={groupEditOpen}
 	group={editGroup}
-	onSaved={async () => {
-		editGroup = null;
-		await refetch();
-	}}
+	onSuccess={() => void refetch()}
 	onClosed={() => {
 		editGroup = null;
 	}}

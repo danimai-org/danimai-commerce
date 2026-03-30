@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
@@ -21,19 +22,21 @@
 
 	let initializedForId = $state<string | null>(null);
 
-	const { form, errors, enhance, delayed, reset } = superForm(
-		{ id: '', title: '', handle: '' },
-		{
-			resetForm: false,
-			onResult: async ({ result }) => {
-				if (result.status === 200) {
-					toast.success('Collection updated successfully');
-					open = false;
-					if (onSuccess) await onSuccess();
-				}
+	const { form, errors, enhance, delayed, reset } = superForm(page.data.collectionUpdateForm, {
+		resetForm: false,
+		onResult: async ({ result }) => {
+			if (result.type === 'failure') {
+				const d = result.data as { error?: string } | undefined;
+				if (d?.error) toast.error(d.error);
+				return;
+			}
+			if (result.status === 200) {
+				toast.success('Collection updated successfully');
+				open = false;
+				if (onSuccess) await onSuccess();
 			}
 		}
-	);
+	});
 
 	$effect(() => {
 		if (!open) {
@@ -98,8 +101,12 @@
 							id="handle"
 							name="handle"
 							bind:value={$form.handle}
+							aria-invalid={!!$errors.handle}
 							class={cn($errors.handle && 'border-destructive')}
 						/>
+						{#if $errors.handle}
+							<span class="text-xs text-destructive">{$errors.handle}</span>
+						{/if}
 					</div>
 				</div>
 			</div>

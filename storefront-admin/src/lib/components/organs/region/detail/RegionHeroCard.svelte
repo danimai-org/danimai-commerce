@@ -1,78 +1,69 @@
 <script lang="ts">
 	import Pencil from '@lucide/svelte/icons/pencil';
-	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import { DropdownMenu } from 'bits-ui';
-	import { client } from '$lib/client.js';
 
-	interface Props {
-		region: { name: string; currency_code: string };
-		onEdit: () => void;
-		onDelete: () => void;
-	}
+	import EditRegion from '$lib/components/organs/region/update/edit-region.svelte';
+	import { getDetailContext } from '$lib/hooks';
+	import type { Region } from '../type';
+	import { client } from '$lib/client';
 
-	let { region, onEdit, onDelete }: Props = $props();
+	let formSheetOpen = $state(false);
+
+	const detailQuery = getDetailContext<Region>();
+	const region = $derived(detailQuery?.data ?? null);
 
 	let currencyData = $state<{ name: string; tax_inclusive_pricing: boolean } | null>(null);
 	let currencyLoading = $state(false);
 	let currencyError = $state<string | null>(null);
 
+	const currencyLabel = $derived.by(() => {
+		if (currencyData)
+			return `${region?.currency_code?.toUpperCase() ?? ''} ${currencyData?.name ?? '—'}`;
+		return region?.currency_code?.toUpperCase() ?? '—';
+	});
+
 	$effect(() => {
-		const code = region.currency_code?.trim();
+		const code = region?.currency_code?.trim();
 		if (!code) {
 			currencyData = null;
 			currencyError = null;
+			currencyLoading = false;
 			return;
 		}
+
 		let cancelled = false;
 		currencyLoading = true;
 		currencyError = null;
-		currencyData = null;
-		client.currencies
-			.get({ query: { limit: 1, filters: { code: code.toUpperCase() } } })
+
+		void client.currencies
+			.get({ query: { search: code.toLowerCase(), limit: 1, page: 1 } })
 			.then((res) => {
 				if (cancelled) return;
-				currencyLoading = false;
-				if (res.error) {
-					currencyError = String(
-						(res.error as { value?: { message?: string } })?.value?.message ?? res.error
-					);
-					return;
-				}
-				const raw = res.data as unknown;
-				const rows = Array.isArray(raw) ? raw : ((raw as { rows?: unknown[] })?.rows ?? []);
-				const c = rows[0] as
-					| { code?: string; name?: string; tax_inclusive_pricing?: boolean }
-					| undefined;
-				if (c) {
-					currencyData = {
-						name: c.name ?? code,
-						tax_inclusive_pricing: c.tax_inclusive_pricing ?? false
-					};
-				} else {
-					currencyData = { name: code, tax_inclusive_pricing: false };
-				}
+				const row = res.data?.rows?.[0];
+				currencyData = row
+					? { name: row.name, tax_inclusive_pricing: row.tax_inclusive_pricing }
+					: null;
 			})
 			.catch((e) => {
 				if (cancelled) return;
-				currencyLoading = false;
 				currencyError = e instanceof Error ? e.message : String(e);
+				currencyData = null;
+			})
+			.finally(() => {
+				if (!cancelled) currencyLoading = false;
 			});
+
 		return () => {
 			cancelled = true;
 		};
-	});
-
-	const currencyLabel = $derived.by(() => {
-		if (currencyData) return `${region.currency_code?.toUpperCase() ?? ''} ${currencyData.name}`;
-		return region.currency_code?.toUpperCase() ?? '—';
 	});
 </script>
 
 <div class="rounded-lg border bg-card p-6 shadow-sm">
 	<section class="flex flex-col gap-6">
 		<div class="flex items-center justify-between gap-4">
-			<h1 class="text-2xl font-semibold tracking-tight">{region.name}</h1>
+			<h1 class="text-2xl font-semibold tracking-tight">{region?.name ?? '—'}</h1>
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger
 					class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
@@ -88,18 +79,10 @@
 						<DropdownMenu.Item
 							textValue="Edit"
 							class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-							onSelect={onEdit}
+							onSelect={() => (formSheetOpen = true)}
 						>
 							<Pencil class="size-4" />
 							Edit
-						</DropdownMenu.Item>
-						<DropdownMenu.Item
-							textValue="Delete"
-							class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-							onSelect={onDelete}
-						>
-							<Trash2 class="size-4" />
-							Delete
 						</DropdownMenu.Item>
 					</DropdownMenu.Content>
 				</DropdownMenu.Portal>
@@ -140,3 +123,10 @@
 		</dl>
 	</section>
 </div>
+<EditRegion
+	bind:open={formSheetOpen}
+	{region}
+	onSuccess={() => {
+		void detailQuery?.refetch?.();
+	}}
+/>

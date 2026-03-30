@@ -12,16 +12,10 @@
 	} from '$lib/components/organs/index.js';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
-	import EditCategoryHero from '$lib/components/organs/category/update/EditCategoryHero.svelte';
 	import { resolve } from '$app/paths';
 	import { setDetailContext, useDetailQuery } from '$lib/hooks';
 
 	const categoryId = $derived(page.params?.id ?? '');
-	let formSheetOpen = $state(false);
-
-	function openEdit() {
-		formSheetOpen = true;
-	}
 
 	const detailQuery = useDetailQuery(async () => {
 		const res = await client['product-categories']({ id: categoryId }).get();
@@ -35,6 +29,7 @@
 	const isPending = $derived(detailQuery?.isPending);
 
 	let selectedIds = $state<Set<string>>(new Set());
+	const productListingFilter = $derived({ category_ids: [categoryId] });
 </script>
 
 <svelte:head>
@@ -74,7 +69,7 @@
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="flex flex-col gap-6 p-6 lg:flex-row lg:items-start">
-				<CategoryHeroCard onEdit={openEdit} />
+				<CategoryHeroCard />
 				<CategoryStatusCard
 					{category}
 					onUpdated={() => {
@@ -86,7 +81,7 @@
 			<div class="flex flex-col gap-8 p-6 pt-0">
 				<ProductListingCard
 					title="Category Products"
-					filter={{ category_ids: [categoryId] }}
+					filter={productListingFilter}
 					pickerFilter={{}}
 					bind:selectedIds
 					onAddProducts={async (ids) => {
@@ -115,7 +110,7 @@
 
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent
-						productId={category.id}
+						productId={category?.id ?? ''}
 						metadataEntity="product-category"
 						metadata={category.metadata as Record<string, unknown> | null}
 						onSaved={() => {
@@ -128,9 +123,3 @@
 		</div>
 	{/if}
 </div>
-
-<EditCategoryHero
-	bind:open={formSheetOpen}
-	{category}
-	onSuccess={() => void detailQuery?.refetch()}
-/>

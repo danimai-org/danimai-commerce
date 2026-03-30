@@ -7,17 +7,12 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import ProductListingCard from '$lib/components/organs/product/detail/ProductListingCard.svelte';
 	import { JSONComponent, MetadataComponent } from '$lib/components/organs/index.js';
-	import EditSaleChannel from '$lib/components/organs/sales-channel/update/EditSaleChannel.svelte';
 	import SalesChannelHeroCard from '$lib/components/organs/sales-channel/detail/SalesChannelHeroCard.svelte';
 	import { resolve } from '$app/paths';
 	import { setDetailContext, useDetailQuery } from '$lib/hooks';
 
 	const channelId = $derived(page.params?.id ?? '');
-	let formSheetOpen = $state(false);
-
-	function openEdit() {
-		formSheetOpen = true;
-	}
+	const productListingFilter = $derived({ sales_channel_id: channelId });
 
 	const detailQuery = useDetailQuery(async () => {
 		const res = await client['sales-channels']({ id: channelId }).get();
@@ -67,13 +62,10 @@
 		</div>
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
-			<SalesChannelHeroCard onEdit={openEdit} />
+			<SalesChannelHeroCard />
 
 			<div class="flex flex-col gap-8 p-6">
-				<ProductListingCard
-					filter={{ sales_channel_id: channel.id }}
-					title="Products Sales Channel"
-				/>
+				<ProductListingCard filter={productListingFilter} title="Products Sales Channel" />
 
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent
@@ -90,10 +82,3 @@
 		</div>
 	{/if}
 </div>
-
-<EditSaleChannel
-	bind:open={formSheetOpen}
-	mode="edit"
-	{channel}
-	onSuccess={() => detailQuery.refetch()}
-/>

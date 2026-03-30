@@ -4,14 +4,10 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { getDetailContext } from '$lib/hooks';
 	import type { Category } from '../type';
-
-	interface Props {
-		onEdit: () => void;
-	}
-
-	let { onEdit }: Props = $props();
-
-	const category = $derived(getDetailContext<Category>()?.data ?? null);
+	import EditCategoryHero from '$lib/components/organs/category/update/EditCategoryHero.svelte';
+	const detailQuery = getDetailContext<Category>();
+	let formSheetOpen = $state(false);
+	const category = $derived(detailQuery?.data ?? null);
 
 	function getHandle(c: Category | null): string {
 		if (!c) return '';
@@ -78,7 +74,7 @@
 					variant="ghost"
 					size="icon"
 					class="size-8 shrink-0"
-					onclick={onEdit}
+					onclick={() => (formSheetOpen = true)}
 					aria-label="Edit category"
 				>
 					<Pencil class="size-4" />
@@ -87,3 +83,10 @@
 		</div>
 	</div>
 </div>
+<EditCategoryHero
+	bind:open={formSheetOpen}
+	{category}
+	onSuccess={() => {
+		void detailQuery?.refetch?.();
+	}}
+/>

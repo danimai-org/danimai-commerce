@@ -8,27 +8,18 @@
 	import { ProductListingCard, TagHeroCard } from '$lib/components/organs/index.js';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
-	import EditTag from '$lib/components/organs/tag/update/EditTag.svelte';
 	import { resolve } from '$app/paths';
-	import { createQuery } from '@tanstack/svelte-query';
-	import { setDetailContext } from '$lib/hooks';
+	import { setDetailContext, useDetailQuery } from '$lib/hooks';
 
 	const tagId = $derived(page.params?.id ?? '');
-	let formSheetOpen = $state(false);
-
-	const detailQuery = createQuery(() => ({
-		queryKey: ['tag-detail', page.params?.id ?? ''],
-		queryFn: async () => {
-			const id = page.params?.id ?? '';
-			const res = await client['product-tags']({ id }).get();
-			return res.data;
-		},
-		refetchOnWindowFocus: false
-	}));
+	const productListingFilter = $derived({ tag_ids: [tagId] });
+	const detailQuery = useDetailQuery(async () => {
+		const res = await client['product-tags']({ id: tagId }).get();
+		return res.data;
+	}, () => ['tag-detail', tagId]);
 
 	setDetailContext(detailQuery);
 
-	const tag = $derived(detailQuery?.data ?? null);
 	const error = $derived(detailQuery?.error);
 	const isPending = $derived(detailQuery?.isPending);
 
@@ -36,7 +27,7 @@
 </script>
 
 <svelte:head>
-	<title>{tag?.value ?? tagId ?? 'Tag'} | Tags | Danimai Store</title>
+	<title>{detailQuery?.data?.value ?? tagId ?? 'Tag'} | Tags | Danimai Store</title>
 	<meta name="description" content="Manage product tags." />
 </svelte:head>
 
@@ -52,7 +43,7 @@
 				<span>Tags</span>
 			</button>
 			<ChevronRight class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-			<span class="font-medium text-foreground">{tag?.value ?? tagId ?? '…'}</span>
+			<span class="font-medium text-foreground">{detailQuery?.data?.value ?? tagId ?? '…'}</span>
 		</nav>
 	</div>
 
@@ -60,7 +51,7 @@
 		<div class="flex flex-1 items-center justify-center p-6">
 			<p class="text-muted-foreground">Loading…</p>
 		</div>
-	{:else if error || !tag}
+	{:else if error || !detailQuery?.data}
 		<div class="flex flex-1 flex-col items-center justify-center gap-4 p-6">
 			<p class="text-destructive">{error ?? 'Tag not found'}</p>
 			<Button
@@ -72,10 +63,10 @@
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="flex flex-col gap-4 p-6">
-				<TagHeroCard {tag} />
+				<TagHeroCard />
 				<ProductListingCard
 					title="Tagged products"
-					filter={{ tag_ids: [tagId] }}
+					filter={productListingFilter}
 					pickerFilter={{}}
 					bind:selectedIds
 					onAddProducts={async (ids) => {
@@ -100,18 +91,21 @@
 
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent
-						productId={tag.id}
+						productId={detailQuery?.data?.id ?? ''}
 						metadataEntity="product-tag"
-						metadata={tag.metadata as Record<string, unknown> | null}
+						metadata={detailQuery?.data?.metadata as Record<string, unknown> | null}
 						onSaved={() => {
 							void detailQuery?.refetch();
 						}}
 					/>
-					<JSONComponent product={tag} options={[]} variants={[]} category={null} />
+					<JSONComponent
+						product={detailQuery?.data ?? null}
+						options={[]}
+						variants={[]}
+						category={null}
+					/>
 				</div>
 			</div>
 		</div>
 	{/if}
 </div>
-
-<EditTag bind:open={formSheetOpen} onClosed={() => (formSheetOpen = false)} />

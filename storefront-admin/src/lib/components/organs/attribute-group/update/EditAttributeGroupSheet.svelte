@@ -23,16 +23,19 @@
 		rank: number;
 	};
 
-	interface Props {
+	let {
+		open = $bindable(false),
+		group = null as AttributeGroupItem | null,
+		onSuccess = () => {},
+		onClosed = () => {}
+	}: {
+		open?: boolean;
 		group?: AttributeGroupItem | null;
-		onSaved?: () => void | Promise<void>;
-		onClosed?: () => void | Promise<void>;
-	}
+		onSuccess?: () => void | Promise<void>;
+		onClosed?: () => void;
+	} = $props();
 
-	let { group = null, onSaved = () => {}, onClosed = () => {} }: Props = $props();
-
-	let open = $state(false);
-	let lastGroupId = $state<string | null>(null);
+	let initializedForId = $state<string | null>(null);
 
 	const initialForm: AttributeGroupFormData = {
 		id: '',
@@ -43,41 +46,38 @@
 	};
 
 	const { form, errors, enhance, delayed, message, reset } = superForm(initialForm, {
-		resetForm: true,
+		resetForm: false,
 		onResult: async ({ result }) => {
 			if (result.status === 200) {
 				toast.success('Attribute group updated successfully');
-				await onSaved();
 				open = false;
+				if (onSuccess) await onSuccess();
 			}
 		}
 	});
 
 	$effect(() => {
-		const groupId = group?.id ?? null;
-		if (!groupId || lastGroupId === groupId) return;
-		lastGroupId = groupId;
+		if (!open) {
+			initializedForId = null;
+			return;
+		}
+
+		const nextId = group?.id ?? '';
+		if (!nextId) return;
+		if (initializedForId === nextId) return;
+		initializedForId = nextId;
+
 		const attributeIds = group?.attribute_ids ?? group?.attributes?.map((a) => a.id) ?? [];
 		reset({
 			data: {
-				id: group?.id ?? '',
-				title: group?.title ?? '',
+				id: group!.id,
+				title: group!.title ?? '',
 				attribute_ids: attributeIds,
-				required: (group?.required ?? false) as boolean,
-				rank: (group?.rank ?? 0) as number
+				required: (group!.required ?? false) as boolean,
+				rank: (group!.rank ?? 0) as number
 			}
 		});
 		message.set('');
-		open = true;
-	});
-
-	$effect(() => {
-		if (open) return;
-		if (!lastGroupId) return;
-		lastGroupId = null;
-		if (!$delayed) {
-			onClosed();
-		}
 	});
 
 	async function closeSheet() {

@@ -1,15 +1,14 @@
 <script lang="ts">
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { getDetailContext } from '$lib/hooks';
 	import type { SalesChannel } from '../type';
+	import EditSaleChannel from '$lib/components/organs/sales-channel/update/EditSaleChannel.svelte';
+	import { getDetailContext } from '$lib/hooks';
 
-	interface Props {
-		onEdit: () => void;
-	}
+	let formSheetOpen = $state(false);
 
-	let { onEdit }: Props = $props();
-	const channel = $derived(getDetailContext<SalesChannel>()?.data ?? null);
+	const detailQuery = getDetailContext<SalesChannel>();
+	const channel = $derived(detailQuery?.data ?? null);
 </script>
 
 <div class="flex min-h-0 flex-col overflow-auto">
@@ -32,7 +31,7 @@
 						variant="ghost"
 						size="icon"
 						class="size-8 shrink-0"
-						onclick={onEdit}
+						onclick={() => (formSheetOpen = true)}
 						aria-label="Edit sales channel"
 					>
 						<Pencil class="size-4" />
@@ -47,3 +46,11 @@
 		</div>
 	</div>
 </div>
+<EditSaleChannel
+	bind:open={formSheetOpen}
+	mode="edit"
+	{channel}
+	onSuccess={() => {
+		void detailQuery?.refetch?.();
+	}}
+/>

@@ -143,6 +143,7 @@
 	onSuccess={handleFormSaved}
 />
 <EditTag
+	openOnTag
 	tag={formMode === 'edit' ? ((formItem as TagRow | null) ?? null) : null}
 	onSaved={handleFormSaved}
 	onClosed={handleEditClosed}

@@ -206,7 +206,8 @@
 	import Search from '@lucide/svelte/icons/search';
 	import { createQuery } from '@tanstack/svelte-query';
 	import { cn } from '$lib/utils.js';
-	import { listAvailableCurrencies, createCurrencies } from '$lib/currencies/api.js';
+	import { listAvailableCurrencies } from '$lib/currencies/api.js';
+	import { createCurrencies } from '$lib/currencies/api.js';
 	import type { AvailableCurrenciesResponse } from '$lib/currencies/types.js';
 	import { SvelteMap } from 'svelte/reactivity';
 
