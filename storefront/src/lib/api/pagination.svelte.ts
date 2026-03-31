@@ -1,9 +1,5 @@
 import { createQuery, type QueryFunction } from "@tanstack/svelte-query";
 
-/**
- * Pagination meta returned by list APIs. Use createPaginationQuery(url.searchParams)
- * for the request and createPagination<T>(queryFn, queryKey) for state and actions.
- */
 export type PaginationMeta = {
   total: number;
   page: number;

@@ -9,7 +9,11 @@
 		type PaginationMeta
 	} from '$lib/api/pagination.svelte';
 	import { client } from '$lib/api/client.js';
-	
+	import {
+		type CategoryNavRow,
+		isBottomCategory,
+		isChildCategory
+	} from '$lib/category-nav';
 
 	type ProductRow = { id: string; title: string; handle: string };
 
@@ -109,17 +113,42 @@
 				const err = catRes.error as { value?: { message?: string } };
 				throw new Error(err?.value?.message ?? String(catRes.error));
 			}
-			const catPayload = catRes.data as
-				| { rows?: Array<{ id: string; handle: string; value: string }> }
-				| undefined;
+			const catPayload = catRes.data as { rows?: CategoryNavRow[] } | undefined;
 			const categories = catPayload?.rows ?? [];
-			const category = categories.find((c) => c.handle === handle);
-			if (!category) {
+
+			const childCategories = categories.filter(isChildCategory);
+			const bottomChildren = childCategories.filter(isBottomCategory);
+			const topChildren = childCategories.filter((c) => !isBottomCategory(c));
+
+			let categoryIds: string[] = [];
+			let resolvedTitle = '';
+
+			if (handle === 'all-tops') {
+				categoryIds = topChildren.map((c) => c.id);
+				resolvedTitle = 'All Tops';
+			} else if (handle === 'all-bottoms') {
+				categoryIds = bottomChildren.map((c) => c.id);
+				resolvedTitle = 'All Bottoms';
+			} else {
+				const category = categories.find((c) => c.handle === handle);
+				if (!category) {
+					return {
+						rows: [],
+						pagination: emptyPagination(),
+						categoryTitle: handle,
+						categoryNotFound: true
+					};
+				}
+				categoryIds = [category.id];
+				resolvedTitle = category.value;
+			}
+
+			if (categoryIds.length === 0) {
 				return {
 					rows: [],
 					pagination: emptyPagination(),
-					categoryTitle: handle,
-					categoryNotFound: true
+					categoryTitle: resolvedTitle || handle,
+					categoryNotFound: false
 				};
 			}
 
@@ -131,8 +160,8 @@
 				query: {
 					...pq,
 					sorting_field: sort.sorting_field,
-					sorting_direction: sort.sorting_direction,
-					filters: { category_ids: [category.id] }
+					
+					filters: { category_ids: categoryIds }
 				}
 			});
 			if (pres.error) {
@@ -151,7 +180,7 @@
 			return {
 				rows: grid,
 				pagination: pdata?.pagination ?? emptyPagination(),
-				categoryTitle: category.value,
+				categoryTitle: resolvedTitle,
 				categoryNotFound: false
 			};
 		},

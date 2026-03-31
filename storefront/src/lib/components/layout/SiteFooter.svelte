@@ -1,10 +1,10 @@
 <footer class="footer">
 	<div class="footer-newsletter">
 		<h2 class="footer-newsletter-title">Join Our Community</h2>
-		<p class="footer-newsletter-desc">Subscribe to receive updates on new arrivals, special offers, and movement inspiration.</p>
+		<p class="footer-newsletter-desc">Get 10% off your first order when you sign up for our newsletter.</p>
 		<form class="newsletter-form" action="#" method="post">
 			<input type="email" name="email" placeholder="Enter your email" class="newsletter-input" aria-label="Email" />
-			<button type="submit" class="newsletter-btn">SUBSCRIBE →</button>
+			<button type="submit" class="newsletter-btn">JOIN</button>
 		</form>
 	</div>
 	<div class="footer-columns">
@@ -69,7 +69,8 @@
 	.footer {
 		background: #1a1a1a;
 		color: #b0b0b0;
-		padding: 4rem 1.5rem 2rem;
+		padding: 4rem var(--section-padding-x, 1.5rem) 2rem;
+		box-sizing: border-box;
 	}
 	.footer-newsletter {
 		text-align: center;
@@ -108,25 +109,26 @@
 		color: #888;
 	}
 	.newsletter-btn {
-		padding: 0.875rem 1.25rem;
-		background: transparent;
-		border: 1px solid #666;
-		color: #e8e8e8;
+		padding: 0.875rem 1.5rem;
+		background: #fff;
+		border: 1px solid #fff;
+		color: #1a1a1a;
 		font-size: 0.75rem;
-		letter-spacing: 0.08em;
+		font-weight: 600;
+		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		cursor: pointer;
 		white-space: nowrap;
 	}
 	.newsletter-btn:hover {
-		background: #333;
-		border-color: #888;
+		background: #f0f0f0;
+		border-color: #f0f0f0;
 	}
 	.footer-columns {
 		display: grid;
 		grid-template-columns: 1.5fr 1fr 1fr 1fr;
 		gap: 3rem;
-		max-width: 1200px;
+		max-width: var(--section-max-width, 1200px);
 		margin: 0 auto 3rem;
 	}
 	.footer-brand-name {
@@ -203,7 +205,7 @@
 		justify-content: space-between;
 		flex-wrap: wrap;
 		gap: 1rem;
-		max-width: 1200px;
+		max-width: var(--section-max-width, 1200px);
 		margin: 0 auto;
 	}
 	.footer-bottom-left {

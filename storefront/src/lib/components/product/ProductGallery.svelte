@@ -10,12 +10,14 @@
 		alt?: string;
 		selectedImageUrl?: string | null;
 	} = $props();
+
+	const displayMain = $derived(mainImage || images[0] || '');
 </script>
 
 <div class="product-gallery">
 	<div class="product-main-image" style="background-color: #f5f0eb;">
-		{#if mainImage}
-			<img src={mainImage} alt={alt} />
+		{#if displayMain}
+			<img src={displayMain} alt={alt} />
 		{/if}
 	</div>
 	{#if images.length > 1}
@@ -24,7 +26,7 @@
 				<button
 					type="button"
 					class="thumb"
-					class:selected={src === mainImage}
+					class:selected={src === displayMain}
 					aria-label="View image"
 					onclick={() => (selectedImageUrl = src)}
 				>

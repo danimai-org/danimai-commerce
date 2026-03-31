@@ -1,20 +1,14 @@
 <script lang="ts">
 	import { cart } from '$lib/stores/cart';
+	import type { ProductGridItem } from '../../../routes/store/+page.ts';
 
-	interface Product {
-		name: string;
-		price: string;
-		href: string;
-		bg: string;
-		image?: string | null;
-	}
 
 	let {
-		products = [],
-		title = 'Elevated essentials for everyday.',
-		subtitle = 'Functional athleisure made of premium materials to improve your life in small but mighty ways.'
+		products = [] as ProductGridItem[] | undefined,
+		title = 'Essential essentials for everyday.',
+		subtitle = 'A collection of versatile pieces for your daily movement.'
 	}: {
-		products?: Product[];
+		products?: ProductGridItem[] | undefined;
 		title?: string;
 		subtitle?: string;
 	} = $props();
@@ -24,7 +18,7 @@
 		return Number.isFinite(n) ? n : 0;
 	}
 
-	function quickAdd(e: MouseEvent, product: Product) {
+	function quickAdd(e: MouseEvent, product: ProductGridItem) {
 		e.preventDefault();
 		e.stopPropagation();
 		cart.addItem({
@@ -47,49 +41,57 @@
 	{/if}
 	<div class="product-grid">
 		{#each products as product}
-			<a href={product.href} class="product-card" aria-label={product.name}>
-				<div class="product-image" style="background-color: {product.bg};">
-					{#if product.image}
-						<img src={product.image} alt="" class="product-img" />
-					{/if}
-				</div>
+			<article class="product-card">
+				<a href={product.href} class="product-card-link" aria-label={product.name}>
+					<div class="product-image" style="background-color: {product.bg};">
+						{#if product.image}
+							<img src={product.image} alt="" class="product-img" />
+						{/if}
+					</div>
+					<h3 class="product-name">{product.name}</h3>
+					<p class="product-price">{product.price}</p>
+				</a>
 				<button type="button" class="quick-add" onclick={(e) => quickAdd(e, product)}>QUICK ADD</button>
-				<h3 class="product-name">{product.name}</h3>
-				<p class="product-price">{product.price}</p>
-			</a>
+			</article>
 		{/each}
 	</div>
 </section>
 
 <style>
 	.section {
-		max-width: 1200px;
+		max-width: var(--section-max-width, 1200px);
 		margin: 0 auto;
-		padding: 4rem 1.5rem;
+		padding: var(--section-padding-y, 4rem) var(--section-padding-x, 1.5rem);
+		box-sizing: border-box;
 	}
 	.section-title {
-		font-size: clamp(1.5rem, 3vw, 2rem);
-		font-weight: 700;
+		font-family: var(--font-serif, Georgia, serif);
+		font-size: clamp(1.5rem, 3vw, 2.125rem);
+		font-weight: 600;
 		text-align: center;
 		margin: 0 0 0.5rem;
 		letter-spacing: -0.02em;
 	}
 	.section-subtitle {
 		text-align: center;
-		margin: 0 0 2rem;
+		margin: 0 0 2.5rem;
 		color: #555;
 		font-size: 0.9375rem;
-		max-width: 560px;
+		line-height: 1.55;
+		max-width: 36rem;
 		margin-left: auto;
 		margin-right: auto;
 	}
 	.product-grid {
 		display: grid;
 		grid-template-columns: repeat(4, 1fr);
-		gap: 1.5rem;
+		gap: clamp(1rem, 2vw, 1.75rem);
 	}
 	.product-card {
 		position: relative;
+		display: block;
+	}
+	.product-card-link {
 		display: block;
 		text-decoration: none;
 		color: inherit;
@@ -97,9 +99,10 @@
 	.product-image {
 		position: relative;
 		aspect-ratio: 1;
-		border-radius: 8px;
+		border-radius: 0;
 		margin-bottom: 0.75rem;
 		overflow: hidden;
+		background: #e8e8e8;
 	}
 	.product-img {
 		position: absolute;
@@ -110,6 +113,7 @@
 	}
 	.quick-add {
 		position: absolute;
+		z-index: 1;
 		bottom: 4rem;
 		left: 50%;
 		transform: translateX(-50%);
@@ -138,7 +142,7 @@
 		margin: 0;
 		text-align: center;
 	}
-	@media (max-width: 900px) {
+	@media (max-width: 1024px) {
 		.product-grid {
 			grid-template-columns: repeat(2, 1fr);
 		}

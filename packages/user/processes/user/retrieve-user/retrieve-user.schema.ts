@@ -38,7 +38,7 @@ export const MeResponseSchema = Type.Object(
         role_id: "550e8400-e29b-41d4-a716-446655440001",
       },
     ],
-  }
+  },
 );
 
 export const RetrieveUserResponseSchema = Type.Union([

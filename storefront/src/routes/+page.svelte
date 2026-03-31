@@ -1,63 +1,67 @@
 <script lang="ts">
 	import { SiteHeader, SiteFooter } from '$lib/components/layout';
-	import { HeroSection, ProductGridSection, StorySection, CollectionsSection, QuotesSection } from '$lib/components/sections';
+	import {
+		HeroSection,
+		ProductGridSection,
+		StorySection,
+		CollectionsSection,
+		VideoSection,
+		QuotesSection
+	} from '$lib/components/sections';
+	import type { ProductGridItem } from './store/+page.ts';
 
 	let { data } = $props();
-	const products = $derived(data?.products ?? []);
-	const error = $derived(data?.error ?? null);
+	const products = $derived((data as { products?: ProductGridItem[] })?.products ?? []);
+	const error = $derived((data as { error?: string })?.error ?? null);
 </script>
 
-<SiteHeader />
+<svelte:head>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+	<link
+		href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap"
+		rel="stylesheet"
+	/>
+</svelte:head>
 
-<HeroSection />
+<div class="page-home">
+	<SiteHeader />
 
-{#if error}
-	<p class="products-error">{error}</p>
-{/if}
-<ProductGridSection {products} />
+	<main class="home-main">
+		<HeroSection />
 
-<StorySection />
+		{#if error}
+			<p class="products-error">{error}</p>
+		{/if}
+		<ProductGridSection {products} />
 
-<CollectionsSection />
+		<StorySection />
 
-<QuotesSection />
+		<CollectionsSection />
 
-<SiteFooter />
+		<VideoSection />
+
+		<QuotesSection />
+	</main>
+
+	<SiteFooter />
+</div>
 
 <style>
+	.page-home {
+		--font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+		--font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+	}
+
 	:global(body) {
 		margin: 0;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+		font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
 		color: #1a1a1a;
+		background: #fff;
 	}
 
-	/* Banner strip */
-	.banner-strip {
-		position: relative;
-		height: 120px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		overflow: hidden;
-	}
-
-	.banner-strip-bg {
-		position: absolute;
-		inset: 0;
-		background: linear-gradient(135deg, #6b7c5c 0%, #8a9a7a 100%);
-	}
-
-	.banner-strip-bg-alt {
-		background: linear-gradient(135deg, #c4b8a8 0%, #e0d5c8 100%);
-	}
-
-	.banner-strip-text {
-		position: relative;
-		z-index: 1;
-		font-size: 0.8125rem;
-		color: #fff;
-		background: rgba(0,0,0,0.25);
-		padding: 0.5rem 1rem;
+	.home-main {
+		display: block;
 	}
 
 	.products-error {
