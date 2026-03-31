@@ -14,23 +14,7 @@
 	import { resolve } from '$app/paths';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
-	type Store = {
-		id: string;
-		name: string;
-		default_currency_code: string | null;
-		default_sales_channel_id: string | null;
-		default_region_id: string | null;
-		default_location_id: string | null;
-		metadata: unknown | null;
-		created_at: string | Date;
-		updated_at: string | Date;
-		deleted_at: string | Date | null;
-	};
-
-	function parsePositiveInt(raw: string | null, fallback: number) {
-		const n = Number.parseInt(raw ?? '', 10);
-		return Number.isFinite(n) && n > 0 ? n : fallback;
-	}
+	type Store = Awaited<ReturnType<ReturnType<typeof client.stores>['get']>>['data'];
 
 	function unwrapPaginatedBody<T>(res: unknown): { rows: T[]; pagination: PaginationMeta } | null {
 		if (res == null || typeof res !== 'object') return null;
@@ -49,8 +33,8 @@
 		async () => {
 			const res = await client.stores.get({
 				query: {
-					page: parsePositiveInt(page.url.searchParams.get('page'), 1),
-					limit: parsePositiveInt(page.url.searchParams.get('limit'), 10)
+					page: Number.parseInt(page.url.searchParams.get('page') ?? '1', 10),
+					limit: Number.parseInt(page.url.searchParams.get('limit') ?? '10', 10)
 				}
 			});
 			return unwrapPaginatedBody<Store>(res);
@@ -69,7 +53,7 @@
 	const rows = $derived.by(() => {
 		const q = search.trim().toLowerCase();
 		if (!q) return rowsRaw;
-		return rowsRaw.filter((r) => r.name?.toLowerCase().includes(q));
+		return rowsRaw.filter((r) => r?.name?.toLowerCase().includes(q));
 	});
 
 	const loading = $derived(paginateState.loading);
@@ -145,20 +129,30 @@
 						</td>
 					</tr>
 				{:else}
-					{#each rows as row (row.id)}
+					{#each rows as row (row?.id ?? '')}
 						<tr class="border-b transition-colors last:border-b-0 hover:bg-muted/50">
-							<td class="px-4 py-3 font-medium">{row.name}</td>
+							<td class="px-4 py-3 font-medium">{row?.name}</td>
 							<td class="px-4 py-3 text-muted-foreground">
-								{row.default_currency_code?.toUpperCase() ?? '—'}
+								{row?.default_currency_code?.toUpperCase() ?? '—'}
+								{row?.default_currency_code
+									? void client.currencies
+											.get({
+												query: {
+													limit: 1,
+													search: row?.default_currency_code
+												}
+											})
+											.then((res) => res.data?.rows?.[0]?.name ?? '—')
+									: '—'}
 							</td>
 							<td class="px-4 py-3 text-muted-foreground">
-								{row.default_region_id ?? '—'}
+								{row?.default_region_id ?? '—'}
 							</td>
 							<td class="px-4 py-3 text-muted-foreground">
-								{row.default_sales_channel_id ?? '—'}
+								{row?.default_sales_channel_id ?? '—'}
 							</td>
 							<td class="px-4 py-3 text-muted-foreground">
-								{row.default_location_id ?? '—'}
+								{row?.default_location_id ?? '—'}
 							</td>
 							<td class="px-4 py-3 text-right">
 								<DropdownMenu.Root>

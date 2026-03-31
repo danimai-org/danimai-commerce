@@ -16,6 +16,9 @@
 	} = $props();
 
 	const { form, errors, enhance, delayed } = superForm(page.data.collectionCreateForm, {
+		id: 'collection-create-form',
+		invalidateAll: 'force',
+
 		resetForm: true,
 		onResult: ({ result }) => {
 			if (result.type === 'failure') {
