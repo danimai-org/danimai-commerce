@@ -9,7 +9,7 @@
 	</div>
 	<div class="footer-columns">
 		<div class="footer-col footer-brand">
-			<div class="footer-brand-name">ESSENTIALS</div>
+			<div class="footer-brand-name">DENIMAI</div>
 			<p class="footer-brand-desc">Premium athleisure designed for movement. Thoughtfully crafted essentials that move seamlessly from studio to street.</p>
 			<div class="footer-region">
 				<label for="region">REGION</label>
@@ -40,12 +40,12 @@
 		<div class="footer-col">
 			<div class="footer-heading">SUPPORT</div>
 			<div class="footer-subheading">CUSTOMER CARE</div>
-			<a href="mailto:hello@essentials.com" class="footer-email">hello@essentials.com</a>
+			<a href="mailto:denimai.org@gmail.com" class="footer-email">denimai.org@gmail.com</a>
 		</div>
 	</div>
 	<div class="footer-bottom">
 		<div class="footer-bottom-left">
-			<span class="footer-copy">© 2026 Essentials. All rights reserved.</span>
+			<span class="footer-copy">© 2026 Denimai. All rights reserved.</span>
 			<a href="/privacy">Privacy Policy</a>
 			<a href="/terms">Terms of Service</a>
 		</div>

@@ -23,11 +23,13 @@
 	let cartCount = $state(0);
 	let searchOpen = $state(false);
 	let menuOpen = $state(false);
+	let accountMenuOpen = $state(false);
 	let navWide = $state(false);
 
 
 	afterNavigate(() => {
 		menuOpen = false;
+		accountMenuOpen = false;
 	});
 
 	$effect(() => {
@@ -150,11 +152,27 @@
 			document.removeEventListener('keydown', onKey);
 		};
 	});
+
+	$effect(() => {
+		if (!accountMenuOpen) return;
+		const onDocClick = () => {
+			accountMenuOpen = false;
+		};
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') accountMenuOpen = false;
+		};
+		document.addEventListener('click', onDocClick);
+		document.addEventListener('keydown', onKey);
+		return () => {
+			document.removeEventListener('click', onDocClick);
+			document.removeEventListener('keydown', onKey);
+		};
+	});
 </script>
 
 <header class="site-header">
 	<nav class="nav" class:nav--mobile-search-open={searchOpen && !navWide}>
-		<a href="/" class="brand">ESSENTIALS</a>
+		<a href="/" class="brand">DENIMAI</a>
 		<ul class="nav-links nav-links--desktop">
 			<li class="nav-dropdown">
 				<button type="button" class="nav-item">
@@ -209,6 +227,7 @@
 					aria-label="Search"
 					onclick={() => {
 						menuOpen = false;
+						accountMenuOpen = false;
 						search.open();
 					}}
 				>
@@ -216,15 +235,38 @@
 				</button>
 			{/if}
 			<div class="nav-actions-icons">
-				<button type="button" class="icon-btn icon-btn--account" aria-label="Account">
-					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-				</button>
+				<div class="nav-account-wrap">
+					<button
+						type="button"
+						class="icon-btn icon-btn--account"
+						aria-label="Account"
+						aria-expanded={accountMenuOpen}
+						aria-haspopup="true"
+						onclick={(e) => {
+							e.stopPropagation();
+							accountMenuOpen = !accountMenuOpen;
+						}}
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+					</button>
+					{#if accountMenuOpen}
+						<div class="account-dropdown" role="menu" aria-label="Account">
+							<a
+								href="/login"
+								class="account-dropdown-link"
+								role="menuitem"
+								onclick={() => (accountMenuOpen = false)}>Login</a>
+									
+						</div>
+					{/if}
+				</div>
 				<button
 					type="button"
 					class="icon-btn cart-btn"
 					aria-label="Cart"
 					onclick={() => {
 						menuOpen = false;
+						accountMenuOpen = false;
 						cart.open();
 					}}
 				>
@@ -291,6 +333,11 @@
 				{/if}
 			</section>
 			<a href="/about" class="drawer-link drawer-link--standalone" onclick={() => (menuOpen = false)}>About</a>
+			<section class="drawer-section">
+				<h2 class="drawer-cat">Account</h2>
+				<a href="/login" class="drawer-link" onclick={() => (menuOpen = false)}>Login</a>
+				<a href="/register" class="drawer-link" onclick={() => (menuOpen = false)}>Register</a>
+			</section>
 		</nav>
 	</aside>
 {/if}
@@ -455,13 +502,36 @@
 			gap: 1.125rem;
 		}
 	}
-	.icon-btn--account {
+	.nav-account-wrap {
+		position: relative;
 		display: none;
 	}
 	@media (min-width: 768px) {
-		.icon-btn--account {
-			display: flex;
+		.nav-account-wrap {
+			display: block;
 		}
+	}
+	.account-dropdown {
+		position: absolute;
+		top: 100%;
+		right: 0;
+		margin-top: 0.35rem;
+		min-width: 10rem;
+		padding: 0.35rem 0;
+		background: #fff;
+		border: 1px solid #e8e8e8;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+		z-index: 120;
+	}
+	.account-dropdown-link {
+		display: block;
+		padding: 0.5rem 1rem;
+		font-size: 0.9375rem;
+		color: #1a1a1a;
+		text-decoration: none;
+	}
+	.account-dropdown-link:hover {
+		background: #f5f5f5;
 	}
 	.menu-trigger {
 		display: flex;
