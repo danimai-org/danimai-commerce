@@ -10,7 +10,19 @@ const RegionCreateSchema = z.object({
 	currency_code: z
 		.string()
 		.min(3, 'Currency code must be 3 characters (e.g. USD)')
-		.max(3, 'Currency code must be 3 characters (e.g. USD)')
+		.max(3, 'Currency code must be 3 characters (e.g. USD)'),
+	country_ids: z.preprocess(
+		(val) => (val === undefined || val === null ? '' : String(val)),
+		z.string().transform((s) => {
+			if (!s.trim()) return [] as string[];
+			try {
+				const parsed = JSON.parse(s) as unknown;
+				return Array.isArray(parsed) ? parsed.map(String) : [];
+			} catch {
+				return [];
+			}
+		})
+	)
 });
 
 const RegionUpdateSchema = RegionCreateSchema.extend({
@@ -56,7 +68,23 @@ export const actions = {
 			return fail(400, { regionCreateForm, error: 'Failed to create region' });
 		}
 
-		return message(regionCreateForm, 'Region created successfully');
+		const created = region.data as { id: string } | undefined;
+		if (!created?.id) {
+			return fail(400, { regionCreateForm, error: 'Failed to create region' });
+		}
+		const ids = regionCreateForm.data.country_ids;
+		if (ids.length > 0) {
+			const assign = await client['regions']({ id: created.id }).countries.post({ ids });
+			if (assign?.error) {
+				return fail(400, {
+					regionCreateForm,
+					error: 'Region was created but assigning countries failed'
+				});
+			}
+		}
+
+		const out = message(regionCreateForm, 'Region created successfully');
+		return { ...out, createdId: created.id };
 	},
 	update: async ({ request }) => {
 		const regionUpdateForm = await superValidate(request, zod4(RegionUpdateSchema));

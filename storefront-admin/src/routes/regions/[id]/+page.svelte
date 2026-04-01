@@ -17,6 +17,10 @@
 	const detailQuery = useDetailQuery(
 		async () => {
 			const res = await client.regions({ id: regionId }).get();
+			if (res.error) {
+				const err = res.error as { value?: { message?: string } };
+				throw new Error(err?.value?.message ?? 'Failed to load region');
+			}
 			return res.data;
 		},
 		() => ['region-detail', regionId]

@@ -6,7 +6,7 @@
 	import EditRegion from '$lib/components/organs/region/update/edit-region.svelte';
 	import { getDetailContext } from '$lib/hooks';
 	import type { Region } from '../type';
-	import { client } from '$lib/client';
+	import { client } from '$lib/client.js';
 
 	let formSheetOpen = $state(false);
 
@@ -36,11 +36,13 @@
 		currencyLoading = true;
 		currencyError = null;
 
+		const codeUpper = code.toUpperCase();
 		void client.currencies
-			.get({ query: { search: code.toLowerCase(), limit: 1, page: 1 } })
+			.get({ query: { search: code.toLowerCase(), limit: 100, page: 1 } })
 			.then((res) => {
 				if (cancelled) return;
-				const row = res.data?.rows?.[0];
+				const rows = res.data?.rows ?? [];
+				const row = rows.find((r) => r.code.toUpperCase() === codeUpper) ?? null;
 				currencyData = row
 					? { name: row.name, tax_inclusive_pricing: row.tax_inclusive_pricing }
 					: null;
@@ -114,7 +116,13 @@
 			</div>
 			<div>
 				<dt class="text-muted-foreground">Automatic Taxes</dt>
-				<dd class="mt-1 font-medium">—</dd>
+				<dd class="mt-1 font-medium">
+					{#if typeof (region as Record<string, unknown> | null)?.automatic_taxes === 'boolean'}
+						{(region as Record<string, unknown>).automatic_taxes ? 'True' : 'False'}
+					{:else}
+						—
+					{/if}
+				</dd>
 			</div>
 			<div>
 				<dt class="text-muted-foreground">Payment Providers</dt>

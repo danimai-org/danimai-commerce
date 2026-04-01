@@ -7,6 +7,7 @@ import {
   UPDATE_REGION_PROCESS,
   DELETE_REGIONS_PROCESS,
   LIST_COUNTRIES_PROCESS,
+  ADD_COUNTRIES_TO_REGION_PROCESS,
   REMOVE_COUNTRIES_FROM_REGION_PROCESS,
   RETRIEVE_REGION_PROCESS,
   PaginatedRegionsProcess,
@@ -14,6 +15,7 @@ import {
   UpdateRegionProcess,
   DeleteRegionsProcess,
   ListCountriesProcess,
+  AddCountriesToRegionProcess,
   RemoveCountriesFromRegionProcess,
   RetrieveRegionProcess,
   PaginatedRegionsSchema,
@@ -138,6 +140,34 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
         tags: ["Regions"],
         summary: "List countries in region",
         description: "Gets the list of countries assigned to a region",
+      },
+    },
+  )
+  .post(
+    "/:id/countries",
+    async ({ params, body, set }) => {
+      const process = getService<AddCountriesToRegionProcess>(
+        ADD_COUNTRIES_TO_REGION_PROCESS,
+      );
+      await process.runOperations({
+        input: { region_id: params.id, ids: body.ids },
+      });
+      set.status = 204;
+      return undefined;
+    },
+    {
+      params: Type.Object({ id: Type.String() }),
+      body: RemoveRegionCountriesBodySchema,
+      response: {
+        204: NoContentResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Regions"],
+        summary: "Add countries to region",
+        description:
+          "Assigns countries to a region by ISO 3166-1 alpha-2 codes (ids in body)",
       },
     },
   )

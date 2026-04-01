@@ -1,3 +1,4 @@
+export * from "./add-countries-to-region";
 export * from "./create-region";
 export * from "./delete-regions";
 export * from "./remove-countries-from-region";
