@@ -44,6 +44,24 @@
 		(paginateState.query.data?.data ?? null) as CurrenciesListResponse | null
 	);
 	const rows = $derived(listPayload?.rows ?? []);
+	const paginationMeta = $derived(listPayload?.pagination ?? null);
+	const count = $derived(paginationMeta?.total ?? 0);
+	const currentPage = $derived(paginationMeta?.page ?? pageNum);
+	const totalPages = $derived(Math.max(1, paginationMeta?.total_pages ?? 1));
+	const rangeStart = $derived(
+		paginationMeta ? (paginationMeta.page - 1) * paginationMeta.limit + 1 : 0
+	);
+	const rangeEnd = $derived(
+		paginationMeta
+			? Math.min(paginationMeta.page * paginationMeta.limit, paginationMeta.total)
+			: 0
+	);
+	const loading = $derived(paginateState.loading);
+	const error = $derived(paginateState.error);
+
+	function goToPage(next: number) {
+		pageNum = Math.max(1, Math.min(next, totalPages));
+	}
 
 	let selectedIds = new SvelteSet<string>();
 	const allVisibleSelected = $derived(rows.length > 0 && rows.every((r) => selectedIds.has(r.id)));
@@ -125,26 +143,67 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each rows as row (row.id)}
-					<tr class="border-b last:border-b-0 hover:bg-muted/30">
-						<td class="px-4 py-3">
-							<input
-								type="checkbox"
-								checked={selectedIds.has(row.id)}
-								onchange={() =>
-									selectedIds.has(row.id) ? selectedIds.delete(row.id) : selectedIds.add(row.id)}
-								class="cursor-pointer"
-							/>
-						</td>
-						<td class="px-4 py-3 font-medium">{row.code}</td>
-						<td class="px-4 py-3 text-muted-foreground">{row.name}</td>
-						<td class="px-4 py-3">{row.tax_inclusive_pricing ? 'Yes' : 'No'}</td>
-						<td class="px-4 py-3 text-right"> </td>
+				{#if loading && rows.length === 0}
+					<tr>
+						<td colspan={5} class="px-4 py-8 text-center text-muted-foreground">Loading…</td>
 					</tr>
-				{/each}
+				{:else if error}
+					<tr>
+						<td colspan={5} class="px-4 py-8 text-center text-destructive">{error}</td>
+					</tr>
+				{:else if rows.length === 0}
+					<tr>
+						<td colspan={5} class="px-4 py-8 text-center text-muted-foreground">
+							No currencies found.
+						</td>
+					</tr>
+				{:else}
+					{#each rows as row (row.id)}
+						<tr class="border-b last:border-b-0 hover:bg-muted/30">
+							<td class="px-4 py-3">
+								<input
+									type="checkbox"
+									checked={selectedIds.has(row.id)}
+									onchange={() =>
+										selectedIds.has(row.id) ? selectedIds.delete(row.id) : selectedIds.add(row.id)}
+									class="cursor-pointer"
+								/>
+							</td>
+							<td class="px-4 py-3 font-medium">{row.code}</td>
+							<td class="px-4 py-3 text-muted-foreground">{row.name}</td>
+							<td class="px-4 py-3">{row.tax_inclusive_pricing ? 'Yes' : 'No'}</td>
+							<td class="px-4 py-3 text-right"> </td>
+						</tr>
+					{/each}
+				{/if}
 			</tbody>
 		</table>
 	</div>
+
+	{#if count > 0}
+		<div class="flex items-center justify-between gap-4 border-t px-4 py-3">
+			<p class="text-sm text-muted-foreground">{rangeStart} - {rangeEnd} of {count} results</p>
+			<div class="flex items-center gap-2">
+				<Button
+					size="sm"
+					variant="outline"
+					onclick={() => goToPage(currentPage - 1)}
+					disabled={currentPage <= 1 || loading}
+				>
+					Prev
+				</Button>
+				<span class="text-sm text-muted-foreground">{currentPage} of {totalPages}</span>
+				<Button
+					size="sm"
+					variant="outline"
+					onclick={() => goToPage(currentPage + 1)}
+					disabled={currentPage >= totalPages || loading}
+				>
+					Next
+				</Button>
+			</div>
+		</div>
+	{/if}
 </div>
 
 <AddCurrenciesSheet bind:open={addOpen} onSuccess={() => void paginateState.refetch()} />

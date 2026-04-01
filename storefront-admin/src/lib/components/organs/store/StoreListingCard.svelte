@@ -1,218 +1,244 @@
 <script lang="ts">
-	import Search from '@lucide/svelte/icons/search';
-	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+	import EditStore from '$lib/components/organs/store/EditStore.svelte';
+	import { client } from '$lib/client.js';
+	import { createQuery } from '@tanstack/svelte-query';
+	import Loader from '@lucide/svelte/icons/loader';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import { DropdownMenu } from 'bits-ui';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import EditStore from '$lib/components/organs/store/EditStore.svelte';
-	import { client } from '$lib/client.js';
-	import { page } from '$app/state';
-	import { createPagination, type PaginationMeta } from '$lib/api/pagination.svelte.js';
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
-	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
-	type Store = Awaited<ReturnType<ReturnType<typeof client.stores>['get']>>['data'];
+	const listQuery = { page: 1, limit: 100 } as const;
 
-	function unwrapPaginatedBody<T>(res: unknown): { rows: T[]; pagination: PaginationMeta } | null {
-		if (res == null || typeof res !== 'object') return null;
-		const o = res as Record<string, unknown>;
-		const inner = o.data;
-		if (inner != null && typeof inner === 'object' && inner !== null && 'rows' in inner) {
-			return inner as { rows: T[]; pagination: PaginationMeta };
-		}
-		if ('rows' in o) {
-			return o as { rows: T[]; pagination: PaginationMeta };
-		}
-		return null;
-	}
-
-	const paginateState = createPagination(
-		async () => {
-			const res = await client.stores.get({
-				query: {
-					page: Number.parseInt(page.url.searchParams.get('page') ?? '1', 10),
-					limit: Number.parseInt(page.url.searchParams.get('limit') ?? '10', 10)
-				}
-			});
-			return unwrapPaginatedBody<Store>(res);
-		},
-		['stores'],
-		undefined,
-		{ keySuffix: () => [page.url.searchParams.toString()] }
-	);
-
-	const listPayload = $derived(unwrapPaginatedBody<Store>(paginateState.query.data));
-	const pagination = $derived(listPayload?.pagination ?? null);
-	const rowsRaw = $derived((listPayload?.rows ?? []) as Store[]);
-
-	let search = $state('');
-
-	const rows = $derived.by(() => {
-		const q = search.trim().toLowerCase();
-		if (!q) return rowsRaw;
-		return rowsRaw.filter((r) => r?.name?.toLowerCase().includes(q));
-	});
-
-	const loading = $derived(paginateState.loading);
-	const error = $derived(paginateState.error);
-
-	const count = $derived(pagination?.total ?? 0);
-	const pageNum = $derived(pagination?.page ?? 1);
-	const totalPages = $derived(Math.max(1, pagination?.total_pages ?? 1));
-	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
-	);
-
-	function goToPage(nextPage: number) {
-		const params = new SvelteURLSearchParams(page.url.searchParams);
-		params.set('page', String(Math.max(1, nextPage)));
-
-		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
-	}
+	const storesQuery = createQuery(() => ({
+		queryKey: ['store'],
+		queryFn: () => client.stores.get()
+	}));
 
 	let editStoreOpen = $state(false);
 
-	let storeToEdit = $state<Store | null>(null);
+	const store = $derived(storesQuery.data?.data ?? null);
+	const loading = $derived(storesQuery.isPending);
+	const error = $derived(storesQuery.error);
 
-	function handleEditStore(row: Store) {
-		storeToEdit = row;
-		editStoreOpen = true;
-	}
+	const errorMessage = $derived(
+		error == null ? null : error instanceof Error ? error.message : String(error)
+	);
+
+	const lookupsEnabled = $derived(!!store && !loading && !errorMessage);
+
+	const currenciesQuery = createQuery(() => ({
+		queryKey: ['store-listing-card', 'currencies', listQuery.page, listQuery.limit],
+		queryFn: () => client['currencies'].get({ query: listQuery }),
+		enabled: lookupsEnabled
+	}));
+	const regionsQuery = createQuery(() => ({
+		queryKey: ['store-listing-card', 'regions', listQuery.page, listQuery.limit],
+		queryFn: () => client['regions'].get({ query: listQuery }),
+		enabled: lookupsEnabled
+	}));
+	const salesChannelsQuery = createQuery(() => ({
+		queryKey: ['store-listing-card', 'sales-channels', listQuery.page, listQuery.limit],
+		queryFn: () => client['sales-channels'].get({ query: listQuery }),
+		enabled: lookupsEnabled
+	}));
+	const stockLocationsQuery = createQuery(() => ({
+		queryKey: ['store-listing-card', 'stock-locations', listQuery.page, listQuery.limit],
+		queryFn: () => client['stock-locations'].get({ query: listQuery }),
+		enabled: lookupsEnabled
+	}));
+
+	const currencyDisplay = $derived.by(() => {
+		const code = store?.default_currency_code;
+		if (!code) return null;
+		const rows = currenciesQuery.data?.data?.rows ?? [];
+		const row = rows.find((c) => c.code === code);
+		return row ? { code: row.code, name: row.name } : { code, name: null };
+	});
+
+	const regionDisplay = $derived.by(() => {
+		const id = store?.default_region_id;
+		if (!id) return null;
+		const rows = regionsQuery.data?.data?.rows ?? [];
+		return rows.find((r) => r.id === id)?.name ?? null;
+	});
+
+	const salesChannelDisplay = $derived.by(() => {
+		const id = store?.default_sales_channel_id;
+		if (!id) return null;
+		const rows = salesChannelsQuery.data?.data?.rows ?? [];
+		return rows.find((r) => r.id === id)?.name ?? null;
+	});
+
+	const locationDisplay = $derived.by(() => {
+		const id = store?.default_location_id;
+		if (!id) return null;
+		const rows = stockLocationsQuery.data?.data?.rows ?? [];
+		return rows.find((r) => r.id === id)?.name ?? null;
+	});
+
+	const lookupsPending = $derived(
+		lookupsEnabled &&
+			(currenciesQuery.isPending ||
+				regionsQuery.isPending ||
+				salesChannelsQuery.isPending ||
+				stockLocationsQuery.isPending)
+	);
 </script>
 
 <div class="rounded-lg border bg-card shadow-sm">
-	<div class="flex items-center justify-between gap-4 border-b p-4">
-		<h2 class="font-semibold">Stores</h2>
-		<div class="flex items-center gap-2">
-			<Button size="sm" variant="outline">
-				<SlidersHorizontal class="mr-2 size-4" />
-				Sort
-			</Button>
-			<div class="relative">
-				<Search
-					class="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-muted-foreground"
-				/>
-				<Input class="h-9 w-56 pl-8" placeholder="Search" bind:value={search} />
+	<div class="border-b px-4 py-4">
+		<div class="flex items-start justify-between gap-4">
+			<div class="min-w-0 space-y-1">
+				<h2 class="text-lg font-semibold tracking-tight">Store</h2>
+				<p class="text-sm text-muted-foreground">Manage your store's details.</p>
 			</div>
+			{#if !loading && !errorMessage}
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger
+						class="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-muted"
+						aria-label="Store actions"
+					>
+						<MoreHorizontal class="size-4" />
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Portal>
+						<DropdownMenu.Content
+							class="z-50 min-w-32 rounded-xl border bg-popover p-1 text-popover-foreground shadow-md"
+							sideOffset={4}
+						>
+							<DropdownMenu.Item
+								textValue="Edit"
+								class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+								onSelect={() => (editStoreOpen = true)}
+							>
+								<Pencil class="size-4" />
+								Edit
+							</DropdownMenu.Item>
+						</DropdownMenu.Content>
+					</DropdownMenu.Portal>
+				</DropdownMenu.Root>
+			{/if}
 		</div>
 	</div>
 
-	<div class="overflow-auto p-4">
-		<table class="w-full text-left text-sm">
-			<thead class="border-b bg-muted/20">
-				<tr>
-					<th class="px-4 py-3 font-medium">Name</th>
-					<th class="px-4 py-3 font-medium">Default currency</th>
-					<th class="px-4 py-3 font-medium">Default region</th>
-					<th class="px-4 py-3 font-medium">Default sales channel</th>
-					<th class="px-4 py-3 font-medium">Default location</th>
-					<th class="px-4 py-3 text-right font-medium">Actions</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#if loading && rows.length === 0}
-					<tr>
-						<td colspan={6} class="px-4 py-8 text-center text-muted-foreground">Loading…</td>
-					</tr>
-				{:else if error}
-					<tr>
-						<td colspan={6} class="px-4 py-8 text-center text-destructive">{error}</td>
-					</tr>
-				{:else if rows.length === 0}
-					<tr>
-						<td colspan={6} class="px-4 py-8 text-center text-muted-foreground">
-							{search.trim() ? 'No matching stores.' : 'No stores found.'}
-						</td>
-					</tr>
+	<div class="px-4 pb-4">
+		{#if loading}
+			<div class="flex min-h-[160px] items-center justify-center pt-2">
+				<Loader class="size-6 animate-spin text-muted-foreground" />
+			</div>
+		{:else if errorMessage}
+			<div
+				class="mt-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
+			>
+				{errorMessage}
+			</div>
+		{:else if store}
+			<div class="overflow-x-auto pt-2">
+				{#if lookupsPending}
+					<div class="flex min-h-[120px] items-center justify-center">
+						<Loader class="size-5 animate-spin text-muted-foreground" />
+					</div>
 				{:else}
-					{#each rows as row (row?.id ?? '')}
-						<tr class="border-b transition-colors last:border-b-0 hover:bg-muted/50">
-							<td class="px-4 py-3 font-medium">{row?.name}</td>
-							<td class="px-4 py-3 text-muted-foreground">
-								{row?.default_currency_code?.toUpperCase() ?? '—'}
-								{row?.default_currency_code
-									? void client.currencies
-											.get({
-												query: {
-													limit: 1,
-													search: row?.default_currency_code
-												}
-											})
-											.then((res) => res.data?.rows?.[0]?.name ?? '—')
-									: '—'}
-							</td>
-							<td class="px-4 py-3 text-muted-foreground">
-								{row?.default_region_id ?? '—'}
-							</td>
-							<td class="px-4 py-3 text-muted-foreground">
-								{row?.default_sales_channel_id ?? '—'}
-							</td>
-							<td class="px-4 py-3 text-muted-foreground">
-								{row?.default_location_id ?? '—'}
-							</td>
-							<td class="px-4 py-3 text-right">
-								<DropdownMenu.Root>
-									<DropdownMenu.Trigger
-										class="inline-flex size-8 items-center justify-center rounded-md hover:bg-muted"
-									>
-										<MoreHorizontal class="size-4" />
-										<span class="sr-only">Actions</span>
-									</DropdownMenu.Trigger>
-									<DropdownMenu.Portal>
-										<DropdownMenu.Content
-											class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-											sideOffset={4}
-										>
-											<DropdownMenu.Item
-												class="relative flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none hover:bg-accent hover:text-accent-foreground"
-												onSelect={() => handleEditStore(row)}
+					<table class="w-full border-collapse text-sm">
+						<tbody>
+							<tr class="border-b border-border">
+								<td
+									class="w-[38%] max-w-[12rem] py-3 pr-4 align-middle text-muted-foreground sm:w-1/3"
+									>Name</td
+								>
+								<td class="py-3 align-middle font-medium text-foreground">{store.name}</td>
+							</tr>
+							<tr class="border-b border-border">
+								<td class="py-3 pr-4 align-middle text-muted-foreground">Default currency</td>
+								<td class="py-3 align-middle">
+									{#if currencyDisplay}
+										<span class="inline-flex flex-wrap items-center gap-2">
+											<span
+												class="inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 text-xs font-medium tabular-nums text-foreground"
+												>{currencyDisplay.code}</span
 											>
-												<Pencil class="size-4" />
-												Edit
-											</DropdownMenu.Item>
-										</DropdownMenu.Content>
-									</DropdownMenu.Portal>
-								</DropdownMenu.Root>
-							</td>
-						</tr>
-					{/each}
+											{#if currencyDisplay.name}
+												<span class="font-medium text-foreground">{currencyDisplay.name}</span>
+											{/if}
+										</span>
+									{:else}
+										<span class="text-muted-foreground">—</span>
+									{/if}
+								</td>
+							</tr>
+							<tr class="border-b border-border">
+								<td class="py-3 pr-4 align-middle text-muted-foreground">Default region</td>
+								<td class="py-3 align-middle font-medium text-foreground">
+									{#if regionDisplay}
+										{regionDisplay}
+									{:else if store.default_region_id}
+										<span
+											class="inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 font-mono text-xs text-foreground"
+											>{store.default_region_id}</span
+										>
+									{:else}
+										<span class="text-muted-foreground">—</span>
+									{/if}
+								</td>
+							</tr>
+							<tr class="border-b border-border">
+								<td class="py-3 pr-4 align-middle text-muted-foreground">Default sales channel</td>
+								<td class="py-3 align-middle">
+									{#if salesChannelDisplay}
+										<span
+											class="inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 text-xs font-medium text-foreground"
+											>{salesChannelDisplay}</span
+										>
+									{:else if store.default_sales_channel_id}
+										<span
+											class="inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 font-mono text-xs text-foreground"
+											>{store.default_sales_channel_id}</span
+										>
+									{:else}
+										<span class="text-muted-foreground">—</span>
+									{/if}
+								</td>
+							</tr>
+							<tr class="border-b border-border last:border-0">
+								<td class="py-3 pr-4 align-middle text-muted-foreground">Default location</td>
+								<td class="py-3 align-middle">
+									{#if locationDisplay}
+										<span
+											class="inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 text-xs font-medium text-foreground"
+											>{locationDisplay}</span
+										>
+									{:else if store.default_location_id}
+										<span
+											class="inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 font-mono text-xs text-foreground"
+											>{store.default_location_id}</span
+										>
+									{:else}
+										<span class="text-muted-foreground">—</span>
+									{/if}
+								</td>
+							</tr>
+						</tbody>
+					</table>
 				{/if}
-			</tbody>
-		</table>
-	</div>
-
-	{#if count > 0}
-		<div class="flex items-center justify-between gap-4 border-t px-4 py-3">
-			<p class="text-sm text-muted-foreground">{start} - {end} of {count} results</p>
-			<div class="flex items-center gap-2">
-				<Button
-					size="sm"
-					variant="outline"
-					onclick={() => goToPage(pageNum - 1)}
-					disabled={pageNum <= 1 || loading}
-				>
-					Prev
-				</Button>
-				<span class="text-sm text-muted-foreground">{pageNum} of {totalPages}</span>
-				<Button
-					size="sm"
-					variant="outline"
-					onclick={() => goToPage(pageNum + 1)}
-					disabled={pageNum >= totalPages || loading}
-				>
-					Next
-				</Button>
 			</div>
-		</div>
-	{/if}
+		{:else}
+			<div
+				class="mt-2 flex min-h-[160px] flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-muted/30 px-4 py-10 text-center"
+			>
+				<div class="space-y-1">
+					<p class="text-sm font-medium">No store yet</p>
+					<p class="max-w-sm text-sm text-muted-foreground">
+						Create your store to set defaults for currency, region, and locations.
+					</p>
+				</div>
+				<Button size="sm" onclick={() => (editStoreOpen = true)}>Set up store</Button>
+			</div>
+		{/if}
+	</div>
 </div>
 
 <EditStore
 	bind:open={editStoreOpen}
-	store={storeToEdit}
-	onSuccess={() => paginateState.refetch()}
+	store={store ?? undefined}
+	onSuccess={() => storesQuery.refetch()}
 />

@@ -36,6 +36,7 @@ export class RetrieveStoreProcess implements ProcessContract<typeof RetrieveStor
     const store = await this.db
       .selectFrom("stores")
       .selectAll()
+      .orderBy("updated_at", "desc")
       .executeTakeFirst();
 
     return store;

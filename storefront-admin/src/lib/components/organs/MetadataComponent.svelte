@@ -11,7 +11,8 @@
 		| 'product-attribute'
 		| 'product-attribute-group'
 		| 'region'
-		| 'sales-channel';
+		| 'sales-channel'
+		| 'store';
 
 	interface Props {
 		productId: string | null | undefined;

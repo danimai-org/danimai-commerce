@@ -14,7 +14,8 @@
 		| 'product-attribute'
 		| 'product-attribute-group'
 		| 'region'
-		| 'sales-channel';
+		| 'sales-channel'
+		| 'store';
 
 	interface Props {
 		open: boolean;
@@ -88,6 +89,21 @@
 				return c.regions({ id }).put({ metadata: meta });
 			case 'sales-channel':
 				return c['sales-channels']({ id }).put({ metadata: meta });
+			case 'store': {
+				const res = await client.stores.get();
+				const s = res.data;
+				if (!s || s.id !== id) {
+					throw new Error('Store not found');
+				}
+				return client.stores.post({
+					name: s.name,
+					default_currency_code: s.default_currency_code ?? undefined,
+					default_sales_channel_id: s.default_sales_channel_id ?? undefined,
+					default_region_id: s.default_region_id ?? undefined,
+					default_location_id: s.default_location_id ?? undefined,
+					metadata: meta
+				});
+			}
 			default:
 				return client.products({ id }).put({ metadata: meta });
 		}

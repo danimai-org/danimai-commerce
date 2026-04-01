@@ -4,19 +4,18 @@ import { StoreResponseSchema } from "../retrieve-store/retrieve-store.schema";
 const Metadata = Type.Optional(
   Type.Record(
     Type.String(),
-    Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()])
-  )
+    Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()]),
+  ),
 );
 
 export const CreateStoreSchema = Type.Object({
   name: Type.String(),
-  default_currency_code: Type.Optional(Type.String({ format: "uuid" })),
-  default_sales_channel_id: Type.Optional(Type.String({ format: "uuid" })),
-  default_region_id: Type.Optional(Type.String({ format: "uuid" })),
-  default_location_id: Type.Optional(Type.String({ format: "uuid" })),
+  default_currency_code: Type.Optional(Type.String()),
+  default_sales_channel_id: Type.Optional(Type.String()),
+  default_region_id: Type.Optional(Type.String()),
+  default_location_id: Type.Optional(Type.String()),
   metadata: Metadata,
 });
-
 
 export type CreateStoresProcessInput = Static<typeof CreateStoreSchema>;
 

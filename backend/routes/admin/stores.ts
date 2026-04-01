@@ -2,18 +2,14 @@ import { Elysia } from "elysia";
 import { Type, type StaticDecode } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
-  PAGINATED_STORES_PROCESS,
-  RETRIEVE_STORE_PROCESS,
-  PaginatedStoresProcess,
-  RetrieveStoreProcess,
-  PaginatedStoresSchema,
-  PaginatedStoresResponseSchema,
-  RetrieveStoreSchema,
-  RetrieveStoreResponseSchema,
   CREATE_STORE_PROCESS,
   CreateStoreProcess,
   CreateStoreSchema,
   CreateStoreResponseSchema,
+  RetrieveStoreProcess,
+  RETRIEVE_STORE_PROCESS,
+  RetrieveStoreSchema,
+  RetrieveStoreResponseSchema,
 } from "@danimai/store";
 import { handleProcessError } from "../../utils/error-handler";
 import {
@@ -25,33 +21,14 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query }) => {
-      const process = getService<PaginatedStoresProcess>(PAGINATED_STORES_PROCESS);
-      const input = query as unknown as StaticDecode<typeof PaginatedStoresSchema>;
-      return process.runOperations({ input });
-    },
-    {
-      query: PaginatedStoresSchema,
-      response: {
-        200: PaginatedStoresResponseSchema,
-        400: ValidationErrorResponseSchema,
-        500: InternalErrorResponseSchema,
-      },
-      detail: {
-        tags: ["Stores"],
-        summary: "Get paginated stores",
-        description: "Gets a paginated list of stores",
-      },
-    }
-  )
-  .get(
-    "/:id",
-    async ({ params }) => {
+    async ({ query: input }) => {
       const process = getService<RetrieveStoreProcess>(RETRIEVE_STORE_PROCESS);
-      return process.runOperations({ input: {} as StaticDecode<typeof RetrieveStoreSchema> });
+      return process.runOperations({
+        input: input as StaticDecode<typeof RetrieveStoreSchema>,
+      });
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      query: RetrieveStoreSchema,
       response: {
         200: RetrieveStoreResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -60,15 +37,17 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
       detail: {
         tags: ["Stores"],
         summary: "Retrieve store",
-        description: "Retrieve a single store by id",
+        description: "Retrieves a store by id",
       },
-    }
+    },
   )
   .post(
     "/",
     async ({ body: input }) => {
       const process = getService<CreateStoreProcess>(CREATE_STORE_PROCESS);
-      return process.runOperations({ input });
+      return process.runOperations({
+        input: input as StaticDecode<typeof CreateStoreSchema>,
+      });
     },
     {
       body: CreateStoreSchema,
@@ -79,9 +58,8 @@ export const storeRoutes = new Elysia({ prefix: "/stores" })
       },
       detail: {
         tags: ["Stores"],
-        summary: "Create store(s)",
-        description: "Creates one or more stores. Danimai-style createStores.",
+        summary: "Create store",
+        description: "Creates a store.",
       },
-    }
-  )
-  ;
+    },
+  );
