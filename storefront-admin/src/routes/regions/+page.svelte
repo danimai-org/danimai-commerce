@@ -80,7 +80,6 @@
 		}
 	];
 
-	// Create sheet
 	let createOpen = $state(false);
 	function handleOpenCreate() {
 		createOpen = true;
@@ -90,7 +89,6 @@
 		closeForm();
 	}
 
-	// Edit sheet
 	let editOpen = $state(false);
 	let editRegion = $state<{
 		id: string;
@@ -163,7 +161,11 @@
 	</div>
 </div>
 
-<CreateRegion bind:open={createOpen} regionCreateForm={data.regionCreateForm} onSuccess={handleCreateSuccess} />
+<CreateRegion
+	bind:open={createOpen}
+	regionCreateForm={data.regionCreateForm}
+	onSuccess={handleCreateSuccess}
+/>
 
 <EditRegion bind:open={editOpen} region={editRegion} onSuccess={handleEditSuccess} />
 
