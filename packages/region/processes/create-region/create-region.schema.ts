@@ -5,6 +5,9 @@ export const CreateRegionSchema = Type.Object({
   name: Type.String(),
   currency_code: Type.String(),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()]))),
+  countries: Type.Optional(
+    Type.Array(Type.String({ format: "uuid" }), { uniqueItems: true }),
+  ),
 });
 
 export type CreateRegionProcessInput = Static<typeof CreateRegionSchema>;

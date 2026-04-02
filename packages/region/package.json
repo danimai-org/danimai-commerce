@@ -19,7 +19,9 @@
     "@danimai/product": "../product",
     "@medusajs/js-sdk": "^2.12.3",
     "@medusajs/types": "^2.12.3",
-    "kysely": "^0.28.9",
-    "@sinclair/typebox": "^0.34.48"
+    "@sinclair/typebox": "^0.34.48",
+    "country-state-city": "^3.2.1",
+    "i18n-iso-countries": "^7.14.0",
+    "kysely": "^0.28.9"
   }
 }

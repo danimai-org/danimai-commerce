@@ -6,7 +6,7 @@ import {
   type ProcessContextType,
   type ProcessContract,
 } from "@danimai/core";
-import { Kysely } from "kysely";
+import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type CreateRegionProcessInput,
@@ -36,15 +36,31 @@ export class CreateRegionsProcess
   ) {
     const { input } = context;
 
-    return this.db
-      .insertInto("regions")
-      .values({
-        name: input.name,
-        currency_code: input.currency_code,
-        metadata: input.metadata ?? null,
-      })
-      .returningAll()
-      .executeTakeFirstOrThrow();
+    return this.db.transaction().execute(async (trx) => {
+      const region = await trx
+        .insertInto("regions")
+        .values({
+          name: input.name,
+          currency_code: input.currency_code,
+          metadata: input.metadata ?? null,
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+
+      const countryIds = input.countries?.length
+        ? [...new Set(input.countries)]
+        : [];
+      if (countryIds.length > 0) {
+        await trx
+          .updateTable("countries")
+          .set({ region_id: region.id, updated_at: sql`now()` })
+          .where("deleted_at", "is", null)
+          .where("id", "in", countryIds)
+          .execute();
+      }
+
+      return region;
+    });
   }
 
 }
