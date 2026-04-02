@@ -48,6 +48,7 @@ export const CreateOrderSchema = Type.Object({
   customer_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   sales_channel_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   region_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  cart_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   billing_address_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   shipping_address_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   metadata: Metadata,

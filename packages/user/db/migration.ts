@@ -144,7 +144,10 @@ export async function up(db: Kysely<any>) {
     .createTable("sessions")
     .addColumn("id", "uuid", (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
     .addColumn("user_id", "uuid", (col) =>
-      col.notNull().references("users.id").onDelete("cascade")
+      col.references("users.id").onDelete("cascade")
+    )
+    .addColumn("parent_id", "uuid", (col) =>
+      col.references("sessions.id").onDelete("set null")
     )
     .addColumn("refresh_token_hash", "text")
     .addColumn("ip_address", "text")

@@ -63,6 +63,7 @@ export class UpdateOrdersProcess implements ProcessContract<Order | undefined> {
     if (input.sales_channel_id !== undefined)
       updateData.sales_channel_id = input.sales_channel_id;
     if (input.region_id !== undefined) updateData.region_id = input.region_id;
+    if (input.cart_id !== undefined) updateData.cart_id = input.cart_id;
     if (input.billing_address_id !== undefined)
       updateData.billing_address_id = input.billing_address_id;
     if (input.shipping_address_id !== undefined)

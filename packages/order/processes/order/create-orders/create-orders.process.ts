@@ -62,6 +62,7 @@ export class CreateOrdersProcess implements ProcessContract<Order[]> {
         customer_id: input.customer_id ?? null,
         sales_channel_id: input.sales_channel_id ?? null,
         region_id: input.region_id ?? null,
+        cart_id: input.cart_id ?? null,
         billing_address_id: input.billing_address_id ?? null,
         shipping_address_id: input.shipping_address_id ?? null,
         metadata: input.metadata ?? null,

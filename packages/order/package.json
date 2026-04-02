@@ -14,6 +14,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@danimai/cart": "../cart",
     "@danimai/core": "../core",
     "@medusajs/js-sdk": "^2.12.3",
     "@medusajs/types": "^2.12.3",

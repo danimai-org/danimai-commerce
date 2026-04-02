@@ -37,12 +37,19 @@ export class UpdateSessionProcess
   }) context: ProcessContextType<typeof UpdateSessionSchema>) {
     const { input } = context;
 
-    const updates: { refresh_token_hash?: string; expires_at?: string } = {};
+    const updates: {
+      refresh_token_hash?: string;
+      expires_at?: string;
+      user_id?: string | null;
+    } = {};
     if (input.refresh_token !== undefined) {
       updates.refresh_token_hash = hashToken(input.refresh_token);
     }
     if (input.expires_at !== undefined) {
       updates.expires_at = input.expires_at;
+    }
+    if (input.user_id !== undefined) {
+      updates.user_id = input.user_id;
     }
 
     if (Object.keys(updates).length === 0) {

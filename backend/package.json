@@ -19,6 +19,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@danimai/cart": "../packages/cart",
     "@danimai/cli": "../packages/cli",
     "@danimai/core": "../packages/core",
     "@danimai/currency": "../packages/currency",

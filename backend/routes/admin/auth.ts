@@ -1,9 +1,12 @@
 import { Elysia } from "elysia";
 import { bearer } from "@elysiajs/bearer";
-import { StaticDecode } from "@sinclair/typebox";
+import { type StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   AuthTokensResponseSchema,
+  CREATE_SESSION_PROCESS,
+  CreateSessionProcess,
+  CreateSessionResultSchema,
   EXPIRE_SESSION_PROCESS,
   ExpireSessionProcess,
   LOGIN_PROCESS,
@@ -26,6 +29,18 @@ import {
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 import { loginRateLimitMacro } from "../../macros/login-rate-limit";
+
+const CreateSessionRouteBodySchema = Type.Object({
+  expired_session_id: Type.Optional(
+    Type.String({
+      format: "uuid",
+      description:
+        "Optional id of a session that is already expired; new row gets parent_id set for continuity",
+    })
+  ),
+  ip_address: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  user_agent: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+});
 
 const loginRoute = new Elysia()
   .use(loginRateLimitMacro)
@@ -54,6 +69,40 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
   .use(bearer())
   .onError(({ error, set }) => handleProcessError(error, set))
   .use(loginRoute)
+  .post(
+    "/sessions",
+    async ({
+      body,
+      request,
+    }: {
+      body: StaticDecode<typeof CreateSessionRouteBodySchema>;
+      request: Request;
+    }) => {
+      const process = getService<CreateSessionProcess>(CREATE_SESSION_PROCESS);
+      return process.runOperations({
+        input: {
+          expired_session_id: body.expired_session_id,
+          ip_address: body.ip_address ?? null,
+          user_agent:
+            body.user_agent ?? request.headers.get("user-agent") ?? null,
+        },
+      });
+    },
+    {
+      body: CreateSessionRouteBodySchema,
+      response: {
+        200: CreateSessionResultSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Auth"],
+        summary: "Create session",
+        description:
+          "Create a session and return its id for use as session_id when creating a cart.",
+      },
+    }
+  )
   .post(
     "/refresh",
     async ({ body }: { body: StaticDecode<typeof RefreshTokenSchema> }) => {

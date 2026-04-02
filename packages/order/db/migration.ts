@@ -54,6 +54,7 @@ export async function up(db: Kysely<any>) {
     .addColumn("customer_id", "uuid")
     .addColumn("sales_channel_id", "uuid")
     .addColumn("region_id", "uuid")
+    .addColumn("cart_id", "uuid")
     .addColumn("billing_address_id", "uuid", (col) =>
       col.references("order_addresses.id").onDelete("set null")
     )

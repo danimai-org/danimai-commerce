@@ -32,6 +32,7 @@
 		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
 	}
 
+	
 	const roles = $derived(paginateState.query.data?.data?.rows ?? []);
 	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
 	const start = $derived(paginateState.start);
@@ -69,7 +70,7 @@
 	}
 
 	
-	const tableColumns: TableColumn[] = [
+	const tableColumns: TableColumn<RoleItem>[] = [
 		{ label: 'Name', key: 'name', type: 'text' },
 		{ label: 'Description', key: 'description', type: 'text' },
 		{ label: 'Created', key: 'created_at', type: 'date' },
@@ -77,7 +78,7 @@
 		{ label: 'Actions',key: 'actions', type: 'actions',
 			actions: [
 				{ label: 'Edit', key: 'edit', type: 'button', onClick: (item) => paginateState.openEdit(item as any) },
-				{ label: 'Delete', key: 'delete', type: 'button', onClick: (item) => paginateState.openDeleteConfirm(item as any) }
+				{ label: 'Delete', key: 'delete', type: 'button', onClick: (item) => paginateState.openDeleteConfirm(item ) }
 			]
 		}
 	];

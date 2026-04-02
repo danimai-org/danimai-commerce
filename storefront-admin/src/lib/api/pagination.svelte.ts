@@ -41,7 +41,7 @@ export const createPagination = <T>(
 	queryKey: string[],
 	initialSearchQuery?: ReturnType<typeof createPaginationQuery>,
 	options?: CreatePaginationOptions
-	) => {
+) => {
 	const keySuffix = options?.keySuffix;
 	let searchText = $state<string>(initialSearchQuery?.search ?? "");
 	const form = $state({
@@ -178,13 +178,13 @@ export const createPagination = <T>(
 		},
 		get deleteError() {
 			return deleteState.error;
-        },
-        get searchText() {
-            return searchText;
-        },
-        set searchText(value: string) {
-            searchText = value;
-        },
+		},
+		get searchText() {
+			return searchText;
+		},
+		set searchText(value: string) {
+			searchText = value;
+		},
 		get openDeleteConfirm() {
 			return openDeleteConfirm;
 		},
