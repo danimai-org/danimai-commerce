@@ -14,37 +14,32 @@
 	} from '$lib/components/organs/index.js';
 	import Upload from '@lucide/svelte/icons/upload-cloud';
 	import Pencil from '@lucide/svelte/icons/pencil';
-	import { loadProductDetail, getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
 	import { resolve } from '$app/paths';
 	import type { PageData } from './$types';
+	import { setDetailContext, useDetailQuery } from '$lib/hooks';
+	import { client } from '$lib/client';
 
 	let { data }: { data: PageData } = $props();
 
 	const productId = $derived(page.params?.id ?? '');
-	loadProductDetail(productId);
-	const { data: product, error, isPending } = $derived(getProductDetail());
+	const detailQuery = useDetailQuery(async () => {
+		const res = await client.products({ id: productId }).get();
+		return res.data;
+	}, ['product-detail', productId]);
+
+	setDetailContext(detailQuery);
+
+	const product = $derived(detailQuery?.data ?? null);
+	const error = $derived(detailQuery?.error);
+	const isPending = $derived(detailQuery?.isPending);
 </script>
 
 <svelte:head>
-	<title>{product ? `${product.title} | Product` : 'Product'} | Danimai Store</title>
+	<title>{product?.title ? `${product.title} | Product` : 'Product'} | Danimai Store</title>
 	<meta name="description" content="Manage product." />
 </svelte:head>
 
 <div class="flex h-full flex-col">
-	<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
-		<nav class="flex items-center gap-[5px] pl-[10px] text-sm">
-			<button
-				type="button"
-				class="text-muted-foreground hover:text-foreground"
-				onclick={() => goto(resolve('/products', {}))}
-			>
-				Products
-			</button>
-			<span class="text-muted-foreground">/</span>
-			<span class="font-medium">{product?.title ?? productId ?? '…'}</span>
-		</nav>
-	</div>
-
 	{#if isPending}
 		<div class="flex flex-1 items-center justify-center p-6">
 			<p class="text-muted-foreground">Loading…</p>
@@ -57,6 +52,19 @@
 			>
 		</div>
 	{:else}
+		<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
+			<nav class="flex items-center gap-[5px] pl-[10px] text-sm">
+				<button
+					type="button"
+					class="text-muted-foreground hover:text-foreground"
+					onclick={() => goto(resolve('/products', {}))}
+				>
+					Products
+				</button>
+				<span class="text-muted-foreground">/</span>
+				<span class="font-medium">{product?.title ?? productId ?? '…'}</span>
+			</nav>
+		</div>
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="p-6">
 				<div
@@ -65,7 +73,6 @@
 				>
 					<ProductHero productUpdateForm={data.productUpdateForm} />
 
-					<!-- Right: Status, Visibility, Organisation, Sales Channels, Attributes, Shipping -->
 					<div class="row-span-2 flex w-80 flex-col gap-6 self-start">
 						<ProductStatus />
 						<ProductOrganisation productOrganisationForm={data.productUpdateForm} />
@@ -73,7 +80,6 @@
 						<ProductAttribute productAttributesForm={data.productUpdateForm} />
 					</div>
 
-					<!-- Media + Options (row 2, column 1) -->
 					<div class="flex min-w-0 flex-col gap-6">
 						<div class="rounded-lg border bg-card p-6 shadow-sm">
 							<div class="flex items-center justify-between">
@@ -110,7 +116,6 @@
 						<ProductVariant />
 					</div>
 
-					<!-- Metadata / JSON — full width of main grid -->
 					<div class="col-span-2 grid w-full min-w-0 gap-4 sm:grid-cols-2">
 						<MetadataComponent
 							productId={product?.id}

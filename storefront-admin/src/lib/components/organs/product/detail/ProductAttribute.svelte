@@ -4,6 +4,8 @@
 	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
 	import EditAttributesSheet from './EditAttributesSheet.svelte';
 	import type { SuperValidated } from 'sveltekit-superforms';
+	import type { Product } from '../type';
+	import { getDetailContext } from '$lib/hooks';
 
 	type ProductAttributesFormData = {
 		id: string;
@@ -15,12 +17,20 @@
 	};
 
 	let {
-		productAttributesForm
+		productAttributesForm = $bindable(
+			{} as SuperValidated<ProductAttributesFormData, string | unknown, Record<string, unknown>>
+		)
 	}: {
-		productAttributesForm: SuperValidated<ProductAttributesFormData>;
+		productAttributesForm: SuperValidated<
+			ProductAttributesFormData,
+			string | unknown,
+			Record<string, unknown>
+		>;
 	} = $props();
 
-	const attributes = $derived(getProductDetail().data?.attributes ?? []);
+	const product = $derived(getDetailContext<Product>()?.data ?? null);
+
+	const attributes = $derived(product?.attributes ?? []);
 
 	let editAttributesSheetOpen = $state(false);
 </script>

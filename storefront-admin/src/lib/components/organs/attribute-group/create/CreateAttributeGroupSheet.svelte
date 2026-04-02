@@ -9,18 +9,15 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { toast, Toaster } from 'svelte-sonner';
 	import { MultiSelectCombobox } from '../../multi-select-combobox';
-	type AttributeItem = { id: string; title: string; type: string };
-	type Mode = 'create';
+	
 
 	let {
 		open = $bindable(false),
-		mode = 'create',
-		attribute = null as AttributeItem | null,
+	
 		onSuccess = () => {}
 	}: {
 		open?: boolean;
-		mode?: Mode;
-		attribute?: AttributeItem | null;
+		
 		onSuccess?: () => void;
 	} = $props();
 

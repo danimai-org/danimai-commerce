@@ -4,7 +4,9 @@ export const RetrievePriceListSchema = Type.Object({
   id: Type.String(),
 });
 
-export type RetrievePriceListProcessInput = Static<typeof RetrievePriceListSchema>;
+export type RetrievePriceListProcessInput = Static<
+  typeof RetrievePriceListSchema
+>;
 
 export const PriceListResponseSchema = Type.Object({
   id: Type.String(),
@@ -20,4 +22,6 @@ export const PriceListResponseSchema = Type.Object({
   deleted_at: Type.Union([Type.Date(), Type.Null()]),
 });
 
-export type RetrievePriceListProcessOutput = Static<typeof PriceListResponseSchema>;
+export type RetrievePriceListProcessOutput = Static<
+  typeof PriceListResponseSchema
+>;

@@ -14,16 +14,16 @@
 	} from '$lib/components/organs/index.js';
 	import Folder from '@lucide/svelte/icons/folder';
 	import {
-		listCustomerGroups,
 		deleteCustomerGroups,
 		createCustomerGroup,
 		updateCustomerGroup,
-		type ListCustomerGroupsParams,
 		type ListCustomerGroupsResponse
 	} from '$lib/customer-groups/api.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import { client } from '$lib/client';
 	import type { CustomerGroup } from '$lib/customer-groups/api.js';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
@@ -35,9 +35,9 @@
 	);
 
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
 	const queryData = $derived(paginateState.query.data as ListCustomerGroupsResponse | undefined);
@@ -48,7 +48,6 @@
 	const openCreate = $derived(paginateState.openCreate);
 	const openEdit = $derived(paginateState.openEdit);
 	const closeForm = $derived(paginateState.closeForm);
-	const deleteConfirmOpen = $derived(paginateState.deleteConfirmOpen);
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
 	const deleteItem = $derived(paginateState.deleteItem);
 	const deleteError = $derived(paginateState.deleteError);

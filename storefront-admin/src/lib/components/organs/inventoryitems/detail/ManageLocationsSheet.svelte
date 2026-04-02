@@ -16,26 +16,11 @@
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import { client } from '$lib/client.js';
 	import { DropdownMenu } from 'bits-ui';
-
-	type InventoryLevel = {
-		id: string;
-		inventory_item_id: string;
-		location_id: string;
-		stocked_quantity: number;
-		reserved_quantity: number;
-		available_quantity: number;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	type LevelWithLocation = InventoryLevel & {
-		location?: { id: string; name: string | null } | null;
-	};
+	import type { InventoryLevelWithLocation } from '$lib/components/organs/inventoryitems/type.js';
 
 	type ManageLocationsDetail = {
 		item: { id: string };
-		levels: LevelWithLocation[];
+		levels: InventoryLevelWithLocation[];
 	};
 
 	let {
@@ -72,7 +57,7 @@
 	let levelReservedEdit = $state<Record<string, string>>({});
 	let levelAvailableEdit = $state<Record<string, string>>({});
 	let deleteLevelModalOpen = $state(false);
-	let levelToDelete = $state<InventoryLevel | null>(null);
+	let levelToDelete = $state<InventoryLevelWithLocation | null>(null);
 	let wasOpen = $state(false);
 
 	const existingLocationIds = $derived(new Set((detail?.levels ?? []).map((l) => l.location_id)));
@@ -179,7 +164,7 @@
 		}
 	}
 
-	async function deleteLevel(level: InventoryLevel) {
+	async function deleteLevel(level: InventoryLevelWithLocation) {
 		levelsError = null;
 		levelsSaving = true;
 		try {

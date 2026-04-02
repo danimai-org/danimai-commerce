@@ -1,92 +1,75 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { createQuery } from '@tanstack/svelte-query';
+	import ChevronRight from '@lucide/svelte/icons/chevron-right';
+	import Layers from '@lucide/svelte/icons/layers';
 	import { client } from '$lib/client.js';
-	import { resolve } from '$app/paths';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import { CollectionHeroCard, ProductListingCard } from '$lib/components/organs/index.js';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 
+	import { resolve } from '$app/paths';
+	import { setDetailContext, useDetailQuery } from '$lib/hooks';
+
 	const collectionId = $derived(page.params?.id ?? '');
 
-	type CollectionDetail = {
-		id: string;
-		title: string;
-		handle: string;
-		metadata?: unknown | null;
-	};
+	const detailQuery = useDetailQuery(async () => {
+		const res = await client['collections']({ id: collectionId }).get();
+		return res.data;
+	}, ['collection-detail', collectionId]);
 
-	const collectionDetailQuery = createQuery(() => ({
-		queryKey: ['collection-detail', collectionId],
-		queryFn: async (): Promise<CollectionDetail | null> => {
-			if (!collectionId) return null;
-			const res = await client['collections']({ id: collectionId }).get();
-			if (res?.error) {
-				const err = res.error as { status?: number; value?: { message?: string } };
-				if (err?.status === 404) {
-					throw new Error('Collection not found');
-				}
-				throw new Error(String(err?.value?.message ?? res.error));
-			}
-			return (res?.data ?? null) as CollectionDetail | null;
-		},
-		enabled: !!collectionId,
-		refetchOnWindowFocus: false
-	}));
+	setDetailContext(detailQuery);
 
-	const collection = $derived(collectionDetailQuery.data ?? null);
-	const loading = $derived(collectionDetailQuery.isPending && collectionDetailQuery.isFetching);
-	const error = $derived(
-		collectionDetailQuery.error != null
-			? collectionDetailQuery.error instanceof Error
-				? collectionDetailQuery.error.message
-				: String(collectionDetailQuery.error)
-			: collection === null && collectionDetailQuery.isSuccess && collectionId
-				? 'Collection not found'
-				: null
-	);
-
-	const displayName = $derived(collection?.title ?? collectionId ?? 'Collection');
-
+	const collection = $derived(detailQuery?.data ?? null);
+	const error = $derived(detailQuery?.error);
+	const isPending = $derived(detailQuery?.isPending);
 	let selectedIds = $state<Set<string>>(new Set());
-
-	async function refetchCollection() {
-		await collectionDetailQuery.refetch();
-	}
+	const productListingFilter = $derived({ collection_ids: [collectionId] });
 </script>
 
 <svelte:head>
-	<title>{displayName} | Collections | Danimai Store</title>
+	<title>{collection?.title ?? collectionId ?? 'Collection'} | Collections | Danimai Store</title>
 	<meta name="description" content="Manage product collections." />
 </svelte:head>
-<div class="flex h-full flex-col">
-	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div
-			class="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-b pb-4 text-sm text-muted-foreground"
-		>
-			<a href={resolve('/products/collections', {})} class="hover:text-foreground">Collections</a>
-			<span>/</span>
-			<span class="text-foreground">{displayName}</span>
-		</div>
 
-		{#if error}
-			<div
-				class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+<div class="flex h-full flex-col">
+	<div class="flex shrink-0 items-center gap-4 border-b px-6 py-3">
+		<nav class="flex items-center gap-[5px] pl-[10px] text-sm">
+			<button
+				type="button"
+				class="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+				onclick={() => goto(resolve('/products/collections', {}), { replaceState: true })}
 			>
-				{error}
-			</div>
-		{:else if loading}
-			<div class="flex min-h-0 flex-1 items-center justify-center">
-				<p class="text-muted-foreground">Loading…</p>
-			</div>
-		{:else if collection}
-			<div class="flex flex-col gap-6">
-				<div class="flex gap-6">
-					<CollectionHeroCard {collection} onUpdated={refetchCollection} />
-				</div>
+				<Layers class="size-4 shrink-0" />
+				<span>Collections</span>
+			</button>
+			<ChevronRight class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+			<span class="font-medium text-foreground">{collection?.title ?? collectionId ?? '…'}</span>
+		</nav>
+	</div>
+
+	{#if isPending}
+		<div class="flex flex-1 items-center justify-center p-6">
+			<p class="text-muted-foreground">Loading…</p>
+		</div>
+	{:else if error || !collection}
+		<div class="flex flex-1 flex-col items-center justify-center gap-4 p-6">
+			<p class="text-destructive">{error ?? 'Collection not found'}</p>
+			<Button
+				variant="outline"
+				onclick={() => goto(resolve('/products/collections', {}), { replaceState: true })}
+				>Back to Collections</Button
+			>
+		</div>
+	{:else}
+		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
+			<CollectionHeroCard />
+
+			<div class="flex flex-col gap-8 p-6">
 				<ProductListingCard
+					filter={productListingFilter}
 					title="Collection Products"
-					filter={{ collection_ids: [collectionId] }}
 					pickerFilter={{}}
 					bind:selectedIds
 					onAddProducts={async (ids) => {
@@ -111,14 +94,16 @@
 
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent
-						productId={collection.id}
+						productId={collection?.id ?? ''}
 						metadataEntity="collection"
 						metadata={collection.metadata as Record<string, unknown> | null}
-						onSaved={refetchCollection}
+						onSaved={() => {
+							detailQuery?.refetch();
+						}}
 					/>
 					<JSONComponent product={collection} options={[]} variants={[]} category={null} />
 				</div>
 			</div>
-		{/if}
-	</div>
+		</div>
+	{/if}
 </div>

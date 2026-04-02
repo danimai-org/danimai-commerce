@@ -5,59 +5,79 @@
 	import { cn } from '$lib/utils.js';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { Toaster, toast } from 'svelte-sonner';
-	type AttributeGroupItem = { id: string; title: string; attribute_ids: string[]; required: boolean; rank: number };
-	type Mode = 'update' ;
+	/** Listing rows use attribute_ids/required/rank; detail views use nested attributes. */
+	type AttributeGroupItem = {
+		id: string;
+		title: string;
+		attribute_ids?: string[];
+		attributes?: { id: string }[];
+		required?: boolean;
+		rank?: number;
+	};
 
-	interface Props {
+	type AttributeGroupFormData = {
+		id: string;
+		title: string;
+		attribute_ids: string[];
+		required: boolean;
+		rank: number;
+	};
+
+	let {
+		open = $bindable(false),
+		group = null as AttributeGroupItem | null,
+		onSuccess = () => {},
+		onClosed = () => {}
+	}: {
+		open?: boolean;
 		group?: AttributeGroupItem | null;
-		mode?: Mode;
-		onSaved?: () => void | Promise<void>;
-		onClosed?: () => void | Promise<void>;
-	}
+		onSuccess?: () => void | Promise<void>;
+		onClosed?: () => void;
+	} = $props();
 
-	let { group = null, onSaved = () => {}, onClosed = () => {} }: Props = $props();
+	let initializedForId = $state<string | null>(null);
 
-	let open = $state(false);
-	let lastGroupId = $state<string | null>(null);
+	const initialForm: AttributeGroupFormData = {
+		id: '',
+		title: '',
+		attribute_ids: [],
+		required: false,
+		rank: 0
+	};
 
-	const { form, errors, enhance, delayed, message, reset } = superForm(
-		{ id: '', title: '', attribute_ids: [], required: false, rank: 0 },
-		{
-			resetForm: true,
-			onResult: async ({ result }) => {
-				if (result.status === 200) {
-					toast.success('Attribute group updated successfully');
-					await onSaved();
-					open = false;
-				}
+	const { form, errors, enhance, delayed, message, reset } = superForm(initialForm, {
+		resetForm: false,
+		onResult: async ({ result }) => {
+			if (result.status === 200) {
+				toast.success('Attribute group updated successfully');
+				open = false;
+				if (onSuccess) await onSuccess();
 			}
 		}
-	);
-
-	$effect(() => {
-		const groupId = group?.id ?? null;
-		if (!groupId || lastGroupId === groupId) return;
-		lastGroupId = groupId;
-		reset({
-			data: {
-				id: group?.id ?? '',
-				title: group?.title ?? '',
-				// attribute_ids: (group?.attribute_ids ?? []) as string[],
-				required: (group?.required ?? false) as boolean,
-				rank: (group?.rank ?? 0) as number
-			}
-		});
-		message.set('');
-		open = true;
 	});
 
 	$effect(() => {
-		if (open) return;
-		if (!lastGroupId) return;
-		lastGroupId = null;
-		if (!$delayed) {
-			onClosed();
+		if (!open) {
+			initializedForId = null;
+			return;
 		}
+
+		const nextId = group?.id ?? '';
+		if (!nextId) return;
+		if (initializedForId === nextId) return;
+		initializedForId = nextId;
+
+		const attributeIds = group?.attribute_ids ?? group?.attributes?.map((a) => a.id) ?? [];
+		reset({
+			data: {
+				id: group!.id,
+				title: group!.title ?? '',
+				attribute_ids: attributeIds,
+				required: (group!.required ?? false) as boolean,
+				rank: (group!.rank ?? 0) as number
+			}
+		});
+		message.set('');
 	});
 
 	async function closeSheet() {
@@ -76,13 +96,13 @@
 
 <Toaster richColors position="top-center" />
 
-<Sheet.Root bind:open={open} onOpenChange={onOpenChange}>
+<Sheet.Root bind:open {onOpenChange}>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
 		<form method="POST" action="?/update" use:enhance class="flex h-full flex-col">
 			<input type="hidden" name="id" bind:value={$form.id} />
 			<input type="hidden" name="required" value={$form.required ? 'true' : 'false'} />
 			<input type="hidden" name="rank" value={String($form.rank)} />
-			{#each $form.attribute_ids as attributeId}
+			{#each $form.attribute_ids as attributeId (attributeId)}
 				<input type="hidden" name="attribute_ids" value={attributeId} />
 			{/each}
 			<div class="flex-1 overflow-auto p-6 pt-12">

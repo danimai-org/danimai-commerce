@@ -3,16 +3,7 @@
 	import EditTax from '$lib/components/organs/tax-region/update/EditTax.svelte';
 
 	interface Props {
-		taxRegion:
-			| {
-					id: string;
-					name?: string | null;
-					tax_provider_id?: string | null;
-					created_at?: string | Date | null;
-					updated_at?: string | Date | null;
-			  }
-			| null
-			| undefined;
+		taxRegion?: Record<string, unknown> | null;
 		onUpdated?: () => void | Promise<void>;
 	}
 
@@ -20,9 +11,9 @@
 
 	let editSheetOpen = $state(false);
 
-	function formatDate(value: string | Date | null | undefined): string {
+	function formatDate(value: unknown): string {
 		if (!value) return '—';
-		const date = new Date(value);
+		const date = new Date(value as unknown as string | Date);
 		if (Number.isNaN(date.getTime())) return '—';
 		return date.toLocaleDateString('en-US', {
 			month: 'short',
@@ -54,13 +45,15 @@
 		</div>
 		<div>
 			<dt class="text-muted-foreground">Created</dt>
-			<dd class="mt-1 font-medium">{formatDate(taxRegion?.created_at)}</dd>
+			<dd class="mt-1 font-medium">{formatDate(taxRegion?.created_at as unknown as string | Date)}</dd>
 		</div>
 		<div>
 			<dt class="text-muted-foreground">Updated</dt>
-			<dd class="mt-1 font-medium">{formatDate(taxRegion?.updated_at)}</dd>
+			<dd class="mt-1 font-medium">{formatDate(taxRegion?.updated_at as unknown as string | Date)}</dd>
 		</div>
 	</dl>
 </div>
 
-<EditTax bind:open={editSheetOpen} region={taxRegion ?? null} onSuccess={onUpdated} />
+{#key taxRegion?.id}
+	<EditTax bind:open={editSheetOpen} region={taxRegion as Record<string, unknown> | null} onSuccess={onUpdated} />
+{/key}

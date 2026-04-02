@@ -7,13 +7,11 @@
 
 	let {
 		open = $bindable(false),
-		mode = 'edit',
-		region = null as any | null,
+		region = null as Record<string, unknown> | null,
 		onSuccess = () => {}
 	}: {
 		open?: boolean;
-		mode?: 'edit';
-		region?: any | null;
+		region?: Record<string, unknown> | null;
 		onSuccess?: () => void;
 	} = $props();
 
@@ -44,10 +42,10 @@
 
 		const nextId = region?.id ?? '';
 		if (initializedForId === nextId) return;
-		initializedForId = nextId;
+		initializedForId = String(nextId);
 
 		$form = {
-			id: nextId,
+			id: String(nextId),
 			name: String(region?.name ?? ''),
 			tax_provider_id: String(region?.tax_provider_id ?? '')
 		};

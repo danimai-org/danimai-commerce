@@ -1,8 +1,11 @@
 <script lang="ts">
 	import * as Select from '$lib/components/ui/select/index.js';
-	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
+	import { getDetailContext } from '$lib/hooks';
+	import type { Product } from '../type';
 
-	const status = $derived(getProductDetail().data?.status ?? 'draft');
+	const product = $derived(getDetailContext<Product>()?.data ?? null);
+
+	const status = $derived(product?.status ?? 'draft');
 
 	function statusLabel(s: string | undefined): string {
 		if (!s) return 'Draft';
@@ -32,7 +35,6 @@
 				// onStatusChange(v);
 			}
 		}}
-		// {disabled}
 	>
 		<Select.Trigger class="w-full">
 			<span class="flex items-center gap-2">
@@ -78,7 +80,6 @@
 			// if (v === 'public') onStatusChange('published');
 			// if (v === 'private') onStatusChange('draft');
 		}}
-		// {disabled}
 	>
 		<Select.Trigger class="w-full">
 			{status === 'published' ? 'Public' : 'Private'}

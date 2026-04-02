@@ -19,7 +19,10 @@ const CollectionDeleteSchema = z.object({
 });
 
 export const load: PageServerLoad = async () => {
-	const collectionCreateForm = await superValidate(zod4(CollectionCreateSchema));
+	const collectionCreateForm = await superValidate(
+		{ title: '', handle: '' },
+		zod4(CollectionCreateSchema)
+	);
 	return { collectionCreateForm };
 };
 
@@ -38,7 +41,12 @@ export const actions = {
 			.replace(/[^a-z0-9-]/g, '');
 		const collection = await client['collections'].post({ title, handle });
 		if (!collection || collection.error) {
-			return fail(400, { error: 'Failed to create collection' });
+			return fail(400, {
+				collectionCreateForm,
+				error:
+					(collection.error as { value?: { message?: string } } | undefined)?.value?.message ??
+					'Failed to create collection'
+			});
 		}
 		return message(collectionCreateForm, 'Collection created successfully');
 	},

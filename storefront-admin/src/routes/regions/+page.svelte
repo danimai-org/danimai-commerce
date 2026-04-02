@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -17,6 +18,8 @@
 	import { createPagination, createPaginationQuery } from '$lib/api';
 	import { resolve } from '$app/paths';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
+
+	let { data }: { data: PageData } = $props();
 
 	const paginateState = createPagination(
 		async () => client['regions'].get({ query: createPaginationQuery(page.url.searchParams) }),
@@ -77,19 +80,15 @@
 		}
 	];
 
-	// Create sheet
 	let createOpen = $state(false);
-
 	function handleOpenCreate() {
 		createOpen = true;
 	}
-
 	function closeCreate() {
 		createOpen = false;
 		closeForm();
 	}
 
-	// Edit sheet
 	let editOpen = $state(false);
 	let editRegion = $state<{
 		id: string;
@@ -162,7 +161,11 @@
 	</div>
 </div>
 
-<CreateRegion bind:open={createOpen} onSuccess={handleCreateSuccess} />
+<CreateRegion
+	bind:open={createOpen}
+	regionCreateForm={data.regionCreateForm}
+	onSuccess={handleCreateSuccess}
+/>
 
 <EditRegion bind:open={editOpen} region={editRegion} onSuccess={handleEditSuccess} />
 

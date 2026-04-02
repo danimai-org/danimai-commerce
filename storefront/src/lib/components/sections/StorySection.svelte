@@ -2,8 +2,8 @@
 	let {
 		title = 'Built for the in-between',
 		text = 'Essentials is built for the in-between moments – the walk to the studio, the coffee after training, the quiet hours at home.',
-		ctaHref = '/about',
-		ctaLabel = 'OUR STORY →'
+		ctaHref = '/store',
+		ctaLabel = 'SHOP ALL →'
 	}: {
 		title?: string;
 		text?: string;
@@ -12,7 +12,8 @@
 	} = $props();
 </script>
 
-<section class="section story-section">
+<section class="section story-section ">
+	
 	<div class="story-image">
 		<img
 			src="https://cdn.mignite.app/ws/works_01KGFKTHDC6ZD3WS7GQTX8992N/nano_banana_pro_20260204_141238_1-01KGMCQQ1KXNTY3K55VA3T84KE.png"
@@ -24,15 +25,26 @@
 		<p class="story-text">{text}</p>
 		<a href={ctaHref} class="story-cta">{ctaLabel}</a>
 	</div>
+	
 </section>
 
 <style>
+	.section {
+		background: #f8f6f3;
+		max-width: 100%;
+		padding: var(--section-padding-y,10rem) var(--section-padding-x, 5rem);
+
+
+	}
+
 	.story-section {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		gap: 0;
-		padding: 0;
-		max-width: 100%;
+		
+		margin: 0 auto;
+	
+		box-sizing: border-box;
 		overflow: hidden;
 	}
 	.story-image {
@@ -52,12 +64,13 @@
 		display: flex;
 		flex-direction: column;
 		justify-content: center;
-		padding: clamp(2rem, 5vw, 4rem) clamp(1.5rem, 4vw, 3rem);
+		padding: clamp(2rem, 5vw, 4rem) clamp(1.25rem, 3vw, 2rem);
 		background: #f8f6f3;
 	}
 	.story-title {
+		font-family: var(--font-serif, Georgia, serif);
 		font-size: clamp(1.75rem, 3vw, 2.5rem);
-		font-weight: 700;
+		font-weight: 600;
 		margin: 0 0 1rem;
 		letter-spacing: -0.02em;
 		line-height: 1.2;
@@ -69,9 +82,9 @@
 		max-width: 42ch;
 	}
 	.story-cta {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		letter-spacing: 0.08em;
+		font-size: 0.75rem;
+		font-weight: 600;
+		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		color: #1a1a1a;
 		text-decoration: none;
@@ -91,7 +104,7 @@
 			min-height: 280px;
 		}
 		.story-content {
-			padding: 2rem 1.5rem;
+			padding: 2rem var(--section-padding-x, 1.5rem);
 		}
 	}
 </style>

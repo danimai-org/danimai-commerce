@@ -6,77 +6,40 @@
 
 	import { client } from '$lib/client.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { DeleteConfirmationModal } from '$lib/components/organs/index.js';
-	import EditRegion from '$lib/components/organs/region/update/edit-region.svelte';
 	import RegionHeroCard from '$lib/components/organs/region/detail/RegionHeroCard.svelte';
 	import RegionCountriesCard from '$lib/components/organs/region/detail/RegionCountriesCard.svelte';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
-	import { createPagination, createPaginationQuery } from '$lib/api';
 	import { resolve } from '$app/paths';
+	import { setDetailContext, useDetailQuery } from '$lib/hooks';
 
-	// 1. Get ID from params (Reactive)
-	const regionId = $derived(page.params.id);
-
-	// 2. Initialize Pagination State
-	// Passing regionId inside the arrow function ensures it refetches when the ID changes
-	const paginateState = createPagination(
+	const regionId = $derived(page.params?.id ?? '');
+	const detailQuery = useDetailQuery(
 		async () => {
-			if (!regionId) throw new Error('Missing Region ID');
-			return client.regions({ id: regionId }).get();
+			const res = await client.regions({ id: regionId }).get();
+			if (res.error) {
+				const err = res.error as { value?: { message?: string } };
+				throw new Error(err?.value?.message ?? 'Failed to load region');
+			}
+			return res.data;
 		},
-		['regions', regionId], // Added regionId to keys to force refresh on route change
-		createPaginationQuery(page.url.searchParams)
+		() => ['region-detail', regionId]
 	);
 
-	const { query } = paginateState;
-	const region = $derived(query.data?.data ?? null);
-	const loading = $derived(paginateState.loading);
-	const error = $derived(paginateState.error);
+	setDetailContext(detailQuery);
 
-	// UI States
-	let editOpen = $state(false);
-	let deleteConfirmOpen = $state(false);
-	let deleteSubmitting = $state(false);
-	let deleteError = $state<string | null>(null);
+	const region = $derived(detailQuery?.data ?? null);
+	const loading = $derived(detailQuery?.isPending);
+	const error = $derived(
+		detailQuery?.error != null
+			? detailQuery.error instanceof Error
+				? detailQuery.error.message
+				: String(detailQuery.error)
+			: null
+	);
 
-	// Manual Refresh Helper
 	async function refreshData() {
-		await paginateState.refetch();
-	}
-
-	function openEdit() {
-		editOpen = true;
-	}
-
-	function openDelete() {
-		deleteError = null;
-		deleteConfirmOpen = true;
-	}
-
-	async function confirmDelete() {
-		if (!region?.id) return;
-
-		deleteSubmitting = true;
-		deleteError = null;
-
-		try {
-			const { error: apiError } = await client.regions.delete({ ids: [region.id] });
-			if (apiError) throw new Error(apiError.value?.message || 'Failed to delete');
-
-			deleteConfirmOpen = false;
-			// Use path helper to go back
-			goto(resolve('/regions', {}), { replaceState: true });
-		} catch (e) {
-			deleteError = e instanceof Error ? e.message : String(e);
-		} finally {
-			deleteSubmitting = false;
-		}
-	}
-
-	function handleEditSuccess() {
-		editOpen = false;
-		refreshData();
+		await detailQuery.refetch();
 	}
 </script>
 
@@ -115,7 +78,7 @@
 	{:else if region}
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="flex flex-col gap-6 p-6">
-				<RegionHeroCard {region} onEdit={openEdit} onDelete={openDelete} />
+				<RegionHeroCard />
 
 				<RegionCountriesCard regionId={region.id} />
 
@@ -133,15 +96,3 @@
 		</div>
 	{/if}
 </div>
-
-<EditRegion bind:open={editOpen} {region} onSuccess={handleEditSuccess} />
-
-<DeleteConfirmationModal
-	bind:open={deleteConfirmOpen}
-	entityName="region"
-	entityTitle={region?.name ?? ''}
-	onConfirm={confirmDelete}
-	onCancel={() => (deleteConfirmOpen = false)}
-	submitting={deleteSubmitting}
-	error={deleteError}
-/>

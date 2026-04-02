@@ -17,14 +17,13 @@
 	import Hash from '@lucide/svelte/icons/hash';
 	import Paperclip from '@lucide/svelte/icons/paperclip';
 	import FileText from '@lucide/svelte/icons/file-text';
-	import Printer from '@lucide/svelte/icons/printer';
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
 	import ArrowDown from '@lucide/svelte/icons/arrow-down';
 	import User from '@lucide/svelte/icons/user';
 	import BarChart3 from '@lucide/svelte/icons/bar-chart-3';
+	import { resolve } from '$app/paths';
 
-	const API_BASE =
-		'http://localhost:8000/admin';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type Order = {
 		id: string;
@@ -88,8 +87,6 @@
 	let customerSearch = $state('');
 	let customerPhone = $state<string | null>(null);
 	let timelineComment = $state('');
-	let editContactOpen = $state(false);
-	let editShippingOpen = $state(false);
 
 	async function loadOrder() {
 		if (!orderId) return;
@@ -123,7 +120,6 @@
 	}
 
 	$effect(() => {
-		orderId;
 		loadOrder();
 	});
 
@@ -155,7 +151,9 @@
 	const discountAmount = $derived(orderMetadata().discount_amount ?? 0);
 	const shippingAmount = $derived(orderMetadata().shipping_amount ?? 0);
 	const taxAmount = $derived(orderMetadata().tax_amount ?? 0);
-	const total = $derived(orderMetadata().total ?? subtotal + discountAmount + shippingAmount + taxAmount);
+	const total = $derived(
+		orderMetadata().total ?? subtotal + discountAmount + shippingAmount + taxAmount
+	);
 	const paidAmount = $derived(order?.payment_status === 'captured' ? total : 0);
 	const itemCount = $derived(orderItems.reduce((sum, item) => sum + item.quantity, 0));
 
@@ -201,20 +199,6 @@
 			return iso;
 		}
 	}
-
-	function formatDateShort(iso: string) {
-		try {
-			return new Date(iso).toLocaleDateString('en-US', {
-				year: 'numeric',
-				month: 'short',
-				day: 'numeric',
-				hour: 'numeric',
-				minute: '2-digit'
-			});
-		} catch {
-			return iso;
-		}
-	}
 </script>
 
 <div class="flex h-full flex-col">
@@ -236,7 +220,12 @@
 			<div class="border-b bg-background px-6 py-4">
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-4">
-						<Button variant="ghost" size="icon" class="size-8" onclick={() => goto('/orders')}>
+						<Button
+							variant="ghost"
+							size="icon"
+							class="size-8"
+							onclick={() => goto(resolve('/orders', {}))}
+						>
 							<ArrowLeft class="size-4" />
 						</Button>
 						<div class="flex items-center gap-3">
@@ -253,7 +242,9 @@
 									</span>
 								{/if}
 								{#if order.fulfillment_status === 'not_fulfilled'}
-									<span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+									<span
+										class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400"
+									>
 										<span class="size-2 rounded-full bg-amber-500"></span>
 										Unfulfilled
 									</span>
@@ -262,8 +253,16 @@
 						</div>
 					</div>
 					<div class="flex items-center gap-2">
-						<Button variant="outline" size="sm" onclick={() => goto(`/orders/${orderId}/refund`)}>Refund</Button>
-						<Button variant="outline" size="sm" onclick={() => goto(`/orders/${orderId}/edit`)}>Edit</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							onclick={() => goto(resolve(`/orders/${orderId}/refund`, {}))}>Refund</Button
+						>
+						<Button
+							variant="outline"
+							size="sm"
+							onclick={() => goto(resolve(`/orders/${orderId}/edit`, {}))}>Edit</Button
+						>
 						<DropdownMenu.Root>
 							<DropdownMenu.Trigger
 								class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
@@ -320,9 +319,13 @@
 						<div class="mb-4 flex items-center gap-2">
 							<span class={statusBadgeClass(order.fulfillment_status)}>
 								<Package class="mr-1 size-3" />
-								{order.fulfillment_status === 'not_fulfilled' ? 'Unfulfilled' : order.fulfillment_status.replace(/_/g, ' ')}
+								{order.fulfillment_status === 'not_fulfilled'
+									? 'Unfulfilled'
+									: order.fulfillment_status.replace(/_/g, ' ')}
 							</span>
-							<span class="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
+							<span
+								class="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs font-medium"
+							>
 								<MapPin class="size-3" />
 								Shop location
 							</span>
@@ -345,7 +348,7 @@
 												<ImageIcon class="size-6" />
 											</div>
 										{/if}
-										<div class="flex-1 min-w-0">
+										<div class="min-w-0 flex-1">
 											<div class="font-medium">{item.title}</div>
 											{#if item.sku}
 												<div class="text-sm text-muted-foreground">SKU: {item.sku}</div>
@@ -386,7 +389,8 @@
 						<div class="space-y-2 text-sm">
 							<div class="flex justify-between">
 								<span class="text-muted-foreground">
-									Subtotal ({itemCount} {itemCount === 1 ? 'item' : 'items'})
+									Subtotal ({itemCount}
+									{itemCount === 1 ? 'item' : 'items'})
 								</span>
 								<span class="font-medium">{formatCurrency(subtotal)}</span>
 							</div>
@@ -425,7 +429,7 @@
 								<textarea
 									placeholder="Leave a comment..."
 									bind:value={timelineComment}
-									class="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+									class="flex min-h-20 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 								></textarea>
 								<div class="mt-2 flex items-center gap-2">
 									<button
@@ -497,15 +501,15 @@
 									>
 										<DropdownMenu.Item
 											textValue="Edit contact information"
-											class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-											onSelect={() => (editContactOpen = true)}
+											class="relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+											onSelect={() => goto(resolve(`/orders/${orderId}/edit`, {}))}
 										>
 											Edit contact information
 										</DropdownMenu.Item>
 										<DropdownMenu.Item
 											textValue="Edit shipping address"
-											class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-											onSelect={() => (editShippingOpen = true)}
+											class="relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+											onSelect={() => goto(resolve(`/orders/${orderId}/edit`, {}))}
 										>
 											Edit shipping address
 										</DropdownMenu.Item>
@@ -514,7 +518,9 @@
 							</DropdownMenu.Root>
 						</div>
 						<div class="relative mb-4">
-							<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+							<Search
+								class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+							/>
 							<Input
 								type="search"
 								placeholder="Search or create a customer"
@@ -584,7 +590,9 @@
 						<p class="text-sm text-muted-foreground">
 							There aren't any conversion details available for this order yet
 						</p>
-						<button type="button" class="mt-2 text-xs text-primary hover:underline">Learn more</button>
+						<button type="button" class="mt-2 text-xs text-primary hover:underline"
+							>Learn more</button
+						>
 					</div>
 
 					<!-- Order Risk -->

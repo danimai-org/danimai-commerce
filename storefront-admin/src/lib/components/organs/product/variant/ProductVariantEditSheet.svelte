@@ -43,7 +43,41 @@
 		onSave: () => void;
 	}
 
-	let { open = $bindable(false), options, editVariantAttributes, availableAttributesList, editVariantTitle, editVariantSize, editVariantMaterial, editVariantSku, editVariantEan, editVariantUpc, editVariantBarcode, editVariantManageInventory, editVariantAllowBackorder, editVariantPrice, editVariantError, editVariantSubmitting, editVariantAddAttributeId, onTitleChange, onSizeChange, onMaterialChange, onSkuChange, onEanChange, onUpcChange, onBarcodeChange, onManageInventoryChange, onAllowBackorderChange, onPriceChange, onAddAttributeIdChange, onAttributeValueChange, onRemoveAttribute, onAddAttribute, onCancel, onSave }: Props = $props();
+	let {
+		open = $bindable(false),
+		options,
+		editVariantAttributes,
+		availableAttributesList,
+		editVariantTitle,
+		editVariantSize,
+		editVariantMaterial,
+		editVariantSku,
+		editVariantEan,
+		editVariantUpc,
+		editVariantBarcode,
+		editVariantManageInventory,
+		editVariantAllowBackorder,
+		editVariantPrice,
+		editVariantError,
+		editVariantSubmitting,
+		editVariantAddAttributeId,
+		onTitleChange,
+		onSizeChange,
+		onMaterialChange,
+		onSkuChange,
+		onEanChange,
+		onUpcChange,
+		onBarcodeChange,
+		onManageInventoryChange,
+		onAllowBackorderChange,
+		onPriceChange,
+		onAddAttributeIdChange,
+		onAttributeValueChange,
+		onRemoveAttribute,
+		onAddAttribute,
+		onCancel,
+		onSave
+	}: Props = $props();
 </script>
 
 <Sheet.Root bind:open>
@@ -94,8 +128,7 @@
 								>Price EUR (Optional)</label
 							>
 							<div class="relative mt-1">
-								<span
-									class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground"
+								<span class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground"
 									>€</span
 								>
 								<Input
@@ -163,8 +196,8 @@
 					<div class="flex flex-col gap-2">
 						<p class="text-sm font-medium">Attributes</p>
 						<p class="text-xs text-muted-foreground">
-							Values default from product attributes; variant overrides when set. Changes are
-							saved as variant attribute values.
+							Values default from product attributes; variant overrides when set. Changes are saved
+							as variant attribute values.
 						</p>
 						<div class="space-y-3 text-sm">
 							{#each editVariantAttributes as attr (attr.id)}
@@ -179,7 +212,10 @@
 											class="mt-1 h-9"
 											value={attr.value}
 											oninput={(e) =>
-												onAttributeValueChange(attr.id, (e.currentTarget as HTMLInputElement).value)}
+												onAttributeValueChange(
+													attr.id,
+													(e.currentTarget as HTMLInputElement).value
+												)}
 										/>
 									</div>
 									<Button
@@ -243,8 +279,8 @@
 							<span class="text-sm font-medium">Manage inventory</span>
 						</div>
 						<p class="text-xs text-muted-foreground">
-							When enabled, we'll change the inventory quantity for you when orders and
-							returns are created.
+							When enabled, we'll change the inventory quantity for you when orders and returns are
+							created.
 						</p>
 					</div>
 					<div class="flex flex-col gap-2">

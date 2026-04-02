@@ -6,18 +6,16 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { Toaster, toast } from 'svelte-sonner';
 
-	type Mode = 'update';
-
 	let {
 		open = $bindable(false),
-		mode = 'update',
 		tag = null,
+		openOnTag = false,
 		onSaved = async () => {},
 		onClosed = () => {}
 	}: {
 		open?: boolean;
-		mode?: Mode;
 		tag?: { id: string; value: string } | null;
+		openOnTag?: boolean;
 		onSaved?: () => void | Promise<void>;
 		onClosed?: () => void;
 	} = $props();
@@ -49,17 +47,10 @@
 		}
 	}
 
-	function resetForm() {
-		message.set('');
-		reset({
-			data: {
-				value: ''
-			}
-		});
-	}
+	let initializedForId = $state<string | null>(null);
 
 	$effect(() => {
-		if (tag) {
+		if (tag && openOnTag) {
 			reset({
 				data: {
 					value: tag.value
@@ -70,14 +61,26 @@
 		}
 
 		if (!open) {
-			resetForm();
+			initializedForId = null;
+			return;
 		}
+
+		const nextId = tag?.id ?? '';
+		if (!nextId) return;
+		if (initializedForId === nextId) return;
+		initializedForId = nextId;
+
+		reset({
+			data: {
+				value: tag!.value
+			}
+		});
 	});
 </script>
 
 <Toaster richColors position="top-center" />
 
-<Sheet.Root bind:open={open} onOpenChange={onOpenChange}>
+<Sheet.Root bind:open {onOpenChange}>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
 		<form method="POST" action="?/update" use:enhance class="flex h-full flex-col">
 			<div class="flex-1 overflow-auto p-6 pt-12">

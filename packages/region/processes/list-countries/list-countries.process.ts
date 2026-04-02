@@ -22,12 +22,12 @@ export class ListCountriesProcess implements ProcessContract<Country[]> {
     @InjectDB()
     private readonly db: Kysely<Database>,
     @InjectLogger()
-    private readonly logger: Logger
+    private readonly logger: Logger,
   ) {}
 
   async runOperations(
     @ProcessContext({ schema: ListCountriesSchema })
-    context: ProcessContextType<typeof ListCountriesSchema>
+    context: ProcessContextType<typeof ListCountriesSchema>,
   ) {
     const input = context.input as ListCountriesProcessInput;
 

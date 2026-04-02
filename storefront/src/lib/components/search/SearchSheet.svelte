@@ -1,20 +1,19 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { API_BASE, firstVariantIdByProductIds, rowsFromPaginated } from '$lib/api/storefront-api';
+	import { API_BASE, firstVariantIdByProductIds, rowsFromPaginated } from '../../api/storefront-api';
 	import { search } from '$lib/stores/search';
+	import type { ProductGridItem } from '../../../routes/store/+page.ts';
 
-	type SearchProduct = {
-		name: string;
-		price: string;
-		href: string;
-		image: string | null;
-	};
+	let { persistent = false }: { persistent?: boolean } = $props();
 
 	let searchState = $state({ open: false });
 	let query = $state('');
-	let results = $state<SearchProduct[]>([]);
+	let results = $state<ProductGridItem[]>([]);
 	let loading = $state(false);
 	let inputEl = $state<HTMLInputElement | undefined>(undefined);
+	let prevStoreOpen = false;
+
+	const active = $derived(persistent || searchState.open);
 
 	$effect(() => {
 		const unsub = search.subscribe((s) => {
@@ -24,14 +23,27 @@
 	});
 
 	$effect(() => {
-		if (!searchState.open) return;
-		query = '';
-		results = [];
+		if (!active) return;
+		const opened = searchState.open;
+		if (opened && !prevStoreOpen && !persistent) {
+			query = '';
+			results = [];
+		}
+		prevStoreOpen = opened;
 		const onKey = (e: KeyboardEvent) => {
-			if (e.key === 'Escape') search.close();
+			if (e.key !== 'Escape') return;
+			if (persistent) {
+				query = '';
+				results = [];
+				inputEl?.blur();
+			} else {
+				search.close();
+			}
 		};
 		document.addEventListener('keydown', onKey);
-		requestAnimationFrame(() => inputEl?.focus());
+		if (searchState.open && !persistent) {
+			requestAnimationFrame(() => inputEl?.focus());
+		}
 		return () => document.removeEventListener('keydown', onKey);
 	});
 
@@ -39,7 +51,7 @@
 	$effect(() => {
 		const q = query.trim();
 		clearTimeout(debounceId);
-		if (!searchState.open) return;
+		if (!active) return;
 		if (!q) {
 			results = [];
 			return;
@@ -88,24 +100,13 @@
 						.catch(() => null)
 				)
 			);
-			let pi = 0;
-			results = list.map((p) => {
-				const pr: PriceObj = variantIds[pi] ? prices[pi] ?? null : null;
-				pi++;
-				const amount = pr ? parseInt(pr.amount, 10) / 100 : 0;
-				const priceStr =
-					pr && pr.currency_code === 'USD'
-						? `$${amount.toFixed(2)}`
-						: pr
-							? `${pr.currency_code.toUpperCase()} ${amount.toFixed(2)}`
-							: '—';
-				return {
-					name: p.title,
-					price: priceStr,
-					href: `/products/${p.handle}`,
-					image: p.thumbnail ?? null
-				};
-			});
+			results = list.map((p, i) => ({
+				name: p.title,
+				price: prices[i]?.amount ?? '',
+				href: `/products/${p.handle}`,
+				bg: '#f5f0eb',
+				image: p.thumbnail || null
+			}));
 		} catch {
 			results = [];
 		} finally {
@@ -124,29 +125,48 @@
 	}
 
 	function goToProduct(href: string) {
-		search.close();
+		if (!persistent) search.close();
 		goto(href);
 	}
 </script>
 
-{#if searchState.open}
-	<div class="search-bar-wrap">
-		<div class="search-bar">
-			<span class="search-icon" aria-hidden="true">
-				<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-			</span>
-			<input
-				bind:this={inputEl}
-				type="search"
-				class="search-input"
-				placeholder="Search for products..."
-				aria-label="Search for products"
-				bind:value={query}
-				autocomplete="off"
-			/>
-			<button type="button" class="search-close-btn" aria-label="Close search" onclick={handleClose}>
-				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-			</button>
+{#if active}
+	<div class="search-bar-wrap" class:search-bar-wrap--persistent={persistent}>
+		<div class="search-bar-row">
+			{#if persistent}
+				<div class="search-bar search-bar--desktop">
+					<input
+						bind:this={inputEl}
+						type="search"
+						class="search-input"
+						placeholder="Search"
+						aria-label="Search products"
+						bind:value={query}
+						autocomplete="off"
+					/>
+					<button type="button" class="search-icon-inset" aria-label="Search" onclick={() => inputEl?.focus()}>
+						<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+					</button>
+				</div>
+			{:else}
+				<div class="search-bar search-bar--mobile">
+					<button type="button" class="search-icon-lead" aria-label="Search" onclick={() => inputEl?.focus()}>
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+					</button>
+					<input
+						bind:this={inputEl}
+						type="search"
+						class="search-input search-input--mobile"
+						placeholder="Search for products..."
+						aria-label="Search for products"
+						bind:value={query}
+						autocomplete="off"
+					/>
+					<button type="button" class="search-close-inline" aria-label="Close search" onclick={handleClose}>
+						<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+					</button>
+				</div>
+			{/if}
 		</div>
 		{#if loading}
 			<div class="search-dropdown">
@@ -187,64 +207,130 @@
 <style>
 	.search-bar-wrap {
 		position: relative;
-		width: 300px;
-		flex-shrink: 0;
+		flex: 1;
+		min-width: 0;
+		max-width: 100%;
+		width: 100%;
 	}
-	.search-bar {
+	.search-bar-wrap--persistent {
+		width: 100%;
+		max-width: 20rem;
+		flex: 1 1 12rem;
+	}
+	@media (min-width: 768px) {
+		.search-bar-wrap--persistent {
+			max-width: 22rem;
+		}
+	}
+	.search-bar-row {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		width: 300px;
-		height: 48px;
-		padding: 0 0.75rem 0 1rem;
-		background: #fff;
-		border: 1px solid #1a1a1a;
-		border-radius: 4px;
-		box-sizing: border-box;
+		min-width: 0;
+		width: 100%;
 	}
-	.search-icon {
+	.search-bar--desktop {
+		position: relative;
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		color: #888;
-		flex-shrink: 0;
+		flex: 1;
+		min-width: 0;
+		height: 40px;
+		padding: 0 0.35rem 0 0.75rem;
+		background: #fff;
+		border: 1px solid #1a1a1a;
+		border-radius: 2px;
+		box-sizing: border-box;
+	}
+	.search-bar--mobile {
+		display: flex;
+		align-items: center;
+		flex: 1;
+		min-width: 0;
+		width: 100%;
+		height: 44px;
+		padding: 0 0.75rem 0 0.75rem;
+		background: #ebebeb;
+		border: 1px solid #d8d8d8;
+		border-radius: 4px;
+		box-sizing: border-box;
 	}
 	.search-input {
 		flex: 1;
 		min-width: 0;
 		border: none;
 		background: none;
-		font-size: 1rem;
+		font-size: 0.875rem;
 		color: #1a1a1a;
-		padding: 0;
+		padding: 0 0.25rem 0 0;
 	}
-	.search-input::placeholder {
-		color: #999;
+	.search-input--mobile {
+		background: transparent;
 	}
-	.search-input:focus {
-		outline: none;
-	}
-	.search-close-btn {
+	.search-icon-lead {
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		flex-shrink: 0;
+		background: none;
+		border: none;
+		padding: 0.25rem 0.5rem 0.25rem 0;
+		margin: 0;
+		cursor: pointer;
+		color: #555;
+	}
+	.search-close-inline {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
 		background: none;
 		border: none;
 		padding: 0.25rem;
 		cursor: pointer;
 		color: #888;
-		flex-shrink: 0;
 	}
-	.search-close-btn:hover {
+	.search-close-inline:hover {
 		color: #1a1a1a;
+	}
+	.search-icon-inset {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		align-self: stretch;
+		padding: 0 0.35rem;
+		margin: 0;
+		background: none;
+		border: none;
+		cursor: pointer;
+		color: #1a1a1a;
+	}
+	.search-icon-inset:hover {
+		opacity: 0.75;
+	}
+	@media (min-width: 768px) {
+		.search-bar--desktop {
+			height: 42px;
+			padding: 0 0.4rem 0 0.875rem;
+		}
+		.search-input {
+			font-size: 0.9375rem;
+		}
+	}
+	.search-input::placeholder {
+		color: #a3a3a3;
+	}
+	.search-input:focus {
+		outline: none;
 	}
 	.search-dropdown {
 		position: absolute;
 		top: 100%;
 		left: 0;
-		right: auto;
-		width: 300px;
-		min-width: 300px;
+		right: 0;
+		width: 100%;
+		min-width: 0;
 		margin-top: 0.25rem;
 		max-height: 360px;
 		overflow: auto;

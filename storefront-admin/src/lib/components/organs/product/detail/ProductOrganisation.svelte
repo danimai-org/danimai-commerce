@@ -2,8 +2,9 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import ProductOrganisationSheet from './ProductOrganisationSheet.svelte';
-	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
+	import { getDetailContext } from '$lib/hooks';
 	import type { SuperValidated } from 'sveltekit-superforms';
+	import type { Product } from '../type';
 
 	type ProductOrganisationFormData = {
 		id: string;
@@ -15,10 +16,14 @@
 	let {
 		productOrganisationForm
 	}: {
-		productOrganisationForm: SuperValidated<ProductOrganisationFormData>;
+		productOrganisationForm: SuperValidated<
+			ProductOrganisationFormData,
+			string | unknown,
+			Record<string, unknown>
+		>;
 	} = $props();
 
-	const product = $derived(getProductDetail()?.data ?? null);
+	const product = $derived(getDetailContext<Product>()?.data ?? null);
 
 	let orgSheetOpen = $state(false);
 </script>
@@ -31,7 +36,6 @@
 			size="icon"
 			class="size-8 shrink-0"
 			onclick={() => {
-				
 				orgSheetOpen = true;
 			}}
 			aria-label="Edit organisation"
@@ -49,7 +53,9 @@
 			<dd class="mt-0.5">
 				{#if product?.collections?.length}
 					{product.collections.map((c) => c.title).join(', ')}
-				{product.collections.length > 0 ? product.collections.map((c) => c.title).join(', ') : '—'}
+					{product.collections.length > 0
+						? product.collections.map((c) => c.title).join(', ')
+						: '—'}
 				{/if}
 			</dd>
 		</div>
@@ -69,5 +75,5 @@
 <ProductOrganisationSheet
 	bind:open={orgSheetOpen}
 	{productOrganisationForm}
-	onSaved={() => void getProductDetail()?.refetch?.()}
+	onSaved={() => void getDetailContext<Product>()?.refetch?.()}
 />

@@ -1,96 +1,81 @@
 <script lang="ts">
 	import Search from '@lucide/svelte/icons/search';
-	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import { DropdownMenu } from 'bits-ui';
-	import { SvelteSet } from 'svelte/reactivity';
+	import RegionAddCountriesSheet from './RegionAddCountriesSheet.svelte';
+	import { Country } from 'country-state-city';
 	import { client } from '$lib/client.js';
+	import { createQuery } from '@tanstack/svelte-query';
+	let { regionId } = $props<{ regionId: string }>();
+	const listQuery = { page: 1, limit: 1000 } as const;
+	type CountryApiRow = {
+		id: string;
+		iso_2: string;
+		name?: string;
+		display_name?: string;
+	};
 
-	interface Props {
-		regionId: string;
+	function unwrapCountriesPayload(body: unknown): CountryApiRow[] {
+		if (Array.isArray(body)) return body as CountryApiRow[];
+		if (body && typeof body === 'object' && 'data' in body) {
+			const inner = (body as { data: unknown }).data;
+			if (Array.isArray(inner)) return inner as CountryApiRow[];
+		}
+		return [];
 	}
 
-	let { regionId }: Props = $props();
-
-	let addCountriesOpen = $state(false);
-	let countries = $state<CountryRow[]>([]);
-	let loading = $state(false);
-	let error = $state<string | null>(null);
-	let searchQuery = $state('');
-	let selectedIds = new SvelteSet<string>();
+	const countriesQuery = createQuery(() => ({
+		queryKey: ['region-countries', regionId, listQuery.page, listQuery.limit],
+		queryFn: async () => {
+			const res = await client.regions({ id: regionId }).countries.get({ query: listQuery });
+			if (res.error) throw res.error;
+			return unwrapCountriesPayload(res.data);
+		},
+		enabled: Boolean(regionId)
+	}));
 
 	type CountryRow = { id: string; name: string; code: string };
 
-	/**
-	 * STEP 1: API Mapping Logic
-	 * Converts Medusa ISO_2 and display_name into table rows
-	 */
-	function mapApiCountries(data: unknown): CountryRow[] {
-		const list = Array.isArray(data)
-			? data
-			: data != null && typeof data === 'object' && Array.isArray((data as { rows?: unknown }).rows)
-				? (data as { rows: unknown[] }).rows
-				: [];
-		return list
-			.map((item) => {
-				const c = item as Record<string, unknown>;
-				const id = c.id != null ? String(c.id) : '';
-				const iso2 = String(c.iso_2 ?? '').trim();
-				const name = String(c.name ?? '').trim();
-				const displayName = String(c.display_name ?? '').trim();
-				const label = displayName || name || iso2 || '—';
-				return { id, name: label, code: iso2.toUpperCase() };
-			})
-			.filter((row) => row.id.length > 0);
-	}
+	const countries = $derived.by((): CountryRow[] =>
+		(countriesQuery.data ?? []).map((row) => ({
+			id: String(row.id),
+			name: String(row.display_name ?? row.name ?? '').trim() || String(row.iso_2).toUpperCase(),
+			code: String(row.iso_2).toUpperCase()
+		}))
+	);
 
-	/**
-	 * STEP 2: Reactive Fetching
-	 * Runs whenever regionId or refreshNonce changes
-	 */
-	$effect(() => {
-		if (!regionId) return;
-
-		let active = true;
-		loading = true;
-		error = null;
-
-		client
-			.regions({ id: regionId })
-			.countries.get({ query: { limit: 1000 } })
-			.then((res) => {
-				if (!active) return;
-				if (res.error) throw res.error;
-				countries = mapApiCountries(res.data);
-			})
-			.catch((e) => {
-				if (!active) return;
-				error = e.message || String(e);
-			})
-			.finally(() => {
-				if (active) loading = false;
-			});
-
-		return () => (active = false);
+	const loading = $derived(countriesQuery.isPending);
+	const error = $derived.by(() => {
+		if (!countriesQuery.isError) return null;
+		const e = countriesQuery.error;
+		return e instanceof Error ? e.message : String(e);
 	});
 
-	/**
-	 * STEP 3: Remove Logic
-	 */
+	let searchQuery = $state('');
+	let addCountriesOpen = $state(false);
+
+	const initialSelectedIsoCodes = $derived(countries.map((c) => c.code));
+
+	async function handleAddCountries(ids: string[]) {
+		try {
+			const res = await client.regions({ id: regionId }).countries.post({ ids });
+			if (res.error) throw new Error(res.error.value?.message ?? 'Failed to add countries');
+			await countriesQuery.refetch();
+		} catch (e: unknown) {
+			const err = e instanceof Error ? e : new Error(String(e));
+			console.error(err.message);
+		}
+	}
+
 	async function handleRemoveCountry(id: string) {
 		try {
-			const res = await client
-				.regions({ id: regionId as string })
-				.countries.delete({ ids: [id] as string[] });
+			const res = await client.regions({ id: regionId }).countries.delete({ ids: [id] });
 			if (res.error) throw new Error(res.error.value?.message ?? 'Failed to remove country');
-			countries = countries.filter((c) => c.id !== id);
-			selectedIds.delete(id);
+			await countriesQuery.refetch();
 		} catch (e: unknown) {
-			const error = e instanceof Error ? e : new Error(String(e));
-			console.error(error.message);
+			const err = e instanceof Error ? e : new Error(String(e));
+			console.error(err.message);
 		}
 	}
 
@@ -98,28 +83,25 @@
 		const q = searchQuery.trim().toLowerCase();
 		if (!q) return countries;
 		return countries.filter(
-			(c) => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)
+			(c) => String(c.name).toLowerCase().includes(q) || String(c.code).toLowerCase().includes(q)
 		);
 	});
 
-	const allSelected = $derived(
-		filteredCountries.length > 0 && filteredCountries.every((c) => selectedIds.has(c.id))
-	);
-
-	function toggleAll() {
-		if (allSelected) {
-			selectedIds.clear();
-		} else {
-			filteredCountries.forEach((c) => selectedIds.add(c.id));
-		}
-	}
+	const count = $derived(countries.length);
 </script>
 
 <div class="rounded-xl border bg-card shadow-sm">
-	<div class="flex items-center justify-between gap-4 border-b px-6 py-4">
+	<div class="flex items-start justify-between gap-4 border-b px-6 py-4">
 		<div>
-			<h2 class="text-lg font-semibold text-foreground">Countries</h2>
-			<p class="text-sm text-muted-foreground">Countries assigned to this region</p>
+			<h3 class="text-lg font-semibold text-foreground">Selected countries</h3>
+			<p class="text-sm text-muted-foreground">
+				{#if loading}
+					Loading…
+				{:else}
+					{count}
+					{count === 1 ? 'country' : 'countries'} assigned to this region
+				{/if}
+			</p>
 		</div>
 		<Button type="button" variant="outline" size="sm" onclick={() => (addCountriesOpen = true)}
 			>Add countries</Button
@@ -132,7 +114,7 @@
 			<Input
 				placeholder="Search by name or ISO code..."
 				bind:value={searchQuery}
-				class="h-9 w-64 rounded-md bg-background pl-9"
+				class="h-9 w-full max-w-md rounded-md bg-background pl-9"
 			/>
 		</div>
 	</div>
@@ -155,34 +137,21 @@
 					class="border-b bg-muted/20 text-[10px] font-bold tracking-wider text-muted-foreground uppercase"
 				>
 					<tr>
-						<th class="w-12 px-6 py-3">
-							<input
-								type="checkbox"
-								checked={allSelected}
-								onchange={toggleAll}
-								class="size-4 cursor-pointer rounded border-input accent-primary"
-							/>
-						</th>
-						<th class="px-4 py-3">Country Name</th>
-						<th class="px-4 py-3">ISO Code</th>
+						<th class="px-6 py-3">Country Name</th>
+						<th class="px-4 py-3">Country Code</th>
 						<th class="w-16 px-4 py-3 text-right">Actions</th>
 					</tr>
 				</thead>
 				<tbody class="divide-y">
 					{#each filteredCountries as country (country.id)}
+						{@const lc = Country.getCountryByCode(country.code)}
 						<tr class="transition-colors hover:bg-muted/30">
-							<td class="px-6 py-3">
-								<input
-									type="checkbox"
-									checked={selectedIds.has(country.id)}
-									onchange={() =>
-										selectedIds.has(country.id)
-											? selectedIds.delete(country.id)
-											: selectedIds.add(country.id)}
-									class="size-4 cursor-pointer rounded border-input accent-primary"
-								/>
+							<td class="px-6 py-3 font-medium text-foreground">
+								{#if lc?.flag}
+									<span class="mr-1.5" aria-hidden="true">{lc.flag}</span>
+								{/if}
+								{country.name}
 							</td>
-							<td class="px-4 py-3 font-medium text-foreground">{country.name}</td>
 							<td class="px-4 py-3">
 								<span
 									class="rounded bg-muted px-2 py-0.5 font-mono text-xs font-bold text-muted-foreground uppercase"
@@ -191,35 +160,21 @@
 								</span>
 							</td>
 							<td class="px-4 py-3 text-right">
-								<DropdownMenu.Root>
-									<DropdownMenu.Trigger
-										class="inline-flex size-8 items-center justify-center rounded-md hover:bg-muted"
-									>
-										<MoreHorizontal class="size-4" />
-									</DropdownMenu.Trigger>
-									<DropdownMenu.Portal>
-										<DropdownMenu.Content
-											class="z-50 min-w-32 rounded-lg border bg-popover p-1 shadow-lg"
-											sideOffset={5}
-											align="end"
-										>
-											<DropdownMenu.Item
-												onSelect={() => handleRemoveCountry(country.id)}
-												class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive outline-none hover:bg-destructive/10"
-											>
-												<Trash2 class="size-4" />
-												Remove from Region
-											</DropdownMenu.Item>
-										</DropdownMenu.Content>
-									</DropdownMenu.Portal>
-								</DropdownMenu.Root>
+								<button
+									type="button"
+									class="inline-flex size-8 items-center justify-center rounded-md text-destructive hover:bg-destructive/10"
+									aria-label="Remove country"
+									onclick={() => handleRemoveCountry(country.id)}
+								>
+									<Trash2 class="size-4" />
+								</button>
 							</td>
 						</tr>
 					{:else}
 						<tr>
-							<td colspan="4" class="px-6 py-12 text-center text-muted-foreground"
-								>No countries found.</td
-							>
+							<td colspan="3" class="px-6 py-12 text-center text-muted-foreground">
+								{countries.length === 0 ? 'No countries found.' : 'No countries match your search.'}
+							</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -228,20 +183,8 @@
 	{/if}
 </div>
 
-<Sheet.Root bind:open={addCountriesOpen}>
-	<Sheet.Content side="right" class="flex w-full flex-col sm:max-w-lg">
-		<Sheet.Header class="border-b px-6 py-4">
-			<Sheet.Title>Add countries</Sheet.Title>
-			<Sheet.Description>Select the countries that belong to this region.</Sheet.Description>
-		</Sheet.Header>
-
-		<div class="flex-1 p-6 text-center">
-			<p class="text-sm text-muted-foreground">Country selection list goes here...</p>
-		</div>
-
-		<Sheet.Footer class="mt-auto flex justify-end gap-2 border-t p-4">
-			<Button variant="outline" onclick={() => (addCountriesOpen = false)}>Cancel</Button>
-			<Button onclick={() => (addCountriesOpen = false)}>Save Changes</Button>
-		</Sheet.Footer>
-	</Sheet.Content>
-</Sheet.Root>
+<RegionAddCountriesSheet
+	bind:open={addCountriesOpen}
+	initialSelectedIds={initialSelectedIsoCodes}
+	onPick={handleAddCountries}
+/>

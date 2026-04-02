@@ -18,8 +18,6 @@
 	{/if}
 	<ProductGridSection
 		products={products}
-		title=""
-		subtitle=""
 	/>
 </main>
 

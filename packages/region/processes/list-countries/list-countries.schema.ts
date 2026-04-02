@@ -22,4 +22,6 @@ export const CountryResponseSchema = Type.Object({
 
 export const ListCountriesResponseSchema = Type.Array(CountryResponseSchema);
 
-export type ListCountriesProcessOutput = Static<typeof ListCountriesResponseSchema>;
+export type ListCountriesProcessOutput = Static<
+  typeof ListCountriesResponseSchema
+>;

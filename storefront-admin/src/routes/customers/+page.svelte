@@ -13,47 +13,52 @@
 		type TableColumn
 	} from '$lib/components/organs/index.js';
 	import Users from '@lucide/svelte/icons/users';
-	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import {
+		createPaginationQuery,
+		createPagination,
+		type PaginationMeta
+	} from '$lib/api/pagination.svelte.js';
 	import {
 		createCustomers,
 		updateCustomer,
 		deleteCustomers,
-		type Customer,
+		type Customer
 	} from '$lib/customers/api.js';
 	import { client } from '$lib/client';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
-	const paginateState = createPagination(
-		async () => {
-			return client['customers'].get({ query: paginationQuery });
-		},
-		['customers']
-	);
+	const paginateState = createPagination(async () => {
+		return client['customers'].get({ query: paginationQuery });
+	}, ['customers']);
 
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
-	const queryData = $derived(paginateState.query.data as CustomerListResponse | undefined);
+	const queryData = $derived(
+		paginateState.query.data as
+			| { data?: { rows?: Customer[]; pagination?: unknown }; pagination?: unknown }
+			| undefined
+	);
 	const rows = $derived((queryData?.data?.rows ?? []) as Customer[]);
 	const rowsWithDisplay = $derived(
 		rows.map((r: Customer) => ({
 			...r,
-			name:
-				r.first_name || r.last_name
-					? `${r.first_name ?? ''} ${r.last_name ?? ''}`.trim()
-					: '–',
+			name: r.first_name || r.last_name ? `${r.first_name ?? ''} ${r.last_name ?? ''}`.trim() : '–',
 			account_type: r.has_account ? 'Account' : 'Guest'
 		}))
-	);		
-	const pagination = $derived(queryData?.data?.pagination ?? queryData?.pagination ?? null);
+	);
+	const pagination = $derived(
+		(queryData?.data?.pagination ?? queryData?.pagination ?? null) as PaginationMeta | null
+	);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
 	const openCreate = $derived(paginateState.openCreate);
-	const openEdit = $derived(paginateState.openEdit);
 	const closeForm = $derived(paginateState.closeForm);
 	const formSheetOpen = $derived(paginateState.formSheetOpen);
 	const formMode = $derived(paginateState.formMode);
@@ -61,7 +66,6 @@
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
 	const deleteItem = $derived(paginateState.deleteItem) as Customer | null;
 	const deleteError = $derived(paginateState.deleteError);
-	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
 	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
 	const confirmDelete = $derived(paginateState.confirmDelete);
 	const refetch = $derived(paginateState.refetch);
@@ -86,21 +90,21 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => openEdit(item as Customer)
+					onClick: (item) =>
+						paginateState.openEdit(item as Parameters<typeof paginateState.openEdit>[0])
 				},
 				{
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => openDeleteConfirm(item as Customer)
+					onClick: (item) =>
+						paginateState.openDeleteConfirm(
+							item as Parameters<typeof paginateState.openDeleteConfirm>[0]
+						)
 				}
 			]
 		}
 	];
-
-	
-		
-	
 
 	let formFirstName = $state('');
 	let formLastName = $state('');
@@ -180,10 +184,18 @@
 
 	const formTitle = $derived(formMode === 'edit' ? 'Edit Customer' : 'Create Customer');
 	const formSubtitle = $derived(
-		formMode === 'edit' ? 'Update customer details.' : 'Create a new customer and manage their details.'
+		formMode === 'edit'
+			? 'Update customer details.'
+			: 'Create a new customer and manage their details.'
 	);
 	const formSubmitLabel = $derived(
-		formSubmitting ? (formMode === 'edit' ? 'Saving...' : 'Creating...') : formMode === 'edit' ? 'Save' : 'Create'
+		formSubmitting
+			? formMode === 'edit'
+				? 'Saving...'
+				: 'Creating...'
+			: formMode === 'edit'
+				? 'Save'
+				: 'Create'
 	);
 </script>
 
@@ -224,12 +236,7 @@
 					</table>
 				</div>
 
-				<TablePagination
-					{pagination}
-					{start}
-					{end}
-					onPageChange={goToPage}
-				/>
+				<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
 			{/if}
 		</PaginationTable>
 	</div>
@@ -322,9 +329,7 @@
 			</div>
 
 			<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeFormSheet} disabled={formSubmitting}>
-					Cancel
-				</Button>
+				<Button variant="outline" onclick={closeFormSheet} disabled={formSubmitting}>Cancel</Button>
 				<Button onclick={submitForm} disabled={formSubmitting}>
 					{formSubmitLabel}
 				</Button>

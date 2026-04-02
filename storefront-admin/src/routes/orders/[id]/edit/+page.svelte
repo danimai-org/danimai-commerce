@@ -12,8 +12,10 @@
 	import X from '@lucide/svelte/icons/x';
 	import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
 	import Search from '@lucide/svelte/icons/search';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
-	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type Order = {
 		id: string;
@@ -103,7 +105,6 @@
 	}
 
 	$effect(() => {
-		orderId;
 		loadOrder();
 	});
 
@@ -121,10 +122,16 @@
 	const calculatedTax = $derived(calculatedSubtotal * taxRate);
 	const calculatedTotal = $derived(calculatedSubtotal + shippingAmount + calculatedTax);
 	const meta = $derived(orderMetadata());
-	const displaySubtotal = $derived(editItems.length > 0 ? calculatedSubtotal : (meta.subtotal ?? 0));
+	const displaySubtotal = $derived(
+		editItems.length > 0 ? calculatedSubtotal : (meta.subtotal ?? 0)
+	);
 	const displayTax = $derived(editItems.length > 0 ? calculatedTax : (meta.tax_amount ?? 0));
-	const displayTotal = $derived(editItems.length > 0 ? calculatedTotal : (meta.total ?? calculatedTotal));
-	const paidAmount = $derived(order?.payment_status === 'captured' ? (meta.total ?? displayTotal) : 0);
+	const displayTotal = $derived(
+		editItems.length > 0 ? calculatedTotal : (meta.total ?? calculatedTotal)
+	);
+	const paidAmount = $derived(
+		order?.payment_status === 'captured' ? (meta.total ?? displayTotal) : 0
+	);
 
 	const origItems = $derived.by(() => {
 		const raw = meta.items;
@@ -136,7 +143,10 @@
 	const hasChanges = $derived.by(() => {
 		if (reasonForEdit.trim()) return true;
 		if (editItems.length !== origItems.length) return true;
-		return editItems.some((it, i) => origItems[i] && (origItems[i].quantity !== it.quantity || origItems[i].id !== it.id));
+		return editItems.some(
+			(it, i) =>
+				origItems[i] && (origItems[i].quantity !== it.quantity || origItems[i].id !== it.id)
+		);
 	});
 
 	function formatCurrency(amount: number): string {
@@ -180,12 +190,9 @@
 				editItems.length > 0
 					? editItems.reduce((s, i) => s + i.price * i.quantity, 0)
 					: (currentMeta.subtotal ?? 0);
-			const newTax =
-				editItems.length > 0 ? newSubtotal * taxRate : (currentMeta.tax_amount ?? 0);
+			const newTax = editItems.length > 0 ? newSubtotal * taxRate : (currentMeta.tax_amount ?? 0);
 			const newTotal =
-				editItems.length > 0
-					? newSubtotal + shippingAmount + newTax
-					: (currentMeta.total ?? 0);
+				editItems.length > 0 ? newSubtotal + shippingAmount + newTax : (currentMeta.total ?? 0);
 			const metadata: Record<string, unknown> = {
 				...(typeof order.metadata === 'object' && order.metadata !== null
 					? (order.metadata as Record<string, unknown>)
@@ -208,10 +215,13 @@
 			if (!res.ok) {
 				const body = await res.json().catch(() => ({}));
 				updateError =
-					(body?.message as string) ?? body?.message ?? (await res.text()) ?? 'Failed to update order';
+					(body?.message as string) ??
+					body?.message ??
+					(await res.text()) ??
+					'Failed to update order';
 				return;
 			}
-			goto(`/orders/${orderId}`);
+			goto(resolve(`/orders/${orderId}`, {}), { replaceState: true });
 		} catch (e) {
 			updateError = e instanceof Error ? e.message : 'Failed to update order';
 		} finally {
@@ -226,7 +236,12 @@
 		handle: string;
 		status: string;
 		thumbnail: string | null;
-		variants?: Array<{ id: string; title: string; product_id: string | null; thumbnail: string | null }>;
+		variants?: Array<{
+			id: string;
+			title: string;
+			product_id: string | null;
+			thumbnail: string | null;
+		}>;
 	};
 	let addProductOpen = $state(false);
 	let productBrowserPage = $state(1);
@@ -243,7 +258,7 @@
 	async function fetchProductsForEdit() {
 		productBrowserLoading = true;
 		try {
-			const params = new URLSearchParams({
+			const params = new SvelteURLSearchParams({
 				page: String(productBrowserPage),
 				limit: '20',
 				sorting_field: 'created_at',
@@ -303,8 +318,11 @@
 			let thumbnail = product.thumbnail;
 			let variantId = productId;
 			try {
-				const variantsRes = await fetch(`${API_BASE}/product-variants?limit=100`, { cache: 'no-store' });
-				let variants: Array<{ id: string; product_id: string | null; thumbnail: string | null }> = [];
+				const variantsRes = await fetch(`${API_BASE}/product-variants?limit=100`, {
+					cache: 'no-store'
+				});
+				let variants: Array<{ id: string; product_id: string | null; thumbnail: string | null }> =
+					[];
 				if (variantsRes.ok) {
 					const data = (await variantsRes.json()) as { data?: typeof variants };
 					variants = (data.data ?? []).filter((v) => v.product_id === productId);
@@ -347,8 +365,7 @@
 
 	$effect(() => {
 		if (!addProductOpen) return;
-		productBrowserPage;
-		productBrowserSearch;
+
 		fetchProductsForEdit();
 	});
 </script>
@@ -372,13 +389,18 @@
 			<div class="border-b bg-background px-6 py-4">
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-2">
-						<Button variant="ghost" size="icon" class="size-8" onclick={() => goto(`/orders/${orderId}`)}>
+						<Button
+							variant="ghost"
+							size="icon"
+							class="size-8"
+							onclick={() => goto(resolve(`/orders/${orderId}`, {}))}
+						>
 							<ArrowLeft class="size-4" />
 						</Button>
 						<div class="flex items-center gap-2">
 							<FileText class="size-4 text-muted-foreground" />
 							<span class="text-sm text-muted-foreground">#{order.display_id}</span>
-							<span class="text-sm text-muted-foreground">></span>
+							<span class="text-sm text-muted-foreground">-</span>
 							<span class="text-lg font-semibold">Edit order</span>
 						</div>
 					</div>
@@ -413,7 +435,9 @@
 							</div>
 						</div>
 						<div class="overflow-hidden rounded-md border">
-							<div class="grid grid-cols-[1fr_80px_100px_100px_40px] gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
+							<div
+								class="grid grid-cols-[1fr_80px_100px_100px_40px] gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground"
+							>
 								<span>Product</span>
 								<span>Price</span>
 								<span>Quantity</span>
@@ -421,15 +445,17 @@
 								<span></span>
 							</div>
 							{#if editItems.length > 0}
-								<div class="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5 border-b">
+								<div
+									class="flex items-center gap-1.5 rounded-md border-b bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400"
+								>
 									<AlertTriangle class="size-3.5 shrink-0" />
 									This line item has -2 units in stock
 								</div>
 							{/if}
 							{#each editItems as item (item.id)}
 								<div class="border-b bg-background px-3 py-3 last:border-b-0">
-									<div class="grid grid-cols-[1fr_80px_100px_100px_40px] gap-2 items-center">
-										<div class="flex items-center gap-3 min-w-0">
+									<div class="grid grid-cols-[1fr_80px_100px_100px_40px] items-center gap-2">
+										<div class="flex min-w-0 items-center gap-3">
 											{#if item.thumbnail}
 												<img
 													src={item.thumbnail}
@@ -444,7 +470,7 @@
 												</div>
 											{/if}
 											<div class="min-w-0">
-												<div class="font-medium truncate">{item.title}</div>
+												<div class="truncate font-medium">{item.title}</div>
 												{#if item.sku}
 													<div class="text-xs text-muted-foreground">{item.sku}</div>
 												{/if}
@@ -456,10 +482,15 @@
 											min="0"
 											value={item.quantity}
 											oninput={(e) =>
-												updateQuantity(item.id, parseInt((e.currentTarget as HTMLInputElement).value, 10))}
+												updateQuantity(
+													item.id,
+													parseInt((e.currentTarget as HTMLInputElement).value, 10)
+												)}
 											class="h-8 w-20"
 										/>
-										<span class="text-sm font-medium">{formatCurrency(item.price * item.quantity)}</span>
+										<span class="text-sm font-medium"
+											>{formatCurrency(item.price * item.quantity)}</span
+										>
 										<Button
 											variant="ghost"
 											size="icon"
@@ -483,14 +514,14 @@
 								<span class="text-muted-foreground">Subtotal</span>
 								<span class="font-medium">{formatCurrency(displaySubtotal)}</span>
 							</div>
-							<button type="button" class="text-primary hover:underline text-sm">
+							<button type="button" class="text-sm text-primary hover:underline">
 								Add shipping fee
 							</button>
 							<div class="flex justify-between">
 								<span class="text-muted-foreground">CGST 9%</span>
 								<span class="font-medium">{formatCurrency(displayTax)}</span>
 							</div>
-							<div class="border-t pt-2 flex justify-between font-semibold">
+							<div class="flex justify-between border-t pt-2 font-semibold">
 								<span>Total</span>
 								<span>{formatCurrency(displayTotal)}</span>
 							</div>
@@ -510,7 +541,7 @@
 						<textarea
 							bind:value={reasonForEdit}
 							placeholder="Enter a reason for editing this order..."
-							class="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+							class="flex min-h-20 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 							rows={3}
 						></textarea>
 						<p class="mt-2 text-xs text-muted-foreground">Only visible to staff</p>
@@ -528,11 +559,7 @@
 								{hasChanges ? 'You have unsaved changes' : 'No changes have been made'}
 							</p>
 						{/if}
-						<Button
-							class="w-full"
-							disabled={!hasChanges || updating}
-							onclick={saveOrder}
-						>
+						<Button class="w-full" disabled={!hasChanges || updating} onclick={saveOrder}>
 							{updating ? 'Updating…' : 'Update order'}
 						</Button>
 					</div>
@@ -541,7 +568,11 @@
 
 			<!-- Footer -->
 			<div class="border-t bg-background px-6 py-4 text-center">
-				<button type="button" class="text-sm text-primary hover:underline bg-transparent border-none cursor-pointer">Learn more about editing orders</button>
+				<button
+					type="button"
+					class="cursor-pointer border-none bg-transparent text-sm text-primary hover:underline"
+					>Learn more about editing orders</button
+				>
 			</div>
 		{/if}
 	</div>
@@ -549,14 +580,14 @@
 
 <!-- Add product dialog -->
 <Dialog.Root bind:open={addProductOpen}>
-	<Dialog.Content class="max-w-3xl max-h-[85vh] m-auto flex flex-col rounded-xl border shadow-lg">
+	<Dialog.Content class="m-auto flex max-h-[85vh] max-w-3xl flex-col rounded-xl border shadow-lg">
 		<div class="flex flex-1 flex-col overflow-hidden">
 			<Dialog.Header class="flex flex-row items-center justify-between border-b px-6 py-4">
 				<Dialog.Title class="text-base font-semibold">Browse products</Dialog.Title>
 			</Dialog.Header>
 			<div class="flex flex-wrap items-center justify-between gap-4 border-b px-6 py-4">
-				<div class="relative w-64 ml-auto">
-					<Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+				<div class="relative ml-auto w-64">
+					<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 					<Input
 						type="search"
 						placeholder="Search products"
@@ -590,7 +621,7 @@
 								{:else}
 									{#each productBrowserProducts as product (product.id)}
 										<tr
-											class="border-b transition-colors hover:bg-muted/30 cursor-pointer last:border-b-0"
+											class="cursor-pointer border-b transition-colors last:border-b-0 hover:bg-muted/30"
 											role="button"
 											tabindex="0"
 											onclick={() => toggleProductSelection(product.id)}
@@ -615,7 +646,9 @@
 															class="size-10 shrink-0 rounded-md object-cover"
 														/>
 													{:else}
-														<div class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+														<div
+															class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
+														>
 															<ImageIcon class="size-5" />
 														</div>
 													{/if}
@@ -655,7 +688,7 @@
 						Next
 					</Button>
 				</div>
-				<div class="flex items-center gap-2 ml-auto">
+				<div class="ml-auto flex items-center gap-2">
 					<Button variant="outline" onclick={closeAddProduct}>Cancel</Button>
 					<Button onclick={addSelectedProductsToOrder} disabled={selectedProductIds.length === 0}>
 						Add {selectedProductIds.length > 0 ? `(${selectedProductIds.length})` : ''}

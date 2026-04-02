@@ -5,22 +5,23 @@
 	import { cn } from '$lib/utils.js';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { Toaster, toast } from 'svelte-sonner';
+	import type { Attribute } from '../type.js';
 
-	type Mode = 'update';
+	type AttributeForEdit = NonNullable<Attribute>;
 
 	let {
 		open = $bindable(false),
-		mode = 'update',
-		attribute = null,
-		onSaved = async () => {},
+		attribute = null as AttributeForEdit | null,
+		onSuccess = () => {},
 		onClosed = () => {}
 	}: {
 		open?: boolean;
-		mode?: Mode;
-		attribute?: { id: string; title: string; type: string } | null;
-		onSaved?: () => void | Promise<void>;
-		onClosed?: () => void | Promise<void>;
+		attribute?: AttributeForEdit | null;
+		onSuccess?: () => void | Promise<void>;
+		onClosed?: () => void;
 	} = $props();
+
+	let initializedForId = $state<string | null>(null);
 
 	const { form, errors, enhance, message, delayed, reset } = superForm(
 		{
@@ -29,30 +30,39 @@
 			type: ''
 		},
 		{
-			resetForm: true,
+			resetForm: false,
 			onResult: async ({ result }) => {
 				if (result.status === 200) {
 					toast.success('Attribute updated successfully');
-					await onSaved();
 					open = false;
+					if (onSuccess) await onSuccess();
 				}
 			}
 		}
 	);
 
-	function closeSheet() {
-		if (!$delayed) open = false;
-	}
+	$effect(() => {
+		if (!open) {
+			initializedForId = null;
+			return;
+		}
 
-	function resetForm() {
-		message.set('');
+		const nextId = attribute?.id ?? '';
+		if (!nextId) return;
+		if (initializedForId === nextId) return;
+		initializedForId = nextId;
+
 		reset({
 			data: {
-				id: '',
-				title: '',
-				type: ''
+				id: attribute!.id,
+				title: attribute!.title ?? '',
+				type: attribute!.type ?? ''
 			}
 		});
+	});
+
+	function close() {
+		open = false;
 	}
 
 	function onOpenChange(isOpen: boolean) {
@@ -61,29 +71,11 @@
 			message.set('');
 		}
 	}
-
-	$effect(() => {
-		if (attribute) {
-			reset({
-				data: {
-					id: attribute.id,
-					title: attribute.title,
-					type: attribute.type
-				}
-			});
-			open = true;
-			return;
-		}
-
-		if (!open) {
-			resetForm();
-		}
-	});
 </script>
 
 <Toaster richColors position="top-center" />
 
-<Sheet.Root bind:open={open} onOpenChange={onOpenChange}>
+<Sheet.Root bind:open {onOpenChange}>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
 		<form action="?/update" method="POST" use:enhance class="flex h-full flex-col">
 			<input type="hidden" name="id" bind:value={$form.id} />
@@ -125,7 +117,7 @@
 				</div>
 			</div>
 			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" type="button" onclick={closeSheet}>Cancel</Button>
+				<Button variant="outline" type="button" onclick={close}>Cancel</Button>
 				<Button type="submit" disabled={$delayed}>
 					{$delayed ? 'Saving...' : 'Save'}
 				</Button>

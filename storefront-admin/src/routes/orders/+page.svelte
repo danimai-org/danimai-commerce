@@ -13,8 +13,9 @@
 	} from '$lib/components/organs/index.js';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import ShoppingCart from '@lucide/svelte/icons/shopping-cart';
-
-	const API_BASE = 'http://localhost:8000/admin';
+	import { client } from '$lib/client.js';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
 	type Order = {
 		id: string;
@@ -31,61 +32,31 @@
 		updated_at: string;
 	};
 
-	type Pagination = {
-		total: number;
-		page: number;
-		limit: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_previous_page: boolean;
-	};
-
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
 	const paginateState = createPagination(
-		async () => {
-			const base = {
-				page: '1',
-				limit: '10',
-				sorting_field: 'created_at',
-				sorting_direction: 'desc'
-			};
-			const fromUrl = paginationQuery as Record<string, unknown>;
-			const q: Record<string, string> = { ...base };
-			for (const [k, v] of Object.entries(fromUrl)) {
-				if (v != null && v !== '') q[k] = String(v);
-			}
-			const params = new URLSearchParams(q);
-			const res = await fetch(`${API_BASE}/orders?${params}`, { cache: 'no-store' });
-			if (!res.ok) throw new Error(await res.text());
-			return (await res.json()) as { rows: Order[]; pagination: Pagination };
-		},
+		async () => client.orders.get({ query: paginationQuery as Record<string, unknown> }),
 		['orders']
 	);
 
 	$effect(() => {
 		page.url.searchParams.toString();
-		paginateState.refetch();
 	});
 
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
-	const rawRows = $derived((paginateState.query.data?.rows ?? []) as Order[]);
+	const rawRows = $derived((paginateState.query.data?.data?.rows ?? []) as unknown as Order[]);
 	const rows = $derived(
 		rawRows.map((r) => ({ ...r, order_label: `#${r.display_id}` })) as Record<string, unknown>[]
 	);
-	const listPagination = $derived(paginateState.query.data?.pagination ?? null);
-	const start = $derived(
-		listPagination ? (listPagination.page - 1) * listPagination.limit + 1 : 0
-	);
+	const listPagination = $derived(paginateState.query.data?.data?.pagination ?? null);
+	const start = $derived(listPagination ? (listPagination.page - 1) * listPagination.limit + 1 : 0);
 	const end = $derived(
-		listPagination
-			? Math.min(listPagination.page * listPagination.limit, listPagination.total)
-			: 0
+		listPagination ? Math.min(listPagination.page * listPagination.limit, listPagination.total) : 0
 	);
 
 	let searchQuery = $state('');
@@ -96,7 +67,7 @@
 			label: 'Order',
 			key: 'order_label',
 			type: 'link',
-			cellHref: (row) => `/orders/${row.id}`,
+			cellHref: (row) => resolve(`/orders/${row.id}`, {}),
 			textKey: 'order_label'
 		},
 		{ label: 'Status', key: 'status', type: 'text' },
@@ -105,7 +76,6 @@
 		{ label: 'Customer', key: 'email', type: 'text' },
 		{ label: 'Date', key: 'created_at', type: 'date' }
 	];
-	
 </script>
 
 <svelte:head>
@@ -138,20 +108,11 @@
 				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
 					<table class="w-full text-sm">
 						<TableHead columns={tableColumns} />
-						<TableBody
-							rows={rows}
-							columns={tableColumns}
-							emptyMessage="No orders found."
-						/>
+						<TableBody {rows} columns={tableColumns} emptyMessage="No orders found." />
 					</table>
 				</div>
 
-				<TablePagination
-					pagination={listPagination}
-					{start}
-					{end}
-					onPageChange={goToPage}
-				/>
+				<TablePagination pagination={listPagination} {start} {end} onPageChange={goToPage} />
 			{/if}
 		</PaginationTable>
 	</div>
@@ -159,6 +120,5 @@
 
 <CreateOrderDialog
 	bind:open={createOrderOpen}
-	apiBase={API_BASE}
-	onSuccess={(id) => goto(`/orders/${id}`)}
+	onSuccess={(id) => goto(resolve(`/orders/${id}`, {}), { replaceState: true })}
 />

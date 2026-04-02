@@ -5,8 +5,14 @@ import { zod4 } from 'sveltekit-superforms/adapters';
 import { superValidate, message } from 'sveltekit-superforms';
 import { client } from '$lib/client';
 
+const INVITE_EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
 const InviteCreateSchema = z.object({
-	email: z.string().email('Invalid email address'),
+	email: z
+		.string()
+		.trim()
+		.min(1, 'Invalid email address')
+		.refine((s) => INVITE_EMAIL_PATTERN.test(s), 'Invalid email address'),
 	role_ids: z.array(z.string()).default([])
 });
 

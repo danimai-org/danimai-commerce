@@ -1,70 +1,52 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button/index.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { getDetailContext } from '$lib/hooks';
+	import type { Collection } from '../type.js';
 	import EditCollectionHero from '$lib/components/organs/collection/update/EditCollectionHero.svelte';
+	let formSheetOpen = $state(false);
 
-	interface Props {
-		collection: Record<string, unknown> | null;
-		onUpdated?: () => void | Promise<void>;
-	}
-	let { collection, onUpdated = () => {} }: Props = $props();
-	let editOpen = $state(false);
+	const detailQuery = getDetailContext<Collection>();
 
-	function getHandle(c: { handle?: string | undefined } | null): string {
+	const collection = $derived(detailQuery?.data ?? null);
+
+	function getHandle(c: Collection | null): string {
 		if (!c) return '';
-		return (c.handle as string)?.startsWith('/') ? (c.handle as string) : `/${c.handle as string}`;
-	}
-
-	function openEdit() {
-		if (!collection) return;
-		editOpen = true;
+		return c.handle?.startsWith('/') ? c.handle : `/${c.handle ?? ''}`;
 	}
 </script>
 
-<div class="flex-1 rounded-lg border bg-card p-6 shadow-sm">
-	<section class="flex flex-col gap-6 pb-8">
-		<div class="flex items-center justify-between gap-4">
-			<h1 class="text-2xl font-semibold tracking-tight">
-				{(collection?.title as string | undefined) ?? 'Collection'}
-			</h1>
-			<Button
-				variant="ghost"
-				size="icon"
-				class="size-8 shrink-0"
-				onclick={openEdit}
-				aria-label="Edit collection"
-				disabled={!collection}
-			>
-				<Pencil class="size-4" />
-			</Button>
+<div class="flex min-h-0 flex-col overflow-auto">
+	<div class="flex flex-col gap-6 p-6">
+		<div class="rounded-lg border bg-card p-8 shadow-sm">
+			<div class="flex items-start justify-between gap-4">
+				<div class="space-y-6">
+					<h1 class="text-3xl font-semibold tracking-tight">
+						{(collection?.title as string | undefined) ?? ''}
+					</h1>
+					<div class="grid gap-4 text-sm sm:grid-cols-[110px_minmax(0,1fr)] sm:items-start">
+						<span class="pt-0.5 font-medium text-muted-foreground">Handle</span>
+						<p class="font-mono text-foreground">{getHandle(collection)}</p>
+					</div>
+				</div>
+				<Button
+					variant="ghost"
+					size="icon"
+					class="size-8 shrink-0"
+					onclick={() => (formSheetOpen = true)}
+					aria-label="Edit collection"
+				>
+					<Pencil class="size-4" />
+				</Button>
+			</div>
 		</div>
-		<div class="flex items-center gap-3">
-			<label for="collection-handle" class="shrink-0 text-sm font-medium text-muted-foreground"
-				>Handle</label
-			>
-			<input
-				id="collection-handle"
-				type="text"
-				value={getHandle(collection)}
-				readonly
-				class="h-9 max-w-xs rounded-md border border-input bg-background px-3 font-mono text-sm"
-			/>
-		</div>
-	</section>
+	</div>
 </div>
 
 <EditCollectionHero
-	collection={editOpen
-		? (collection as unknown as {
-				id: string;
-				title?: string | undefined;
-				value?: string | undefined;
-				handle?: string | undefined;
-				metadata?: { handle?: string | undefined } | null | undefined;
-			} | null)
-		: null}
-	onSaved={onUpdated}
-	onClosed={() => {
-		editOpen = false;
+	bind:open={formSheetOpen}
+	{collection}
+	onSuccess={() => {
+		void detailQuery?.refetch?.();
 	}}
 />

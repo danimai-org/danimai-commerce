@@ -13,37 +13,30 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { client } from '$lib/client.js';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
 	let { data }: { data: PageData } = $props();
 
-	type Invite = {
-		id: string;
-		email: string;
-		role?: string | null;
-		accepted: boolean;
-		expires_at: string | Date;
-		created_at: string | Date;
-	};
-	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+	type InviteRow = (typeof invites)[number];
 
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
 	const paginateState = createPagination(
 		async () => {
-			return client.invites.get({ query: paginationQuery as any });
+			return client.invites.get({ query: createPaginationQuery(page.url.searchParams) });
 		},
-		['invites']
+		['invites'],
+		createPaginationQuery(page.url.searchParams)
 	);
 
 	const invites = $derived(paginateState.query.data?.data?.rows ?? []);
 	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
-	const start = $derived(
-		pagination ? (pagination.page - 1) * pagination.limit + 1 : 0
-	);
+	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
 	const end = $derived(
 		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
 	);
@@ -92,19 +85,24 @@
 		return new Date(expiresAt) < new Date();
 	}
 
-	function parseClientError(result: any, fallback: string) {
+	function parseClientError(result: { error: { value: { message: string } } }, fallback: string) {
 		const msg = result?.error?.value?.message;
 		return typeof msg === 'string' && msg.trim().length > 0 ? msg : fallback;
 	}
 
-	async function resendInvite(invite: Invite) {
+	async function resendInvite(invite: InviteRow) {
 		if (invite.accepted) return;
 		resendError = null;
 		resendingId = invite.id;
 		try {
-			const res = await (client as any).invites({ id: invite.id }).resend.post();
+			const res = await client.invites({ id: invite.id }).resend.post();
 			if (res.error) {
-				throw new Error(parseClientError(res, 'Failed to resend invite'));
+				throw new Error(
+					parseClientError(
+						res as unknown as { error: { value: { message: string } } },
+						'Failed to resend invite'
+					)
+				);
 			}
 			paginateState.refetch();
 		} catch (e) {
@@ -116,8 +114,8 @@
 </script>
 
 <svelte:head>
-    <title>Invites</title>
-    <meta name="description" content="Manage invites." />
+	<title>Invites</title>
+	<meta name="description" content="Manage invites." />
 </svelte:head>
 
 <div class="flex h-full flex-col">
@@ -149,7 +147,7 @@
 				</div>
 			{:else if invites.length === 0}
 				<div
-					class="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground bg-card"
+					class="rounded-lg border border-dashed bg-card p-8 text-center text-sm text-muted-foreground"
 				>
 					No invites yet. Click &quot;Invite user&quot; to send your first invite.
 				</div>
@@ -209,4 +207,8 @@
 		</PaginationTable>
 	</div>
 </div>
-<InviteCreateSheet bind:open={inviteOpen} formData={data.inviteCreateForm} onSuccess={() => paginateState.refetch()} />
+<InviteCreateSheet
+	bind:open={inviteOpen}
+	formData={data.inviteCreateForm.data as { email: string; role_ids: string[] }}
+	onSuccess={() => paginateState.refetch()}
+/>

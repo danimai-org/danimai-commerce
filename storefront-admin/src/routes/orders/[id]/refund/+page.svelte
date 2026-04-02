@@ -9,9 +9,9 @@
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import MapPin from '@lucide/svelte/icons/map-pin';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
+	import { resolve } from '$app/paths';
 
-	const API_BASE =
-		'http://localhost:8000/admin';
+	const API_BASE = 'http://localhost:8000/admin';
 
 	type Order = {
 		id: string;
@@ -82,7 +82,6 @@
 	}
 
 	$effect(() => {
-		orderId;
 		loadOrder();
 	});
 
@@ -115,7 +114,8 @@
 	);
 
 	const hasSelection = $derived(
-		orderItems.some((item) => (refundQuantities[item.id] ?? 0) > 0) || manualRefundAmount.trim() !== ''
+		orderItems.some((item) => (refundQuantities[item.id] ?? 0) > 0) ||
+			manualRefundAmount.trim() !== ''
 	);
 
 	const canSubmit = $derived(
@@ -155,7 +155,7 @@
 							variant="ghost"
 							size="icon"
 							class="size-8"
-							onclick={() => goto(`/orders/${orderId}`)}
+							onclick={() => goto(resolve(`/orders/${orderId}`, {}))}
 						>
 							<ArrowLeft class="size-4" />
 						</Button>
@@ -164,9 +164,8 @@
 								<FileText class="size-4 text-muted-foreground" />
 								<span class="text-sm text-muted-foreground">></span>
 								<a
-									href="/orders/{orderId}"
-									class="text-lg font-semibold hover:underline"
-									>#{order.display_id}</a
+									href={resolve(`/orders/${orderId}`, {})}
+									class="text-lg font-semibold hover:underline">#{order.display_id}</a
 								>
 								<span class="text-sm text-muted-foreground">></span>
 								<h1 class="text-lg font-semibold">Refund</h1>
@@ -213,10 +212,8 @@
 												<ImageIcon class="size-6" />
 											</div>
 										{/if}
-										<div class="flex-1 min-w-0">
-											<a
-												href="/products"
-												class="font-medium hover:underline"
+										<div class="min-w-0 flex-1">
+											<a href={resolve(`/products`, {})} class="font-medium hover:underline"
 												>{item.title}</a
 											>
 											{#if item.sku}
@@ -307,12 +304,7 @@
 					<div class="rounded-lg border bg-card p-4">
 						<h3 class="mb-1 text-sm font-semibold">Refund amount</h3>
 						<p class="mb-2 text-xs text-muted-foreground">Manual</p>
-						<Input
-							type="text"
-							bind:value={manualRefundAmount}
-							placeholder="₹0.00"
-							class="h-9"
-						/>
+						<Input type="text" bind:value={manualRefundAmount} placeholder="₹0.00" class="h-9" />
 						<p class="mt-2 text-xs text-muted-foreground">
 							{formatCurrency(availableForRefund)} available for refund
 						</p>
@@ -325,17 +317,11 @@
 								bind:checked={sendNotification}
 								class="size-4 rounded border-input"
 							/>
-							<span class="text-sm font-medium"
-								>Send notification once refund is finalized</span
-							>
+							<span class="text-sm font-medium">Send notification once refund is finalized</span>
 						</label>
 					</div>
 
-					<Button
-						class="w-full"
-						disabled={!canSubmit}
-						onclick={() => {}}
-					>
+					<Button class="w-full" disabled={!canSubmit} onclick={() => {}}>
 						Refund {formatCurrency(effectiveRefundAmount)}
 					</Button>
 				</div>
@@ -344,7 +330,7 @@
 			<div class="border-t px-6 py-4 text-center">
 				<button
 					type="button"
-					class="text-sm text-primary hover:underline bg-transparent border-none cursor-pointer"
+					class="cursor-pointer border-none bg-transparent text-sm text-primary hover:underline"
 					>Learn more about refunding orders</button
 				>
 			</div>

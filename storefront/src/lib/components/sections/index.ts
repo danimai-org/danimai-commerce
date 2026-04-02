@@ -4,6 +4,7 @@ export { default as ProductGridSection } from '$lib/components/sections/ProductG
 export { default as StorySection } from '$lib/components/sections/StorySection.svelte';
 export { default as CollectionsSection } from '$lib/components/sections/CollectionsSection.svelte';
 export { default as QuotesSection } from '$lib/components/sections/QuotesSection.svelte';
+export { default as VideoSection } from '$lib/components/sections/VideoSection.svelte';
 export { default as AboutHeroSection } from '$lib/components/sections/AboutHeroSection.svelte';
 export { default as AboutPurposeSection } from '$lib/components/sections/AboutPurposeSection.svelte';
 export { default as AboutCraftedSection } from '$lib/components/sections/AboutCraftedSection.svelte';

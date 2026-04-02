@@ -7,7 +7,7 @@
 	import Search from '@lucide/svelte/icons/search';
 
 	interface Props {
-		open: boolean;
+		open?: boolean;
 		onSave?: (data: OverrideFormData) => void;
 	}
 

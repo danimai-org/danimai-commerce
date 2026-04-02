@@ -2,14 +2,16 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import Share2 from '@lucide/svelte/icons/share-2';
 	import ProductSalesChannelsSheet from './ProductSalesChannelsSheet.svelte';
-	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
+	import { getDetailContext } from '$lib/hooks';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { client } from '$lib/client.js';
 	import { createQuery } from '@tanstack/svelte-query';
+	import type { Product } from '../type';
 
+	const product = $derived(getDetailContext<Product>()?.data ?? null);
 
-	const salesChannels = $derived(getProductDetail().data?.sales_channels ?? []);
+	const salesChannels = $derived(product?.sales_channels ?? []);
 	const salesChannelsQuery = createQuery(() => ({
 		queryKey: ['sales-channels', 'product-detail-sheet'],
 		queryFn: async () =>
@@ -23,7 +25,9 @@
 		refetchOnWindowFocus: false
 	}));
 	const allSalesChannels = $derived.by(() => {
-		const payload = salesChannelsQuery.data?.data as { rows?: unknown[]; data?: unknown[] } | undefined;
+		const payload = salesChannelsQuery.data?.data as
+			| { rows?: unknown[]; data?: unknown[] }
+			| undefined;
 		const rows = (payload?.rows ?? payload?.data ?? []) as {
 			id: string;
 			name?: string;
@@ -37,11 +41,13 @@
 			is_default: channel.is_default
 		}));
 	});
-	let selectedIds = $state(new SvelteSet<string>());
+	const selectedIds = $derived.by(
+		() => new SvelteSet((salesChannels ?? []).map((channel: { id: string }) => channel.id))
+	);
 	let sheetOpen = $state(false);
 
 	$effect(() => {
-		selectedIds = new SvelteSet((salesChannels ?? []).map((channel: { id: string }) => channel.id));
+		void selectedIds;
 	});
 </script>
 
@@ -81,9 +87,12 @@
 <ProductSalesChannelsSheet
 	bind:open={sheetOpen}
 	channels={allSalesChannels.length ? allSalesChannels : salesChannels}
-	selectedIds={selectedIds}
-	onSelectedIdsChange={(set) => (selectedIds = set)}
-	onSave={() => {}}
-	onCancel={() => {}}
-	submitting={false}
+	{selectedIds}
+	onSelectedIdsChange={(set) => {
+		void selectedIds;
+		void set;
+	}}
+	onSave={() => void 0}
+	onCancel={() => void 0}
+	submitting={salesChannelsQuery.isPending}
 />

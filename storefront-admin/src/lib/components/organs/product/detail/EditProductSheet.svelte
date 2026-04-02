@@ -3,9 +3,10 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { cn } from '$lib/utils.js';
-	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
 	import { superForm } from 'sveltekit-superforms/client';
 	import type { SuperValidated } from 'sveltekit-superforms';
+	import { getDetailContext } from '$lib/hooks';
+	import type { Product } from '../type';
 
 	type ProductUpdateFormData = {
 		id: string;
@@ -23,13 +24,9 @@
 		onSaved?: () => void | Promise<void>;
 	}
 
-	let {
-		open = $bindable(false),
-		productUpdateForm,
-		onSaved = () => {}
-	}: Props = $props();
+	let { open = $bindable(false), productUpdateForm, onSaved = () => {} }: Props = $props();
 
-	const product = $derived(getProductDetail()?.data ?? null);
+	const product = $derived(getDetailContext<Product>()?.data ?? null);
 
 	let apiError = $state<string | null>(null);
 	let initializedForId = $state<string | null>(null);
@@ -108,7 +105,7 @@
 	}
 </script>
 
-<Sheet.Root bind:open onOpenChange={onOpenChange}>
+<Sheet.Root bind:open {onOpenChange}>
 	<Sheet.Content class="flex w-full flex-col sm:max-w-lg" side="right">
 		<form method="POST" action="?/update" use:enhance class="flex min-h-0 flex-1 flex-col">
 			<input type="hidden" name="id" bind:value={$form.id} />

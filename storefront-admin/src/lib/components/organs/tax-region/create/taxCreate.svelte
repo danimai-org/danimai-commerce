@@ -6,47 +6,17 @@
 	import { cn } from '$lib/utils.js';
 	import Info from '@lucide/svelte/icons/info';
 	import { Combobox } from '$lib/components/organs/index.js';
-
-	const COUNTRY_OPTIONS = [
-		{ value: 'India', label: 'India' },
-		{ value: 'United States', label: 'United States' },
-		{ value: 'United Kingdom', label: 'United Kingdom' },
-		{ value: 'Germany', label: 'Germany' },
-		{ value: 'France', label: 'France' },
-		{ value: 'Canada', label: 'Canada' },
-		{ value: 'Australia', label: 'Australia' },
-		{ value: 'Japan', label: 'Japan' },
-		{ value: 'Spain', label: 'Spain' },
-		{ value: 'Italy', label: 'Italy' },
-		{ value: 'Brazil', label: 'Brazil' },
-		{ value: 'Mexico', label: 'Mexico' },
-		{ value: 'Netherlands', label: 'Netherlands' },
-		{ value: 'Singapore', label: 'Singapore' }
-	];
-
-	const TAX_PROVIDER_OPTIONS = [
-		{ id: 'manual', value: 'Manual' },
-		{ id: 'stripe', value: 'Stripe' },
-		{ id: 'paypal', value: 'PayPal' },
-		{ id: 'shopify', value: 'Shopify' },
-		{ id: 'shopify-pay', value: 'Shopify Pay' },
-	];
+	import { Toaster } from 'svelte-sonner';
+	import { toast } from 'svelte-sonner';
+	import { Country } from 'country-state-city';
 
 	let {
 		open = $bindable(false),
-		mode = 'create',
 		onSuccess = () => {}
 	}: {
 		open?: boolean;
-		mode?: 'create';
 		onSuccess?: () => void;
 	} = $props();
-
-	let selectedCountry = $state('');
-	let selectedTaxProvider = $state('');
-	let defaultRateName = $state('');
-	let defaultRateValue = $state('');
-	let defaultRateCode = $state('');
 
 	const { form, errors, enhance, delayed } = superForm(
 		{
@@ -58,11 +28,22 @@
 			onResult: ({ result }) => {
 				if (result.status === 200) {
 					open = false;
+					toast.success('Tax region created successfully');
 					onSuccess();
 				}
 			}
 		}
 	);
+
+	const countries = $derived(
+		[...Country.getAllCountries()].sort((a, b) =>
+			(a.name ?? '').localeCompare(b.name ?? '')
+		)
+	);
+
+	let defaultRateName = $state('');
+	let defaultRateValue = $state<number | ''>('');
+	let defaultRateCode = $state('');
 
 	let initialized = $state(false);
 
@@ -74,40 +55,26 @@
 
 		if (initialized) return;
 		initialized = true;
-		selectedCountry = '';
-		selectedTaxProvider = '';
+		$form = { name: '', tax_provider_id: '' };
 		defaultRateName = '';
 		defaultRateValue = '';
 		defaultRateCode = '';
-		$form = {
-			name: '',
-			tax_provider_id: ''
-		};
 	});
 
 	function close() {
 		open = false;
 	}
 
-	$effect(() => {
-		const country = selectedCountry.trim();
-		$form.name = country;
-	});
-
-	$effect(() => {
-		$form.tax_provider_id = selectedTaxProvider;
-	});
-
 	const title = $derived('Create Tax Region');
 	const subtitle = $derived('Create a new tax region to define tax rates for a specific country.');
 	const submitLabel = $derived($delayed ? 'Creating...' : 'Save');
 </script>
 
+<Toaster richColors position="top-center" duration={3000} />
 <Sheet.Root bind:open>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-lg">
 		<form action="?/create" method="POST" use:enhance class="flex h-full flex-col">
 			<input type="hidden" name="name" value={$form.name} />
-			<input type="hidden" name="tax_provider_id" value={$form.tax_provider_id} />
 			<div class="flex-1 overflow-auto p-6 pt-12">
 				<h2 class="text-lg font-semibold">{title}</h2>
 				<p class="mt-1 text-sm text-muted-foreground">{subtitle}</p>
@@ -117,12 +84,15 @@
 						<label for="tr-country" class="text-sm font-medium">Country</label>
 						<Combobox
 							id="tr-country"
-							bind:value={selectedCountry}	
+							bind:value={$form.name}
 							class={cn(
-								'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+								'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
 								$errors.name && 'border-destructive'
 							)}
-							options={COUNTRY_OPTIONS.map((opt) => ({ id: opt.value, value: opt.label }))}
+							options={countries.map((c) => ({
+								id: c.name ?? c.isoCode,
+								value: c.name ?? c.isoCode
+							}))}
 						/>
 						{#if $errors.name}
 							<span class="text-xs text-destructive">{$errors.name}</span>
@@ -130,14 +100,13 @@
 					</div>
 					<div class="flex flex-col gap-2">
 						<label for="tr-tax-provider" class="text-sm font-medium">Tax provider</label>
-						<Combobox
+						<Input
 							id="tr-tax-provider"
-							bind:value={selectedTaxProvider}
-							class={cn(
-								'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
-								$errors.tax_provider_id && 'border-destructive'
-							)}
-							options={TAX_PROVIDER_OPTIONS.map((opt) => ({ id: opt.id, value: opt.value }))}
+							name="tax_provider_id"
+							bind:value={$form.tax_provider_id}
+							class={cn('h-9', $errors.tax_provider_id && 'border-destructive')}
+							placeholder="Tax provider ID (optional)"
+							aria-invalid={$errors.tax_provider_id ? 'true' : undefined}
 						/>
 						{#if $errors.tax_provider_id}
 							<span class="text-xs text-destructive">{$errors.tax_provider_id}</span>
@@ -159,12 +128,7 @@
 					<div class="grid grid-cols-2 gap-4">
 						<div class="flex flex-col gap-2">
 							<label for="tr-default-rate-name" class="text-sm font-medium">Name</label>
-							<Input
-								id="tr-default-rate-name"
-								bind:value={defaultRateName}
-								class="h-9"
-								placeholder=""
-							/>
+							<Input id="tr-default-rate-name" bind:value={defaultRateName} class="h-9" />
 						</div>
 						<div class="flex flex-col gap-2">
 							<label for="tr-default-rate-value" class="text-sm font-medium">Tax rate</label>
@@ -181,19 +145,13 @@
 									type="number"
 									step="0.01"
 									min="0"
-									placeholder=""
 								/>
 							</div>
 						</div>
 					</div>
 					<div class="mt-4 flex flex-col gap-2">
 						<label for="tr-default-rate-code" class="text-sm font-medium">Tax code</label>
-						<Input
-							id="tr-default-rate-code"
-							bind:value={defaultRateCode}
-							class="h-9"
-							placeholder=""
-						/>
+						<Input id="tr-default-rate-code" bind:value={defaultRateCode} class="h-9" />
 					</div>
 				</div>
 			</div>

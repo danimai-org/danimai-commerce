@@ -11,6 +11,11 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
 	},
+	"dependencies": {
+		"@danimai/backend": "../backend",
+		"@sinclair/typebox": "^0.34.48",
+		"@tanstack/svelte-query": "^6.0.18"
+	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^7.0.0",
 		"@sveltejs/kit": "^2.50.2",

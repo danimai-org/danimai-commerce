@@ -25,7 +25,6 @@
 	import {
 		getCustomerGroup,
 		listCustomersInGroup,
-		updateCustomerGroup,
 		type CustomerGroupDetail,
 		type ListCustomersInGroupParams,
 		type ListCustomersInGroupResponse
@@ -33,6 +32,8 @@
 	import { listCustomers, type Customer } from '$lib/customers/api.js';
 	import { createQuery } from '@tanstack/svelte-query';
 	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
 	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
@@ -43,20 +44,40 @@
 	let error = $state<string | null>(null);
 
 	const emptyCustomersResponse = {
-		data: { rows: [] as Customer[], pagination: { total: 0, page: 1, limit: 10, total_pages: 1, has_next_page: false, has_previous_page: false } },
-		pagination: { total: 0, page: 1, limit: 10, total_pages: 1, has_next_page: false, has_previous_page: false }
+		data: {
+			rows: [] as Customer[],
+			pagination: {
+				total: 0,
+				page: 1,
+				limit: 10,
+				total_pages: 1,
+				has_next_page: false,
+				has_previous_page: false
+			}
+		},
+		pagination: {
+			total: 0,
+			page: 1,
+			limit: 10,
+			total_pages: 1,
+			has_next_page: false,
+			has_previous_page: false
+		}
 	};
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
-	const customersQueryKey = $derived(['pagination', 'customer-group-customers', groupId ?? '', paginationQuery] as const);
+	const customersQueryKey = $derived([
+		'pagination',
+		'customer-group-customers',
+		groupId ?? '',
+		paginationQuery
+	] as const);
 	const customersQuery = createQuery(() => ({
 		queryKey: customersQueryKey,
 		queryFn: async ({ queryKey }) => {
 			const id = queryKey[2];
 			const params = queryKey[3] as ListCustomersInGroupParams;
-			return id
-				? listCustomersInGroup(id, params)
-				: Promise.resolve(emptyCustomersResponse);
+			return id ? listCustomersInGroup(id, params) : Promise.resolve(emptyCustomersResponse);
 		}
 	}));
 	const paginateState = $derived({
@@ -68,29 +89,39 @@
 		},
 		get error() {
 			return customersQuery.error != null
-				? (customersQuery.error instanceof Error ? customersQuery.error.message : String(customersQuery.error))
+				? customersQuery.error instanceof Error
+					? customersQuery.error.message
+					: String(customersQuery.error)
 				: null;
 		},
 		get start() {
-			const p = (customersQuery.data as ListCustomersInGroupResponse | undefined)?.data?.pagination ?? (customersQuery.data as ListCustomersInGroupResponse | undefined)?.pagination;
+			const p =
+				(customersQuery.data as ListCustomersInGroupResponse | undefined)?.data?.pagination ??
+				(customersQuery.data as ListCustomersInGroupResponse | undefined)?.pagination;
 			return p ? (p.page - 1) * p.limit + 1 : 0;
 		},
 		get end() {
-			const p = (customersQuery.data as ListCustomersInGroupResponse | undefined)?.data?.pagination ?? (customersQuery.data as ListCustomersInGroupResponse | undefined)?.pagination;
+			const p =
+				(customersQuery.data as ListCustomersInGroupResponse | undefined)?.data?.pagination ??
+				(customersQuery.data as ListCustomersInGroupResponse | undefined)?.pagination;
 			return p ? Math.min(p.page * p.limit, p.total) : 0;
 		},
 		refetch: () => customersQuery.refetch()
 	});
 
 	function goToPage(pageNum: number) {
-		const params = new URLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
-		goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true });
+		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
-	const customersQueryData = $derived(customersQuery.data as ListCustomersInGroupResponse | undefined);
+	const customersQueryData = $derived(
+		customersQuery.data as ListCustomersInGroupResponse | undefined
+	);
 	const customersRows = $derived(customersQueryData?.data?.rows ?? []);
-	const customersPagination = $derived(customersQueryData?.data?.pagination ?? customersQueryData?.pagination ?? null);
+	const customersPagination = $derived(
+		customersQueryData?.data?.pagination ?? customersQueryData?.pagination ?? null
+	);
 	const customersStart = $derived(paginateState.start);
 	const customersEnd = $derived(paginateState.end);
 	async function customersRefetch() {
@@ -127,7 +158,6 @@
 	}
 
 	$effect(() => {
-		groupId;
 		loadGroup();
 	});
 
@@ -207,7 +237,9 @@
 	let addCustomersModalOpen = $state(false);
 	let customerModalPage = $state(1);
 	let customerModalSearch = $state('');
-	let customerModalData = $state<import('$lib/customers/api.js').ListCustomersResponse | null>(null);
+	let customerModalData = $state<import('$lib/customers/api.js').ListCustomersResponse | null>(
+		null
+	);
 	let customerModalLoading = $state(false);
 	let addCustomersSubmitting = $state(false);
 	let addCustomersError = $state<string | null>(null);
@@ -272,7 +304,9 @@
 				});
 				if (!res.ok) {
 					const err = await res.json().catch(() => ({}));
-					throw new Error((err as { message?: string })?.message ?? 'Failed to add customer to group');
+					throw new Error(
+						(err as { message?: string })?.message ?? 'Failed to add customer to group'
+					);
 				}
 			}
 			selectedCustomerIds = [];
@@ -288,27 +322,34 @@
 
 	$effect(() => {
 		if (!addCustomersModalOpen) return;
-		customerModalPage;
 		fetchCustomerModalCustomers();
 	});
 
 	const customerModalCustomers = $derived(customerModalData?.data?.rows ?? []);
-	const customerModalPagination = $derived(customerModalData?.data?.pagination ?? customerModalData?.pagination ?? null);
+	const customerModalPagination = $derived(
+		customerModalData?.data?.pagination ?? customerModalData?.pagination ?? null
+	);
 	const customerModalFiltered = $derived(
 		customerModalSearch.trim()
-			? customerModalCustomers.filter((c) =>
-					c.email.toLowerCase().includes(customerModalSearch.toLowerCase()) ||
-					(c.first_name?.toLowerCase().includes(customerModalSearch.toLowerCase()) ?? false) ||
-					(c.last_name?.toLowerCase().includes(customerModalSearch.toLowerCase()) ?? false)
+			? customerModalCustomers.filter(
+					(c) =>
+						c.email.toLowerCase().includes(customerModalSearch.toLowerCase()) ||
+						(c.first_name?.toLowerCase().includes(customerModalSearch.toLowerCase()) ?? false) ||
+						(c.last_name?.toLowerCase().includes(customerModalSearch.toLowerCase()) ?? false)
 				)
 			: customerModalCustomers
 	);
 	const customerModalStart = $derived(
-		customerModalPagination ? (customerModalPagination.page - 1) * customerModalPagination.limit + 1 : 0
+		customerModalPagination
+			? (customerModalPagination.page - 1) * customerModalPagination.limit + 1
+			: 0
 	);
 	const customerModalEnd = $derived(
 		customerModalPagination
-			? Math.min(customerModalPagination.page * customerModalPagination.limit, customerModalPagination.total)
+			? Math.min(
+					customerModalPagination.page * customerModalPagination.limit,
+					customerModalPagination.total
+				)
 			: 0
 	);
 
@@ -361,13 +402,15 @@
 			<button
 				type="button"
 				class="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-				onclick={() => goto('/customers/groups')}
+				onclick={() => goto(resolve('/customers/groups', {}), { replaceState: true })}
 			>
 				<SlidersHorizontal class="size-4 shrink-0" />
 				<span>Customer Groups</span>
 			</button>
 			<ChevronRight class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-			<span class="font-medium text-foreground">{group ? group.name : (loading ? '…' : 'Customer group')}</span>
+			<span class="font-medium text-foreground"
+				>{group ? group.name : loading ? '…' : 'Customer group'}</span
+			>
 		</nav>
 	</div>
 
@@ -378,7 +421,10 @@
 	{:else if error || !group}
 		<div class="flex flex-1 flex-col items-center justify-center gap-4 p-6">
 			<p class="text-destructive">{error ?? 'Customer group not found'}</p>
-			<Button variant="outline" onclick={() => goto('/customers/groups')}>
+			<Button
+				variant="outline"
+				onclick={() => goto(resolve('/customers/groups', {}), { replaceState: true })}
+			>
 				Back to Customer Groups
 			</Button>
 		</div>
@@ -410,14 +456,14 @@
 										>
 											<DropdownMenu.Item
 												textValue="Edit"
-												class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+												class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
 											>
 												<Pencil class="size-4" />
 												Edit
 											</DropdownMenu.Item>
 											<DropdownMenu.Item
 												textValue="Delete"
-												class="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
+												class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
 											>
 												<Trash2 class="size-4" />
 												Delete
@@ -431,9 +477,11 @@
 				</div>
 
 				<!-- Customers section -->
-				<section class="w-full min-w-0 rounded-lg border bg-card shadow-sm overflow-hidden">
-					<div class="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4 rounded-t-lg">
-						<h2 class="text-base font-semibold flex items-center gap-2">
+				<section class="w-full min-w-0 overflow-hidden rounded-lg border bg-card shadow-sm">
+					<div
+						class="flex flex-wrap items-center justify-between gap-4 rounded-t-lg border-b bg-card px-6 py-4"
+					>
+						<h2 class="flex items-center gap-2 text-base font-semibold">
 							<Users class="size-4" />
 							Customers
 						</h2>
@@ -516,7 +564,7 @@
 <!-- Add customers modal -->
 <Dialog.Root bind:open={addCustomersModalOpen}>
 	<Dialog.Content
-		class="max-w-3xl h-auto max-h-[85vh] m-auto flex flex-col rounded-xl border shadow-lg"
+		class="m-auto flex h-auto max-h-[85vh] max-w-3xl flex-col rounded-xl border shadow-lg"
 	>
 		<div class="flex flex-1 flex-col overflow-hidden">
 			<Dialog.Header class="flex flex-row items-center justify-between border-b px-6 py-4">
@@ -529,9 +577,9 @@
 					<SlidersHorizontal class="mr-1.5 size-4" />
 					Add filter
 				</Button>
-				<div class="flex items-center gap-2 ml-auto">
+				<div class="ml-auto flex items-center gap-2">
 					<div class="relative w-64">
-						<Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 						<Input
 							type="search"
 							placeholder="Search"
@@ -551,7 +599,9 @@
 
 			<div class="flex flex-1 flex-col overflow-auto p-6">
 				{#if addCustomersError}
-					<div class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+					<div
+						class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+					>
 						{addCustomersError}
 					</div>
 				{/if}
@@ -592,8 +642,13 @@
 			</div>
 
 			<Dialog.Footer class="flex-row flex-wrap items-center justify-end gap-2 border-t px-6 py-4">
-				<Button variant="outline" onclick={closeAddCustomersModal} disabled={addCustomersSubmitting}>Cancel</Button>
-				<Button onclick={saveAddCustomers} disabled={addCustomersSubmitting || selectedCustomerIds.length === 0}>
+				<Button variant="outline" onclick={closeAddCustomersModal} disabled={addCustomersSubmitting}
+					>Cancel</Button
+				>
+				<Button
+					onclick={saveAddCustomers}
+					disabled={addCustomersSubmitting || selectedCustomerIds.length === 0}
+				>
 					{addCustomersSubmitting ? 'Saving...' : 'Save'}
 				</Button>
 			</Dialog.Footer>
@@ -607,7 +662,8 @@
 		<div class="flex h-full flex-col">
 			<Sheet.Header class="flex flex-col gap-1 border-b px-6 py-4">
 				<Sheet.Title>Edit Metadata</Sheet.Title>
-				<Sheet.Description>View and edit customer group metadata key-value pairs.</Sheet.Description>
+				<Sheet.Description>View and edit customer group metadata key-value pairs.</Sheet.Description
+				>
 			</Sheet.Header>
 			<div class="min-h-0 flex-1 overflow-auto px-6 py-6">
 				{#if metadataError}
@@ -628,7 +684,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each metadataRows as row, i}
+							{#each metadataRows as row, i (row.key)}
 								<tr class="border-b last:border-0">
 									<td class="px-4 py-2">
 										<Input bind:value={row.key} placeholder="Key" class="h-9 w-full" />
@@ -655,7 +711,9 @@
 				<Button variant="outline" size="sm" class="mt-4" onclick={addMetadataRow}>Add row</Button>
 			</div>
 			<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={closeMetadataSheet} disabled={metadataSubmitting}>Cancel</Button>
+				<Button variant="outline" onclick={closeMetadataSheet} disabled={metadataSubmitting}
+					>Cancel</Button
+				>
 				<Button onclick={submitGroupMetadata} disabled={metadataSubmitting}>
 					{metadataSubmitting ? 'Saving…' : 'Save'}
 				</Button>
@@ -674,8 +732,9 @@
 			<div class="min-h-0 flex-1 overflow-auto p-6">
 				{#if group}
 					<pre
-						class="rounded-md border bg-zinc-900 p-4 font-mono text-sm break-all whitespace-pre-wrap text-zinc-300"
-					><code>{JSON.stringify(group, null, 2)}</code></pre>
+						class="rounded-md border bg-zinc-900 p-4 font-mono text-sm break-all whitespace-pre-wrap text-zinc-300"><code
+							>{JSON.stringify(group, null, 2)}</code
+						></pre>
 				{:else}
 					<p class="text-sm text-muted-foreground">No data</p>
 				{/if}

@@ -21,7 +21,11 @@
 		productCreateForm: Record<string, unknown>;
 		onSuccess?: () => void;
 	}
-	let { open = $bindable(false), productCreateForm: initialProductCreateForm, onSuccess }: Props = $props();
+	let {
+		open = $bindable(false),
+		productCreateForm: initialProductCreateForm,
+		onSuccess
+	}: Props = $props();
 
 	type ProductOption = { title: string; values: string[] };
 	type ProductVariantForm = {
@@ -77,7 +81,7 @@
 		enhance: enhanceCreate,
 		submitting: createSubmitting,
 		errors: serverFieldErrors
-	} = superForm(initialProductCreateForm as SuperValidated<Record<string, unknown>, any, Record<string, unknown>>, {
+	} = superForm(initialProductCreateForm as SuperValidated<Record<string, unknown>>, {
 		resetForm: false,
 		invalidateAll: false,
 		dataType: 'json',
@@ -149,9 +153,7 @@
 		has_next_page: variantPage * variantLimit < variantTotal,
 		has_previous_page: variantPage > 1
 	} as PaginationMeta);
-	const variantStart = $derived(
-		variantTotal === 0 ? 0 : (variantPage - 1) * variantLimit + 1
-	);
+	const variantStart = $derived(variantTotal === 0 ? 0 : (variantPage - 1) * variantLimit + 1);
 	const variantEnd = $derived(Math.min(variantPage * variantLimit, variantTotal));
 
 	const variantTableColumns: TableColumn[] = [
@@ -185,9 +187,9 @@
 			group_id?: string | null;
 		}[]
 	>([]);
-	let attributeGroupsList = $state<
-		{ id: string; title: string; value?: string; name?: string }[]
-	>([]);
+	let attributeGroupsList = $state<{ id: string; title: string; value?: string; name?: string }[]>(
+		[]
+	);
 	let salesChannelsList = $state<{ id: string; name: string }[]>([]);
 
 	type CreateAttributeEntry = { attributeId: string; attributeTitle: string; value: string };
@@ -204,7 +206,7 @@
 						...v,
 						sku: ex.sku,
 						availableCount: ex.availableCount,
-					manage_inventory: ex.manage_inventory,
+						manage_inventory: ex.manage_inventory,
 						allow_backorder: ex.allow_backorder,
 						priceAmount: ex.priceAmount
 					}
@@ -354,21 +356,19 @@
 				: [];
 		attributesList =
 			attributesResponse.status === 'fulfilled'
-				? extractRows<
-						{
-							id: string;
-							title?: string;
-							value?: string;
-							name?: string;
-							type?: string;
-							attribute_group_id?: string | null;
-							product_attribute_group_id?: string | null;
-							attributeGroupId?: string | null;
-							attribute_group?: { id?: string | null } | null;
-							product_attribute_group?: { id?: string | null } | null;
-							group_id?: string | null;
-						}
-				  >(attributesResponse.value).map((row) => ({
+				? extractRows<{
+						id: string;
+						title?: string;
+						value?: string;
+						name?: string;
+						type?: string;
+						attribute_group_id?: string | null;
+						product_attribute_group_id?: string | null;
+						attributeGroupId?: string | null;
+						attribute_group?: { id?: string | null } | null;
+						product_attribute_group?: { id?: string | null } | null;
+						group_id?: string | null;
+					}>(attributesResponse.value).map((row) => ({
 						id: row.id,
 						title: pickLabel(row),
 						type: row.type ?? '',
@@ -384,7 +384,7 @@
 			attributeGroupsResponse.status === 'fulfilled'
 				? extractRows<{ id: string; title?: string; value?: string; name?: string }>(
 						attributeGroupsResponse.value
-				  ).map((row) => ({
+					).map((row) => ({
 						id: row.id,
 						title: pickLabel(row),
 						value: row.value,
@@ -394,7 +394,9 @@
 
 		const fetchedSalesChannels =
 			salesChannelsResponse.status === 'fulfilled'
-				? extractRows<{ id: string; name: string; is_default?: boolean }>(salesChannelsResponse.value)
+				? extractRows<{ id: string; name: string; is_default?: boolean }>(
+						salesChannelsResponse.value
+					)
 				: [];
 		salesChannelsList = fetchedSalesChannels.map((ch) => ({ id: ch.id, name: ch.name }));
 		const defaultChannels = fetchedSalesChannels.filter((ch) => ch.is_default);
@@ -472,16 +474,6 @@
 		syncVariantsFromOptions();
 	}
 
-	function addTag(tagId: string) {
-		if (tagId && !createTagIds.includes(tagId)) {
-			createTagIds = [...createTagIds, tagId];
-		}
-	}
-
-	function removeTag(tagId: string) {
-		createTagIds = createTagIds.filter((id) => id !== tagId);
-	}
-
 	const createTagIdsJson = $derived(JSON.stringify(createTagIds));
 	const createCollectionIdsJson = $derived(JSON.stringify(createCollectionIds));
 	const createSalesChannelIdsJson = $derived(JSON.stringify(createSalesChannelIds));
@@ -529,10 +521,7 @@
 
 	const normalizedFieldErrors = $derived(($serverFieldErrors ?? {}) as Record<string, unknown>);
 	const titleError = $derived(firstError(normalizedFieldErrors.title));
-	const attributeGroupError = $derived(
-		firstError(normalizedFieldErrors.attribute_group_id)
-	);
-	const categoryError = $derived(firstError(normalizedFieldErrors.category_id));
+	const attributeGroupError = $derived(firstError(normalizedFieldErrors.attribute_group_id));
 	const variantsError = $derived(firstError(normalizedFieldErrors.variants));
 
 	function submitCreate(status: 'draft' | 'published') {
@@ -663,7 +652,7 @@
 						<button
 							type="button"
 							class={cn(
-								'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+								'inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors',
 								createStep === 1
 									? 'bg-primary/10 text-primary'
 									: 'text-muted-foreground hover:text-foreground'
@@ -680,7 +669,7 @@
 						<button
 							type="button"
 							class={cn(
-								'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+								'inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors',
 								createStep === 2
 									? 'bg-primary/10 text-primary'
 									: 'text-muted-foreground hover:text-foreground'
@@ -697,7 +686,7 @@
 						<button
 							type="button"
 							class={cn(
-								'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+								'inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors',
 								createStep === 3
 									? 'bg-primary/10 text-primary'
 									: 'text-muted-foreground hover:text-foreground'
@@ -714,7 +703,7 @@
 						<button
 							type="button"
 							class={cn(
-								'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+								'inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors',
 								createStep === 4
 									? 'bg-primary/10 text-primary'
 									: 'text-muted-foreground hover:text-foreground'
@@ -731,7 +720,9 @@
 			</div>
 
 			{#if createError && !$createSubmitting}
-				<div class="mx-4 mt-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive sm:mx-6">
+				<div
+					class="mx-4 mt-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive sm:mx-6"
+				>
 					{createError}
 				</div>
 			{/if}
@@ -776,17 +767,10 @@
 					bind:createCategoryId
 					bind:createTagIds
 					bind:createSalesChannelIds
-					
-					collectionsList={collectionsList}
-					categoriesList={categoriesList}
-					tagsList={tagsList}
-					salesChannelsList={salesChannelsList}
-					addTag={addTag}
-					removeTag={removeTag}
-					addSalesChannel={(ids: string[]) => (createSalesChannelIds = ids)}
-					removeSalesChannel={(id: string) =>
-						(createSalesChannelIds = createSalesChannelIds.filter((channelId) => channelId !== id))}
-					
+					bind:salesChannelsList
+					{collectionsList}
+					{categoriesList}
+					{tagsList}
 				/>
 			{/if}
 
@@ -796,10 +780,10 @@
 					bind:createOptions
 					{displayedVariants}
 					bind:variantSearch
-					variantPagination={variantPagination}
-					variantStart={variantStart}
-					variantEnd={variantEnd}
-					variantTableColumns={variantTableColumns}
+					{variantPagination}
+					{variantStart}
+					{variantEnd}
+					{variantTableColumns}
 					{addOption}
 					{removeOption}
 					{updateOptionTitle}

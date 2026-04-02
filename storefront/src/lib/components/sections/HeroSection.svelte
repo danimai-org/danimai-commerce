@@ -3,14 +3,8 @@
 		title = 'Movement, simplified.',
 		subtitle = 'Scandinavian-inspired athleisure designed for everyday balance.',
 		ctaHref = '/collections/core-essentials',
-		ctaLabel = 'SHOP CORE ESSENTIALS →',
+		ctaLabel = 'SHOP CORE DENIMAI →',
 		videoSrc = 'https://cdn.mignite.app/ws/works_01KGFKTHDC6ZD3WS7GQTX8992N/Bring_a_bit_202602041404_u6uf6-01KGMC3H3BPBGYA1KXAMFFT0AM.mp4'
-	}: {
-		title?: string;
-		subtitle?: string;
-		ctaHref?: string;
-		ctaLabel?: string;
-		videoSrc?: string;
 	} = $props();
 </script>
 

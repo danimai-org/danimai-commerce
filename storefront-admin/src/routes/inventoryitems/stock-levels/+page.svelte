@@ -5,48 +5,23 @@
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import { client } from '$lib/client.js';
 	import { page } from '$app/state';
+	import { formatDate } from '$lib/utils';
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
-	const paginateState = createPagination(
-		async () => {
-			return client.inventory.levels.get({ query: paginationQuery });
-		},
-		['inventory-levels']
-	);
-
-	type InventoryLevel = {
-		id: string;	
-		inventory_item_id: string;
-		location_id: string;
-		stocked_quantity: number;
-		reserved_quantity: number;
-		available_quantity: number;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-		deleted_at: string | null;
-	};
-
-	
+	const paginateState = createPagination(async () => {
+		return client.inventory.levels.get({ query: paginationQuery });
+	}, ['inventory-levels']);
 
 	let searchQuery = $state('');
 
 	$effect(() => {
-		paginationQuery;
+		paginationQuery.search = searchQuery;
 		paginateState.refetch();
 	});
 	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
-	const rows = $derived((paginateState.query.data?.data?.rows ?? []) as unknown as InventoryLevel[]);
+	const rows = $derived(paginateState.query.data?.data?.rows ?? []);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
-
-	function formatDate(iso: string) {
-		return new Date(iso).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: '2-digit'
-		});
-	}
 </script>
 
 <svelte:head>
@@ -65,14 +40,12 @@
 		</div>
 		<div class="mb-6 flex flex-col gap-4">
 			<div>
-				<h1 class="text-lg font-semibold leading-none">Stock levels</h1>
-				<p class="mt-1 text-sm text-muted-foreground">
-					View and manage stock levels by location.
-				</p>
+				<h1 class="text-lg leading-none font-semibold">Stock levels</h1>
+				<p class="mt-1 text-sm text-muted-foreground">View and manage stock levels by location.</p>
 			</div>
 			<div class="flex items-center gap-2">
-				<div class="relative flex-1 max-w-sm">
-					<Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+				<div class="relative max-w-sm flex-1">
+					<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 					<Input
 						type="text"
 						placeholder="Search by Item ID or Location ID..."
@@ -153,7 +126,7 @@
 						size="sm"
 						disabled={!pagination?.has_next_page}
 						onclick={() => paginateState.query.refetch()}
-					>	
+					>
 						Next
 					</Button>
 				</div>

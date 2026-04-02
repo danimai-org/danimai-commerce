@@ -80,6 +80,30 @@ export const campaignRoutes = new Elysia({ prefix: "/campaigns" })
       },
     }
   )
+  .get(
+    "/:id",
+    async ({ params, set }) => {
+      const campaign = campaignsStore.find((c) => c.id === params.id);
+      if (!campaign) {
+        set.status = 404;
+        return { error: "NotFound", message: "Campaign not found" } as const;
+      }
+      return campaign;
+    },
+    {
+      params: Type.Object({ id: Type.String() }),
+      response: {
+        200: CampaignSchema,
+        404: NotFoundResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Campaigns"],
+        summary: "Get campaign by ID",
+        description: "Gets a single campaign by ID",
+      },
+    }
+  )
   .post(
     "/",
     async ({ body }) => {

@@ -1,4 +1,3 @@
-
 <script lang="ts">
 	import Search from '@lucide/svelte/icons/search';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
@@ -10,6 +9,8 @@
 	import { cn } from '$lib/utils.js';
 	import type { PaginationMeta, Product } from '../create/types.js';
 	import ProductListingCardPicker from './ProductListingCard.svelte';
+	import { resolve } from '$app/paths';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	type ProductFilter = Record<string, string | number | boolean | string[] | null | undefined>;
 	interface Props {
@@ -44,7 +45,6 @@
 	let addSubmitting = $state(false);
 	let removeSubmitting = $state(false);
 	let removeError = $state<string | null>(null);
-	let listVersion = $state(0);
 
 	let rows = $state<Product[]>([]);
 	let pagination = $state<PaginationMeta | null>(null);
@@ -99,19 +99,19 @@
 	const totalPages = $derived(Math.max(1, pagination?.total_pages ?? 1));
 	const start = $derived(pagination ? (pagination.page - 1) * pagination.limit + 1 : 0);
 	const end = $derived(pagination ? Math.min(pagination.page * pagination.limit, count) : 0);
-	const allVisibleSelected = $derived(rows.length > 0 && rows.every((row) => selectedIds.has(row.id)));
+	const allVisibleSelected = $derived(
+		rows.length > 0 && rows.every((row) => selectedIds.has(row.id))
+	);
 
 	$effect(() => {
-		filterKey;
+		void filterKey;
 		pageNum = 1;
 	});
 
 	$effect(() => {
-		filterKey;
-		listVersion;
-		pageNum;
-		limit;
-		search;
+		void filterKey;
+		void limit;
+		void search;
 		void loadProducts();
 	});
 
@@ -167,21 +167,20 @@
 	}
 
 	function toggleRowSelection(id: string) {
-		const next = new Set(selectedIds);
+		const next = new SvelteSet(selectedIds);
 		if (next.has(id)) next.delete(id);
 		else next.add(id);
 		selectedIds = next;
 	}
 
-
 	function toggleSelectAllVisible() {
 		if (allVisibleSelected) {
-			const next = new Set(selectedIds);
+			const next = new SvelteSet(selectedIds);
 			for (const row of rows) next.delete(row.id);
 			selectedIds = next;
 			return;
 		}
-		const next = new Set(selectedIds);
+		const next = new SvelteSet(selectedIds);
 		for (const row of rows) next.add(row.id);
 		selectedIds = next;
 	}
@@ -243,9 +242,9 @@
 		addSubmitting = true;
 		try {
 			await onAddProducts(Array.from(sheetSelectedIds));
-			listVersion++;
 			addSheetOpen = false;
 			sheetSelectedIds = new Set();
+			await loadProducts();
 		} catch (e) {
 			sheetError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -263,7 +262,7 @@
 			const ids = Array.from(selectedIds);
 			await onRemoveProducts(ids);
 			selectedIds = new Set();
-			listVersion++;
+			await loadProducts();
 		} catch (e) {
 			removeError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -280,12 +279,7 @@
 			embedded && 'border-b px-2 py-3 sm:px-4'
 		)}
 	>
-		<div
-			class={cn(
-				'flex flex-wrap items-center justify-between gap-4',
-				embedded && 'gap-2'
-			)}
-		>
+		<div class={cn('flex flex-wrap items-center justify-between gap-4', embedded && 'gap-2')}>
 			{#if !embedded && title.trim().length > 0}
 				<h2 class="font-semibold">{title}</h2>
 			{:else if embedded && title.trim().length > 0}
@@ -316,7 +310,7 @@
 				</Button>
 				<div class="relative">
 					<Search
-						class="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+						class="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-muted-foreground"
 					/>
 					<Input class="h-9 w-56 pl-8" placeholder="Search" bind:value={search} />
 				</div>
@@ -332,7 +326,7 @@
 
 	<div
 		class={cn(
-			'min-h-0 overflow-y-auto pl-6 pr-4',
+			'min-h-0 overflow-y-auto pr-4 pl-6',
 			embedded ? 'flex-1 px-2 py-2 sm:px-4' : 'max-h-[min(55vh,28rem)]'
 		)}
 	>
@@ -371,7 +365,7 @@
 				{:else}
 					{#each rows as row (row.id)}
 						<tr class="border-b last:border-b-0">
-							<td class="align-middle px-4 py-3">
+							<td class="px-4 py-3 align-middle">
 								<input
 									type="checkbox"
 									class="rounded border-muted-foreground/50"
@@ -381,7 +375,10 @@
 								/>
 							</td>
 							<td class="px-4 py-3">
-								<a href={`/products/${row.id}`} class="flex items-center gap-3 hover:opacity-90">
+								<a
+									href={resolve(`/products/${row.id}`, {})}
+									class="flex items-center gap-3 hover:opacity-90"
+								>
 									{#if row.thumbnail}
 										<img src={row.thumbnail} alt="" class="size-10 rounded-md object-cover" />
 									{:else}
@@ -446,7 +443,12 @@
 		>
 			<p class="text-sm text-muted-foreground">{start} - {end} of {count} results</p>
 			<div class="flex items-center gap-2">
-				<Button size="sm" variant="outline" onclick={() => goToPage(pageNum - 1)} disabled={pageNum <= 1}>
+				<Button
+					size="sm"
+					variant="outline"
+					onclick={() => goToPage(pageNum - 1)}
+					disabled={pageNum <= 1}
+				>
 					Prev
 				</Button>
 				<span class="text-sm text-muted-foreground">{pageNum} of {totalPages}</span>

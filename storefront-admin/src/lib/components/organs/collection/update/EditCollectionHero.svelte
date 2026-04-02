@@ -1,62 +1,76 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { cn } from '$lib/utils.js';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { toast, Toaster } from 'svelte-sonner';
+	import type { Collection } from '../type.js';
 
-	interface Collection {
-		id: string;
-		title?: string;
-		handle?: string;
-		metadata?: { handle?: string } | null;
-	}
+	type CollectionForEdit = NonNullable<Collection>;
 
-	interface Props {
-		collection: Collection | null;
-		onSaved?: () => void | Promise<void>;
-		onClosed: () => void;
-	}
+	let {
+		open = $bindable(false),
+		collection = null as CollectionForEdit | null,
+		onSuccess = () => {}
+	}: {
+		open?: boolean;
+		collection?: CollectionForEdit | null;
+		onSuccess?: () => void | Promise<void>;
+	} = $props();
 
-	let { collection, onSaved, onClosed }: Props = $props();
-	let open = $derived(!!collection);
+	let initializedForId = $state<string | null>(null);
 
-	const { form, errors, enhance, delayed, message, reset } = superForm(
-		{ id: '', title: '', handle: '' },
-		{
-			invalidateAll: true,
-			onResult: async ({ result }) => {
-				if (result.type === 'success') {
-					toast.success('Collection updated successfully');
-					if (onSaved) await onSaved();
-					onClosed(); // Close the sheet via the parent
-				}
+	const { form, errors, enhance, delayed, reset } = superForm(page.data.collectionUpdateForm, {
+		resetForm: false,
+		onResult: async ({ result }) => {
+			if (result.type === 'failure') {
+				const d = result.data as { error?: string } | undefined;
+				if (d?.error) toast.error(d.error);
+				return;
 			}
-		}
-	);
-	// Update form data only when a NEW collection is selected
-	$effect(() => {
-		if (collection) {
-			reset({
-				data: {
-					id: collection.id,
-					title: collection.title ?? '',
-					handle: (collection.handle ?? collection.metadata?.handle ?? '').replace(/^\//, '')
-				}
-			});
+			if (result.status === 200) {
+				toast.success('Collection updated successfully');
+				open = false;
+				if (onSuccess) await onSuccess();
+			}
 		}
 	});
 
-	function handleOpenChange(isOpen: boolean) {
-		if (!isOpen) onClosed();
+	$effect(() => {
+		if (!open) {
+			initializedForId = null;
+			return;
+		}
+
+		const nextId = collection?.id ?? '';
+		if (!nextId) return;
+		if (initializedForId === nextId) return;
+		initializedForId = nextId;
+
+		reset({
+			data: {
+				id: collection!.id,
+				title: collection!.title ?? '',
+				handle: (
+					collection!.handle ??
+					(collection!.metadata as { handle?: string })?.handle ??
+					''
+				).replace(/^\//, '')
+			}
+		});
+	});
+
+	function close() {
+		open = false;
 	}
 </script>
 
 <Toaster position="top-center" richColors={true} />
 
-<Sheet.Root {open} onOpenChange={handleOpenChange}>
-	<Sheet.Content side="right" class="w-full max-w-md">
+<Sheet.Root bind:open>
+	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
 		<form method="POST" action="?/update" use:enhance class="flex h-full flex-col">
 			<input type="hidden" name="id" bind:value={$form.id} />
 
@@ -65,10 +79,6 @@
 					<Sheet.Title>Edit Collection</Sheet.Title>
 					<Sheet.Description>Update the collection details below.</Sheet.Description>
 				</Sheet.Header>
-
-				{#if $message}
-					<p class="mt-4 text-sm text-destructive">{$message}</p>
-				{/if}
 
 				<div class="mt-6 space-y-4">
 					<div class="grid gap-2">
@@ -91,14 +101,18 @@
 							id="handle"
 							name="handle"
 							bind:value={$form.handle}
+							aria-invalid={!!$errors.handle}
 							class={cn($errors.handle && 'border-destructive')}
 						/>
+						{#if $errors.handle}
+							<span class="text-xs text-destructive">{$errors.handle}</span>
+						{/if}
 					</div>
 				</div>
 			</div>
 
 			<Sheet.Footer class="border-t p-4">
-				<Button variant="outline" type="button" onclick={onClosed}>Cancel</Button>
+				<Button variant="outline" type="button" onclick={close}>Cancel</Button>
 				<Button type="submit" disabled={$delayed}>
 					{$delayed ? 'Saving...' : 'Save Changes'}
 				</Button>

@@ -1,7 +1,20 @@
 <script lang="ts">
 	import StoreIcon from '@lucide/svelte/icons/store';
-	import { StoreListingCard } from '$lib/components/organs/index.js';
+	import {
+		JSONComponent,
+		MetadataComponent,
+		StoreListingCard
+	} from '$lib/components/organs/index.js';
 	import CurrencySheet from '$lib/components/organs/store/CurrencySheet.svelte';
+	import { client } from '$lib/client.js';
+	import { createQuery } from '@tanstack/svelte-query';
+
+	const storesQuery = createQuery(() => ({
+		queryKey: ['store'],
+		queryFn: () => client.stores.get()
+	}));
+
+	const store = $derived(storesQuery.data?.data ?? null);
 </script>
 
 <svelte:head>
@@ -23,5 +36,24 @@
 		</div>
 
 		<CurrencySheet />
+
+		{#if store}
+			<div class="mt-8 grid gap-4 sm:grid-cols-2">
+				<MetadataComponent
+					productId={store.id}
+					metadataEntity="store"
+					metadata={(store.metadata ?? {}) as Record<string, unknown>}
+					onSaved={() => {
+						void storesQuery.refetch();
+					}}
+				/>
+				<JSONComponent
+					product={store as Record<string, unknown>}
+					options={[]}
+					variants={[]}
+					category={null}
+				/>
+			</div>
+		{/if}
 	</div>
 </div>

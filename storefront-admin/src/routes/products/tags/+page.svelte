@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -18,6 +19,9 @@
 	import { client } from '$lib/client.js';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
+
+	let { data }: { data: PageData } = $props();
+
 	const paginateState = createPagination(
 		async () =>
 			client['product-tags'].get({
@@ -133,8 +137,13 @@
 	</div>
 </div>
 
-<TagFormSheet bind:open={paginateState.formSheetOpen} mode="create" onSuccess={handleFormSaved} />
+<TagFormSheet
+	bind:open={paginateState.formSheetOpen}
+	formData={data.tagCreateForm.data as { value: string }}
+	onSuccess={handleFormSaved}
+/>
 <EditTag
+	openOnTag
 	tag={formMode === 'edit' ? ((formItem as TagRow | null) ?? null) : null}
 	onSaved={handleFormSaved}
 	onClosed={handleEditClosed}

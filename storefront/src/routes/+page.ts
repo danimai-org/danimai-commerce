@@ -1,12 +1,5 @@
 import { API_BASE, firstVariantIdByProductIds, rowsFromPaginated } from '$lib/api/storefront-api';
-
-export type ProductGridItem = {
-	name: string;
-	price: string;
-	href: string;
-	bg: string;
-	image?: string | null;
-};
+import type { ProductGridItem } from './store/+page.ts';
 
 type ApiProduct = {
 	id: string;
@@ -50,7 +43,7 @@ export async function load() {
 	let error: string | null = null;
 
 	try {
-		const params = new URLSearchParams({ limit: '20', page: '1' });
+		const params = new URLSearchParams({ limit: '8', page: '1' });
 		const res = await fetch(`${API_BASE}/products?${params}`, { cache: 'no-store' });
 		if (!res.ok) {
 			error = `Products failed: ${res.status}`;

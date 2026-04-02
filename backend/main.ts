@@ -52,34 +52,44 @@ const serverLogger = new Elysia({ name: "server-logger" })
     const referer = request.headers.get("referer") ?? "";
     const uaShort = truncate(userAgent, 50);
     logger.info(
-      `→ Incoming  ${request.method} ${pathWithSearch}  [${reqId}]  ${uaShort}${referer ? `  referer=${truncate(referer, 50)}` : ""}`
+      `→ Incoming  ${request.method} ${pathWithSearch}  [${reqId}]  ${uaShort}${referer ? `  referer=${truncate(referer, 50)}` : ""}`,
     );
   })
   .onAfterResponse(({ request, set }) => {
     const start = requestStartTimes.get(request);
     const durationMs = start != null ? Math.round(Date.now() - start) : null;
     const url = new URL(request.url);
-    const status = typeof set.status === "number" ? set.status : Number(set.status) || 0;
-    const statusLabel = status >= 200 && status < 300 ? "OK" : status >= 400 && status < 500 ? "ClientError" : "ServerError";
+    const status =
+      typeof set.status === "number" ? set.status : Number(set.status) || 0;
+    const statusLabel =
+      status >= 200 && status < 300
+        ? "OK"
+        : status >= 400 && status < 500
+          ? "ClientError"
+          : "ServerError";
     const reqId = requestIds.get(request);
     logger.info(
-      `← Completed  ${request.method} ${url.pathname}  ${set.status} ${statusLabel}  ${durationMs != null ? durationMs + "ms" : "—"}  [${reqId}]`
+      `← Completed  ${request.method} ${url.pathname}  ${set.status} ${statusLabel}  ${durationMs != null ? durationMs + "ms" : "—"}  [${reqId}]`,
     );
   })
   .onError(({ request, code, error }) => {
     const msg = error instanceof Error ? error.message : String(error);
     const url = request ? new URL(request.url) : null;
     const reqId = request ? requestIds.get(request) : "—";
-    logger.error(`✗ Error  [${reqId}]  ${code}  ${msg}  ${url ? url.pathname : ""}`);
+    logger.error(
+      `✗ Error  [${reqId}]  ${code}  ${msg}  ${url ? url.pathname : ""}`,
+    );
   });
 
 const corsOrigin = process.env.CORS_ORIGIN || "*";
 
 const app = new Elysia()
-  .use(cors({
-    origin: corsOrigin,
-    credentials: corsOrigin !== "*",
-  }))
+  .use(
+    cors({
+      origin: corsOrigin,
+      credentials: corsOrigin !== "*",
+    }),
+  )
   .use(serverLogger)
   .use(
     swagger({
@@ -90,18 +100,25 @@ const app = new Elysia()
           version: "1.0.0",
         },
       },
-    })
+    }),
   )
   .use(adminRoutes)
   .listen(8000, () => {
     logger.info("Server started on http://localhost:8000");
-    logger.info("Swagger documentation available at http://localhost:8000/swagger");
+    logger.info(
+      "Swagger documentation available at http://localhost:8000/swagger",
+    );
   });
 
-const server = (app as { server?: { stop?: (force?: boolean) => Promise<void> } }).server;
+const server = (
+  app as { server?: { stop?: (force?: boolean) => Promise<void> } }
+).server;
 function shutdown() {
   if (typeof server?.stop === "function") {
-    server.stop(true).then(() => process.exit(0)).catch(() => process.exit(1));
+    server
+      .stop(true)
+      .then(() => process.exit(0))
+      .catch(() => process.exit(1));
   } else {
     process.exit(0);
   }
@@ -109,4 +126,4 @@ function shutdown() {
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
-export type App = typeof app 
+export type App = typeof app;

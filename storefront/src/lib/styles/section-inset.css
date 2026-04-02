@@ -1,0 +1,13 @@
+/* Shared horizontal alignment with ProductGridSection */
+:root {
+	--section-max-width: 1200px;
+	--section-padding-x: 1.5rem;
+	--section-padding-y: 4rem;
+}
+
+@media (max-width: 480px) {
+	:root {
+		--section-padding-x: 1.25rem;
+		--section-padding-y: 3rem;
+	}
+}

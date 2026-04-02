@@ -1,90 +1,72 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { createQuery } from '@tanstack/svelte-query';
+	import ChevronRight from '@lucide/svelte/icons/chevron-right';
+	import Tag from '@lucide/svelte/icons/tag';
 	import { client } from '$lib/client.js';
-	import { resolve } from '$app/paths';
-	import { TagHeroCard } from '$lib/components/organs/index.js';
-	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { ProductListingCard, TagHeroCard } from '$lib/components/organs/index.js';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
-	import { ProductListingCard } from '$lib/components/organs/index.js';
+	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
+	import { resolve } from '$app/paths';
+	import { setDetailContext, useDetailQuery } from '$lib/hooks';
+
 	const tagId = $derived(page.params?.id ?? '');
-	type TagDetail = {
-		id: string;
-		value: string;
-		metadata?: unknown | null;
-	};
+	const productListingFilter = $derived({ tag_ids: [tagId] });
+	const detailQuery = useDetailQuery(async () => {
+		const res = await client['product-tags']({ id: tagId }).get();
+		return res.data;
+	}, () => ['tag-detail', tagId]);
 
-	const tagDetailQuery = createQuery(() => ({
-		queryKey: ['tag-detail', tagId],
-		queryFn: async (): Promise<TagDetail | null> => {
-			if (!tagId) return null;
-			const res = await client['product-tags']({ id: tagId }).get();
-			if (res?.error) {
-				const err = res.error as { status?: number; value?: { message?: string } };
-				if (err?.status === 404) {
-					throw new Error('Tag not found');
-				}
-				throw new Error(String(err?.value?.message ?? res.error));
-			}
-			return (res?.data ?? null) as TagDetail | null;
-		},
-		enabled: !!tagId,
-		refetchOnWindowFocus: false
-	}));
+	setDetailContext(detailQuery);
 
-	const tag = $derived(tagDetailQuery.data ?? null);
-	const loading = $derived(tagDetailQuery.isPending && tagDetailQuery.isFetching);
-	const error = $derived(
-		tagDetailQuery.error != null
-			? tagDetailQuery.error instanceof Error
-				? tagDetailQuery.error.message
-				: String(tagDetailQuery.error)
-			: tag === null && tagDetailQuery.isSuccess && tagId
-				? 'Tag not found'
-				: null
-	);
+	const error = $derived(detailQuery?.error);
+	const isPending = $derived(detailQuery?.isPending);
 
-	const displayName = $derived(tag?.value ?? tagId ?? 'Tag');
 	let selectedIds = $state<Set<string>>(new Set());
-	async function refetchTag() {
-		await tagDetailQuery.refetch();
-	}
 </script>
 
 <svelte:head>
-	<title>{displayName} | Tags | Danimai Store</title>
+	<title>{detailQuery?.data?.value ?? tagId ?? 'Tag'} | Tags | Danimai Store</title>
 	<meta name="description" content="Manage product tags." />
 </svelte:head>
 
 <div class="flex h-full flex-col">
-	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div
-			class="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-b pb-4 text-sm text-muted-foreground"
-		>
-			<a href={resolve('/products/tags', {})} class="hover:text-foreground">Tags</a>
-			<span>/</span>
-			<span class="text-foreground">{displayName}</span>
-		</div>
-
-		{#if error}
-			<div
-				class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+	<div class="flex shrink-0 items-center gap-4 border-b px-6 py-3">
+		<nav class="flex items-center gap-[5px] pl-[10px] text-sm">
+			<button
+				type="button"
+				class="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+				onclick={() => goto(resolve('/products/tags', {}), { replaceState: true })}
 			>
-				{error}
-			</div>
-		{:else if loading}
-			<div class="flex min-h-0 flex-1 items-center justify-center">
-				<p class="text-muted-foreground">Loading…</p>
-			</div>
-		{:else if tag}
-			<div class="flex flex-col gap-6">
-				<div class="flex gap-6">
-					<TagHeroCard {tag} onUpdated={refetchTag} />
-				</div>
+				<Tag class="size-4 shrink-0" />
+				<span>Tags</span>
+			</button>
+			<ChevronRight class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+			<span class="font-medium text-foreground">{detailQuery?.data?.value ?? tagId ?? '…'}</span>
+		</nav>
+	</div>
 
+	{#if isPending}
+		<div class="flex flex-1 items-center justify-center p-6">
+			<p class="text-muted-foreground">Loading…</p>
+		</div>
+	{:else if error || !detailQuery?.data}
+		<div class="flex flex-1 flex-col items-center justify-center gap-4 p-6">
+			<p class="text-destructive">{error ?? 'Tag not found'}</p>
+			<Button
+				variant="outline"
+				onclick={() => goto(resolve('/products/tags', {}), { replaceState: true })}
+				>Back to Tags</Button
+			>
+		</div>
+	{:else}
+		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
+			<div class="flex flex-col gap-4 p-6">
+				<TagHeroCard />
 				<ProductListingCard
 					title="Tagged products"
-					filter={{ tag_ids: [tagId] }}
+					filter={productListingFilter}
 					pickerFilter={{}}
 					bind:selectedIds
 					onAddProducts={async (ids) => {
@@ -106,16 +88,24 @@
 						}
 					}}
 				/>
+
 				<div class="grid gap-4 sm:grid-cols-2">
 					<MetadataComponent
-						productId={tag.id}
-						metadata={tag.metadata as Record<string, unknown> | null}
+						productId={detailQuery?.data?.id ?? ''}
 						metadataEntity="product-tag"
-						onSaved={refetchTag}
+						metadata={detailQuery?.data?.metadata as Record<string, unknown> | null}
+						onSaved={() => {
+							void detailQuery?.refetch();
+						}}
 					/>
-					<JSONComponent product={tag} options={[]} variants={[]} category={null} />
+					<JSONComponent
+						product={detailQuery?.data ?? null}
+						options={[]}
+						variants={[]}
+						category={null}
+					/>
 				</div>
 			</div>
-		{/if}
-	</div>
+		</div>
+	{/if}
 </div>

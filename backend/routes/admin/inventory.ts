@@ -18,6 +18,10 @@ import {
   CreateInventoryLevelProcess,
   DeleteInventoryLevelsProcess,
   DeleteInventoryItemsProcess,
+  CREATE_RESERVATION_ITEM_PROCESS,
+  CreateReservationItemProcess,
+  CreateReservationItemSchema,
+  CreateReservationItemResponseSchema,
   PaginatedInventoryItemsSchema,
   PaginatedInventoryItemsResponseSchema,
   CreateInventoryItemSchema,
@@ -227,6 +231,28 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
         tags: ["Inventory"],
         summary: "Get paginated inventory levels",
         description: "Gets a paginated list of inventory levels by location",
+      },
+    }
+  )
+  .post(
+    "/reservation-items",
+    async ({ body: input }) => {
+      const process = getService<CreateReservationItemProcess>(
+        CREATE_RESERVATION_ITEM_PROCESS
+      );
+      return process.runOperations({ input });
+    },
+    {
+      body: CreateReservationItemSchema,
+      response: {
+        200: CreateReservationItemResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Inventory"],
+        summary: "Create reservation item",
+        description: "Creates a reservation for stock at a location",
       },
     }
   );
