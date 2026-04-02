@@ -21,9 +21,15 @@ const CollectionDeleteSchema = z.object({
 export const load: PageServerLoad = async () => {
 	const collectionCreateForm = await superValidate(
 		{ title: '', handle: '' },
-		zod4(CollectionCreateSchema)
+		zod4(CollectionCreateSchema),
+		{ errors: false }
 	);
-	return { collectionCreateForm };
+	const collectionDeleteForm = await superValidate(
+		{ collection_ids: [] },
+		zod4(CollectionDeleteSchema),
+		{ errors: false }
+	);
+	return { collectionCreateForm, collectionDeleteForm };
 };
 
 export const actions = {

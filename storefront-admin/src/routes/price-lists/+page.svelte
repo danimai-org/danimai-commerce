@@ -52,6 +52,12 @@
 	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
 	const refetch = $derived(paginateState.refetch);
 
+	function goToPriceListEdit(item: Parameters<typeof paginateState.openEdit>[0]) {
+		const id = (item as { id?: string }).id;
+		if (!id) return;
+		goto(resolve(`/price-lists/${id}?edit=true`, {}));
+	}
+
 	const tableColumns: TableColumn[] = [
 		{ label: 'Name', key: 'name', type: 'text' },
 		{ label: 'Type', key: 'type', type: 'text' },
@@ -68,8 +74,7 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) =>
-						paginateState.openEdit(item as Parameters<typeof paginateState.openEdit>[0])
+					onClick: (item) => goToPriceListEdit(item as Parameters<typeof paginateState.openEdit>[0])
 				},
 				{
 					label: 'Delete',
@@ -83,6 +88,10 @@
 			]
 		}
 	];
+
+	function goToPriceListDetails(row: PriceListRow) {
+		goto(resolve(`/price-lists/${row.id}`, {}));
+	}
 </script>
 
 <svelte:head>
@@ -118,6 +127,7 @@
 							{rows}
 							columns={tableColumns}
 							emptyMessage="No price lists yet. Create one to define custom pricing (e.g. sales or overrides)."
+							onRowClick={(row) => goToPriceListDetails(row as unknown as PriceListRow)}
 						/>
 					</table>
 				</div>

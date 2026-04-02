@@ -35,7 +35,8 @@ export const load: PageServerLoad = async () => {
 			name: '',
 			currency_code: ''
 		},
-		zod4(RegionCreateSchema)
+		zod4(RegionCreateSchema),
+		{ errors: false }
 	);
 
 	const regionUpdateForm = await superValidate(
@@ -44,10 +45,14 @@ export const load: PageServerLoad = async () => {
 			name: '',
 			currency_code: ''
 		},
-		zod4(RegionUpdateSchema)
+		zod4(RegionUpdateSchema),
+		{ errors: false }
 	);
 
-	return { regionCreateForm, regionUpdateForm };
+	return {
+		regionCreateForm,
+		regionUpdateForm
+	};
 };
 
 export const actions = {

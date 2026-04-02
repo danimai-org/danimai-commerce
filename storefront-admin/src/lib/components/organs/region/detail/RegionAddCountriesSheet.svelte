@@ -19,7 +19,6 @@
 		if (!iso) return undefined;
 		return countryByIso.get(String(iso).toUpperCase());
 	}
-
 	let {
 		open = $bindable(false),
 		initialSelectedIds = [] as string[],

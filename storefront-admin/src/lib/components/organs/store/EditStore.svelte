@@ -6,15 +6,21 @@
 	import type { ComboboxOption } from '$lib/components/organs/combobox/combobox.svelte';
 	import { client } from '$lib/client.js';
 	import { createQuery } from '@tanstack/svelte-query';
+	import { superForm } from 'sveltekit-superforms/client';
+	import type { PageData } from '../../../../routes/store/$types';
+	import { cn } from '$lib/utils.js';
 
 	type Store = Awaited<ReturnType<typeof client.stores.get>>['data'];
+	type StoreUpdateForm = PageData['storeUpdateForm'];
 
 	let {
 		open = $bindable(false),
+		storeUpdateForm,
 		store,
 		onSuccess = () => {}
 	}: {
 		open?: boolean;
+		storeUpdateForm: StoreUpdateForm;
 		store?: Store;
 		onSuccess?: () => void;
 	} = $props();
@@ -74,132 +80,146 @@
 			currenciesQuery.isPending
 	);
 
-	let name = $state('');
-	let defaultCurrency = $state('');
-	let defaultSalesChannel = $state('');
-	let defaultRegion = $state('');
-	let defaultLocation = $state('');
-	let submitting = $state(false);
-	let submitError = $state<string | null>(null);
+	// svelte-ignore state_referenced_locally
+	const { form, errors, enhance, delayed, reset, message } = superForm(storeUpdateForm, {
+		id: 'edit-store-form',
+		resetForm: false,
+		invalidateAll: 'force',
+		onResult: ({ result }) => {
+			if (result.type === 'success') {
+				open = false;
+				onSuccess();
+				return;
+			}
+			if (result.type === 'failure') {
+				const d = result.data as { error?: string } | undefined;
+				if (d?.error) message.set(d.error);
+			}
+		}
+	});
 
 	$effect(() => {
 		if (!open) return;
 		const s = store;
 		if (s) {
-			name = s.name;
-			defaultCurrency = s.default_currency_code ?? '';
-			defaultSalesChannel = s.default_sales_channel_id ?? '';
-			defaultRegion = s.default_region_id ?? '';
-			defaultLocation = s.default_location_id ?? '';
+			reset({
+				data: {
+					id: s.id,
+					name: s.name,
+					default_currency_code: s.default_currency_code ?? '',
+					default_sales_channel_id: s.default_sales_channel_id ?? '',
+					default_region_id: s.default_region_id ?? '',
+					default_location_id: s.default_location_id ?? ''
+				}
+			});
 		} else {
-			name = '';
-			defaultCurrency = '';
-			defaultSalesChannel = '';
-			defaultRegion = '';
-			defaultLocation = '';
+			reset({
+				data: {
+					id: '',
+					name: '',
+					default_currency_code: '',
+					default_sales_channel_id: '',
+					default_region_id: '',
+					default_location_id: ''
+				}
+			});
 		}
+		message.set('');
 	});
 
 	function close() {
 		open = false;
-		submitError = null;
-	}
-
-	async function submit() {
-		submitting = true;
-		submitError = null;
-		try {
-			await client.stores.post({
-				name: name.trim() || 'Store',
-				default_currency_code: defaultCurrency || undefined,
-				default_sales_channel_id: defaultSalesChannel || undefined,
-				default_region_id: defaultRegion || undefined,
-				default_location_id: defaultLocation || undefined
-			});
-			open = false;
-			onSuccess();
-		} catch (e: unknown) {
-			submitError = e instanceof Error ? e.message : String(e);
-		} finally {
-			submitting = false;
-		}
+		message.set('');
 	}
 </script>
 
 <Sheet.Root bind:open>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-md">
-		<div class="flex h-full flex-col">
-			<div class="flex-1 overflow-auto p-6 pt-12">
-				<h2 class="text-lg font-semibold">Edit store</h2>
-				<p class="mt-1 text-sm text-muted-foreground">Update your store's details.</p>
-				{#if submitError}
-					<div
-						class="mt-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-					>
-						{submitError}
-					</div>
-				{/if}
-				<div class="mt-6 flex flex-col gap-4">
-					<div class="flex flex-col gap-2">
-						<label for="edit-store-name" class="text-sm font-medium">Name</label>
-						<Input
-							id="edit-store-name"
-							type="text"
-							bind:value={name}
-							placeholder="Store name"
-							class="h-9"
-						/>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="edit-store-currency" class="text-sm font-medium">Default currency</label>
-						<Combobox
-							id="edit-store-currency"
-							options={currencyOptions}
-							bind:value={defaultCurrency}
-							placeholder="Select currency"
-							disabled={optionsLoading}
-						/>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="edit-store-region" class="text-sm font-medium">Default region</label>
-						<Combobox
-							id="edit-store-region"
-							options={regionOptions}
-							bind:value={defaultRegion}
-							placeholder="Select region"
-							disabled={optionsLoading}
-						/>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="edit-store-sales-channel" class="text-sm font-medium"
-							>Default sales channel</label
+		<form method="POST" action="?/updateStore" use:enhance class="flex h-full flex-col">
+			<input type="hidden" name="id" value={$form.id ?? ''} />
+			<input type="hidden" name="default_currency_code" value={$form.default_currency_code} />
+			<input type="hidden" name="default_sales_channel_id" value={$form.default_sales_channel_id} />
+			<input type="hidden" name="default_region_id" value={$form.default_region_id} />
+			<input type="hidden" name="default_location_id" value={$form.default_location_id} />
+
+			<div class="flex h-full flex-col">
+				<div class="flex-1 overflow-auto p-6 pt-12">
+					<h2 class="text-lg font-semibold">Edit store</h2>
+					<p class="mt-1 text-sm text-muted-foreground">Update your store's details.</p>
+					{#if $message}
+						<div
+							class="mt-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
 						>
-						<Combobox
-							id="edit-store-sales-channel"
-							options={salesChannelOptions}
-							bind:value={defaultSalesChannel}
-							placeholder="Select sales channel"
-							disabled={optionsLoading}
-						/>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="edit-store-location" class="text-sm font-medium">Default location</label>
-						<Combobox
-							id="edit-store-location"
-							options={locationOptions}
-							bind:value={defaultLocation}
-							placeholder="Select location"
-							disabled={optionsLoading}
-						/>
+							{$message}
+						</div>
+					{/if}
+					<div class="mt-6 flex flex-col gap-4">
+						<div class="flex flex-col gap-2">
+							<label for="edit-store-name" class="text-sm font-medium">Name</label>
+							<Input
+								id="edit-store-name"
+								name="name"
+								type="text"
+								bind:value={$form.name}
+								placeholder="Store name"
+								aria-invalid={$errors.name ? 'true' : undefined}
+								class={cn('h-9', $errors.name && 'border-destructive')}
+							/>
+							{#if $errors.name}
+								<span class="text-xs text-destructive">{$errors.name}</span>
+							{/if}
+						</div>
+						<div class="flex flex-col gap-2">
+							<label for="edit-store-currency" class="text-sm font-medium">Default currency</label>
+							<Combobox
+								id="edit-store-currency"
+								options={currencyOptions}
+								bind:value={$form.default_currency_code}
+								placeholder="Select currency"
+								disabled={optionsLoading}
+							/>
+						</div>
+						<div class="flex flex-col gap-2">
+							<label for="edit-store-region" class="text-sm font-medium">Default region</label>
+							<Combobox
+								id="edit-store-region"
+								options={regionOptions}
+								bind:value={$form.default_region_id}
+								placeholder="Select region"
+								disabled={optionsLoading}
+							/>
+						</div>
+						<div class="flex flex-col gap-2">
+							<label for="edit-store-sales-channel" class="text-sm font-medium"
+								>Default sales channel</label
+							>
+							<Combobox
+								id="edit-store-sales-channel"
+								options={salesChannelOptions}
+								bind:value={$form.default_sales_channel_id}
+								placeholder="Select sales channel"
+								disabled={optionsLoading}
+							/>
+						</div>
+						<div class="flex flex-col gap-2">
+							<label for="edit-store-location" class="text-sm font-medium">Default location</label>
+							<Combobox
+								id="edit-store-location"
+								options={locationOptions}
+								bind:value={$form.default_location_id}
+								placeholder="Select location"
+								disabled={optionsLoading}
+							/>
+						</div>
 					</div>
 				</div>
+				<div class="flex justify-end gap-2 border-t p-4">
+					<Button type="button" variant="outline" onclick={close} disabled={$delayed}>Cancel</Button>
+					<Button type="submit" disabled={$delayed || optionsLoading}>
+						{$delayed ? 'Saving…' : 'Save'}
+					</Button>
+				</div>
 			</div>
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={close} disabled={submitting}>Cancel</Button>
-				<Button onclick={submit} disabled={submitting || optionsLoading}>
-					{submitting ? 'Saving…' : 'Save'}
-				</Button>
-			</div>
-		</div>
+		</form>
 	</Sheet.Content>
 </Sheet.Root>

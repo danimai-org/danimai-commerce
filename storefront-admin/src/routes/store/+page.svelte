@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { PageData } from './$types';
 	import StoreIcon from '@lucide/svelte/icons/store';
 	import {
 		JSONComponent,
@@ -8,6 +9,8 @@
 	import CurrencySheet from '$lib/components/organs/store/CurrencySheet.svelte';
 	import { client } from '$lib/client.js';
 	import { createQuery } from '@tanstack/svelte-query';
+
+	let { data }: { data: PageData } = $props();
 
 	const storesQuery = createQuery(() => ({
 		queryKey: ['store'],
@@ -32,7 +35,7 @@
 		</div>
 
 		<div class="mb-8">
-			<StoreListingCard />
+			<StoreListingCard storeUpdateForm={data.storeUpdateForm} />
 		</div>
 
 		<CurrencySheet />

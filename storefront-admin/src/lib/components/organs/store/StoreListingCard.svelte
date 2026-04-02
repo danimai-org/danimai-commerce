@@ -2,6 +2,7 @@
 	import EditStore from '$lib/components/organs/store/EditStore.svelte';
 	import { client } from '$lib/client.js';
 	import { createQuery } from '@tanstack/svelte-query';
+	import type { PageData } from '../../../../routes/store/$types';
 	import Loader from '@lucide/svelte/icons/loader';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
@@ -9,6 +10,10 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 
 	const listQuery = { page: 1, limit: 100 } as const;
+
+	type StoreUpdateForm = PageData['storeUpdateForm'];
+
+	let { storeUpdateForm }: { storeUpdateForm: StoreUpdateForm } = $props();
 
 	const storesQuery = createQuery(() => ({
 		queryKey: ['store'],
@@ -42,6 +47,11 @@
 		queryFn: () => client['sales-channels'].get({ query: listQuery }),
 		enabled: lookupsEnabled
 	}));
+const defaultSalesChannelQuery = createQuery(() => ({
+	queryKey: ['store-listing-card', 'sales-channel', store?.default_sales_channel_id ?? null],
+	queryFn: () => client['sales-channels']({ id: store!.default_sales_channel_id! }).get(),
+	enabled: lookupsEnabled && !!store?.default_sales_channel_id
+}));
 	const stockLocationsQuery = createQuery(() => ({
 		queryKey: ['store-listing-card', 'stock-locations', listQuery.page, listQuery.limit],
 		queryFn: () => client['stock-locations'].get({ query: listQuery }),
@@ -67,7 +77,9 @@
 		const id = store?.default_sales_channel_id;
 		if (!id) return null;
 		const rows = salesChannelsQuery.data?.data?.rows ?? [];
-		return rows.find((r) => r.id === id)?.name ?? null;
+	const fromList = rows.find((r) => r.id === id)?.name ?? null;
+	if (fromList) return fromList;
+	return defaultSalesChannelQuery.data?.data?.name ?? null;
 	});
 
 	const locationDisplay = $derived.by(() => {
@@ -82,6 +94,7 @@
 			(currenciesQuery.isPending ||
 				regionsQuery.isPending ||
 				salesChannelsQuery.isPending ||
+				defaultSalesChannelQuery.isPending ||
 				stockLocationsQuery.isPending)
 	);
 </script>
@@ -154,7 +167,7 @@
 									{#if currencyDisplay}
 										<span class="inline-flex flex-wrap items-center gap-2">
 											<span
-												class="inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 text-xs font-medium tabular-nums text-foreground"
+												class="inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 text-xs font-medium text-foreground tabular-nums"
 												>{currencyDisplay.code}</span
 											>
 											{#if currencyDisplay.name}
@@ -239,6 +252,7 @@
 
 <EditStore
 	bind:open={editStoreOpen}
+	{storeUpdateForm}
 	store={store ?? undefined}
 	onSuccess={() => storesQuery.refetch()}
 />
