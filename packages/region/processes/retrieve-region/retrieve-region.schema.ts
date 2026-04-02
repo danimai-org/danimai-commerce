@@ -1,4 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
+import { CountryResponseSchema } from "../list-countries/list-countries.schema";
 
 export const RetrieveRegionSchema = Type.Object({
   id: Type.String(),
@@ -16,9 +17,11 @@ export const RegionResponseSchema = Type.Object({
   deleted_at: Type.Union([Type.Date(), Type.Null()]),
 });
 
-export const RetrieveRegionResponseSchema = Type.Union([
+export const RetrieveRegionResponseSchema = Type.Composite([
   RegionResponseSchema,
-  Type.Undefined(),
+  Type.Object({
+    countries: Type.Array(CountryResponseSchema),
+  }),
 ]);
 
 export type RetrieveRegionProcessOutput = Static<
