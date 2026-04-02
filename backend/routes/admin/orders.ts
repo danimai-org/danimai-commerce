@@ -1,21 +1,26 @@
 import { Elysia } from "elysia";
-import { Type } from "@sinclair/typebox";
-import { DANIMAI_DB, getService } from "@danimai/core";
-import type { Kysely } from "kysely";
+import { Type, type StaticDecode } from "@sinclair/typebox";
+import { getService } from "@danimai/core";
 import {
   PAGINATED_ORDERS_PROCESS,
   PaginatedOrdersProcess,
-  PaginatedOrdersSchema,
+  PaginatedOrdersQuerySchema,
   PaginatedOrdersResponseSchema,
   CREATE_ORDERS_PROCESS,
   CreateOrdersProcess,
   CreateOrdersSchema,
   CreateOrdersResponseSchema,
+  CREATE_ORDER_FROM_CART_PROCESS,
+  CreateOrderFromCartProcess,
+  CreateOrderFromCartSchema,
   UPDATE_ORDERS_PROCESS,
   UpdateOrdersProcess,
+  UpdateOrderSchema,
   UpdateOrderResponseSchema,
   OrderResponseSchema,
-  type Database,
+  RETRIEVE_ORDER_PROCESS,
+  RetrieveOrderProcess,
+  RetrieveOrderSchema,
 } from "@danimai/order";
 import { handleProcessError } from "../../utils/error-handler";
 import {
@@ -23,66 +28,20 @@ import {
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
-const OrderStatus = Type.Union([
-  Type.Literal("pending"),
-  Type.Literal("completed"),
-  Type.Literal("archived"),
-  Type.Literal("canceled"),
-  Type.Literal("requires_action"),
-]);
-const FulfillmentStatus = Type.Union([
-  Type.Literal("not_fulfilled"),
-  Type.Literal("partially_fulfilled"),
-  Type.Literal("fulfilled"),
-  Type.Literal("partially_shipped"),
-  Type.Literal("shipped"),
-  Type.Literal("partially_returned"),
-  Type.Literal("returned"),
-  Type.Literal("canceled"),
-  Type.Literal("requires_action"),
-]);
-const PaymentStatus = Type.Union([
-  Type.Literal("not_paid"),
-  Type.Literal("awaiting"),
-  Type.Literal("captured"),
-  Type.Literal("partially_refunded"),
-  Type.Literal("refunded"),
-  Type.Literal("canceled"),
-  Type.Literal("requires_action"),
-]);
-
-const UpdateOrderBodySchema = Type.Object({
-  status: Type.Optional(OrderStatus),
-  fulfillment_status: Type.Optional(FulfillmentStatus),
-  payment_status: Type.Optional(PaymentStatus),
-  email: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-  customer_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-  sales_channel_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-  region_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-  billing_address_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-  shipping_address_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-  metadata: Type.Optional(Type.Unknown()),
-});
+const UpdateOrderBodySchema = Type.Omit(UpdateOrderSchema, ["id"]);
 
 export const orderRoutes = new Elysia({ prefix: "/orders" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .get(
     "/",
-    async ({ query }) => {
+    async ({ query: input }) => {
       const process = getService<PaginatedOrdersProcess>(PAGINATED_ORDERS_PROCESS);
-      const input: Record<string, unknown> = { ...query };
-      if (query.page !== undefined) {
-        const p = typeof query.page === "string" ? parseInt(query.page, 10) : query.page;
-        input.page = Number.isNaN(p) ? 1 : Math.max(1, p);
-      }
-      if (query.limit !== undefined) {
-        const l = typeof query.limit === "string" ? parseInt(query.limit, 10) : query.limit;
-        input.limit = Number.isNaN(l) ? 10 : Math.max(1, Math.min(100, l));
-      }
-      return process.runOperations({ input });
+      return process.runOperations({
+        input: input as StaticDecode<typeof PaginatedOrdersQuerySchema>,
+      });
     },
     {
-      query: PaginatedOrdersSchema,
+      query: PaginatedOrdersQuerySchema,
       response: {
         200: PaginatedOrdersResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -97,15 +56,14 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
   )
   .post(
     "/",
-    async ({ body: input }) => {
+    async ({ body: input }: { body: StaticDecode<typeof CreateOrdersSchema> }) => {
       const process = getService<CreateOrdersProcess>(CREATE_ORDERS_PROCESS);
-      const result = await process.runOperations({ input });
-      return { data: result };
+      return process.runOperations({ input });
     },
     {
       body: CreateOrdersSchema,
       response: {
-        200: Type.Object({ data: CreateOrdersResponseSchema }),
+        200: CreateOrdersResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -116,29 +74,39 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
       },
     }
   )
-  .get(
-    "/:id",
-    async ({ params, set }) => {
-      const db = getService<Kysely<Database>>(DANIMAI_DB);
-      const order = await db
-        .selectFrom("orders")
-        .where("id", "=", params.id)
-        .where("deleted_at", "is", null)
-        .selectAll()
-        .executeTakeFirst();
-
-      if (!order) {
-        set.status = 404;
-        return { message: "Order not found" };
-      }
-
-      return order;
+  .post(
+    "/from-cart",
+    async ({ body }: { body: StaticDecode<typeof CreateOrderFromCartSchema> }) => {
+      const process = getService<CreateOrderFromCartProcess>(
+        CREATE_ORDER_FROM_CART_PROCESS
+      );
+      return process.runOperations({ input: body });
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      body: CreateOrderFromCartSchema,
       response: {
         200: OrderResponseSchema,
-        404: Type.Object({ message: Type.String() }),
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Orders"],
+        summary: "Create order from cart",
+        description:
+          "Builds an order from a cart (line items, tax lines, shipping snapshot), marks the cart completed",
+      },
+    }
+  )
+  .get(
+    "/:id",
+    async ({ params }) => {
+      const process = getService<RetrieveOrderProcess>(RETRIEVE_ORDER_PROCESS);
+      return process.runOperations({ input: { id: params.id } });
+    },
+    {
+      params: Type.Object({ id: RetrieveOrderSchema.properties.id }),
+      response: {
+        200: OrderResponseSchema,
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },
@@ -151,22 +119,26 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
   )
   .patch(
     "/:id",
-    async ({ params, body, set }) => {
+    async ({
+      params,
+      body,
+    }: {
+      params: { id: string };
+      body: StaticDecode<typeof UpdateOrderBodySchema>;
+    }) => {
       const process = getService<UpdateOrdersProcess>(UPDATE_ORDERS_PROCESS);
-      const input = { ...(body as Record<string, unknown>), id: params.id };
-      const result = await process.runOperations({ input });
-      if (!result) {
-        set.status = 404;
-        return { message: "Order not found" };
-      }
-      return result;
+      return process.runOperations({
+        input: {
+          ...body,
+          id: params.id,
+        },
+      });
     },
     {
-      params: Type.Object({ id: Type.String() }),
+      params: Type.Object({ id: UpdateOrderSchema.properties.id }),
       body: UpdateOrderBodySchema,
       response: {
         200: UpdateOrderResponseSchema,
-        404: Type.Object({ message: Type.String() }),
         400: ValidationErrorResponseSchema,
         500: InternalErrorResponseSchema,
       },

@@ -3,6 +3,7 @@ import { Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   PAGINATED_REGIONS_PROCESS,
+  PAGINATED_COUNTRIES_PROCESS,
   CREATE_REGIONS_PROCESS,
   UPDATE_REGION_PROCESS,
   DELETE_REGIONS_PROCESS,
@@ -11,6 +12,7 @@ import {
   REMOVE_COUNTRIES_FROM_REGION_PROCESS,
   RETRIEVE_REGION_PROCESS,
   PaginatedRegionsProcess,
+  PaginatedCountriesProcess,
   CreateRegionsProcess,
   UpdateRegionProcess,
   DeleteRegionsProcess,
@@ -20,6 +22,8 @@ import {
   RetrieveRegionProcess,
   PaginatedRegionsSchema,
   PaginatedRegionsResponseSchema,
+  PaginatedCountriesSchema,
+  PaginatedCountriesResponseSchema,
   CreateRegionSchema,
   CreateRegionResponseSchema,
   UpdateRegionResponseSchema,
@@ -75,6 +79,31 @@ export const regionRoutes = new Elysia({ prefix: "/regions" })
         tags: ["Regions"],
         summary: "Get paginated regions",
         description: "Gets a paginated list of regions",
+      },
+    },
+  )
+  .get(
+    "/countries",
+    async ({ query: input }) => {
+      const process = getService<PaginatedCountriesProcess>(
+        PAGINATED_COUNTRIES_PROCESS,
+      );
+      return process.runOperations({
+        input: input as StaticDecode<typeof PaginatedCountriesSchema>,
+      });
+    },
+    {
+      query: PaginatedCountriesSchema,
+      response: {
+        200: PaginatedCountriesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Regions"],
+        summary: "Get paginated countries",
+        description:
+          "Gets a paginated list of countries (optionally filtered by region)",
       },
     },
   )

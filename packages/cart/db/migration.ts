@@ -15,6 +15,7 @@ export async function up(db: Kysely<unknown>) {
     .addColumn("currency_code", "text")
     .addColumn("region_id", "text")
     .addColumn("customer_id", "text")
+    .addColumn("session_id", "uuid", (col) => col.notNull())
     .addColumn("type", "text")
     .addColumn("completed_at", "timestamptz")
     .addColumn("payment_authorized_at", "timestamptz")

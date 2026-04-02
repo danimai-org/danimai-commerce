@@ -28,6 +28,14 @@ if (!packageName.match(/^[a-z0-9-]+$/)) {
   process.exit(1);
 }
 
+if (packageName === "superadmin") {
+  console.error(
+    'There is no @danimai/superadmin/db migration. To create a superadmin user, from the backend directory run:\n' +
+      "  bun run superadmin"
+  );
+  process.exit(1);
+}
+
 async function runMigration() {
   try {
     const logger = getLogger();

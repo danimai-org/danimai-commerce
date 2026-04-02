@@ -6,3 +6,4 @@ export * from "./list-countries";
 export * from "./update-region";
 export * from "./retrieve-region";
 export * from "./paginated-regions";
+export * from "./paginated-countries";

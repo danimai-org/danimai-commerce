@@ -95,7 +95,6 @@ export class LoginProcess
 
     const session = await this.createSessionProcess.runOperations({
       input: {
-        user_id: user.id,
         expires_at: sessionExpiresAt.toISOString(),
       },
     });
@@ -118,7 +117,7 @@ export class LoginProcess
     );
 
     await this.updateSessionProcess.runOperations({
-      input: { id: session.id, refresh_token },
+      input: { id: session.id, user_id: user.id, refresh_token },
     });
 
     return {

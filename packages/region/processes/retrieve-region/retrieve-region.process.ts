@@ -42,6 +42,14 @@ export class RetrieveRegionProcess
       throw new NotFoundError("Region not found");
     }
 
-    return region;
+    const countries = await this.db
+      .selectFrom("countries")
+      .where("region_id", "=", region.id)
+      .where("deleted_at", "is", null)
+      .orderBy("display_name", "asc")
+      .selectAll()
+      .execute();
+
+    return { ...region, countries };
   }
 }

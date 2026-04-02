@@ -20,38 +20,40 @@ import { customerRoutes } from "./customers";
 import { customerGroupRoutes } from "./customer-groups";
 import { inventoryRoutes } from "./inventory";
 import { orderRoutes } from "./orders";
+import { cartRoutes } from "./carts";
 import { stockLocationRoutes } from "./stock-locations";
 import { priceListRoutes } from "./price-lists";
 import { uploadRoutes } from "./upload";
 import { promotionRoutes } from "./promotions";
 import { campaignRoutes } from "./campaigns";
 
-export const routes = new Elysia().group("/admin", (app) => {
-  return app
-    .use(uploadRoutes)
-    .use(productRoutes)
-    .use(collectionRoutes)
-    .use(productCategoryRoutes)
-    .use(productTagRoutes)
-    .use(productAttributeRoutes)
-    .use(productAttributeGroupRoutes)
-    .use(productVariantRoutes)
-    .use(salesChannelRoutes)
-    .use(currencyRoutes)
-    .use(regionRoutes)
-    .use(taxRegionRoutes)
-    .use(storeRoutes)
-    .use(userRoutes)
-    .use(roleRoutes)
-    .use(permissionRoutes)
-    .use(authRoutes)
-    .use(inviteRoutes)
-    .use(customerRoutes)
-    .use(customerGroupRoutes)
-    .use(inventoryRoutes)
-    .use(orderRoutes)
-    .use(stockLocationRoutes)
-    .use(priceListRoutes)
-    .use(promotionRoutes)
-    .use(campaignRoutes);
-});
+export const routes = new Elysia()
+    .group('/admin', (app) => {
+        return app.use(uploadRoutes)
+            .use(productRoutes)
+            .use(collectionRoutes)
+            .use(productCategoryRoutes)
+            .use(productTagRoutes)
+            .use(productAttributeRoutes)
+            .use(productAttributeGroupRoutes)
+            .use(productVariantRoutes)
+            .use(salesChannelRoutes)
+            .use(currencyRoutes)
+            .use(regionRoutes)
+            .use(taxRegionRoutes)
+            .use(storeRoutes)
+            .use(userRoutes)
+            .use(roleRoutes)
+            .use(permissionRoutes)
+            .use(authRoutes)
+            .use(inviteRoutes)
+            .use(customerRoutes)
+            .use(customerGroupRoutes)
+            .use(inventoryRoutes)
+            .use(orderRoutes)
+            .use(cartRoutes)
+            .use(stockLocationRoutes)
+            .use(priceListRoutes)
+            .use(promotionRoutes)
+            .use(campaignRoutes)
+    });

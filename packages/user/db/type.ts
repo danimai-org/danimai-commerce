@@ -143,7 +143,8 @@ export type InviteUpdate = Updateable<InviteTable>;
 // table sessions — tracks each user session; filter by expires_at for automatic expiry
 export interface SessionTable {
   id: Generated<string>;
-  user_id: string;
+  user_id: string | null; // nullable (e.g. guest or pre-auth session)
+  parent_id: string | null; // prior session (e.g. replacement after expiry)
   refresh_token_hash: string | null; // hash of refresh token for validation/revocation
   ip_address: string | null;
   user_agent: string | null;

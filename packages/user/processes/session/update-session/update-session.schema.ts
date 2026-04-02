@@ -19,6 +19,15 @@ export const UpdateSessionSchema = Type.Object({
       examples: ["2025-12-31T23:59:59.000Z"],
     })
   ),
+  user_id: Type.Optional(
+    Type.Union([
+      Type.String({
+        format: "uuid",
+        description: "Associate session with a user (e.g. after login)",
+      }),
+      Type.Null(),
+    ])
+  ),
 });
 
 export type UpdateSessionProcessInput = Static<typeof UpdateSessionSchema>;

@@ -4,6 +4,24 @@ import type { Generated, Selectable, Insertable, Updateable } from "kysely";
  * Cart module data types based on Danimai Cart Module.
  */
 
+export enum CartProgress {
+  CREATED = "created",
+  BASIC_INFORMATION_ENTERED = "basic_information_entered",
+  ADDRESS_ENTERED = "address_entered",
+  PAYMENT_METHOD_ENTERED = "payment_method_entered",
+  PAYMENT_AUTHORIZED = "payment_authorized",
+  ORDER_PLACED = "order_placed",
+  FULFILLED = "fulfilled",
+  CANCELED = "canceled",
+  EXPIRED = "expired",
+  ABANDONED = "abandoned",
+  RESTORED = "restored",
+  RESTORED_FROM_ABANDONED = "restored_from_abandoned",
+  RESTORED_FROM_CANCELED = "restored_from_canceled",
+  RESTORED_FROM_EXPIRED = "restored_from_expired",
+  RESTORED_FROM_FULFILLED = "restored_from_fulfilled",
+}
+
 export interface Database {
   carts: CartTable;
   cart_addresses: CartAddressTable;
@@ -22,7 +40,10 @@ export interface CartTable {
   email: string | null;
   currency_code: string | null;
   region_id: string | null;
+  order_id: string | null; // Foreign key to orders.id
   customer_id: string | null;
+  session_id: string; // user sessions.id; required for every cart
+  progress: CartProgress[];
   type: string | null; // "default" | "swap" | "draft_order" | "payment_link" | "claim"
   completed_at: string | null; // ISO timestamp
   payment_authorized_at: string | null; // ISO timestamp

@@ -58,6 +58,7 @@ export interface OrderTable {
   customer_id: string | null;
   sales_channel_id: string | null;
   region_id: string | null;
+  cart_id: string | null;
   billing_address_id: string | null;
   shipping_address_id: string | null;
   metadata: unknown | null;
