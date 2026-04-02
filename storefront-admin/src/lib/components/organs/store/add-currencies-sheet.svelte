@@ -30,7 +30,6 @@
 		);
 	});
 
-	// Logic Fix: Only items that are NOT already active can be selected
 	const selectableList = $derived(availableList.filter((c) => !c.active));
 	const isAllSelected = $derived(
 		selectableList.length > 0 && selectableList.every((c) => addSelected.has(c.code))
@@ -81,7 +80,6 @@
 					/>
 				</div>
 			</div>
-
 			<div class="flex-1 overflow-auto p-4">
 				<table class="w-full text-sm">
 					<thead class="border-b bg-muted/50">
