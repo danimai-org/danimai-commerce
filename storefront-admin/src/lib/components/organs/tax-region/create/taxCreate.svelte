@@ -8,7 +8,8 @@
 	import { Combobox } from '$lib/components/organs/index.js';
 	import { Toaster } from 'svelte-sonner';
 	import { toast } from 'svelte-sonner';
-	import { Country } from 'country-state-city';
+	import { client } from '$lib/client.js';
+	import { createQuery } from '@tanstack/svelte-query';
 
 	let {
 		open = $bindable(false),
@@ -17,6 +18,22 @@
 		open?: boolean;
 		onSuccess?: () => void;
 	} = $props();
+
+	const listQuery = { page: 1, limit: 100 } as const;
+	const countriesQuery = createQuery(() => ({
+		queryKey: ['tax-region', 'countries', listQuery.page, listQuery.limit],
+		queryFn: () => client['regions'].countries.get({ query: listQuery }),
+		enabled: open
+	}));
+
+	type CountryRow = { id: string; name: string; code: string };
+	const countries = $derived.by((): CountryRow[] =>
+		(countriesQuery.data?.data?.rows ?? []).map((row) => ({
+			id: String(row.id),
+			name: String(row.display_name ?? row.name ?? '').trim() || String(row.iso_2).toUpperCase(),
+			code: String(row.iso_2).toUpperCase()
+		}))
+	);
 
 	const { form, errors, enhance, delayed } = superForm(
 		{
@@ -33,12 +50,6 @@
 				}
 			}
 		}
-	);
-
-	const countries = $derived(
-		[...Country.getAllCountries()].sort((a, b) =>
-			(a.name ?? '').localeCompare(b.name ?? '')
-		)
 	);
 
 	let defaultRateName = $state('');
@@ -90,8 +101,8 @@
 								$errors.name && 'border-destructive'
 							)}
 							options={countries.map((c) => ({
-								id: c.name ?? c.isoCode,
-								value: c.name ?? c.isoCode
+								id: c.name,
+								value: c.name
 							}))}
 						/>
 						{#if $errors.name}

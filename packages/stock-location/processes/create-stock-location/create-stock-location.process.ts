@@ -38,9 +38,21 @@ export class CreateStockLocationProcess
     this.logger.info("Creating stock location", { input });
 
     return this.db.transaction().execute(async (tx) => {
+      const a = input.address;
       const address = await tx
         .insertInto("stock_location_addresses")
-        .values(input.address)
+        .values({
+          stock_location_id: null,
+          address_1: a.address_1 ?? null,
+          address_2: a.address_2 ?? null,
+          company: a.company ?? null,
+          city: a.city ?? null,
+          province: a.province ?? null,
+          postal_code: a.postal_code ?? null,
+          country_code: a.country_code ?? null,
+          phone: a.phone ?? null,
+          metadata: null,
+        })
         .returningAll()
         .executeTakeFirst();
 

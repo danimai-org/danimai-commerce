@@ -335,6 +335,6 @@
 
 <RegionAddCountriesSheet
 	bind:open={addCountriesOpen}
-	initialSelectedIds={pickedCountryIds}
+	preselectedIds={pickedCountryIds}
 	onPick={(ids) => (pickedCountryIds = ids)}
 />

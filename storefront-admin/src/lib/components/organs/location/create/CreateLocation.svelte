@@ -1,11 +1,26 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { superForm } from 'sveltekit-superforms/client';
+	import type { SuperValidated } from 'sveltekit-superforms';
 	import { cn } from '$lib/utils.js';
 	import { Toaster } from 'svelte-sonner';
 	import { toast } from 'svelte-sonner';
+
+	type StockLocationCreateFormData = {
+		id: string;
+		name: string;
+		address_1: string;
+		address_2: string;
+		company: string;
+		city: string;
+		province: string;
+		postal_code: string;
+		country_code: string;
+		phone: string;
+	};
 
 	let {
 		open = $bindable(false),
@@ -17,7 +32,7 @@
 
 	let apiError = $state<string | null>(null);
 
-	const emptyData = {
+	const emptyData: StockLocationCreateFormData = {
 		id: '',
 		name: '',
 		address_1: '',
@@ -30,30 +45,33 @@
 		phone: ''
 	};
 
-	const { form, errors, enhance, delayed, reset } = superForm(emptyData, {
-		resetForm: true,
-		invalidateAll: false,
-		onResult: async ({ result }) => {
-			if (result.type === 'failure') {
-				const d = result.data as { error?: string } | undefined;
-				apiError = d?.error ?? null;
-				return;
-			}
-			if (result.type === 'error') {
-				apiError =
-					result.error instanceof Error
-						? result.error.message
-						: String(result.error ?? 'Something went wrong');
-				return;
-			}
-			if (result.type === 'success') {
-				apiError = null;
-				open = false;
-				toast.success('Location created successfully');
-				await onSuccess();
+	const { form, errors, enhance, delayed, reset } = superForm(
+		page.data.stockLocationCreateForm as SuperValidated<StockLocationCreateFormData>,
+		{
+			resetForm: true,
+			invalidateAll: false,
+			onResult: async ({ result }) => {
+				if (result.type === 'failure') {
+					const d = result.data as { error?: string } | undefined;
+					apiError = d?.error ?? null;
+					return;
+				}
+				if (result.type === 'error') {
+					apiError =
+						result.error instanceof Error
+							? result.error.message
+							: String(result.error ?? 'Something went wrong');
+					return;
+				}
+				if (result.type === 'success') {
+					apiError = null;
+					open = false;
+					toast.success('Location created successfully');
+					await onSuccess();
+				}
 			}
 		}
-	});
+	);
 
 	let initializedCreate = $state(false);
 
@@ -141,7 +159,9 @@
 							{/if}
 						</div>
 						<div class="flex flex-col gap-2">
-							<label for="loc-company" class="text-xs font-medium text-muted-foreground">Company</label>
+							<label for="loc-company" class="text-xs font-medium text-muted-foreground"
+								>Company</label
+							>
 							<Input
 								id="loc-company"
 								name="company"

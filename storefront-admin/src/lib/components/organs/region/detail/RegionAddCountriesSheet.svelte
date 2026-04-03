@@ -4,46 +4,67 @@
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import Search from '@lucide/svelte/icons/search';
 	import { cn } from '$lib/utils.js';
-	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-	import { Country, type ICountry } from 'country-state-city';
+	import { SvelteSet } from 'svelte/reactivity';
+	import { client } from '$lib/client.js';
+	import { createQuery } from '@tanstack/svelte-query';
 
-	const countryByIso = (() => {
-		const map = new SvelteMap<string, ICountry>();
-		for (const x of Country.getAllCountries()) {
-			map.set(String(x.isoCode).toUpperCase(), x);
-		}
-		return map;
-	})();
-
-	function localCountry(iso: string | undefined): ICountry | undefined {
-		if (!iso) return undefined;
-		return countryByIso.get(String(iso).toUpperCase());
-	}
 	let {
 		open = $bindable(false),
-		initialSelectedIds = [] as string[],
+		preselectedIds = [] as string[],
+		excludeIds = [] as string[],
 		onPick
 	} = $props<{
 		open?: boolean;
-		initialSelectedIds?: string[];
+		/** Restored selection when reopening (e.g. create-region flow). */
+		preselectedIds?: string[];
+		/** ISO codes already in the region — hidden from the list (e.g. region detail). */
+		excludeIds?: string[];
 		onPick?: (ids: string[]) => void;
 	}>();
 
 	let search = $state('');
-	let selectedIds = new SvelteSet<string>();
 
-	const rows = $derived.by(() => {
-		const q = search.trim().toLowerCase();
-		if (!q) return Country.getAllCountries();
-		return Country.getAllCountries().filter((c) => {
-			const name = String(c.name).toLowerCase();
-			const code = String(c.isoCode).toLowerCase();
-			return name.includes(q) || code.includes(q);
-		});
+	const listQuery = { page: 1, limit: 100 } as const;
+	const countriesQuery = createQuery(() => ({
+		queryKey: ['add-region-countries', listQuery.page, listQuery.limit, search.trim()],
+		queryFn: () =>
+			client['regions'].countries.get({
+				query: {
+					page: listQuery.page,
+					limit: listQuery.limit,
+					search: search.trim()
+				}
+			}),
+		enabled: open
+	}));
+
+	type CountryRow = { id: string; name: string; code: string };
+	type CountryApiRow = {
+		id: string;
+		iso_2: string;
+		name?: string;
+		display_name?: string;
+	};
+
+	const apiRows = $derived.by((): CountryRow[] =>
+		(countriesQuery.data?.data?.rows ?? []).map((row: CountryApiRow) => ({
+			id: String(row.id),
+			name: String(row.display_name ?? row.name ?? '').trim() || String(row.iso_2).toUpperCase(),
+			code: String(row.iso_2).toUpperCase()
+		}))
+	);
+
+	const rows = $derived.by((): CountryRow[] => {
+		const excluded = new Set(excludeIds.map((x: string) => String(x).toUpperCase()));
+		return apiRows.filter((r) => !excluded.has(r.code));
 	});
 
+	const loading = $derived(countriesQuery.isPending);
+
+	let selectedIds = new SvelteSet<string>();
+
 	const allRowsSelected = $derived(
-		rows.length > 0 && rows.every((c) => selectedIds.has(String(c.isoCode)))
+		rows.length > 0 && rows.every((c) => selectedIds.has(c.code))
 	);
 
 	$effect(() => {
@@ -54,8 +75,8 @@
 		}
 		search = '';
 		selectedIds.clear();
-		for (const id of initialSelectedIds) {
-			selectedIds.add(String(id));
+		for (const id of preselectedIds) {
+			selectedIds.add(String(id).toUpperCase());
 		}
 	});
 </script>
@@ -80,7 +101,11 @@
 		</div>
 
 		<div class="min-h-0 flex-1 overflow-auto">
-			{#if rows.length === 0}
+			{#if loading}
+				<div class="flex min-h-[12rem] items-center justify-center px-6 py-12">
+					<p class="text-center text-sm text-muted-foreground">Loading countries…</p>
+				</div>
+			{:else if rows.length === 0}
 				<div class="flex min-h-[12rem] items-center justify-center px-6 py-12">
 					<p class="text-center text-sm text-muted-foreground">No countries match your search.</p>
 				</div>
@@ -99,7 +124,7 @@
 											selectedIds.clear();
 										} else {
 											for (const c of rows) {
-												selectedIds.add(String(c.isoCode));
+												selectedIds.add(c.code);
 											}
 										}
 									}}
@@ -111,35 +136,30 @@
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-border">
-						{#each rows as c (c.isoCode)}
-							{@const lc = localCountry(String(c.isoCode))}
+						{#each rows as c (c.code)}
 							<tr class={cn('transition-colors hover:bg-muted/30')}>
 								<td class="py-3.5 pr-2 pl-6 align-middle">
 									<input
 										type="checkbox"
-										checked={selectedIds.has(String(c.isoCode))}
+										checked={selectedIds.has(c.code)}
 										onchange={() => {
-											const id = String(c.isoCode);
-											if (selectedIds.has(id)) {
-												selectedIds.delete(id);
+											if (selectedIds.has(c.code)) {
+												selectedIds.delete(c.code);
 											} else {
-												selectedIds.add(id);
+												selectedIds.add(c.code);
 											}
 										}}
 										class="size-4 cursor-pointer rounded border-input accent-primary"
 									/>
 								</td>
 								<td class="py-3.5 pr-4 align-middle leading-snug font-medium">
-									{#if lc?.flag}
-										<span class="mr-2 inline-block align-middle" aria-hidden="true">{lc.flag}</span>
-									{/if}
 									<span class="align-middle">{c.name}</span>
 								</td>
 								<td class="py-3.5 pr-6 align-middle">
 									<span
 										class="inline-block rounded-md bg-muted px-2.5 py-1 font-mono text-xs font-bold uppercase"
 									>
-										{String(c.isoCode).toUpperCase()}
+										{c.code}
 									</span>
 								</td>
 							</tr>

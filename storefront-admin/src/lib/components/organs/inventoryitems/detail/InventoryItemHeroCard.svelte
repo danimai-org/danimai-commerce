@@ -1,17 +1,12 @@
 <script lang="ts">
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { client } from '$lib/client.js';
 	import { getDetailContext } from '$lib/hooks';
 	import type { InventoryItemDetailData } from '../type.js';
 	import EditInventoryHero from '$lib/components/organs/inventoryitems/update/EditInventoryHero.svelte';
 	import AddVariantSheet from '$lib/components/organs/inventoryitems/detail/AddVariantSheet.svelte';
 
 	let formSheetOpen = $state(false);
-	let editSku = $state('');
-	let editRequiresShipping = $state(true);
-	let editHeroError = $state<string | null>(null);
-	let editHeroSaving = $state(false);
 	let variantSheetOpen = $state(false);
 	let addVariantProductId = $state('');
 	let addVariantTitle = $state('');
@@ -30,34 +25,7 @@
 
 	function openEditHero() {
 		if (!detail?.item) return;
-		editSku = detail.item.sku ?? '';
-		editRequiresShipping = detail.item.requires_shipping ?? true;
-		editHeroError = null;
 		formSheetOpen = true;
-	}
-
-	async function saveEditHero() {
-		const id = detail?.item?.id;
-		if (!id) return;
-		editHeroError = null;
-		editHeroSaving = true;
-		try {
-			const trimmed = editSku.trim();
-			const res = await client.inventory.items({ id }).put({
-				sku: trimmed === '' ? null : trimmed,
-				requires_shipping: editRequiresShipping
-			});
-			if (res?.error) {
-				const err = res.error as { value?: { message?: string } };
-				throw new Error(String(err.value?.message ?? 'Failed to update inventory item'));
-			}
-			formSheetOpen = false;
-			void detailQuery?.refetch?.();
-		} catch (e) {
-			editHeroError = e instanceof Error ? e.message : String(e);
-		} finally {
-			editHeroSaving = false;
-		}
 	}
 
 	const totals = $derived.by(() => {
@@ -146,11 +114,10 @@
 
 <EditInventoryHero
 	bind:open={formSheetOpen}
-	bind:sku={editSku}
-	bind:requiresShipping={editRequiresShipping}
-	error={editHeroError}
-	saving={editHeroSaving}
-	onSave={saveEditHero}
+	item={detail?.item ?? null}
+	onSuccess={() => {
+		void detailQuery?.refetch?.();
+	}}
 />
 
 <AddVariantSheet

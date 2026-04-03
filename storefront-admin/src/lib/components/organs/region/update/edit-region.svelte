@@ -8,6 +8,7 @@
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import { client } from '$lib/client.js';
 	import { createQuery } from '@tanstack/svelte-query';
+	import { Toaster, toast } from 'svelte-sonner';
 
 	const listQuery = { page: 1, limit: 100 } as const;
 
@@ -38,10 +39,11 @@
 		},
 		{
 			resetForm: false,
-			onResult: ({ result }) => {
+			onResult: async ({ result }) => {
 				if (result.type === 'success') {
 					open = false;
-					onSuccess();
+					toast.success('Region updated successfully');
+					if (onSuccess) await onSuccess();
 				}
 			}
 		}
@@ -82,10 +84,7 @@
 
 	const currencyOptions = $derived.by(() => {
 		const code = region?.currency_code != null ? String(region.currency_code) : '';
-		if (
-			code &&
-			!currencies.some((row) => row.code === code)
-		) {
+		if (code && !currencies.some((row) => row.code === code)) {
 			return [{ code, name: code, symbol: '' }, ...currencies];
 		}
 		return currencies;
@@ -229,3 +228,4 @@
 		</form>
 	</Sheet.Content>
 </Sheet.Root>
+<Toaster position="top-center" richColors={true} />

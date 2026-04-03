@@ -185,6 +185,6 @@
 
 <RegionAddCountriesSheet
 	bind:open={addCountriesOpen}
-	initialSelectedIds={initialSelectedIsoCodes}
+	excludeIds={initialSelectedIsoCodes}
 	onPick={handleAddCountries}
 />
