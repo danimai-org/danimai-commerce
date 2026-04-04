@@ -1,22 +1,141 @@
 <script lang="ts">
 	import { SiteHeader, SiteFooter } from '$lib/components/layout';
-	import { cart } from '$lib/stores/cart';
-	import type { CartLineItem } from '$lib/stores/cart';
+	import { client } from '$lib/api/client.js';
+	import { API_BASE, firstVariantIdByProductIds } from '$lib/api/storefront-api';
+	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 
-	let { data } = $props();
-	const products = $derived(data?.products ?? []);
+	const SESSION_STORAGE_KEY = 'dm_sf_session_id';
+	const CART_STORAGE_KEY = 'dm_sf_cart_id';
 
-	let cartItems = $state<CartLineItem[]>([]);
-	$effect(() => {
-		const unsub = cart.subscribe((s) => {
-			cartItems = s.items;
-		});
-		return unsub;
+	type ApiLineItem = {
+		id: string;
+		title: string | null;
+		description: string | null;
+		thumbnail: string | null;
+		variant_id: string | null;
+		product_id: string | null;
+		quantity: number | null;
+		unit_price: string | null;
+	};
+
+	type ApiCart = {
+		id: string;
+		line_items: ApiLineItem[];
+	};
+
+	type LineItemPut = {
+		id?: string;
+		title?: string | null;
+		description?: string | null;
+		thumbnail?: string | null;
+		variant_id?: string | null;
+		product_id?: string | null;
+		quantity?: number | null;
+		unit_price?: string | null;
+	};
+
+	type CartRowView = {
+		lineId: string;
+		href: string;
+		name: string;
+		priceDisplay: string;
+		priceValue: number;
+		image: string | null;
+		quantity: number;
+		variant: string;
+	};
+
+	const queryClient = useQueryClient();
+	let {} = $props();
+	const listQuery = { page: 1, limit: 100 } as const;
+	const productsQuery = createQuery(() => ({
+		queryKey: ['products', listQuery.page, listQuery.limit],
+		queryFn: () => client['products'].get({ query: listQuery }),
+	}));
+
+	const products = $derived((productsQuery.data?.data?.rows ?? []) as { id: string; title: string; handle: string }[]);
+	const handleByProductId = $derived.by(() => {
+		const m = new Map<string, string>();
+		for (const p of products) m.set(p.id, p.handle);
+		return m;
 	});
 
-	const subtotal = $derived(
-		cartItems.reduce((sum, i) => sum + i.priceValue * i.quantity, 0)
+	function treatyErrorMessage(err: unknown): string {
+		const o = err as { value?: { message?: string } };
+		return o?.value?.message ?? String(err);
+	}
+
+	async function ensureSessionId(): Promise<string> {
+		let sid = localStorage.getItem(SESSION_STORAGE_KEY);
+		if (sid) return sid;
+		const res = await client.auth.sessions.post({});
+		if (res.error) throw new Error(treatyErrorMessage(res.error));
+		const j = res.data as { id: string };
+		sid = j.id;
+		localStorage.setItem(SESSION_STORAGE_KEY, sid);
+		return sid;
+	}
+
+	async function createCartRow(sessionId: string): Promise<string> {
+		const res = await client.carts.post({ session_id: sessionId });
+		if (res.error) throw new Error(treatyErrorMessage(res.error));
+		const row = res.data as { id: string };
+		localStorage.setItem(CART_STORAGE_KEY, row.id);
+		return row.id;
+	}
+
+	async function fetchCartJson(cartId: string): Promise<ApiCart> {
+		const res = await client.carts({ id: cartId }).get();
+		if (res.error) throw new Error(treatyErrorMessage(res.error));
+		return res.data as ApiCart;
+	}
+
+	async function loadShopperCart(): Promise<ApiCart> {
+		const sessionId = await ensureSessionId();
+		let cartId = localStorage.getItem(CART_STORAGE_KEY);
+		if (!cartId) cartId = await createCartRow(sessionId);
+		try {
+			return await fetchCartJson(cartId);
+		} catch {
+			localStorage.removeItem(CART_STORAGE_KEY);
+			cartId = await createCartRow(sessionId);
+			return fetchCartJson(cartId);
+		}
+	}
+
+	const cartQuery = createQuery(
+		() => ({
+			queryKey: ['storefront-cart'] as const,
+			queryFn: loadShopperCart
+		}),
+		() => queryClient
 	);
+
+	const cartPending = $derived(cartQuery.isPending && cartQuery.data === undefined);
+	const cartFailed = $derived(cartQuery.isError);
+	const cartItems = $derived.by((): CartRowView[] => {
+		const cart = cartQuery.data;
+		const map = handleByProductId;
+		if (!cart?.line_items?.length) return [];
+		return cart.line_items.map((li) => {
+			const handle = li.product_id ? map.get(li.product_id) : undefined;
+			const href = handle ? `/products/${handle}` : '/';
+			const qty = li.quantity ?? 0;
+			const pv = parsePrice(li.unit_price ?? '0');
+			return {
+				lineId: li.id,
+				href,
+				name: li.title ?? 'Item',
+				priceDisplay: `$${pv.toFixed(2)}`,
+				priceValue: pv,
+				image: li.thumbnail,
+				quantity: qty,
+				variant: li.variant_id ? 'Variant' : 'Default'
+			};
+		});
+	});
+
+	const subtotal = $derived(cartItems.reduce((sum, i) => sum + i.priceValue * i.quantity, 0));
 	const subtotalDisplay = $derived(`$${subtotal.toFixed(2)}`);
 	const totalDisplay = $derived(`$${subtotal.toFixed(2)}`);
 
@@ -25,17 +144,87 @@
 		return Number.isFinite(n) ? n : 0;
 	}
 
-	function quickAdd(e: MouseEvent, product: { name: string; price: string; href: string; image?: string | null }) {
+	function lineItemToPut(li: ApiLineItem): LineItemPut {
+		return {
+			id: li.id,
+			title: li.title,
+			description: li.description,
+			thumbnail: li.thumbnail,
+			variant_id: li.variant_id,
+			product_id: li.product_id,
+			quantity: li.quantity,
+			unit_price: li.unit_price
+		};
+	}
+
+	async function putLineItems(cartId: string, line_items: LineItemPut[]) {
+		const res = await client
+			.carts({ id: cartId })
+			['line-items'].put({ line_items });
+		if (res.error) throw new Error(treatyErrorMessage(res.error));
+	}
+
+	function currentCart(): ApiCart | undefined {
+		return queryClient.getQueryData<ApiCart>(['storefront-cart']);
+	}
+
+	async function refreshCart() {
+		await queryClient.invalidateQueries({ queryKey: ['storefront-cart'] });
+	}
+
+	async function changeLineQuantity(lineId: string, delta: number) {
+		const cart = currentCart();
+		if (!cart?.id) return;
+		const next = cart.line_items
+			.map((li) => {
+				if (li.id !== lineId) return lineItemToPut(li);
+				const q = Math.max(0, (li.quantity ?? 0) + delta);
+				return { ...lineItemToPut(li), quantity: q };
+			})
+			.filter((li) => (li.quantity ?? 0) > 0);
+		await putLineItems(cart.id, next);
+		await refreshCart();
+	}
+
+	async function removeLine(lineId: string) {
+		const cart = currentCart();
+		if (!cart?.id) return;
+		const next = cart.line_items.filter((li) => li.id !== lineId).map(lineItemToPut);
+		await putLineItems(cart.id, next);
+		await refreshCart();
+	}
+
+	async function quickAdd(e: MouseEvent, product: { id: string; title: string; handle: string }) {
 		e.preventDefault();
 		e.stopPropagation();
-		cart.addItem({
-			href: product.href,
-			name: product.name,
-			priceDisplay: product.price,
-			priceValue: parsePrice(product.price),
-			image: product.image ?? null,
-			variant: 'Default'
-		});
+		const cart = currentCart();
+		if (!cart?.id) return;
+		const variantMap = await firstVariantIdByProductIds(API_BASE, [product.id]);
+		const variant_id = variantMap.get(product.id);
+		if (!variant_id) return;
+		const existing = cart.line_items.find((li) => li.variant_id === variant_id);
+		let line_items: LineItemPut[];
+		if (existing) {
+			line_items = cart.line_items.map((li) =>
+				li.id === existing.id
+					? { ...lineItemToPut(li), quantity: (li.quantity ?? 0) + 1 }
+					: lineItemToPut(li)
+			);
+		} else {
+			line_items = [
+				...cart.line_items.map(lineItemToPut),
+				{
+					variant_id,
+					product_id: product.id,
+					title: product.title,
+					quantity: 1,
+					unit_price: '0',
+					thumbnail: null
+				}
+			];
+		}
+		await putLineItems(cart.id, line_items);
+		await refreshCart();
 	}
 </script>
 
@@ -49,14 +238,21 @@
 				<a href="/" class="continue-shopping">Continue shopping</a>
 			</header>
 
-			{#if cartItems.length === 0}
+			{#if cartPending}
+				<p class="cart-status">Loading cart…</p>
+			{:else if cartFailed}
+				<div class="cart-empty">
+					<p>Could not load your cart.</p>
+					<a href="/" class="continue-shopping-btn">Continue shopping</a>
+				</div>
+			{:else if cartItems.length === 0}
 				<div class="cart-empty">
 					<p>Your cart is empty.</p>
 					<a href="/" class="continue-shopping-btn">Continue shopping</a>
 				</div>
 			{:else}
 				<ul class="line-items">
-					{#each cartItems as item (item.key)}
+					{#each cartItems as item (item.lineId)}
 						<li class="line-item">
 							<a href={item.href} class="line-item-image" style="background-color: #f5f0eb;">
 								{#if item.image}
@@ -68,11 +264,11 @@
 								<p class="line-item-variant">{item.variant}</p>
 								<div class="line-item-actions">
 									<div class="quantity-controls">
-										<button type="button" class="qty-btn" onclick={() => cart.updateQuantity(item.key, -1)} aria-label="Decrease quantity">−</button>
+										<button type="button" class="qty-btn" onclick={() => void changeLineQuantity(item.lineId, -1)} aria-label="Decrease quantity">−</button>
 										<span class="qty-value">{item.quantity}</span>
-										<button type="button" class="qty-btn" onclick={() => cart.updateQuantity(item.key, 1)} aria-label="Increase quantity">+</button>
+										<button type="button" class="qty-btn" onclick={() => void changeLineQuantity(item.lineId, 1)} aria-label="Increase quantity">+</button>
 									</div>
-									<button type="button" class="remove-btn" onclick={() => cart.removeItem(item.key)} aria-label="Remove item">
+									<button type="button" class="remove-btn" onclick={() => void removeLine(item.lineId)} aria-label="Remove item">
 										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
 									</button>
 								</div>
@@ -90,7 +286,7 @@
 			{/if}
 		</div>
 
-		{#if cartItems.length > 0}
+		{#if !cartPending && !cartFailed && cartItems.length > 0}
 			<aside class="order-summary">
 				<h2 class="order-summary-title">ORDER SUMMARY</h2>
 				<dl class="order-summary-rows">
@@ -127,15 +323,10 @@
 			<h2 class="complete-look-title">Complete Your Look</h2>
 			<div class="complete-look-grid">
 				{#each products.slice(0, 4) as product}
-					<a href={product.href} class="look-card" aria-label={product.name}>
-						<div class="look-image" style="background-color: {product.bg};">
-							{#if product.image}
-								<img src={product.image} alt="" />
-							{/if}
-						</div>
-						<button type="button" class="look-quick-add" onclick={(e) => quickAdd(e, product)}>QUICK ADD</button>
-						<h3 class="look-name">{product.name}</h3>
-						<p class="look-price">{product.price}</p>
+					<a href={`/products/${product.handle}`} class="look-card" aria-label={product.title}>
+						<button type="button" class="look-quick-add" onclick={(e) => void quickAdd(e, { id: product.id, title: product.title, handle: product.handle })}>QUICK ADD</button>
+						<h3 class="look-name">{product.title}</h3>
+						<p class="look-price">$0.00</p>
 					</a>
 				{/each}
 			</div>
@@ -188,6 +379,13 @@
 	.continue-shopping:hover {
 		color: #1a1a1a;
 		text-decoration: underline;
+	}
+	.cart-status {
+		margin: 0;
+		padding: 2rem 0;
+		text-align: center;
+		color: #666;
+		font-size: 1rem;
 	}
 	.cart-empty {
 		text-align: center;

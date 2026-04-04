@@ -42,6 +42,11 @@
 		queryFn: () => client['regions'].get({ query: listQuery }),
 		enabled: lookupsEnabled
 	}));
+	const defaultRegionQuery = createQuery(() => ({
+		queryKey: ['store-listing-card', 'region', store?.default_region_id ?? null],
+		queryFn: () => client['regions']({ id: store!.default_region_id! }).get(),
+		enabled: lookupsEnabled && !!store?.default_region_id
+	}));
 	const salesChannelsQuery = createQuery(() => ({
 		queryKey: ['store-listing-card', 'sales-channels', listQuery.page, listQuery.limit],
 		queryFn: () => client['sales-channels'].get({ query: listQuery }),
@@ -70,7 +75,9 @@ const defaultSalesChannelQuery = createQuery(() => ({
 		const id = store?.default_region_id;
 		if (!id) return null;
 		const rows = regionsQuery.data?.data?.rows ?? [];
-		return rows.find((r) => r.id === id)?.name ?? null;
+		const fromList = rows.find((r) => r.id === id)?.name ?? null;
+		if (fromList) return fromList;
+		return defaultRegionQuery.data?.data?.name ?? null;
 	});
 
 	const salesChannelDisplay = $derived.by(() => {
@@ -93,6 +100,7 @@ const defaultSalesChannelQuery = createQuery(() => ({
 		lookupsEnabled &&
 			(currenciesQuery.isPending ||
 				regionsQuery.isPending ||
+				defaultRegionQuery.isPending ||
 				salesChannelsQuery.isPending ||
 				defaultSalesChannelQuery.isPending ||
 				stockLocationsQuery.isPending)
