@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { SiteHeader, SiteFooter } from '$lib/components/layout';
 	import { client } from '$lib/api/client.js';
-	import { API_BASE, firstVariantIdByProductIds } from '$lib/api/storefront-api';
+	import { cart, type CartLineItem } from '$lib/stores/cart';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 
 	const SESSION_STORAGE_KEY = 'dm_sf_session_id';
@@ -35,7 +35,9 @@
 	};
 
 	type CartRowView = {
+		key: string;
 		lineId: string;
+		source: 'api' | 'local';
 		href: string;
 		name: string;
 		priceDisplay: string;
@@ -47,6 +49,13 @@
 
 	const queryClient = useQueryClient();
 	let {} = $props();
+	let localCartItems = $state([] as CartLineItem[]);
+	$effect(() => {
+		const unsub = cart.subscribe((s) => {
+			localCartItems = s.items;
+		});
+		return unsub;
+	});
 	const listQuery = { page: 1, limit: 100 } as const;
 	const productsQuery = createQuery(() => ({
 		queryKey: ['products', listQuery.page, listQuery.limit],
@@ -123,7 +132,9 @@
 			const qty = li.quantity ?? 0;
 			const pv = parsePrice(li.unit_price ?? '0');
 			return {
+				key: `api:${li.id}`,
 				lineId: li.id,
+				source: 'api',
 				href,
 				name: li.title ?? 'Item',
 				priceDisplay: `$${pv.toFixed(2)}`,
@@ -134,8 +145,24 @@
 			};
 		});
 	});
+	const localItems = $derived.by((): CartRowView[] => {
+		if (!localCartItems.length) return [];
+		return localCartItems.map((item) => ({
+			key: `local:${item.key}`,
+			lineId: item.key,
+			source: 'local',
+			href: item.href,
+			name: item.name,
+			priceDisplay: item.priceDisplay,
+			priceValue: item.priceValue,
+			image: item.image,
+			quantity: item.quantity,
+			variant: item.variant
+		}));
+	});
+	const displayItems = $derived((cartItems.length > 0 ? cartItems : localItems));
 
-	const subtotal = $derived(cartItems.reduce((sum, i) => sum + i.priceValue * i.quantity, 0));
+	const subtotal = $derived(displayItems.reduce((sum, i) => sum + i.priceValue * i.quantity, 0));
 	const subtotalDisplay = $derived(`$${subtotal.toFixed(2)}`);
 	const totalDisplay = $derived(`$${subtotal.toFixed(2)}`);
 
@@ -162,6 +189,15 @@
 			.carts({ id: cartId })
 			['line-items'].put({ line_items });
 		if (res.error) throw new Error(treatyErrorMessage(res.error));
+	}
+
+	async function firstVariantIdByProductId(productId: string): Promise<string | null> {
+		const res = await client['product-variants'].get({
+			query: { page: 1, limit: 1, filters: { product_id: productId } }
+		});
+		if (res.error) throw new Error(treatyErrorMessage(res.error));
+		const rows = (res.data as { rows?: Array<{ id?: string | null }> })?.rows ?? [];
+		return rows[0]?.id ?? null;
 	}
 
 	function currentCart(): ApiCart | undefined {
@@ -199,8 +235,7 @@
 		e.stopPropagation();
 		const cart = currentCart();
 		if (!cart?.id) return;
-		const variantMap = await firstVariantIdByProductIds(API_BASE, [product.id]);
-		const variant_id = variantMap.get(product.id);
+		const variant_id = await firstVariantIdByProductId(product.id);
 		if (!variant_id) return;
 		const existing = cart.line_items.find((li) => li.variant_id === variant_id);
 		let line_items: LineItemPut[];
@@ -245,14 +280,14 @@
 					<p>Could not load your cart.</p>
 					<a href="/" class="continue-shopping-btn">Continue shopping</a>
 				</div>
-			{:else if cartItems.length === 0}
+			{:else if displayItems.length === 0}
 				<div class="cart-empty">
 					<p>Your cart is empty.</p>
 					<a href="/" class="continue-shopping-btn">Continue shopping</a>
 				</div>
 			{:else}
 				<ul class="line-items">
-					{#each cartItems as item (item.lineId)}
+					{#each displayItems as item (item.key)}
 						<li class="line-item">
 							<a href={item.href} class="line-item-image" style="background-color: #f5f0eb;">
 								{#if item.image}
@@ -264,11 +299,11 @@
 								<p class="line-item-variant">{item.variant}</p>
 								<div class="line-item-actions">
 									<div class="quantity-controls">
-										<button type="button" class="qty-btn" onclick={() => void changeLineQuantity(item.lineId, -1)} aria-label="Decrease quantity">−</button>
+										<button type="button" class="qty-btn" onclick={() => item.source === 'api' ? void changeLineQuantity(item.lineId, -1) : cart.updateQuantity(item.lineId, -1)} aria-label="Decrease quantity">−</button>
 										<span class="qty-value">{item.quantity}</span>
-										<button type="button" class="qty-btn" onclick={() => void changeLineQuantity(item.lineId, 1)} aria-label="Increase quantity">+</button>
+										<button type="button" class="qty-btn" onclick={() => item.source === 'api' ? void changeLineQuantity(item.lineId, 1) : cart.updateQuantity(item.lineId, 1)} aria-label="Increase quantity">+</button>
 									</div>
-									<button type="button" class="remove-btn" onclick={() => void removeLine(item.lineId)} aria-label="Remove item">
+									<button type="button" class="remove-btn" onclick={() => item.source === 'api' ? void removeLine(item.lineId) : cart.removeItem(item.lineId)} aria-label="Remove item">
 										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
 									</button>
 								</div>
@@ -286,7 +321,7 @@
 			{/if}
 		</div>
 
-		{#if !cartPending && !cartFailed && cartItems.length > 0}
+		{#if !cartPending && !cartFailed && displayItems.length > 0}
 			<aside class="order-summary">
 				<h2 class="order-summary-title">ORDER SUMMARY</h2>
 				<dl class="order-summary-rows">
