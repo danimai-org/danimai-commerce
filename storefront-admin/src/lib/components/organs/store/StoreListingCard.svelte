@@ -2,7 +2,7 @@
 	import EditStore from '$lib/components/organs/store/EditStore.svelte';
 	import { client } from '$lib/client.js';
 	import { createQuery } from '@tanstack/svelte-query';
-	import type { PageData } from '../../../../routes/store/$types';
+	import type { PageData } from '../../../../routes/store/$types.js';
 	import Loader from '@lucide/svelte/icons/loader';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
@@ -52,11 +52,11 @@
 		queryFn: () => client['sales-channels'].get({ query: listQuery }),
 		enabled: lookupsEnabled
 	}));
-const defaultSalesChannelQuery = createQuery(() => ({
-	queryKey: ['store-listing-card', 'sales-channel', store?.default_sales_channel_id ?? null],
-	queryFn: () => client['sales-channels']({ id: store!.default_sales_channel_id! }).get(),
-	enabled: lookupsEnabled && !!store?.default_sales_channel_id
-}));
+	const defaultSalesChannelQuery = createQuery(() => ({
+		queryKey: ['store-listing-card', 'sales-channel', store?.default_sales_channel_id ?? null],
+		queryFn: () => client['sales-channels']({ id: store!.default_sales_channel_id! }).get(),
+		enabled: lookupsEnabled && !!store?.default_sales_channel_id
+	}));
 	const stockLocationsQuery = createQuery(() => ({
 		queryKey: ['store-listing-card', 'stock-locations', listQuery.page, listQuery.limit],
 		queryFn: () => client['stock-locations'].get({ query: listQuery }),
@@ -84,9 +84,9 @@ const defaultSalesChannelQuery = createQuery(() => ({
 		const id = store?.default_sales_channel_id;
 		if (!id) return null;
 		const rows = salesChannelsQuery.data?.data?.rows ?? [];
-	const fromList = rows.find((r) => r.id === id)?.name ?? null;
-	if (fromList) return fromList;
-	return defaultSalesChannelQuery.data?.data?.name ?? null;
+		const fromList = rows.find((r) => r.id === id)?.name ?? null;
+		if (fromList) return fromList;
+		return defaultSalesChannelQuery.data?.data?.name ?? null;
 	});
 
 	const locationDisplay = $derived.by(() => {

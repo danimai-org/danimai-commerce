@@ -3,6 +3,7 @@
 		"src/**/*.svelte",
 		"src/**/*.ts",
 		"src/**/*.js",
+		"src/**/*.d.ts",
 		"src/**/*.json",
 		"src/**/*.css",
 		"src/**/*.html",

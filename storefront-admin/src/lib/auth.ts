@@ -36,7 +36,9 @@ export function setSession(tokens: { access_token: string; refresh_token: string
 		window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tokens));
 		const maxAge = COOKIE_MAX_AGE_DAYS * 24 * 60 * 60;
 		document.cookie = `${SESSION_COOKIE}=1; path=/; max-age=${maxAge}; samesite=strict`;
-	} catch { /* ignore */ }
+	} catch {
+		/* ignore */
+	}
 	const payload = decodePayload(tokens.access_token);
 	if (payload?.sub) {
 		user.set({ id: payload.sub, email: payload.email ?? '' });
@@ -48,7 +50,9 @@ export function clearSession() {
 	try {
 		window.localStorage.removeItem(STORAGE_KEY);
 		document.cookie = `${SESSION_COOKIE}=; path=/; max-age=0`;
-	} catch { /* ignore */ }
+	} catch {
+		/* ignore */
+	}
 }
 
 export function isLoggedIn(): boolean {
@@ -67,7 +71,8 @@ export function getAccessToken(): string | null {
 	}
 }
 
-const API_BASE = typeof window !== 'undefined' ? (import.meta.env.VITE_API_BASE ?? 'http://localhost:8000') : '';
+const API_BASE =
+	typeof window !== 'undefined' ? (import.meta.env.VITE_API_BASE ?? 'http://localhost:8000') : '';
 
 /** Call backend to expire session (set logged_out_at), then clear local session. */
 export async function logout(apiBase: string = API_BASE): Promise<void> {
@@ -76,9 +81,11 @@ export async function logout(apiBase: string = API_BASE): Promise<void> {
 		try {
 			await fetch(`${apiBase}/auth/logout`, {
 				method: 'POST',
-				headers: { Authorization: `Bearer ${token}` },
+				headers: { Authorization: `Bearer ${token}` }
 			});
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 	}
 	clearSession();
 }
