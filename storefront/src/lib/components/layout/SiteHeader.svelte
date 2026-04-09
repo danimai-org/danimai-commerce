@@ -135,9 +135,13 @@
 	const productCategories = $derived((productCategoriesQuery.data?.rows ?? []) as CategoryRow[]);
 	const navCollections = $derived((collectionsQuery.data?.rows ?? []) as CollectionRow[]);
 
-	const childCategories = $derived(productCategories.filter(isChildCategory));
-	const bottoms = $derived(childCategories.filter(isBottomCategory));
-	const tops = $derived(childCategories.filter((c) => !isBottomCategory(c)));
+	const navCategoryPool = $derived(
+		productCategories.filter(isChildCategory).length > 0
+			? productCategories.filter(isChildCategory)
+			: productCategories
+	);
+	const bottoms = $derived(navCategoryPool.filter(isBottomCategory));
+	const tops = $derived(navCategoryPool.filter((c) => !isBottomCategory(c)));
 
 	$effect(() => {
 		if (!menuOpen) return;

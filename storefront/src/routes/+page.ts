@@ -1,5 +1,5 @@
 import type { ProductGridItem } from "./store/+page.ts";
-import { API_BASE } from "$lib/api/storefront-api";
+import { API_BASE } from "../lib/api/storefront-api";
 
 type ApiVariant = {
   id: string;

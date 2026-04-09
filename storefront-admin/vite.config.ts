@@ -22,6 +22,9 @@ export default defineConfig({
 				rewrite: (p) => p.replace(/^\/api/, '')
 			}
 		},
+		watch: {
+			ignored: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/.DS_Store']
+		},
 		warmup: {
 			clientFiles: ['./src/routes/**/*.svelte']
 		}

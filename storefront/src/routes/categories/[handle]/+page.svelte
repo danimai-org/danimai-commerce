@@ -117,8 +117,10 @@
 			const categories = catPayload?.rows ?? [];
 
 			const childCategories = categories.filter(isChildCategory);
-			const bottomChildren = childCategories.filter(isBottomCategory);
-			const topChildren = childCategories.filter((c) => !isBottomCategory(c));
+			const categoryPool = childCategories.length > 0 ? childCategories : categories;
+			const bottomChildren = categoryPool.filter(isBottomCategory);
+			const topChildren = categoryPool.filter((c) => !isBottomCategory(c));
+			
 
 			let categoryIds: string[] = [];
 			let resolvedTitle = '';
@@ -152,7 +154,6 @@
 				};
 			}
 
-			const sortParam = page.url.searchParams.get('sort') ?? 'best-selling';
 			const sort = { sorting_field: 'products.title', sorting_direction: 'desc' };
 
 			const pq = productsListQuery(page.url);

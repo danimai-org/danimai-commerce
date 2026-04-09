@@ -9,6 +9,7 @@
 	import { client } from '$lib/api/client.js';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
 	type ProductRow = { id: string; title: string; handle: string };
 
@@ -16,6 +17,22 @@
 	function pickBg(index: number) {
 		return FALLBACK_BGS[index % FALLBACK_BGS.length];
 	}
+
+function slugify(value: string): string {
+	return value
+		.toLowerCase()
+		.replace(/&/g, 'and')
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '');
+}
+
+function prettyHandle(handle: string): string {
+	return handle
+		.split('-')
+		.filter(Boolean)
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(' ');
+}
 
 	function emptyPagination(): PaginationMeta {
 		return {
@@ -30,8 +47,15 @@
 
 	const paginateState = createPagination(
 		async () => {
+			const queryParams = {
+				...createPaginationQuery(new SvelteURLSearchParams(page.url.search)),
+			
+				filters: {
+					handle: page.params.handle ?? '',
+				}
+			};
 			const res = await client['collections'].get({
-				query: createPaginationQuery(page.url.searchParams)
+				query: queryParams
 			});
 			if (res.error) {
 				const err = res.error as { value?: { message?: string } };
@@ -44,7 +68,7 @@
 			};
 		},
 		['collection-products'],
-		createPaginationQuery(page.url.searchParams),
+		createPaginationQuery(new SvelteURLSearchParams(page.url.search)),
 		{
 			keySuffix: () => [page.params.handle ?? '']
 		}
@@ -58,9 +82,17 @@
 	const pagination = $derived(paginateState.pagination);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
+const activeHandle = $derived((page.params.handle ?? '').toLowerCase());
+const matchedRows = $derived(
+	rows.filter((row) => slugify(row.title) === activeHandle || slugify(row.handle) === activeHandle)
+);
+const pageRows = $derived(matchedRows.length > 0 ? matchedRows : rows);
+const heroTitle = $derived(
+	pageRows[0]?.title ?? (activeHandle ? prettyHandle(activeHandle) : 'Collection')
+);
 
 	const gridProducts = $derived(
-		rows.map((p, i) => ({
+	pageRows.map((p, i) => ({
 			name: p.title,
 			price: '—',
 			href: `/products/${p.handle}`,
@@ -85,16 +117,24 @@
 {:else}
 	<main class="collection-main">
 		<section class="collection-hero">
-			<h1 class="collection-hero-title">{query.data?.rows?.[0]?.title}</h1>
+			<h1 class="collection-hero-title">{heroTitle}</h1>
 		</section>
 		<div class="collection-toolbar" aria-live="polite">
 			{#if loading}
 				<span class="collection-loading">Loading…</span>
 			{/if}
-			{#if pagination && pagination.total > 0}
-				<span class="collection-range">{start}–{end} of {pagination.total}</span>
+			{#if pageRows.length > 0}
+				<span class="collection-range">
+					{#if matchedRows.length > 0}
+						1–{pageRows.length} of {pageRows.length}
+					{:else if pagination && pagination.total > 0}
+						{start}–{end} of {pagination.total}
+					{:else}
+						1–{pageRows.length} of {pageRows.length}
+					{/if}
+				</span>
 			{/if}
-			{#if pagination && pagination.total_pages > 1}
+			{#if matchedRows.length === 0 && pagination && pagination.total_pages > 1}
 				<div class="collection-pagination">
 					<button
 						type="button"
