@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { SiteHeader, SiteFooter } from '$lib/components/layout';
 	import { ProductGridSection } from '$lib/components/sections';
+	import CatalogToolbar from '$lib/components/sections/CatalogToolbar.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import {
@@ -198,7 +199,7 @@
 	const end = $derived(paginateState.end);
 
 	const products = $derived((query.data?.rows ?? []) as GridProduct[]);
-	const productCount = $derived(pagination?.total ?? 0);
+	const productCount = $derived((pagination?.total ?? 0) > 0 ? (pagination?.total ?? 0) : products.length);
 	const categoryNotFound = $derived(query.data?.categoryNotFound === true);
 	const categoryTitle = $derived(
 		query.data?.categoryTitle ?? page.params.handle ?? 'Category'
@@ -229,71 +230,28 @@
 		<section class="category-hero" aria-label={categoryTitle}>
 			<h1 class="category-hero-title">{categoryTitle}</h1>
 		</section>
-		<div class="category-toolbar">
-			<div class="toolbar-filters">
-				<span class="toolbar-label">Filter:</span>
-				<select class="toolbar-select" onchange={applyAvailability} value={currentAvailability} aria-label="Availability">
-					<option value="all">Availability</option>
-					<option value="in-stock">In stock</option>
-					<option value="out-of-stock">Out of stock</option>
-				</select>
-				<select class="toolbar-select" onchange={applyPrice} value={currentPrice} aria-label="Price">
-					<option value="all">Price</option>
-					<option value="0-50">Under $50</option>
-					<option value="50-100">$50 – $100</option>
-					<option value="100-200">$100 – $200</option>
-					<option value="200-plus">$200+</option>
-				</select>
-				<select class="toolbar-select" onchange={applyColor} value={currentColor} aria-label="Color">
-					<option value="all">Color</option>
-					<option value="black">Black</option>
-					<option value="white">White</option>
-					<option value="gray">Gray</option>
-					<option value="navy">Navy</option>
-					<option value="green">Green</option>
-					<option value="beige">Beige</option>
-					<option value="brown">Brown</option>
-				</select>
-			</div>
-			<div class="toolbar-group">
-				<label for="sort-by" class="toolbar-label">Sort by:</label>
-				<select id="sort-by" class="toolbar-select" onchange={applySort} value={currentSort} aria-label="Sort products">
-					{#each sortOptions as opt}
-						<option value={opt.value}>{opt.label}</option>
-					{/each}
-				</select>
-			</div>
-			<span class="product-count">{productCount} {productCount === 1 ? 'product' : 'products'}</span>
-		</div>
-		<div class="category-toolbar-meta" aria-live="polite">
-			{#if loading}
-				<span class="category-loading">Loading…</span>
-			{/if}
-			{#if pagination && pagination.total > 0}
-				<span class="category-range">{start}–{end} of {pagination.total}</span>
-			{/if}
-			{#if pagination && pagination.total_pages > 1}
-				<div class="category-pagination">
-					<button
-						type="button"
-						class="category-page-btn"
-						disabled={loading || !pagination.has_previous_page}
-						onclick={() => goToPage(pagination.page - 1)}
-					>
-						Previous
-					</button>
-					<span class="category-page-num">Page {pagination.page} of {pagination.total_pages}</span>
-					<button
-						type="button"
-						class="category-page-btn"
-						disabled={loading || !pagination.has_next_page}
-						onclick={() => goToPage(pagination.page + 1)}
-					>
-						Next
-					</button>
-				</div>
-			{/if}
-		</div>
+		<CatalogToolbar
+			loading={loading}
+			start={start}
+			end={end}
+			total={pagination?.total ?? 0}
+			totalPages={pagination?.total_pages ?? 0}
+			page={pagination?.page ?? 1}
+			hasNextPage={pagination?.has_next_page ?? false}
+			hasPreviousPage={pagination?.has_previous_page ?? false}
+			productCount={productCount}
+			currentSort={currentSort}
+			currentAvailability={currentAvailability}
+			currentPrice={currentPrice}
+			currentColor={currentColor}
+			sortOptions={sortOptions}
+			onSort={applySort}
+			onAvailability={applyAvailability}
+			onPrice={applyPrice}
+			onColor={applyColor}
+			onPrevious={() => goToPage((pagination?.page ?? 1) - 1)}
+			onNext={() => goToPage((pagination?.page ?? 1) + 1)}
+		/>
 		<ProductGridSection products={products} title="" subtitle="" />
 	</main>
 {/if}
@@ -324,86 +282,6 @@
 		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 		letter-spacing: -0.02em;
 		line-height: 1.2;
-	}
-	.category-toolbar {
-		display: flex;
-		align-items: center;
-		flex-wrap: wrap;
-		gap: 1rem 1.5rem;
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 1rem 1.5rem 2rem;
-		border-bottom: 1px solid #eee;
-	}
-	.category-toolbar-meta {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		justify-content: center;
-		gap: 1rem 1.5rem;
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 0 1.5rem 1rem;
-		font-size: 0.875rem;
-		color: #555;
-	}
-	.category-loading {
-		color: #666;
-	}
-	.category-range {
-		margin: 0 auto;
-	}
-	.category-pagination {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-	}
-	.category-page-btn {
-		padding: 0.35rem 0.75rem;
-		font-size: 0.875rem;
-		border: 1px solid #ccc;
-		border-radius: 6px;
-		background: #fff;
-		cursor: pointer;
-	}
-	.category-page-btn:disabled {
-		opacity: 0.45;
-		cursor: not-allowed;
-	}
-	.category-page-num {
-		color: #666;
-	}
-	.toolbar-filters {
-		display: flex;
-		align-items: center;
-		flex-wrap: wrap;
-		gap: 0.5rem 1rem;
-	}
-	.toolbar-filters .toolbar-select {
-		min-width: 7rem;
-	}
-	.toolbar-group {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-	.toolbar-label {
-		font-size: 0.875rem;
-		color: #555;
-	}
-	.toolbar-select {
-		font-size: 0.875rem;
-		padding: 0.35rem 0.5rem;
-		border: 1px solid #ddd;
-		border-radius: 6px;
-		background: #fff;
-		color: #1a1a1a;
-		cursor: pointer;
-	}
-	.product-count {
-		margin-left: auto;
-		font-size: 0.875rem;
-		color: #666;
 	}
 	.category-error {
 		max-width: 1200px;

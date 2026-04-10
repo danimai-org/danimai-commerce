@@ -6,25 +6,31 @@
 	let {
 		products = [] as ProductGridItem[] | undefined,
 		title = 'Essential essentials for everyday.',
-		subtitle = 'A collection of versatile pieces for your daily movement.'
+		subtitle = 'A collection of versatile pieces for your daily movement.',
+		catalogMode = false
 	}: {
 		products?: ProductGridItem[] | undefined;
 		title?: string;
 		subtitle?: string;
+		catalogMode?: boolean;
 	} = $props();
 
-	function parsePrice(priceStr: string): number {
-		const n = parseFloat(priceStr.replace(/[^0-9.]/g, ''));
+	function parsePrice(priceInput: string | number | null | undefined): number {
+		if (typeof priceInput === 'number') {
+			return Number.isFinite(priceInput) ? priceInput : 0;
+		}
+		if (typeof priceInput !== 'string') {
+			return 0;
+		}
+		const n = parseFloat(priceInput.replace(/[^0-9.]/g, ''));
 		return Number.isFinite(n) ? n : 0;
 	}
 
-	function quickAdd(e: MouseEvent, product: ProductGridItem) {
-		e.preventDefault();
-		e.stopPropagation();
+	function quickAdd(e	: MouseEvent, product: ProductGridItem) {
 		cart.addItem({
 			href: product.href,
 			name: product.name,
-			priceDisplay: product.price,
+			priceDisplay: `$${parsePrice(product.price).toFixed(2)}`,
 			priceValue: parsePrice(product.price),
 			image: product.image ?? null,
 			variant: 'Default'
@@ -32,7 +38,7 @@
 	}
 </script>
 
-<section class="section products-section">
+<section class="section products-section" class:catalog-mode={catalogMode}>
 	{#if title}
 		<h2 class="section-title">{title}</h2>
 	{/if}
@@ -48,8 +54,10 @@
 							<img src={product.image} alt="" class="product-img" />
 						{/if}
 					</div>
-					<h3 class="product-name">{product.name}</h3>
-					<p class="product-price">{product.price}</p>
+					<div class="product-meta">
+						<h3 class="product-name">{product.name}</h3>
+						<p class="product-price">${parsePrice(product.price).toFixed(2)}</p>
+					</div>
 				</a>
 				<button type="button" class="quick-add" onclick={(e) => quickAdd(e, product)}>QUICK ADD</button>
 			</article>
@@ -145,6 +153,42 @@
 	@media (max-width: 1024px) {
 		.product-grid {
 			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+	.catalog-mode {
+		padding-top: 1rem;
+	}
+	.catalog-mode .product-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 1.5rem;
+	}
+	.catalog-mode .product-name {
+		text-align: left;
+		font-weight: 500;
+		font-size: 0.95rem;
+		margin: 0;
+	}
+	.catalog-mode .product-price {
+		text-align: right;
+		color: #1a1a1a;
+		font-size: 1rem;
+		margin: 0;
+		font-weight: 500;
+	}
+	.catalog-mode .product-meta {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+	}
+	@media (max-width: 1024px) {
+		.catalog-mode .product-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+	@media (max-width: 640px) {
+		.catalog-mode .product-grid {
+			grid-template-columns: 1fr;
 		}
 	}
 </style>
