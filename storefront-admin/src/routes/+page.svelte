@@ -1,8 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-
-	goto(resolve('/products', {}), { replaceState: true });
 </script>
 
 <h1>Welcome to SvelteKit</h1>

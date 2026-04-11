@@ -22,14 +22,17 @@
 	let { data }: { data: PageData } = $props();
 	let createOpen = $state(false);
 
-	const paginationQuery = createPaginationQuery(page.url.searchParams);
+	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
 	const paginateState = createPagination(
 		async () => {
 			return client.products.get({ query: paginationQuery });
 		},
 		['products'],
-		paginationQuery
+		paginationQuery,
+		{
+			keySuffix: () => [page.url.searchParams.toString()]
+		}
 	);
 
 	async function deleteProducts(ids: string[]): Promise<void> {
@@ -51,11 +54,14 @@
 		}))
 	) as Record<string, unknown>[];
 	const pagination = $derived((queryData?.data?.pagination ?? null) as PaginationMeta | null);
-	const start = $derived(paginateState.start);
-	const end = $derived(paginateState.end);
+	const start = $derived(
+		pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0
+	);
+	const end = $derived(
+		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	);
 	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
 	const deleteItem = $derived(paginateState.deleteItem);
-	const searchText = $derived(paginateState.searchText);
 
 	function goWithParams(params: Record<string, string>) {
 		const searchParams = untrack(() => new SvelteURLSearchParams(page.url.searchParams));
@@ -116,7 +122,6 @@
 	}
 
 	$effect(() => {
-		console.log('searchText', searchText);
 		handleSearchChange(paginateState.searchText);
 	});
 </script>

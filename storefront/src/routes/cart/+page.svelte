@@ -7,6 +7,10 @@
 	const SESSION_STORAGE_KEY = 'dm_sf_session_id';
 	const CART_STORAGE_KEY = 'dm_sf_cart_id';
 
+	const shippingDisplay = $state('$0.00');
+	const discountDisplay = $state('$0.00');
+	const taxDisplay = $state('$0.00');
+
 	type ApiLineItem = {
 		id: string;
 		title: string | null;
@@ -17,12 +21,10 @@
 		quantity: number | null;
 		unit_price: string | null;
 	};
-
 	type ApiCart = {
 		id: string;
 		line_items: ApiLineItem[];
 	};
-
 	type LineItemPut = {
 		id?: string;
 		title?: string | null;
@@ -33,7 +35,6 @@
 		quantity?: number | null;
 		unit_price?: string | null;
 	};
-
 	type CartRowView = {
 		key: string;
 		lineId: string;
@@ -165,6 +166,22 @@
 	const subtotal = $derived(displayItems.reduce((sum, i) => sum + i.priceValue * i.quantity, 0));
 	const subtotalDisplay = $derived(`$${subtotal.toFixed(2)}`);
 	const totalDisplay = $derived(`$${subtotal.toFixed(2)}`);
+
+	let promoOpen = $state(false);
+	let promoInput = $state('');
+
+	function openPromo() {
+		promoOpen = true;
+	}
+
+	function closePromo() {
+		promoOpen = false;
+		promoInput = '';
+	}
+
+	function applyPromo() {
+		// Wire to promotions / cart API when available
+	}
 
 	function parsePrice(priceStr: string): number {
 		const n = parseFloat(priceStr.replace(/[^0-9.]/g, ''));
@@ -331,22 +348,36 @@
 					</div>
 					<div class="summary-row">
 						<dt>Shipping</dt>
-						<dd>$0.00</dd>
+						<dd>{shippingDisplay}</dd>
 					</div>
 					<div class="summary-row">
 						<dt>Discount</dt>
-						<dd>$0.00</dd>
+						<dd>{discountDisplay}</dd>
 					</div>
 					<div class="summary-row">
 						<dt>Tax</dt>
-						<dd>$0.00</dd>
+						<dd>{taxDisplay}</dd>
 					</div>
 				</dl>
 				<div class="summary-total">
 					<span>Total</span>
 					<strong>{totalDisplay}</strong>
 				</div>
-				<button type="button" class="add-promo">Add promo code</button>
+				{#if !promoOpen}
+					<button type="button" class="add-promo" onclick={openPromo}>Add promo code</button>
+				{:else}
+					<div class="promo-row">
+						<input
+							type="text"
+							class="promo-input"
+							placeholder="Enter code"
+							bind:value={promoInput}
+							aria-label="Promo code"
+						/>
+						<button type="button" class="promo-apply" onclick={applyPromo}>Apply</button>
+						<button type="button" class="promo-cancel" onclick={closePromo}>Cancel</button>
+					</div>
+				{/if}
 				<a href="/checkout" class="checkout-btn">PROCEED TO CHECKOUT</a>
 				<p class="shipping-note">Free shipping on all orders</p>
 			</aside>
@@ -618,6 +649,56 @@
 	}
 	.add-promo:hover {
 		color: #1a1a1a;
+	}
+	.promo-row {
+		display: flex;
+		align-items: stretch;
+		gap: 0.5rem;
+		margin-top: 1rem;
+	}
+	.promo-input {
+		flex: 1;
+		min-width: 0;
+		border: 1px solid #ccc;
+		border-radius: 0;
+		padding: 0.65rem 0.75rem;
+		font-size: 0.875rem;
+		box-sizing: border-box;
+		background: #fff;
+		color: #1a1a1a;
+	}
+	.promo-input::placeholder {
+		color: #888;
+	}
+	.promo-apply {
+		flex-shrink: 0;
+		background: #2d2d2d;
+		color: #fff;
+		border: none;
+		border-radius: 0;
+		padding: 0 1rem;
+		font-size: 0.875rem;
+		font-weight: 500;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.promo-apply:hover {
+		background: #1a1a1a;
+	}
+	.promo-cancel {
+		flex-shrink: 0;
+		background: #fff;
+		color: #1a1a1a;
+		border: 1px solid #1a1a1a;
+		border-radius: 0;
+		padding: 0 1rem;
+		font-size: 0.875rem;
+		font-weight: 500;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.promo-cancel:hover {
+		background: #f5f5f5;
 	}
 	.checkout-btn {
 		display: block;

@@ -40,7 +40,6 @@
 		{ value: 'title-desc', label: 'Title Z–A' }
 	];
 
-	
 
 	const FALLBACK_BGS = ['#e8e0d5', '#4a4a4a', '#f5f0eb', '#6b7c5c'];
 	function pickBg(i: number) {

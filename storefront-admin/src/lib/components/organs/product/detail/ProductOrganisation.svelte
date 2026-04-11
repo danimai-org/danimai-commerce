@@ -53,9 +53,8 @@
 			<dd class="mt-0.5">
 				{#if product?.collections?.length}
 					{product.collections.map((c) => c.title).join(', ')}
-					{product.collections.length > 0
-						? product.collections.map((c) => c.title).join(', ')
-						: '—'}
+				{:else}
+					—
 				{/if}
 			</dd>
 		</div>

@@ -3,55 +3,45 @@
 		title: string;
 		handle: string;
 		image: string;
-	}
-
-	const FALLBACK: Collection[] = [
-		{
-			title: 'Core Essentials',
-			handle: 'core-essentials',
-			image:
-				'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=800&q=80'
-		},
-		{
-			title: 'Studio & Training',
-			handle: 'studio-training',
-			image:
-				'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&q=80'
-		},
-		{
-			title: 'Outer Layers',
-			handle: 'outer-layers',
-			image:
-				'https://images.unsplash.com/photo-1617137968427-85924c2a0505?w=800&q=80'
-		}
-	];
+	}	
 
 	let {
 		title = 'Shop Collections',
-		collections = [] as Collection[]
+		collections: collectionsProp
 	}: {
 		title?: string;
 		collections?: Collection[];
 	} = $props();
 
-	const display = $derived(collections.length > 0 ? collections : FALLBACK);
+
+	const display = $derived(
+		collectionsProp === undefined ? collectionsProp ?? [] : collectionsProp?.length > 0 ? collectionsProp : []
+	);
+	const collections = $derived(display);
+	const featureLayout = $derived(collections.length === 3);
 </script>
 
 <section class="section collections-section">
 	<h2 class="section-title">{title}</h2>
-	<div class="collections-layout">
-		{#each display as collection, i (collection.handle)}
-			<a
-				href={`/collections/${collection.handle}`}
-				class="collection-card"
-				class:collection-card--large={i === 0 && display.length >= 3}
-			>
-				<div class="collection-bg" style="background-image: url({collection.image});"></div>
-				<div class="collection-overlay"></div>
-				<span class="collection-label">{collection.title}</span>
-			</a>
-		{/each}
-	</div>
+	{#if collections.length === 0}
+		<p class="collections-empty">No collections yet.</p>
+	{:else}
+		<div class="collections-layout" class:collections-layout--feature={featureLayout}>
+			{#each collections as collection, i (collection.handle)}
+				<a
+					href={`/collections/${encodeURIComponent(collection.handle)}`}
+					class="collection-card"
+					class:collection-card--large={featureLayout && i === 0}
+				>
+					<div class="collection-bg" style="background-image: url({collection.image});"></div>
+					<div class="collection-overlay"></div>
+					<span class="collection-title">{collection.title}</span>
+					<img src={collection.image} alt={collection.title} class="collection-image" />
+				
+				</a>
+			{/each}
+		</div>
+	{/if}
 </section>
 
 <style>
@@ -69,11 +59,20 @@
 		margin: 0 0 2rem;
 		letter-spacing: -0.02em;
 	}
+	.collections-empty {
+		margin: 0;
+		text-align: center;
+		color: #666;
+		font-size: 1rem;
+	}
 	.collections-layout {
 		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+		gap: 1rem;
+	}
+	.collections-layout--feature {
 		grid-template-columns: 1fr 1fr;
 		grid-auto-rows: 1fr;
-		gap: 1rem;
 		min-height: 700px;
 	}
 	.collection-card {
@@ -128,6 +127,9 @@
 			flex-direction: column;
 			gap: 0.75rem;
 			min-height: unset;
+		}
+		.collections-layout--feature {
+			display: flex;
 		}
 		.collection-card,
 		.collection-card--large {

@@ -9,9 +9,11 @@
 		QuotesSection
 	} from '$lib/components/sections';
 	import type { ProductGridItem } from './store/+page.ts';
+	import type { HomeCollectionCard } from './+page.ts';
 
 	let { data } = $props();
 	const products = $derived((data as { products?: ProductGridItem[] })?.products ?? []);
+	const collections = $derived((data as { collections?: HomeCollectionCard[] })?.collections ?? []);
 	const error = $derived((data as { error?: string })?.error ?? null);
 </script>
 
@@ -37,7 +39,7 @@
 
 		<StorySection />
 
-		<CollectionsSection />
+		<CollectionsSection {collections} />
 
 		<VideoSection />
 

@@ -1,10 +1,10 @@
 <footer class="footer">
 	<div class="footer-newsletter">
 		<h2 class="footer-newsletter-title">Join Our Community</h2>
-		<p class="footer-newsletter-desc">Get 10% off your first order when you sign up for our newsletter.</p>
+		<p class="footer-newsletter-desc">Subscribe to receive updates on new arrivals, special offers, and movement inspiration.</p>
 		<form class="newsletter-form" action="#" method="post">
 			<input type="email" name="email" placeholder="Enter your email" class="newsletter-input" aria-label="Email" />
-			<button type="submit" class="newsletter-btn">JOIN</button>
+			<button type="submit" class="newsletter-btn">Subscribe</button>
 		</form>
 	</div>
 	<div class="footer-columns">
@@ -15,6 +15,15 @@
 				<label for="region">REGION</label>
 				<select id="region" name="region" class="footer-select">
 					<option>United States (USD)</option>
+					<option>Canada (CAD)</option>
+					<option>United Kingdom (GBP)</option>
+					<option>Australia (AUD)</option>
+					<option>New Zealand (NZD)</option>
+					<option>Europe (EUR)</option>
+					<option>Asia (JPY)</option>
+					<option>Latin America (MXN)</option>
+					<option>Middle East (AED)</option>
+					<option>Africa (ZAR)</option>
 				</select>
 			</div>
 		</div>
