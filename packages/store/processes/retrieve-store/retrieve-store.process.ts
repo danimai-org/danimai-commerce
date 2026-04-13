@@ -14,7 +14,7 @@ import {
   StoreResponseSchema,
   RetrieveStoreProcessOutput,
 } from "./retrieve-store.schema";
-import type { Database, Store } from "@danimai/store/db";
+import type { Database, Store } from "../../../db";
 
 /**
  * Handles the retrieve store process.

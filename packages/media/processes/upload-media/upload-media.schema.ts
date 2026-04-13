@@ -8,7 +8,7 @@ export const UploadMediaSchema = Type.Object({
   metadata: Type.Optional(Type.Record(Type.String(), Type.Any())),
 });
 
-export const UploadMediaResponseSchema = Type.Object({
+const UploadMediaItemSchema = Type.Object({
   id: Type.String(),
   type: Type.String(),
   owner_type: Type.Union([Type.String(), Type.Null()]),
@@ -26,5 +26,10 @@ export const UploadMediaResponseSchema = Type.Object({
   created_at: Type.Any(),
 });
 
-export type UploadMediaProcessInput = Static<typeof UploadMediaSchema>;
+export const UploadMediaResponseSchema = Type.Array(UploadMediaItemSchema);
+
+type UploadMediaSchemaInput = Static<typeof UploadMediaSchema>;
+export type UploadMediaProcessInput = Omit<UploadMediaSchemaInput, "file"> & {
+  file: File | File[];
+};
 export type UploadMediaProcessOutput = Static<typeof UploadMediaResponseSchema>;

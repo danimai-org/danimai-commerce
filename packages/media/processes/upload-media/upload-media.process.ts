@@ -50,59 +50,62 @@ export class UploadMediaProcess {
       }]);
     }
 
-    const file = input.file;
-    if (!(file instanceof File)) {
+    const files = Array.isArray(input.file) ? input.file : [input.file];
+    if (files.length === 0 || files.some((file) => !(file instanceof File))) {
       throw new ValidationError("Invalid file input", [{
         type: "invalid",
-        message: "file must be a multipart file",
+        message: "file must be a multipart file or array of files",
         path: "file",
       }]);
     }
-
-    const extension = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() ?? null : null;
-    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const objectKey = `${input.type}/${Date.now()}-${randomUUID()}-${safeFileName}`;
-    const body = new Uint8Array(await file.arrayBuffer());
-
-    const uploaded = await this.s3.send(new PutObjectCommand({
-      Bucket: bucket,
-      Key: objectKey,
-      Body: body,
-      ContentType: file.type || "application/octet-stream",
-    }));
-
-    const s3Url = `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
     const cloudfrontBaseUrl = this.config.aws?.mediaCloudfrontUrl?.trim();
-    const url = cloudfrontBaseUrl
-      ? `${cloudfrontBaseUrl.replace(/\/$/, "")}/${objectKey}`
-      : s3Url;
-    const media = await this.db
-      .insertInto("media_files")
-      .values({
-        id: randomUUID(),
-        provider: "aws_s3",
-        bucket,
-        region,
-        object_key: objectKey,
-        url,
-        etag: uploaded.ETag ?? null,
-        filename: safeFileName,
-        original_filename: file.name,
-        mime_type: file.type || "application/octet-stream",
-        extension,
-        size: file.size.toString(),
-        checksum: null,
-        type: input.type,
-        owner_type: input.owner_type ?? null,
-        owner_id: input.owner_id ?? null,
-        metadata: input.metadata ?? null,
-      })
-      .returningAll()
-      .executeTakeFirstOrThrow();
+    const uploadedMedia: UploadMediaProcessOutput = [];
+    for (const file of files) {
+      const extension = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() ?? null : null;
+      const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const objectKey = `${input.type}/${Date.now()}-${randomUUID()}-${safeFileName}`;
+      const body = new Uint8Array(await file.arrayBuffer());
 
-    return {
-      ...media,
-      metadata: (media.metadata ?? null) as Record<string, unknown> | null,
-    };
+      const uploaded = await this.s3.send(new PutObjectCommand({
+        Bucket: bucket,
+        Key: objectKey,
+        Body: body,
+        ContentType: file.type || "application/octet-stream",
+      }));
+
+      const s3Url = `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
+      const url = cloudfrontBaseUrl
+        ? `${cloudfrontBaseUrl.replace(/\/$/, "")}/${objectKey}`
+        : s3Url;
+      const media = await this.db
+        .insertInto("media_files")
+        .values({
+          id: randomUUID(),
+          provider: "aws_s3",
+          bucket,
+          region,
+          object_key: objectKey,
+          url,
+          etag: uploaded.ETag ?? null,
+          filename: safeFileName,
+          original_filename: file.name,
+          mime_type: file.type || "application/octet-stream",
+          extension,
+          size: file.size.toString(),
+          checksum: null,
+          type: input.type,
+          owner_type: input.owner_type ?? null,
+          owner_id: input.owner_id ?? null,
+          metadata: input.metadata ?? null,
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      uploadedMedia.push({
+        ...media,
+        metadata: (media.metadata ?? null) as Record<string, unknown> | null,
+      });
+    }
+
+    return uploadedMedia;
   }
 }

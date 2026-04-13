@@ -3,50 +3,73 @@ import {
   InjectS3,
   NotFoundError,
   Process,
-  ProcessContext,
-  type ProcessContextType,
-  type ProcessContract,
+  ValidationError,
 } from "@danimai/core";
-import { DeleteObjectCommand, type S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectsCommand, type S3Client } from "@aws-sdk/client-s3";
 import { Kysely } from "kysely";
-import { DeleteMediaSchema } from "./delete-media.schema";
+import type { DeleteMediaProcessInput } from "./delete-media.schema";
 import type { Database } from "../../db";
 
 export const DELETE_MEDIA_PROCESS = Symbol("DeleteMedia");
 
 @Process(DELETE_MEDIA_PROCESS)
-export class DeleteMediaProcess
-  implements ProcessContract<typeof DeleteMediaSchema, void> {
+export class DeleteMediaProcess {
   constructor(
     @InjectDB() private readonly db: Kysely<Database>,
     @InjectS3() private readonly s3: S3Client,
   ) {}
 
   /**
-   * Deletes a media object from S3 and removes its DB record.
-   * Input: media id.
+   * Deletes media objects from S3 and removes their DB records.
+   * Input: media ids.
    * Output: void.
    */
-  async runOperations(
-    @ProcessContext({ schema: DeleteMediaSchema })
-    context: ProcessContextType<typeof DeleteMediaSchema>
-  ) {
-    const media = await this.db
+  async runOperations(context: { input: DeleteMediaProcessInput }): Promise<void> {
+    const ids = [...new Set(context.input.ids)];
+    let query = this.db
       .selectFrom("media_files")
-      .where("id", "=", context.input.id)
-      .where("deleted_at", "is", null)
-      .selectAll()
-      .executeTakeFirst();
+      .where("id", "in", ids)
+      .selectAll();
+    if (context.input.owner_type) {
+      query = query.where("owner_type", "=", context.input.owner_type);
+    }
+    if (context.input.owner_id) {
+      query = query.where("owner_id", "=", context.input.owner_id);
+    }
+    const mediaRows = await query.execute();
 
-    if (!media) {
+    if (mediaRows.length === 0) {
       throw new NotFoundError("Media not found");
     }
 
-    await this.s3.send(new DeleteObjectCommand({
-      Bucket: media.bucket,
-      Key: media.object_key,
-    }));
+    const rowsByBucket = mediaRows.reduce<Record<string, typeof mediaRows>>((acc, row) => {
+      const bucketRows = acc[row.bucket] ?? [];
+      bucketRows.push(row);
+      acc[row.bucket] = bucketRows;
+      return acc;
+    }, {});
 
-    await this.db.deleteFrom("media_files").where("id", "=", media.id).execute();
+    for (const [bucket, rows] of Object.entries(rowsByBucket)) {
+      const deletionResult = await this.s3.send(new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: {
+          Objects: rows.map((row) => ({ Key: row.object_key })),
+          Quiet: false,
+        },
+      }));
+
+      if (deletionResult.Errors && deletionResult.Errors.length > 0) {
+        throw new ValidationError("Failed to delete media from S3", deletionResult.Errors.map((error) => ({
+          type: "invalid",
+          message: error.Message ?? "S3 delete failure",
+          path: error.Key ?? "ids",
+        })));
+      }
+    }
+
+    await this.db
+      .deleteFrom("media_files")
+      .where("id", "in", mediaRows.map((media) => media.id))
+      .execute();
   }
 }

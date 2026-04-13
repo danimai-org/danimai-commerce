@@ -19,7 +19,7 @@ import {
 } from "../../utils/response-schemas";
 
 const UploadMediaBodySchema = t.Object({
-  file: t.File(),
+  file: t.Union([t.File(), t.Array(t.File())]),
   type: t.Optional(t.String()),
   owner_type: t.Optional(t.String()),
   owner_id: t.Optional(t.Union([t.String({ format: "uuid" }), t.Null()])),
@@ -87,7 +87,7 @@ export const mediaRoutes = new Elysia({ prefix: "/media" })
   )
   .post(
     "/upload",
-    async ({ body }: { body: { file: File; type?: string; owner_type?: string; owner_id?: string | null } }) => {
+    async ({ body }: { body: { file: File | File[]; type?: string; owner_type?: string; owner_id?: string | null } }) => {
       const process = getService<UploadMediaProcess>(UPLOAD_MEDIA_PROCESS);
       return process.runOperations({
         input: {
@@ -117,7 +117,15 @@ export const mediaRoutes = new Elysia({ prefix: "/media" })
               schema: {
                 type: "object",
                 properties: {
-                  file: { type: "string", format: "binary" },
+                  file: {
+                    oneOf: [
+                      { type: "string", format: "binary" },
+                      {
+                        type: "array",
+                        items: { type: "string", format: "binary" },
+                      },
+                    ],
+                  },
                   type: { type: "string" },
                   owner_type: { type: "string" },
                   owner_id: { type: "string", format: "uuid", nullable: true },
@@ -135,7 +143,7 @@ export const mediaRoutes = new Elysia({ prefix: "/media" })
     async ({ params, set }) => {
       const process = getService<DeleteMediaProcess>(DELETE_MEDIA_PROCESS);
       await process.runOperations({
-        input: { id: params.id },
+        input: { ids: [params.id] },
       });
       set.status = 204;
       return undefined;
