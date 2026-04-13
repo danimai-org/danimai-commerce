@@ -17,6 +17,11 @@ import type { Database } from "../../db/type";
 import type { Static } from "@sinclair/typebox";
 import type { StockLocationAddressSchema } from "../paginated-stock-locations/paginated-stock-locations.schema";
 
+/**
+ * Handles the retrieve stock location process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_STOCK_LOCATION_PROCESS = Symbol("RetrieveStockLocation");
 
 @Process(RETRIEVE_STOCK_LOCATION_PROCESS)
@@ -30,6 +35,11 @@ export class RetrieveStockLocationProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: RetrieveStockLocationSchema })
     context: ProcessContextType<typeof RetrieveStockLocationSchema>

@@ -16,6 +16,11 @@ import {
 } from "./paginated-tax-regions.schema";
 import type { Database } from "@danimai/tax/db";
 
+/**
+ * Handles the paginated tax regions process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const PAGINATED_TAX_REGIONS_PROCESS = Symbol("PaginatedTaxRegions");
 
 @Process(PAGINATED_TAX_REGIONS_PROCESS)
@@ -31,6 +36,11 @@ export class PaginatedTaxRegionsProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: PaginatedTaxRegionsSchema })
     context: ProcessContextType<typeof PaginatedTaxRegionsSchema>

@@ -14,6 +14,11 @@ import { type UpdateProductAttributeGroupProcessInput, type UpdateProductAttribu
 import type { Database } from "../../../db/type";
 import { randomUUID } from "crypto";
 
+/**
+ * Handles the update product attribute group process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_PRODUCT_ATTRIBUTE_GROUP_PROCESS = Symbol("UpdateProductAttributeGroup");
 
 @Process(UPDATE_PRODUCT_ATTRIBUTE_GROUP_PROCESS)
@@ -26,6 +31,11 @@ export class UpdateProductAttributeGroupProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: UpdateProductAttributeGroupSchema,
   }) context: ProcessContextType<typeof UpdateProductAttributeGroupSchema>) {

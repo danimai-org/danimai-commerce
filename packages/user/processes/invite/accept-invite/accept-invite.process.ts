@@ -17,6 +17,11 @@ import {
 } from "./accept-invite.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the accept invite process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const ACCEPT_INVITE_PROCESS = Symbol("AcceptInvite");
 
 @Process(ACCEPT_INVITE_PROCESS)
@@ -31,6 +36,11 @@ export class AcceptInviteProcess
     private readonly passwordService: Password
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: AcceptInviteSchema,
   }) context: ProcessContextType<typeof AcceptInviteSchema>) {

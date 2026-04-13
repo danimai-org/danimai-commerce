@@ -14,6 +14,11 @@ import {
 } from "./paginated-countries.schema";
 import type { Database } from "@danimai/region/db";
 
+/**
+ * Handles the paginated countries process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const PAGINATED_COUNTRIES_PROCESS = Symbol("PaginatedCountries");
 
 @Process(PAGINATED_COUNTRIES_PROCESS)
@@ -29,6 +34,11 @@ export class PaginatedCountriesProcess
     private readonly db: Kysely<Database>,
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({
       schema: PaginatedCountriesSchema,

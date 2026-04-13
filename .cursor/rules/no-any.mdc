@@ -1,0 +1,7 @@
+# No Any Usage
+
+- Never use `any` in TypeScript code.
+- Prefer explicit concrete types.
+- If exact type is uncertain, use `unknown` and narrow with runtime checks.
+- Do not bypass type safety with `as any`.
+- Prefer named type aliases/interfaces instead of inline object types in function signatures, constructors, and public APIs.

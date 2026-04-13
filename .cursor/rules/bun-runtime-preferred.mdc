@@ -1,0 +1,13 @@
+---
+description: Always prefer Bun runtime and Bun APIs over Node
+alwaysApply: true
+---
+
+# Bun Runtime Preferred
+
+- Use Bun as the default runtime for scripts, tooling, and server execution.
+- Prefer Bun-native APIs and libraries when an equivalent exists.
+- Do not introduce new direct dependencies on Node-specific runtime APIs unless explicitly required.
+- Prefer `bun` commands over `node`, `npm`, `npx`, and `pnpm` in examples and instructions.
+- When reading/writing files, hashing, or serving HTTP, check Bun built-ins first before adding Node-based packages.
+- If Node compatibility is unavoidable, add a short comment explaining why Bun-native alternatives are insufficient.

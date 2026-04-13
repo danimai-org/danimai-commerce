@@ -17,6 +17,11 @@ import {
 } from "./paginated-customer-groups.schema";
 import type { Database, CustomerGroup } from "../../db/type";
 
+/**
+ * Handles the paginated customer groups process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const PAGINATED_CUSTOMER_GROUPS_PROCESS = Symbol("PaginatedCustomerGroups");
 
 @Process(PAGINATED_CUSTOMER_GROUPS_PROCESS)
@@ -29,6 +34,11 @@ export class PaginatedCustomerGroupsProcess
     private readonly logger: Logger
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({
       schema: PaginatedCustomerGroupsSchema,

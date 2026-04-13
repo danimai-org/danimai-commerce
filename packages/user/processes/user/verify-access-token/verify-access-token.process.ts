@@ -23,6 +23,11 @@ export interface VerifyAccessTokenResult {
   sid?: string;
 }
 
+/**
+ * Handles the verify access token process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const VERIFY_ACCESS_TOKEN_PROCESS = Symbol("VerifyAccessToken");
 
 @Process(VERIFY_ACCESS_TOKEN_PROCESS)
@@ -41,6 +46,11 @@ export class VerifyAccessTokenProcess
     private readonly validateSessionProcess: ValidateSessionProcess
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: VerifyAccessTokenSchema,
   }) context: ProcessContextType<typeof VerifyAccessTokenSchema>) {

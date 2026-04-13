@@ -16,6 +16,11 @@ import {
 } from "./paginated-collections.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the paginated collections process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const PAGINATED_COLLECTIONS_PROCESS = Symbol("PaginatedCollections");
 
 @Process(PAGINATED_COLLECTIONS_PROCESS)
@@ -31,6 +36,11 @@ export class PaginatedCollectionsProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: PaginatedCollectionsSchema,
   }) context: ProcessContextType<typeof PaginatedCollectionsSchema>) {

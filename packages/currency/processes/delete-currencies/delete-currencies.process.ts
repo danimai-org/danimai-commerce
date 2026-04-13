@@ -16,6 +16,11 @@ import {
 } from "./delete-currencies.schema";
 import type { Database } from "../../db";
 
+/**
+ * Handles the delete currencies process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const DELETE_CURRENCIES_PROCESS = Symbol("DeleteCurrencies");
 
 @Process(DELETE_CURRENCIES_PROCESS)
@@ -27,6 +32,11 @@ export class DeleteCurrenciesProcess implements ProcessContract<typeof DeleteCur
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: DeleteCurrenciesSchema })
     context: ProcessContextType<typeof DeleteCurrenciesSchema>

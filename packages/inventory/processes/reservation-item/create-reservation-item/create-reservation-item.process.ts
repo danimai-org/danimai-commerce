@@ -15,6 +15,11 @@ import {
   type CreateReservationItemProcessOutput,
 } from "./create-reservation-item.schema";
 
+/**
+ * Handles the create reservation item process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_RESERVATION_ITEM_PROCESS = Symbol("CreateReservationItem");
 
 @Process(CREATE_RESERVATION_ITEM_PROCESS)
@@ -30,6 +35,11 @@ export class CreateReservationItemProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: CreateReservationItemSchema })
     context: ProcessContextType<typeof CreateReservationItemSchema>

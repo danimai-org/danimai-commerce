@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import type { TIntersect, TObject, TSchema } from "@sinclair/typebox";
+import type { TObject } from "@sinclair/typebox";
 import { FormatRegistry } from "@sinclair/typebox";
 import { Check } from "@sinclair/typebox/value";
 import { Errors, ValueErrorType as SchemaValueErrorType } from "@sinclair/typebox/errors";
@@ -16,14 +16,22 @@ const WRAPPED_FLAG = Symbol("process_context_wrapped");
 
 interface ParameterMetadata {
     parameterIndex: number;
-    schema: TObject | TIntersect;
+    schema: TObject;
 }
 
-export interface ProcessContextDecoratorOptions<TInput extends TObject | TIntersect> {
+export interface ProcessContextDecoratorOptions<TInput extends TObject> {
     schema: TInput;
 }
 
-export function ProcessContext<TInput extends TObject | TIntersect>(
+/**
+ * Purpose: Declares and validates a process method context parameter against a TypeBox schema.
+ * Target: parameter
+ * Arguments: `options.schema` (TypeBox object/intersect schema, required)
+ * Runtime behavior: stores parameter metadata during decoration; validation executes when Process wrapper invokes the method.
+ * Side effects: writes reflection metadata and can throw ValidationError before method body executes.
+ * Example: `runOperations(@ProcessContext({ schema: MySchema }) ctx: ProcessContextType<typeof MySchema>)`
+ */
+export function ProcessContext<TInput extends TObject>(
     options: ProcessContextDecoratorOptions<TInput>
 ): ParameterDecorator {
     return (target: any, propertyKey: string | symbol | undefined, parameterIndex: number) => {

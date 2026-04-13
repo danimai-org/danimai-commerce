@@ -15,6 +15,11 @@ import {
   type DeleteInventoryItemsProcessOutput,
 } from "./delete-inventory-items.schema";
 
+/**
+ * Handles the delete inventory items process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const DELETE_INVENTORY_ITEMS_PROCESS = Symbol("DeleteInventoryItems");
 
 @Process(DELETE_INVENTORY_ITEMS_PROCESS)
@@ -30,6 +35,11 @@ export class DeleteInventoryItemsProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: DeleteInventoryItemsSchema })
     context: ProcessContextType<typeof DeleteInventoryItemsSchema>

@@ -8,3 +8,4 @@ export const DANIMAI_EMAIL = Symbol("DANIMAI_EMAIL");
 export const DANIMAI_JWT = Symbol("DANIMAI_JWT");
 export const DANIMAI_PASSWORD = Symbol("DANIMAI_PASSWORD");
 export const DANIMAI_DYNAMODB = Symbol("DANIMAI_DYNAMODB");
+export const DANIMAI_S3 = Symbol("DANIMAI_S3");

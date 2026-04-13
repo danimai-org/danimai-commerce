@@ -16,6 +16,11 @@ import {
 } from "./create-session.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the create session process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_SESSION_PROCESS = Symbol("CreateSession");
 
 @Process(CREATE_SESSION_PROCESS)
@@ -28,6 +33,11 @@ export class CreateSessionProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: CreateSessionSchema,
   }) context: ProcessContextType<typeof CreateSessionSchema>) {

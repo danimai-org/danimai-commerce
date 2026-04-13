@@ -1,4 +1,4 @@
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import { type StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
@@ -11,7 +11,9 @@ import {
   PaginatedProductVariantsSchema,
   PaginatedProductVariantsResponseSchema,
   RETRIEVE_PRODUCT_VARIANT_PROCESS,
+  UPDATE_PRODUCT_VARIANT_IMAGES_PROCESS,
   RetrieveProductVariantProcess,
+  UpdateProductVariantImagesProcess,
   RetrieveProductVariantResponseSchema,
   UpdateProductVariantSchema,
   UpdateProductVariantsResponseSchema,
@@ -33,6 +35,8 @@ const UpdateProductVariantBodySchema = Type.Object({
   manage_inventory: Type.Optional(Type.Boolean()),
   variant_rank: Type.Optional(Type.Number()),
   thumbnail: Type.Optional(Type.String()),
+  thumbnail_media_id: Type.Optional(Type.Union([Type.String({ format: "uuid" }), Type.Null()])),
+  media_ids: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
 });
 
@@ -100,6 +104,40 @@ export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
         tags: ["Product Variants"],
         summary: "Update a product variant",
         description: "Updates an existing product variant by ID",
+      },
+    }
+  )
+  .post(
+    "/:id/images",
+    async ({ params, body }: { params: { id: string }; body: { files?: File | File[]; delete_ids?: string[]; type?: string } }) => {
+      const process = getService<UpdateProductVariantImagesProcess>(UPDATE_PRODUCT_VARIANT_IMAGES_PROCESS);
+      return process.runOperations({
+        input: {
+          id: params.id,
+          files: body.files,
+          delete_ids: body.delete_ids,
+          type: body.type,
+        },
+      });
+    },
+    {
+      params: Type.Object({ id: Type.String({ format: "uuid" }) }),
+      type: "multipart/form-data",
+      body: t.Object({
+        files: t.Optional(t.Union([t.File(), t.Array(t.File())])),
+        delete_ids: t.Optional(t.Array(t.String({ format: "uuid" }))),
+        type: t.Optional(t.String()),
+      }),
+      response: {
+        200: t.Any(),
+        400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Product Variants"],
+        summary: "Update variant images",
+        description: "Uploads raw variant images and deletes selected existing media IDs.",
       },
     }
   )

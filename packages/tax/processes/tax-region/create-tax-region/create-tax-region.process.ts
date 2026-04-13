@@ -12,6 +12,11 @@ import {
 } from "./create-tax-region.schema";
 import type { Database } from "@danimai/tax/db";
 
+/**
+ * Handles the create tax region process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_TAX_REGION_PROCESS = Symbol("CreateTaxRegion");
 
 @Process(CREATE_TAX_REGION_PROCESS)
@@ -25,6 +30,11 @@ export class CreateTaxRegionProcess
     private readonly db: Kysely<Database>,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: CreateTaxRegionSchema })
     context: ProcessContextType<typeof CreateTaxRegionSchema>

@@ -15,6 +15,11 @@ import {
 } from "./create-update-store.schema";
 import type { Database } from "../../db";
 
+/**
+ * Handles the create store process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_STORE_PROCESS = Symbol("CreateStore");
 
 @Process(CREATE_STORE_PROCESS)
@@ -29,6 +34,11 @@ export class CreateStoreProcess implements ProcessContract<
     private readonly logger: Logger,
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: CreateStoreSchema })
     context: ProcessContextType<typeof CreateStoreSchema>,

@@ -13,6 +13,11 @@ import {
 } from "./retrieve-region.schema";
 import type { Database } from "@danimai/region/db";
 
+/**
+ * Handles the retrieve region process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_REGION_PROCESS = Symbol("RetrieveRegion");
 
 @Process(RETRIEVE_REGION_PROCESS)
@@ -23,6 +28,11 @@ export class RetrieveRegionProcess
     private readonly db: Kysely<Database>,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({
       schema: RetrieveRegionSchema,

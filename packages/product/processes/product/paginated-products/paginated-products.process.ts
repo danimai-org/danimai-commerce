@@ -14,6 +14,11 @@ import {
 import type { Database } from "../../../db/type";
 import { paginationResponse } from "@danimai/core/pagination";
 
+/**
+ * Handles the paginated products process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const PAGINATED_PRODUCTS_PROCESS = Symbol("PaginatedProducts");
 
 @Process(PAGINATED_PRODUCTS_PROCESS)
@@ -26,6 +31,11 @@ export class PaginatedProductsProcess implements ProcessContract<
     private readonly db: Kysely<Database>
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({
       schema: PaginatedProductsSchema,

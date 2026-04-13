@@ -6,6 +6,11 @@ import {
 } from "./remove-countries-from-region.schema";
 import type { Database } from "@danimai/region/db";
 
+/**
+ * Handles the remove countries from region process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const REMOVE_COUNTRIES_FROM_REGION_PROCESS = Symbol("RemoveCountriesFromRegion");
 
 @Process(REMOVE_COUNTRIES_FROM_REGION_PROCESS)
@@ -17,6 +22,11 @@ export class RemoveCountriesFromRegionProcess
 		private readonly db: Kysely<Database>
 	) {}
 
+	/**
+	 * Executes the process business logic.
+	 * Input: validated process context and request payload.
+	 * Output: operation result object or entity payload.
+	 */
 	async runOperations(
 		@ProcessContext({
 			schema: RemoveCountriesFromRegionSchema,

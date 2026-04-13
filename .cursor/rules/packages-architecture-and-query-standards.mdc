@@ -1,0 +1,21 @@
+---
+description: Packages architecture and query standards
+globs: packages/**
+alwaysApply: false
+---
+
+# Packages Architecture And Query Standards
+
+- Keep process-layer data retrieval cohesive: prefer one optimized query per use case when practical.
+- Do not introduce N+1 query patterns (for example, querying children inside a loop over parents).
+- Prefer join-first retrieval with grouped aggregation for related entities when building list/detail responses.
+- Select only required columns; avoid `select *` in package queries.
+- Add a short rationale comment above complex multi-join or aggregate queries describing why this shape is used.
+- Return stable structured objects from queries (for example, aggregated JSON fields for related entities) to reduce post-processing and extra round-trips.
+
+## Good Pattern Example
+
+Use the pattern in `packages/product/processes/product/paginated-products/paginated-products.process.ts`:
+- joins product variants, category, and sales channels in one query
+- aggregates related rows (`count`, `array_agg`, `jsonb_build_object`)
+- groups once and returns consumer-ready fields

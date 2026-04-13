@@ -12,8 +12,18 @@ import { type CreateProductCategoryProcessOutput, CreateProductCategorySchema } 
 import type { Database } from "../../../db/type";
 import { ProductCategoryStatus, ProductCategoryVisibility } from "../../../db/type";
 
+/**
+ * Handles the create product category process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_PRODUCT_CATEGORY_PROCESS = Symbol("CreateProductCategory");
 
+/**
+ * Creates a product category after validating uniqueness and parent linkage.
+ * Input: category value and optional parent/status/visibility/metadata.
+ * Output: created or existing category row.
+ */
 @Process(CREATE_PRODUCT_CATEGORY_PROCESS)
 export class CreateProductCategoryProcess
   implements ProcessContract<typeof CreateProductCategorySchema, CreateProductCategoryProcessOutput> {
@@ -22,6 +32,11 @@ export class CreateProductCategoryProcess
     private readonly db: Kysely<Database>,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: CreateProductCategorySchema,
   }) context: ProcessContextType<typeof CreateProductCategorySchema>) {
@@ -86,25 +101,23 @@ export class CreateProductCategoryProcess
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") || "category";
 
-    let handle = baseHandle;
+    const existingHandles = await this.db
+      .selectFrom("product_categories")
+      .where("handle", "like", `${baseHandle}%`)
+      .where("deleted_at", "is", null)
+      .select("handle")
+      .execute();
+
+    const handleSet = new Set(existingHandles.map((row) => row.handle));
+    if (!handleSet.has(baseHandle)) {
+      return baseHandle;
+    }
+
     let counter = 1;
-
-    while (true) {
-      const existing = await this.db
-        .selectFrom("product_categories")
-        .where("handle", "=", handle)
-        .where("deleted_at", "is", null)
-        .select("id")
-        .executeTakeFirst();
-
-      if (!existing) {
-        break;
-      }
-
-      handle = `${baseHandle}-${counter}`;
+    while (handleSet.has(`${baseHandle}-${counter}`)) {
       counter++;
     }
 
-    return handle;
+    return `${baseHandle}-${counter}`;
   }
 }

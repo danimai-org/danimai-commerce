@@ -13,6 +13,11 @@ import type { Logger } from "@logtape/logtape";
 import { type UpdateProductTagProcessInput, type UpdateProductTagProcessOutput, UpdateProductTagSchema } from "./update-product-tag.schema";
 import type { Database, ProductTag } from "../../../db/type";
 
+/**
+ * Handles the update product tag process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_PRODUCT_TAG_PROCESS = Symbol("UpdateProductTag");
 
 @Process(UPDATE_PRODUCT_TAG_PROCESS)
@@ -25,6 +30,11 @@ export class UpdateProductTagProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: UpdateProductTagSchema,
   }) context: ProcessContextType<typeof UpdateProductTagSchema>) {

@@ -15,6 +15,11 @@ import {
 } from "./create-customer-address.schema";
 import type { Database, CustomerAddress } from "../../db/type";
 
+/**
+ * Handles the create customer address process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_CUSTOMER_ADDRESS_PROCESS = Symbol("CreateCustomerAddress");
 
 @Process(CREATE_CUSTOMER_ADDRESS_PROCESS)
@@ -28,6 +33,11 @@ export class CreateCustomerAddressProcess
     private readonly logger: Logger
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({
       schema: CreateCustomerAddressSchema,

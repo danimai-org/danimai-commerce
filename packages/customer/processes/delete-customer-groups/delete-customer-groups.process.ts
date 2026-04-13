@@ -15,6 +15,11 @@ import {
 } from "./delete-customer-groups.schema";
 import type { Database } from "@danimai/customer/db";
 
+/**
+ * Handles the delete customer groups process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const DELETE_CUSTOMER_GROUPS_PROCESS = Symbol("DeleteCustomerGroups");
 
 @Process(DELETE_CUSTOMER_GROUPS_PROCESS)
@@ -26,6 +31,11 @@ export class DeleteCustomerGroupsProcess implements ProcessContract<void> {
     private readonly logger: Logger
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: DeleteCustomerGroupsSchema })
     context: ProcessContextType<typeof DeleteCustomerGroupsSchema>

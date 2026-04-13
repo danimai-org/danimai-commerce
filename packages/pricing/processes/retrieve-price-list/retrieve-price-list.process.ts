@@ -15,6 +15,11 @@ import {
   type RetrievePriceListProcessOutput,
 } from "./retrieve-price-list.schema";
 
+/**
+ * Handles the retrieve price list process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_PRICE_LIST_PROCESS = Symbol("RetrievePriceList");
 
 @Process(RETRIEVE_PRICE_LIST_PROCESS)
@@ -29,6 +34,11 @@ export class RetrievePriceListProcess
     private readonly logger: Logger,
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: RetrievePriceListSchema })
     context: ProcessContextType<typeof RetrievePriceListSchema>,

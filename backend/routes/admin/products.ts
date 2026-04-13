@@ -1,4 +1,4 @@
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import { type StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
@@ -17,6 +17,8 @@ import {
   RETRIEVE_PRODUCT_PROCESS,
   RetrieveProductProcess,
   RetrieveProductResponseSchema,
+  UPDATE_PRODUCT_IMAGES_PROCESS,
+  UpdateProductImagesProcess,
   UpdateProductSchema,
 
   UpdateProductResponseSchema,
@@ -135,6 +137,40 @@ export const productRoutes = new Elysia({ prefix: "/products" })
         tags: ["Products"],
         summary: "Update a product",
         description: "Updates an existing product by ID",
+      },
+    }
+  )
+  .post(
+    "/:id/images",
+    async ({ params, body }: { params: { id: string }; body: { files?: File | File[]; delete_ids?: string[]; type?: string } }) => {
+      const process = getService<UpdateProductImagesProcess>(UPDATE_PRODUCT_IMAGES_PROCESS);
+      return process.runOperations({
+        input: {
+          id: params.id,
+          files: body.files,
+          delete_ids: body.delete_ids,
+          type: body.type,
+        },
+      });
+    },
+    {
+      params: Type.Object({ id: Type.String({ format: "uuid" }) }),
+      type: "multipart/form-data",
+      body: t.Object({
+        files: t.Optional(t.Union([t.File(), t.Array(t.File())])),
+        delete_ids: t.Optional(t.Array(t.String({ format: "uuid" }))),
+        type: t.Optional(t.String()),
+      }),
+      response: {
+        200: t.Any(),
+        400: ValidationErrorResponseSchema,
+        404: NotFoundResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Products"],
+        summary: "Update product images",
+        description: "Uploads raw product images and deletes selected existing media IDs.",
       },
     }
   )

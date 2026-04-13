@@ -18,6 +18,11 @@ import { type Static } from "@sinclair/typebox";
 import { MeResponseSchema } from "../retrieve-user/retrieve-user.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the paginated users process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const PAGINATED_USERS_PROCESS = Symbol("PaginatedUsers");
 
 @Process(PAGINATED_USERS_PROCESS)
@@ -33,6 +38,11 @@ export class PaginatedUsersProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: PaginatedUsersSchema,
   }) context: ProcessContextType<typeof PaginatedUsersSchema>) {

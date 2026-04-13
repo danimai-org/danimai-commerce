@@ -16,6 +16,11 @@ import {
 } from "./update-region.schema";
 import type { Database } from "@danimai/region/db";
 
+/**
+ * Handles the update region process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_REGION_PROCESS = Symbol("UpdateRegion");
 
 @Process(UPDATE_REGION_PROCESS)
@@ -28,6 +33,11 @@ export class UpdateRegionProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({
       schema: UpdateRegionSchema,

@@ -1,0 +1,31 @@
+---
+description: Packages decorator documentation requirements
+globs: packages/**
+alwaysApply: false
+---
+
+# Packages Decorator Documentation Requirements
+
+- Every time a decorator is created or introduced in package code, include a documentation block.
+- Document decorator functionality in terms of purpose and runtime behavior, not just syntax.
+- At minimum, document:
+  - what the decorator does
+  - required arguments/metadata and accepted values
+  - side effects (for example, metadata registration, validation hooks, behavioral overrides)
+  - when it executes and how it affects the decorated class/method/property/parameter
+  - usage example for maintainers
+
+## Required Template
+
+Use or adapt this block above new decorator declarations/usages:
+
+```ts
+/**
+ * Purpose: <what this decorator enforces or enables>
+ * Target: <class | method | property | parameter>
+ * Arguments: <name/type/defaults/allowed values>
+ * Runtime behavior: <when it runs and what it changes>
+ * Side effects: <metadata, validation, injection, or other impacts>
+ * Example: <short usage snippet>
+ */
+```

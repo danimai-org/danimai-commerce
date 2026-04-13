@@ -1,0 +1,23 @@
+---
+description: Packages process and function commenting standards
+globs: packages/**
+alwaysApply: false
+---
+
+# Packages Process Commenting Standards
+
+- Add a brief doc comment above each process entrypoint describing:
+  - what it does
+  - expected inputs
+  - output shape at a high level
+- Add concise comments above major helper functions when behavior is not obvious from the name.
+- For query result shaping, document non-obvious fields and what each field means for downstream consumers.
+- For transformed or aggregated fields, explain semantics (for example, whether counts exclude soft-deleted rows).
+- Keep comments short and specific; avoid repeating code line-by-line.
+
+## Field Meaning Guidance
+
+When returning objects from a process, ensure readers can quickly understand fields such as:
+- calculated counts
+- aggregated related collections
+- nullable object fields and when they are null

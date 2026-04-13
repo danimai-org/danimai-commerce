@@ -12,6 +12,11 @@ import {
 } from "./create-tax-rate.schema";
 import type { Database } from "@danimai/tax/db";
 
+/**
+ * Handles the create tax rate process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_TAX_RATE_PROCESS = Symbol("CreateTaxRate");
 
 @Process(CREATE_TAX_RATE_PROCESS)
@@ -25,6 +30,11 @@ export class CreateTaxRateProcess
     private readonly db: Kysely<Database>,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: CreateTaxRateSchema })
     context: ProcessContextType<typeof CreateTaxRateSchema>

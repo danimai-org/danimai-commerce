@@ -11,6 +11,11 @@ import { Kysely } from "kysely";
 import { CreateProductTagSchema, type CreateProductTagsProcessOutput } from "./create-product-tag.schema";
 import type { Database } from "../../../db/type";
 import { randomUUID } from "crypto";
+/**
+ * Handles the create product tags process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_PRODUCT_TAGS_PROCESS = Symbol("CreateProductTags");
 
 @Process(CREATE_PRODUCT_TAGS_PROCESS)
@@ -21,6 +26,11 @@ export class CreateProductTagsProcess
     private readonly db: Kysely<Database>,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: CreateProductTagSchema,
   }) context: ProcessContextType<typeof CreateProductTagSchema>) {

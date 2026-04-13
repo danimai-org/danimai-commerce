@@ -15,6 +15,11 @@ import {
 } from "./delete-customer-address.schema";
 import type { Database, CustomerAddress } from "../../db/type";
 
+/**
+ * Handles the delete customer address process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const DELETE_CUSTOMER_ADDRESS_PROCESS = Symbol("DeleteCustomerAddress");
 
 @Process(DELETE_CUSTOMER_ADDRESS_PROCESS)
@@ -28,6 +33,11 @@ export class DeleteCustomerAddressProcess
     private readonly logger: Logger
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({
       schema: DeleteCustomerAddressSchema,

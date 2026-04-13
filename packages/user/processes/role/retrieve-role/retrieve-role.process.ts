@@ -16,6 +16,11 @@ import {
 } from "./retrieve-role.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the retrieve role process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_ROLE_PROCESS = Symbol("RetrieveRole");
 
 @Process(RETRIEVE_ROLE_PROCESS)
@@ -28,6 +33,11 @@ export class RetrieveRoleProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: RetrieveRoleSchema,
   }) context: ProcessContextType<typeof RetrieveRoleSchema>) {

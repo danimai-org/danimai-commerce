@@ -12,6 +12,11 @@ import type { Logger } from "@logtape/logtape";
 import type { Database, Order } from "../../../db/type";
 import { RetrieveOrderSchema } from "./retrieve-order.schema";
 
+/**
+ * Handles the retrieve order process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_ORDER_PROCESS = Symbol("RetrieveOrder");
 
 @Process(RETRIEVE_ORDER_PROCESS)
@@ -24,6 +29,11 @@ export class RetrieveOrderProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: RetrieveOrderSchema })
     context: ProcessContextType<typeof RetrieveOrderSchema>

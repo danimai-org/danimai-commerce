@@ -16,6 +16,11 @@ import {
 } from "./paginated-permissions.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the paginated permissions process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const PAGINATED_PERMISSIONS_PROCESS = Symbol("PaginatedPermissions");
 
 @Process(PAGINATED_PERMISSIONS_PROCESS)
@@ -31,6 +36,11 @@ export class PaginatedPermissionsProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: PaginatedPermissionsSchema,
   }) context: ProcessContextType<typeof PaginatedPermissionsSchema>) {

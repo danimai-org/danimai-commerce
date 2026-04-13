@@ -15,6 +15,11 @@ import {
   UpdateCartAddressesSchema,
 } from "./update-cart-addresses.schema";
 
+/**
+ * Handles the update cart addresses process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_CART_ADDRESSES_PROCESS = Symbol("UpdateCartAddresses");
 
 @Process(UPDATE_CART_ADDRESSES_PROCESS)
@@ -27,6 +32,11 @@ export class UpdateCartAddressesProcess
     private readonly db: Kysely<Database>
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: UpdateCartAddressesSchema })
     context: ProcessContextType<typeof UpdateCartAddressesSchema>

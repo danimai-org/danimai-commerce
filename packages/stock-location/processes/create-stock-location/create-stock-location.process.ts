@@ -15,6 +15,11 @@ import {
 } from "./create-stock-location.schema";
 import type { Database } from "../../db";
 
+/**
+ * Handles the create stock location process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_STOCK_LOCATION_PROCESS = Symbol("CreateStockLocation");
 
 @Process(CREATE_STOCK_LOCATION_PROCESS)
@@ -30,6 +35,11 @@ export class CreateStockLocationProcess
     private readonly logger: Logger,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: CreateStockLocationSchema })
     context: ProcessContextType<typeof CreateStockLocationSchema>,

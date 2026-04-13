@@ -14,6 +14,11 @@ import {
 } from "./paginated-product-tags.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the paginated product tags process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const PAGINATED_PRODUCT_TAGS_PROCESS = Symbol("PaginatedProductTags");
 
 @Process(PAGINATED_PRODUCT_TAGS_PROCESS)
@@ -27,6 +32,11 @@ export class PaginatedProductTagsProcess
     private readonly db: Kysely<Database>,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: PaginatedProductTagsSchema,
   }) context: ProcessContextType<typeof PaginatedProductTagsSchema>) {

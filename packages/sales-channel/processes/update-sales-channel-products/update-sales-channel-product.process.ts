@@ -24,6 +24,11 @@ type ProductLookupTable = {
 type UpdateSalesChannelProductsDatabase = Database & {
   products: ProductLookupTable;
 };
+/**
+ * Handles the update sales channel products process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_SALES_CHANNEL_PRODUCTS_PROCESS = Symbol(
   "UpdateSalesChannelProducts"
 );
@@ -41,6 +46,11 @@ export class UpdateSalesChannelProductsProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({
       schema: UpdateSalesChannelProductsSchema,

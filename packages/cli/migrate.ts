@@ -57,6 +57,13 @@ async function runMigration() {
         jwt: {
           secret: process.env.JWT_SECRET || "migrate-placeholder",
         },
+        aws: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+          region: process.env.AWS_REGION || "",
+          s3Bucket: process.env.AWS_S3_BUCKET || "",
+          mediaCloudfrontUrl: process.env.MEDIA_CLOUDFRONT_URL || "",
+        },
       },
     });
 

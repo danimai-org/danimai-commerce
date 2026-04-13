@@ -10,6 +10,11 @@ import { Kysely } from "kysely";
   import { type RetrieveCollectionProcessOutput, RetrieveCollectionSchema } from "./retrieve-collection.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the retrieve collection process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_COLLECTION_PROCESS = Symbol("RetrieveCollection");
 
 @Process(RETRIEVE_COLLECTION_PROCESS)
@@ -20,6 +25,11 @@ export class RetrieveCollectionProcess
     private readonly db: Kysely<Database>,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: RetrieveCollectionSchema,
   }) context: ProcessContextType<typeof RetrieveCollectionSchema>) {

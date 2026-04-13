@@ -13,6 +13,11 @@ import type { Logger } from "@logtape/logtape";
 import type { Database as OrderDatabase, Order } from "@danimai/order/db";
 import { CreateOrderFromCartSchema } from "./create-order-from-cart.schema";
 
+/**
+ * Handles the create order from cart process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_ORDER_FROM_CART_PROCESS = Symbol("CreateOrderFromCart");
 
 type Db = OrderDatabase &
@@ -21,6 +26,11 @@ type Db = OrderDatabase &
     any
   >;
 
+/**
+ * Creates an order snapshot from a cart and marks the cart completed.
+ * Input: `cart_id` plus optional `sales_channel_id` and metadata overrides.
+ * Output: created order row with copied line items and tax lines.
+ */
 @Process(CREATE_ORDER_FROM_CART_PROCESS)
 export class CreateOrderFromCartProcess implements ProcessContract<
   typeof CreateOrderFromCartSchema,
@@ -41,6 +51,11 @@ export class CreateOrderFromCartProcess implements ProcessContract<
     return (Number(row?.max_id ?? 0) + 1) as number;
   }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: CreateOrderFromCartSchema })
     context: ProcessContextType<typeof CreateOrderFromCartSchema>,
@@ -76,6 +91,7 @@ export class CreateOrderFromCartProcess implements ProcessContract<
         },
       ]);
     }
+    const currencyCode = cart.currency_code;
 
     const lineItems = await this.db
       .selectFrom("cart_line_items")
@@ -157,7 +173,7 @@ export class CreateOrderFromCartProcess implements ProcessContract<
       const order = await trx
         .insertInto("orders")
         .values({
-          currency_code: cart.currency_code,
+          currency_code: currencyCode,
           status: "pending",
           fulfillment_status: "not_fulfilled",
           payment_status: "not_paid",
@@ -167,17 +183,17 @@ export class CreateOrderFromCartProcess implements ProcessContract<
           sales_channel_id: input.sales_channel_id ?? null,
           region_id: cart.region_id ?? null,
           cart_id: input.cart_id,
-          billing_address_id: shippingAddrId,
-          shipping_address_id: shippingAddrId,
+          billing_address_id: shippingAddrId ?? undefined,
+          shipping_address_id: shippingAddrId ?? undefined,
           metadata: mergedMetadata ?? null,
         })
         .returningAll()
         .executeTakeFirstOrThrow();
 
-      for (const li of lineItems) {
-        const oli = await trx
-          .insertInto("order_line_items")
-          .values({
+      const createdOrderLineItems = await trx
+        .insertInto("order_line_items")
+        .values(
+          lineItems.map((li) => ({
             order_id: order.id,
             title: li.title ?? "Item",
             description: li.description ?? null,
@@ -202,25 +218,37 @@ export class CreateOrderFromCartProcess implements ProcessContract<
             unit_price: li.unit_price ?? "0",
             quantity: li.quantity ?? 1,
             metadata: li.metadata ?? null,
-          })
-          .returning("id")
-          .executeTakeFirstOrThrow();
+          }))
+        )
+        .returning("id")
+        .execute();
 
-        const tls = taxByLine.get(li.id) ?? [];
-        for (const tl of tls) {
-          await trx
-            .insertInto("order_line_item_tax_lines")
-            .values({
-              order_line_item_id: oli.id,
-              description: tl.description ?? null,
-              tax_rate_id: null,
-              code: tl.code ?? null,
-              rate: tl.rate ?? "0",
-              provider_id: tl.provider_id ?? null,
-              metadata: tl.metadata ?? null,
-            })
-            .execute();
+      // Keep line-item to inserted-order-line-item mapping deterministic by input index.
+      const orderLineIdByCartLineId = new Map<string, string>();
+      for (let index = 0; index < lineItems.length; index++) {
+        const sourceLineItem = lineItems[index];
+        const insertedLineItem = createdOrderLineItems[index];
+        if (sourceLineItem && insertedLineItem) {
+          orderLineIdByCartLineId.set(sourceLineItem.id, insertedLineItem.id);
         }
+      }
+
+      const orderTaxLinesToInsert = lineItems.flatMap((li) => {
+        const orderLineItemId = orderLineIdByCartLineId.get(li.id);
+        if (!orderLineItemId) return [];
+        return (taxByLine.get(li.id) ?? []).map((tl) => ({
+          order_line_item_id: orderLineItemId,
+          description: tl.description ?? null,
+          tax_rate_id: null,
+          code: tl.code ?? null,
+          rate: tl.rate ?? "0",
+          provider_id: tl.provider_id ?? null,
+          metadata: tl.metadata ?? null,
+        }));
+      });
+
+      if (orderTaxLinesToInsert.length > 0) {
+        await trx.insertInto("order_line_item_tax_lines").values(orderTaxLinesToInsert).execute();
       }
 
       await trx

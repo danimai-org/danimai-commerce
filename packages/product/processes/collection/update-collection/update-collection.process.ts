@@ -13,6 +13,11 @@ import type { Logger } from "@logtape/logtape";
 import { type UpdateCollectionProcessOutput, UpdateCollectionSchema } from "./update-collection.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the update collection process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_COLLECTION_PROCESS = Symbol("UpdateCollection");
 
 @Process(UPDATE_COLLECTION_PROCESS)
@@ -25,6 +30,11 @@ export class UpdateCollectionProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: UpdateCollectionSchema,
   }) context: ProcessContextType<typeof UpdateCollectionSchema>) {
