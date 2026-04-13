@@ -2,7 +2,6 @@
 	import { cart } from '$lib/stores/cart';
 	import type { ProductGridItem } from '../../../routes/store/+page.ts';
 
-
 	let {
 		products = [] as ProductGridItem[] | undefined,
 		title = 'Essential essentials for everyday.',
@@ -26,16 +25,33 @@
 		return Number.isFinite(n) ? n : 0;
 	}
 
-	function quickAdd(e	: MouseEvent, product: ProductGridItem) {
+	function cartPriceDisplay(product: ProductGridItem): string {
+		const raw = product.price;
+		if (typeof raw === 'string' && raw.trim() && raw !== '—') {
+			return raw;
+		}
+		const n = parsePrice(raw);
+		return n > 0 ? `$${n.toFixed(2)}` : '—';
+	}
+	function cartPriceValue(product: ProductGridItem): number {
+		const raw = product.price;
+		if (typeof raw === 'string' && raw.trim() && raw !== '—') {
+			return parsePrice(raw);
+		}
+		return parsePrice(raw);
+	}
+	function quickAdd(e: MouseEvent, product: ProductGridItem) {
+		e.preventDefault();
 		cart.addItem({
 			href: product.href,
 			name: product.name,
-			priceDisplay: `$${parsePrice(product.price).toFixed(2)}`,
-			priceValue: parsePrice(product.price),
+			priceDisplay: cartPriceDisplay(product),
+			priceValue: cartPriceValue(product),
 			image: product.image ?? null,
 			variant: 'Default'
 		});
 	}
+
 </script>
 
 <section class="section products-section" class:catalog-mode={catalogMode}>
@@ -47,24 +63,61 @@
 	{/if}
 	<div class="product-grid">
 		{#each products as product}
-			<article class="product-card">
-				<a href={product.href} class="product-card-link" aria-label={product.name}>
-					<div class="product-image" style="background-color: {product.bg};">
-						{#if product.image}
-							<img src={product.image} alt="" class="product-img" />
-						{/if}
+			{#if catalogMode}
+				<article class="product-card catalog-card">
+					<a href={product.href} class="product-card-link" aria-label={product.name}>
+						<div class="product-image" style="background-color: {product.bg};">
+							{#if product.image}
+								<img src={product.image} alt="" class="product-img" />
+							{/if}
+						</div>
+						<div class="product-meta">
+							<h3 class="product-name">{product.name}</h3>
+							<p class="product-price">
+								{typeof product.price === 'string' && product.price.trim()
+									? product.price
+									: `$${parsePrice(product.price).toFixed(2)}`}
+							</p>
+						</div>
+					</a>
+					<button type="button" class="quick-add" onclick={(e) => quickAdd(e, product)}>
+						QUICK ADD
+					</button>
+				</article>
+			{:else}
+				<article class="product-card retail-card">
+					<div class="retail-card-surface">
+						<a href={product.href} class="retail-image-link" aria-label={`View ${product.name}`}>
+							<div
+								class="retail-product-image"
+								style:background-color={product.image ? '#ffffff' : product.bg}
+							>
+								{#if product.image}
+									<img src={product.image} alt="" class="retail-product-img" />
+								{/if}
+							</div>
+						</a>
+						<div class="retail-body">
+							<div class="retail-title-row">
+								<a href={product.href} class="retail-title-link">
+									<h3 class="retail-name">{product.name}</h3>
+								</a>
+							</div>
+							<p class="retail-mrp">
+								<span class="mrp-label">MRP</span>
+								<span class="mrp-value">{cartPriceValue(product).toFixed(2)}</span>
+							</p>
+							
+						</div>
+						<button type="button" class="retail-add-cart" onclick={(e) => quickAdd(e, product)}>
+							Add to Cart
+						</button>
 					</div>
-					<div class="product-meta">
-						<h3 class="product-name">{product.name}</h3>
-						<p class="product-price">${parsePrice(product.price).toFixed(2)}</p>
-					</div>
-				</a>
-				<button type="button" class="quick-add" onclick={(e) => quickAdd(e, product)}>QUICK ADD</button>
-			</article>
+				</article>
+			{/if}
 		{/each}
 	</div>
 </section>
-
 <style>
 	.section {
 		max-width: var(--section-max-width, 1200px);
@@ -95,16 +148,17 @@
 		grid-template-columns: repeat(4, 1fr);
 		gap: clamp(1rem, 2vw, 1.75rem);
 	}
-	.product-card {
+
+	.catalog-card {
 		position: relative;
 		display: block;
 	}
-	.product-card-link {
+	.catalog-card .product-card-link {
 		display: block;
 		text-decoration: none;
 		color: inherit;
 	}
-	.product-image {
+	.catalog-card .product-image {
 		position: relative;
 		aspect-ratio: 1;
 		border-radius: 0;
@@ -112,14 +166,14 @@
 		overflow: hidden;
 		background: #e8e8e8;
 	}
-	.product-img {
+	.catalog-card .product-img {
 		position: absolute;
 		inset: 0;
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
 	}
-	.quick-add {
+	.catalog-card .quick-add {
 		position: absolute;
 		z-index: 1;
 		bottom: 4rem;
@@ -135,21 +189,126 @@
 		opacity: 0;
 		transition: opacity 0.2s;
 	}
-	.product-card:hover .quick-add {
+	.catalog-card:hover .quick-add {
 		opacity: 1;
 	}
-	.product-name {
+	.catalog-card .product-name {
 		font-size: 0.9375rem;
 		font-weight: 600;
 		margin: 0 0 0.25rem;
 		text-align: center;
 	}
-	.product-price {
+	.catalog-card .product-price {
 		font-size: 0.875rem;
 		color: #666;
 		margin: 0;
 		text-align: center;
 	}
+
+	.retail-card {
+		display: flex;
+		min-height: 0;
+
+	}
+	.retail-card-surface {
+		display: flex;
+		flex-direction: column;
+		width: 100%;
+		background: #fff;
+		border: 1px solid #d9d9d9;
+		border-radius: 8px;
+		overflow: hidden;
+		box-sizing: border-box;
+	}
+	.retail-image-link {
+		display: block;
+		text-decoration: none;
+		color: inherit;
+		flex-shrink: 0;
+	}
+	.retail-product-image {
+		position: relative;
+		aspect-ratio: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+		background: #fff;
+	}
+	.retail-product-img {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+		padding: 0.75rem;
+		box-sizing: border-box;
+	}
+	.retail-body {
+		padding: 0.75rem 1rem 0.5rem;
+		flex: 1;
+		min-height: 0;
+	}
+	.retail-title-row {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+		margin-bottom: 0.5rem;
+	}
+	.retail-title-link {
+		flex: 1;
+		min-width: 0;
+		text-decoration: none;
+		color: inherit;
+	}
+	.retail-name {
+		font-family: var(--font-sans, system-ui, sans-serif);
+		font-size: 0.875rem;
+		font-weight: 600;
+		line-height: 1.35;
+		margin: 0;
+		text-align: left;
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		overflow: hidden;
+	}
+
+	.retail-mrp {
+		margin: 0;
+		font-size: 0.9375rem;
+		font-weight: 700;
+		color: #1a1a1a;
+	}
+	.mrp-label {
+		font-weight: 700;
+		margin-right: 0.35rem;
+	}
+	.mrp-value {
+		font-weight: 700;
+	}
+	.retail-add-cart {
+		box-sizing: border-box;
+		margin-top: auto;
+		margin-inline: 0.75rem;
+		margin-bottom: 0.75rem;
+		padding: 0.6875rem 1.75rem;
+		width: calc(100% - 1.5rem);
+		align-self: center;
+		border: none;
+		border-radius: 8px;
+		background: #808050;
+		color: #fff;
+		font-family: var(--font-sans, system-ui, sans-serif);
+		font-size: 0.9375rem;
+		font-weight: 600;
+		text-align: center;
+		cursor: pointer;
+		transition: background 0.15s ease;
+	}
+	.retail-add-cart:hover {
+		background: #6d6d45;
+	}
+
 	@media (max-width: 1024px) {
 		.product-grid {
 			grid-template-columns: repeat(2, 1fr);
@@ -192,3 +351,4 @@
 		}
 	}
 </style>
+

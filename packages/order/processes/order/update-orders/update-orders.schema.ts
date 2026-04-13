@@ -63,7 +63,8 @@ export const OrderResponseSchema = Type.Object({
   shipping_address_id: Type.Union([Type.String(), Type.Null()]),
   metadata: Type.Union([Type.Unknown(), Type.Null()]),
   created_at: Type.Date(),
-  updated_at: Type.Date(),   deleted_at: Type.Union([Type.Date(), Type.Null()]),
+  updated_at: Type.Date(),
+  deleted_at: Type.Union([Type.Date(), Type.Null()]),
 });
 
 export const UpdateOrderResponseSchema = Type.Union([

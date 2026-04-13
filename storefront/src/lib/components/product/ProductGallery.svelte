@@ -36,7 +36,6 @@
 		</div>
 	{/if}
 </div>
-
 <style>
 	.product-gallery {
 		position: sticky;

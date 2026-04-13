@@ -9,6 +9,7 @@
 		createPaginationQuery,
 		type PaginationMeta
 	} from '$lib/api/pagination.svelte';
+	
 	import { client } from '$lib/api/client.js';
 	import {
 		type CategoryNavRow,

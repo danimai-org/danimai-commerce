@@ -19,10 +19,6 @@ function rankValue(rank: number | null | undefined): number {
   return rank == null ? Number.POSITIVE_INFINITY : rank;
 }
 
-/**
- * Resolves the preferred variant id per product (lowest variant_rank) by scanning
- * paginated `/product-variants` until each requested product id is covered or pages end.
- */
 export async function firstVariantIdByProductIds(
   apiBase: string,
   productIds: string[],
@@ -32,10 +28,8 @@ export async function firstVariantIdByProductIds(
   const bestRank = new Map<string, number>();
 
   if (wanted.size === 0) return map;
-
   let page = 1;
   const limit = 100;
-
   for (;;) {
     const params = new URLSearchParams({
       limit: String(limit),
@@ -47,14 +41,12 @@ export async function firstVariantIdByProductIds(
       cache: "no-store",
     });
     if (!res.ok) break;
-
     const raw = await res.json();
     const { rows } = rowsFromPaginated<{
       id: string;
       product_id: string | null;
       variant_rank: number | null;
     }>(raw);
-
     for (const v of rows) {
       const pid = v.product_id;
       if (!pid || !wanted.has(pid)) continue;
@@ -65,7 +57,6 @@ export async function firstVariantIdByProductIds(
         map.set(pid, v.id);
       }
     }
-
     let done = true;
     for (const id of wanted) {
       if (!map.has(id)) {

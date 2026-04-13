@@ -45,7 +45,7 @@
 	></div>
 	<div class="sheet" role="dialog" aria-label="Shopping Cart">
 		<header class="sheet-header">
-			<h2 class="sheet-title">Shopping Cart</h2>
+			<h2 class="sheet-title">Shopping cart</h2>
 			<button type="button" class="sheet-close" onclick={handleClose} aria-label="Close">×</button>
 		</header>
 		<div class="sheet-body">
@@ -54,27 +54,35 @@
 			{:else}
 				<ul class="line-items">
 					{#each cartState.items as item (item.key)}
-						<li class="line-item">
-							<div class="line-item-image" style="background-color: #f5f0eb;">
+						<li class="line-card">
+							<div class="line-card-media">
 								{#if item.image}
 									<img src={item.image} alt="" />
 								{/if}
 							</div>
-							<div class="line-item-details">
-								<p class="line-item-name">{item.name}</p>
-								<p class="line-item-variant">{item.variant}</p>
-								<div class="line-item-actions">
+							<div class="line-card-body">
+								<p class="line-card-title">{item.name}</p>
+								<p class="line-card-meta">{item.variant}</p>
+								<p class="line-card-price">
+									<span class="line-card-price-label">Price</span>
+									<span class="line-card-price-value">{item.priceDisplay}</span>
+									<span class="line-card-qty-label">× {item.quantity}</span>
+								</p>
+								<p class="line-card-line-total">
+									<span class="line-card-line-total-label">Line total</span>
+									<strong>${(item.priceValue * item.quantity).toFixed(2)}</strong>
+								</p>
+								<div class="line-card-actions">
 									<div class="quantity-controls">
 										<button type="button" class="qty-btn" onclick={() => cart.updateQuantity(item.key, -1)} aria-label="Decrease quantity">−</button>
 										<span class="qty-value">{item.quantity}</span>
 										<button type="button" class="qty-btn" onclick={() => cart.updateQuantity(item.key, 1)} aria-label="Increase quantity">+</button>
 									</div>
 									<button type="button" class="remove-btn" onclick={() => cart.removeItem(item.key)} aria-label="Remove item">
-										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+										<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
 									</button>
 								</div>
 							</div>
-							<p class="line-item-total">${(item.priceValue * item.quantity).toFixed(2)}</p>
 						</li>
 					{/each}
 				</ul>
@@ -86,7 +94,7 @@
 					<span>Subtotal</span>
 					<strong>{subtotalDisplay}</strong>
 				</div>
-				<button type="button" class="go-to-cart" onclick={goToCart}>Go to cart</button>
+				<button type="button" class="go-to-cart" onclick={goToCart}>View cart</button>
 			</footer>
 		{/if}
 	</div>
@@ -96,18 +104,26 @@
 	.backdrop {
 		position: fixed;
 		inset: 0;
-		background: rgba(0, 0, 0, 0.3);
+		background: rgba(0, 0, 0, 0.35);
 		z-index: 1000;
 	}
 	.sheet {
+		--cart-bg: #ffffff;
+		--cart-border: #e0e0e0;
+		--cart-text: #000000;
+		--cart-muted: #757575;
+		--cart-accent: #6b6b40;
+		--cart-accent-hover: #5a5a36;
+		--cart-radius: 10px;
+		--cart-radius-sm: 8px;
 		position: fixed;
 		top: 0;
 		right: 0;
 		bottom: 0;
 		width: 100%;
 		max-width: 420px;
-		background: #fff;
-		box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
+		background: #fafafa;
+		box-shadow: -4px 0 28px rgba(0, 0, 0, 0.12);
 		z-index: 1001;
 		display: flex;
 		flex-direction: column;
@@ -117,12 +133,14 @@
 		align-items: center;
 		justify-content: space-between;
 		padding: 1.25rem 1.5rem;
-		border-bottom: 1px solid #eee;
+		background: var(--cart-bg);
+		border-bottom: 1px solid var(--cart-border);
 	}
 	.sheet-title {
 		font-size: 1.125rem;
 		font-weight: 700;
 		margin: 0;
+		color: var(--cart-text);
 	}
 	.sheet-close {
 		background: none;
@@ -130,127 +148,190 @@
 		font-size: 1.5rem;
 		line-height: 1;
 		cursor: pointer;
-		color: #1a1a1a;
+		color: var(--cart-accent);
 		padding: 0.25rem;
+		border-radius: var(--cart-radius-sm);
+	}
+	.sheet-close:hover {
+		background: rgba(107, 107, 64, 0.08);
+		color: var(--cart-accent-hover);
 	}
 	.sheet-body {
 		flex: 1;
 		overflow: auto;
-		padding: 1rem 1.5rem;
+		padding: 1rem 1.25rem;
 	}
 	.empty {
-		color: #666;
+		color: var(--cart-muted);
 		text-align: center;
 		padding: 2rem;
 		margin: 0;
+		font-size: 0.9375rem;
 	}
 	.line-items {
 		list-style: none;
 		margin: 0;
 		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
 	}
-	.line-item {
+	.line-card {
 		display: grid;
-		grid-template-columns: 72px 1fr auto;
-		gap: 0.75rem;
-		align-items: start;
-		padding: 1rem 0;
-		border-bottom: 1px solid #f0f0f0;
-	}
-	.line-item:last-child {
-		border-bottom: none;
-	}
-	.line-item-image {
-		aspect-ratio: 1;
-		border-radius: 6px;
+		grid-template-columns: 100px 1fr;
+		gap: 0;
+		border: 1px solid var(--cart-border);
+		border-radius: var(--cart-radius);
 		overflow: hidden;
-		background: #f5f0eb;
+		background: var(--cart-bg);
 	}
-	.line-item-image img {
+	.line-card-media {
+		aspect-ratio: 1;
+		background: #fff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-right: 1px solid var(--cart-border);
+	}
+	.line-card-media img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
 	}
-	.line-item-details {
+	.line-card-body {
 		min-width: 0;
+		padding: 0.875rem 0.875rem 0.75rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
 	}
-	.line-item-name {
+	.line-card-title {
+		font-weight: 700;
+		font-size: 0.875rem;
+		line-height: 1.35;
+		margin: 0;
+		color: var(--cart-text);
+	}
+	.line-card-meta {
+		font-size: 0.65rem;
 		font-weight: 600;
-		font-size: 0.9375rem;
-		margin: 0 0 0.25rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--cart-muted);
+		margin: 0;
 	}
-	.line-item-variant {
+	.line-card-price {
+		margin: 0;
 		font-size: 0.8125rem;
-		color: #666;
-		margin: 0 0 0.5rem;
+		color: var(--cart-text);
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.25rem 0.4rem;
 	}
-	.line-item-actions {
+	.line-card-price-label {
+		font-weight: 400;
+	}
+	.line-card-price-value {
+		font-weight: 700;
+	}
+	.line-card-qty-label {
+		font-size: 0.75rem;
+		color: var(--cart-muted);
+		font-weight: 500;
+	}
+	.line-card-line-total {
+		margin: 0;
+		font-size: 0.8125rem;
+		color: var(--cart-text);
+		display: flex;
+		align-items: baseline;
+		gap: 0.4rem;
+	}
+	.line-card-line-total-label {
+		color: var(--cart-muted);
+		font-size: 0.75rem;
+	}
+	.line-card-line-total strong {
+		font-weight: 700;
+	}
+	.line-card-actions {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		justify-content: space-between;
+		gap: 0.75rem;
+		margin-top: 0.35rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid var(--cart-border);
 	}
 	.quantity-controls {
 		display: flex;
 		align-items: center;
-		border: 1px solid #ddd;
-		border-radius: 4px;
+		border: 1px solid var(--cart-border);
+		border-radius: var(--cart-radius-sm);
 		overflow: hidden;
+		background: #fff;
 	}
 	.qty-btn {
-		width: 28px;
-		height: 28px;
+		width: 32px;
+		height: 32px;
 		background: #fff;
 		border: none;
 		cursor: pointer;
 		font-size: 1rem;
 		line-height: 1;
-		color: #1a1a1a;
+		color: var(--cart-accent);
+		font-weight: 600;
 	}
 	.qty-btn:hover {
-		background: #f5f5f5;
+		background: rgba(107, 107, 64, 0.08);
 	}
 	.qty-value {
 		min-width: 1.5rem;
 		text-align: center;
-		font-size: 0.875rem;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: var(--cart-text);
 	}
 	.remove-btn {
 		background: none;
 		border: none;
-		padding: 0.25rem;
+		padding: 0.3rem;
 		cursor: pointer;
-		color: #666;
+		color: var(--cart-accent);
+		border-radius: var(--cart-radius-sm);
 	}
 	.remove-btn:hover {
-		color: #1a1a1a;
-	}
-	.line-item-total {
-		font-weight: 600;
-		font-size: 0.9375rem;
-		margin: 0;
+		color: var(--cart-accent-hover);
+		background: rgba(107, 107, 64, 0.08);
 	}
 	.sheet-footer {
 		padding: 1.25rem 1.5rem;
-		border-top: 1px solid #eee;
+		background: var(--cart-bg);
+		border-top: 1px solid var(--cart-border);
 	}
 	.subtotal-row {
 		display: flex;
 		justify-content: space-between;
 		margin-bottom: 1rem;
 		font-size: 0.9375rem;
+		color: var(--cart-text);
+	}
+	.subtotal-row strong {
+		font-weight: 700;
 	}
 	.go-to-cart {
 		width: 100%;
-		background: #2d2d2d;
+		background: var(--cart-accent);
 		color: #fff;
 		border: none;
 		padding: 0.875rem 1.5rem;
 		font-size: 0.9375rem;
-		font-weight: 500;
-		border-radius: 6px;
+		font-weight: 700;
+		border-radius: var(--cart-radius-sm);
 		cursor: pointer;
 	}
 	.go-to-cart:hover {
-		background: #1a1a1a;
+		background: var(--cart-accent-hover);
 	}
 </style>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '$lib/styles/section-inset.css';
+	import '$lib/styles/product-grid-retail.css';
 	import { browser } from '$app/environment';
 	import favicon from '$lib/assets/favicon.svg';
 	import CartSheet from '$lib/components/cart/CartSheet.svelte';

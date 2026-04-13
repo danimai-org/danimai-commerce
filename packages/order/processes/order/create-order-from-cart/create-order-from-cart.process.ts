@@ -1,4 +1,3 @@
-import type { Database as CartDatabase } from "@danimai/cart/db";
 import {
   InjectDB,
   InjectLogger,
@@ -11,26 +10,27 @@ import {
 } from "@danimai/core";
 import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import type { Order } from "@danimai/order/db";
+import type { Database as OrderDatabase, Order } from "@danimai/order/db";
 import { CreateOrderFromCartSchema } from "./create-order-from-cart.schema";
 
 export const CREATE_ORDER_FROM_CART_PROCESS = Symbol("CreateOrderFromCart");
 
 type Db = OrderDatabase &
-  Pick<
-    CartDatabase,
-    "carts" | "cart_addresses" | "cart_line_items" | "cart_line_item_tax_lines"
+  Record<
+    "carts" | "cart_addresses" | "cart_line_items" | "cart_line_item_tax_lines",
+    any
   >;
 
 @Process(CREATE_ORDER_FROM_CART_PROCESS)
-export class CreateOrderFromCartProcess
-  implements ProcessContract<typeof CreateOrderFromCartSchema, Order>
-{
+export class CreateOrderFromCartProcess implements ProcessContract<
+  typeof CreateOrderFromCartSchema,
+  Order
+> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Db>,
     @InjectLogger()
-    private readonly logger: Logger
+    private readonly logger: Logger,
   ) {}
 
   async getNextDisplayId(): Promise<number> {
@@ -43,7 +43,7 @@ export class CreateOrderFromCartProcess
 
   async runOperations(
     @ProcessContext({ schema: CreateOrderFromCartSchema })
-    context: ProcessContextType<typeof CreateOrderFromCartSchema>
+    context: ProcessContextType<typeof CreateOrderFromCartSchema>,
   ): Promise<Order> {
     const { input } = context;
     this.logger.info("Creating order from cart", { cart_id: input.cart_id });

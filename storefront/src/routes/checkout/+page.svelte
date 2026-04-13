@@ -2,10 +2,24 @@
 	import { goto } from '$app/navigation';
 	import { SiteHeader, SiteFooter } from '$lib/components/layout';
 	import { CheckoutOrderSummary, CheckoutDeliveryStep, CheckoutPaymentStep } from '$lib/components/checkout';
+	import { client } from '$lib/api/client.js';
 	import { cart } from '$lib/stores/cart';
 	import type { CartLineItem } from '$lib/stores/cart';
 
 	type CheckoutStep = 'addresses' | 'delivery' | 'payment' | 'review';
+	const CART_STORAGE_KEY = 'dm_sf_cart_id';
+	const ORDER_CACHE_KEY_PREFIX = 'dm_sf_order_';
+	type ApiCartLineItem = { id: string };
+	type ApiCart = { id: string; line_items?: ApiCartLineItem[] };
+	type LineItemPut = {
+		title?: string | null;
+		description?: string | null;
+		thumbnail?: string | null;
+		variant_id?: string | null;
+		product_id?: string | null;
+		quantity?: number | null;
+		unit_price?: string | null;
+	};
 
 	let cartItems = $state<CartLineItem[]>([]);
 	$effect(() => {
@@ -51,6 +65,8 @@
 	let email = $state('');
 	let shippingMethod = $state('standard-worldwide');
 	let paymentMethod = $state('manual');
+	let placeOrderError = $state('');
+	let isPlacingOrder = $state(false);
 	const fullName = $derived(`${shipping.firstName} ${shipping.lastName}`.trim() || '—');
 	const shippingLine1 = $derived(shipping.address1 || '—');
 	const shippingLine2 = $derived(shipping.address2 || '');
@@ -75,6 +91,122 @@
 		else if (currentStep === 'review') currentStep = 'payment';
 	}
 
+	function orderAddressLines(): string[] {
+		return [
+			fullName,
+			shipping.address1 || shipping.address2 || '—',
+			[shipping.city, shipping.state, shipping.postalCode].filter(Boolean).join(', ') || '—',
+			shipping.country || '—'
+		];
+	}
+
+	function orderTotals() {
+		return {
+			subtotal: subtotalDisplay,
+			shipping: '$0.00',
+			discount: '$0.00',
+			tax: '$0.00',
+			total: totalDisplay
+		};
+	}
+
+	function treatyErrorMessage(err: unknown): string {
+		const o = err as { value?: { message?: string } };
+		return o?.value?.message ?? String(err);
+	}
+
+	async function fetchCartJson(cartId: string): Promise<ApiCart> {
+		const res = await client.carts({ id: cartId }).get();
+		if (res.error) throw new Error(treatyErrorMessage(res.error));
+		return res.data as ApiCart;
+	}
+
+	async function putLineItems(cartId: string, line_items: LineItemPut[]) {
+		const res = await client.carts({ id: cartId })['line-items'].put({ line_items });
+		if (res.error) throw new Error(treatyErrorMessage(res.error));
+	}
+
+	async function ensureCartHasLineItems(cartId: string) {
+		const apiCart = await fetchCartJson(cartId);
+		if ((apiCart.line_items?.length ?? 0) > 0) return;
+		if (cartItems.length === 0) return;
+
+		const line_items: LineItemPut[] = cartItems
+			.map((item) => ({
+				title: item.name,
+				description: null,
+				thumbnail: item.image,
+				variant_id: null,
+				product_id: null,
+				quantity: item.quantity,
+				unit_price: String(item.priceValue)
+			}))
+			.filter((item) => (item.quantity ?? 0) > 0);
+
+		if (line_items.length === 0) return;
+		await putLineItems(cartId, line_items);
+	}
+
+	async function placeOrder() {
+		if (isPlacingOrder) return;
+		placeOrderError = '';
+
+		const cartId = localStorage.getItem(CART_STORAGE_KEY);
+		if (!cartId) {
+			placeOrderError = 'Cart not found. Please return to cart and try again.';
+			return;
+		}
+
+		isPlacingOrder = true;
+		try {
+			await ensureCartHasLineItems(cartId);
+			const res = await client.orders['from-cart'].post({
+				cart_id: cartId,
+				metadata: {
+					shipping_method: shippingMethodLabel,
+					payment_method: paymentMethodLabel
+				}
+			});
+			if (res.error) throw new Error(treatyErrorMessage(res.error));
+			const created = res.data as {
+				id: string;
+				display_id?: number;
+				status?: string;
+				email?: string | null;
+			};
+			const orderId = created.id;
+			const number =
+				typeof created.display_id === 'number' ? String(created.display_id) : 'Pending';
+			const cachedOrder = {
+				id: orderId,
+				number,
+				date: new Date().toISOString(),
+				status: created.status ?? 'pending',
+				email: (created.email ?? email ?? '—') as string,
+				items: cartItems.map((item) => ({
+					image: item.image ?? '',
+					imageAlt: item.name,
+					title: item.name,
+					variant: item.variant,
+					quantity: item.quantity,
+					price: item.priceDisplay
+				})),
+				shippingAddress: orderAddressLines(),
+				shippingMethod: shippingMethodLabel,
+				billingAddress: orderAddressLines(),
+				paymentMethod: paymentMethodLabel,
+				totals: orderTotals()
+			};
+			sessionStorage.setItem(`${ORDER_CACHE_KEY_PREFIX}${orderId}`, JSON.stringify(cachedOrder));
+			localStorage.removeItem(CART_STORAGE_KEY);
+			goto(`/order/confirmation?order=${orderId}`);
+		} catch (error) {
+			placeOrderError = error instanceof Error ? error.message : 'Failed to place order.';
+		} finally {
+			isPlacingOrder = false;
+		}
+	}
+
 	function sectionTitle(step: CheckoutStep): string {
 		switch (step) {
 			case 'addresses':
@@ -87,7 +219,6 @@
 				return 'Review';
 		}
 	}
-
 	function sectionSubtitle(step: CheckoutStep): string | null {
 		switch (step) {
 			case 'addresses':
@@ -229,8 +360,13 @@
 					</p>
 					<div class="review-actions">
 						<button type="button" class="back-btn" onclick={goBack}>Back</button>
-						<button type="button" class="place-order-btn">Place order</button>
+						<button type="button" class="place-order-btn" onclick={placeOrder} disabled={isPlacingOrder}>
+							{isPlacingOrder ? 'Placing order...' : 'Place order'}
+						</button>
 					</div>
+					{#if placeOrderError}
+						<p class="place-order-error">{placeOrderError}</p>
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -455,6 +591,15 @@
 	}
 	.place-order-btn:hover {
 		background: #1a1a1a;
+	}
+	.place-order-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+	.place-order-error {
+		margin: 0.25rem 0 0;
+		color: #b42318;
+		font-size: 0.875rem;
 	}
 	@media (max-width: 1024px) {
 		.checkout-container {

@@ -23,6 +23,7 @@
 	};
 	type ApiCart = {
 		id: string;
+		completed_at?: string | Date | null;
 		line_items: ApiLineItem[];
 	};
 	type LineItemPut = {
@@ -105,7 +106,13 @@
 		let cartId = localStorage.getItem(CART_STORAGE_KEY);
 		if (!cartId) cartId = await createCartRow(sessionId);
 		try {
-			return await fetchCartJson(cartId);
+			const fetched = await fetchCartJson(cartId);
+			if (fetched.completed_at != null) {
+				localStorage.removeItem(CART_STORAGE_KEY);
+				cartId = await createCartRow(sessionId);
+				return fetchCartJson(cartId);
+			}
+			return fetched;
 		} catch {
 			localStorage.removeItem(CART_STORAGE_KEY);
 			cartId = await createCartRow(sessionId);
@@ -159,6 +166,7 @@
 			image: item.image,
 			quantity: item.quantity,
 			variant: item.variant
+
 		}));
 	});
 	const displayItems = $derived((cartItems.length > 0 ? cartItems : localItems));
@@ -182,7 +190,6 @@
 	function applyPromo() {
 		// Wire to promotions / cart API when available
 	}
-
 	function parsePrice(priceStr: string): number {
 		const n = parseFloat(priceStr.replace(/[^0-9.]/g, ''));
 		return Number.isFinite(n) ? n : 0;
@@ -200,7 +207,6 @@
 			unit_price: li.unit_price
 		};
 	}
-
 	async function putLineItems(cartId: string, line_items: LineItemPut[]) {
 		const res = await client
 			.carts({ id: cartId })
@@ -216,18 +222,19 @@
 		const rows = (res.data as { rows?: Array<{ id?: string | null }> })?.rows ?? [];
 		return rows[0]?.id ?? null;
 	}
-
 	function currentCart(): ApiCart | undefined {
 		return queryClient.getQueryData<ApiCart>(['storefront-cart']);
 	}
-
 	async function refreshCart() {
 		await queryClient.invalidateQueries({ queryKey: ['storefront-cart'] });
 	}
-
 	async function changeLineQuantity(lineId: string, delta: number) {
 		const cart = currentCart();
 		if (!cart?.id) return;
+		if (cart.completed_at != null) {
+			await refreshCart();
+			return;
+		}
 		const next = cart.line_items
 			.map((li) => {
 				if (li.id !== lineId) return lineItemToPut(li);
@@ -242,6 +249,10 @@
 	async function removeLine(lineId: string) {
 		const cart = currentCart();
 		if (!cart?.id) return;
+		if (cart.completed_at != null) {
+			await refreshCart();
+			return;
+		}
 		const next = cart.line_items.filter((li) => li.id !== lineId).map(lineItemToPut);
 		await putLineItems(cart.id, next);
 		await refreshCart();
@@ -252,6 +263,10 @@
 		e.stopPropagation();
 		const cart = currentCart();
 		if (!cart?.id) return;
+		if (cart.completed_at != null) {
+			await refreshCart();
+			return;
+		}
 		const variant_id = await firstVariantIdByProductId(product.id);
 		if (!variant_id) return;
 		const existing = cart.line_items.find((li) => li.variant_id === variant_id);
@@ -376,6 +391,7 @@
 						/>
 						<button type="button" class="promo-apply" onclick={applyPromo}>Apply</button>
 						<button type="button" class="promo-cancel" onclick={closePromo}>Cancel</button>
+						
 					</div>
 				{/if}
 				<a href="/checkout" class="checkout-btn">PROCEED TO CHECKOUT</a>

@@ -31,7 +31,6 @@
 	type ApiVariant = {
 		prices?: Array<{ amount: string; currency_code: string }>;
 	};
-
 	const FALLBACK_BGS = ['#e8e0d5', '#4a4a4a', '#f5f0eb', '#6b7c5c'];
 	function pickBg(index: number) {
 		return FALLBACK_BGS[index % FALLBACK_BGS.length];
@@ -44,7 +43,6 @@ function slugify(value: string): string {
 		.replace(/[^a-z0-9]+/g, '-')
 		.replace(/^-+|-+$/g, '');
 }
-
 function prettyHandle(handle: string): string {
 	return handle
 		.split('-')
@@ -63,7 +61,6 @@ function prettyHandle(handle: string): string {
 			has_previous_page: false
 		};
 	}
-
 	async function fetchVariantPrice(
 		apiBase: string,
 		variantId: string
@@ -80,7 +77,6 @@ function prettyHandle(handle: string): string {
 			return null;
 		}
 	}
-
 	const paginateState = createPagination(
 		async () => {
 			const requestedHandle = (page.params.handle ?? '').trim().toLowerCase();
@@ -134,7 +130,7 @@ function prettyHandle(handle: string): string {
 			let priceIndex = 0;
 			const gridRows: GridProduct[] = productRows.map((p, i) => {
 				const firstVariantId = p.variants?.[0]?.id ?? variantMap.get(p.id);
-				let price = '$0.00';
+				let price = '—';
 				if (firstVariantId && priceIndex < prices.length) {
 					const pr = prices[priceIndex];
 					priceIndex++;
@@ -234,29 +230,35 @@ const productCount = $derived((pagination?.total ?? 0) > 0 ? (pagination?.total 
 		<section class="collection-hero" aria-label={heroTitle}>
 			<h1 class="collection-hero-title">{heroTitle}</h1>
 		</section>
-		<CatalogToolbar
-			loading={loading}
-			start={start}
-			end={end}
-			total={pagination?.total ?? 0}
-			totalPages={pagination?.total_pages ?? 0}
-			page={pagination?.page ?? 1}
-			hasNextPage={pagination?.has_next_page ?? false}
-			hasPreviousPage={pagination?.has_previous_page ?? false}
-			productCount={productCount}
-			currentSort={currentSort}
-			currentAvailability={currentAvailability}
-			currentPrice={currentPrice}
-			currentColor={currentColor}
-			sortOptions={sortOptions}
-			onSort={applySort}
-			onAvailability={applyAvailability}
-			onPrice={applyPrice}
-			onColor={applyColor}
-			onPrevious={() => goToPage((pagination?.page ?? 1) - 1)}
-			onNext={() => goToPage((pagination?.page ?? 1) + 1)}
-		/>
-		<ProductGridSection products={gridProducts} title="" subtitle="" catalogMode={true} />
+		<div class="catalog-layout">
+			<div class="catalog-sidebar">
+				<CatalogToolbar
+					loading={loading}
+					start={start}
+					end={end}
+					total={pagination?.total ?? 0}
+					totalPages={pagination?.total_pages ?? 0}
+					page={pagination?.page ?? 1}
+					hasNextPage={pagination?.has_next_page ?? false}
+					hasPreviousPage={pagination?.has_previous_page ?? false}
+					productCount={productCount}
+					currentSort={currentSort}
+					currentAvailability={currentAvailability}
+					currentPrice={currentPrice}
+					currentColor={currentColor}
+					sortOptions={sortOptions}
+					onSort={applySort}
+					onAvailability={applyAvailability}
+					onPrice={applyPrice}
+					onColor={applyColor}
+					onPrevious={() => goToPage((pagination?.page ?? 1) - 1)}
+					onNext={() => goToPage((pagination?.page ?? 1) + 1)}
+				/>
+			</div>
+			<div class="collection-grid">
+				<ProductGridSection products={gridProducts} title="" subtitle="" catalogMode={false} />
+			</div>
+		</div>
 	</main>
 {/if}
 
@@ -267,17 +269,48 @@ const productCount = $derived((pagination?.total ?? 0) > 0 ? (pagination?.total 
 		min-height: 40vh;
 	}
 	.collection-hero {
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 1.75rem 1.5rem 0.75rem;
+		background: #e8e0d5;
+		padding: clamp(2.25rem, 5vw, 3.25rem) 1.5rem;
 		box-sizing: border-box;
+		text-align: center;
 	}
 	.collection-hero-title {
-		margin: 0;
-		font-size: clamp(2rem, 3vw, 2.75rem);
+		margin: 0 auto;
+		max-width: 1200px;
+		font-size: clamp(2rem, 4vw, 2.75rem);
 		font-weight: 700;
-		color: #1a1a1a;
-		text-align: left;
+		color: #ffffff;
+		letter-spacing: 0.02em;
+	}
+	.collection-grid {
+		--section-padding-y: 0;
+	}
+	.catalog-layout {
+		max-width: 1200px;
+		margin: 1.25rem auto 0;
+		padding: 0 1.5rem 1.5rem;
+		display: grid;
+		grid-template-columns: 260px minmax(0, 1fr);
+		gap: 1.5rem;
+		align-items: start;
+		box-sizing: border-box;
+	}
+	.catalog-sidebar {
+		position: sticky;
+		top: 1rem;
+	}
+	.collection-grid :global(section.products-section) {
+		max-width: none;
+		padding: 0;
+	}
+	@media (max-width: 1024px) {
+		.catalog-layout {
+			grid-template-columns: 1fr;
+			gap: 1rem;
+		}
+		.catalog-sidebar {
+			position: static;
+		}
 	}
 	.collection-error {
 		max-width: 1200px;
