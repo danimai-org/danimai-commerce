@@ -13,6 +13,11 @@ import {
 } from "./retrieve-product-attribute-group.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Helper: normalizeAttributesColumn.
+ * Input: function parameters for query/shape logic.
+ * Output: derived data used by the process flow.
+ */
 function normalizeAttributesColumn(
   raw: unknown
 ): Array<{ id: string; title: string; type: string }> {
@@ -58,6 +63,11 @@ function normalizeAttributesColumn(
   return out;
 }
 
+/**
+ * Handles the retrieve product attribute group process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_PRODUCT_ATTRIBUTE_GROUP_PROCESS = Symbol("RetrieveProductAttributeGroup");
 
 @Process(RETRIEVE_PRODUCT_ATTRIBUTE_GROUP_PROCESS)
@@ -68,6 +78,11 @@ export class RetrieveProductAttributeGroupProcess
     private readonly db: Kysely<Database>,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: RetrieveProductAttributeGroupSchema,
   }) context: ProcessContextType<typeof RetrieveProductAttributeGroupSchema>) {

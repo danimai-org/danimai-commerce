@@ -16,6 +16,11 @@ import {
 } from "./create-sales-channel.schema";
 import type { Database, SalesChannel } from "@danimai/sales-channel/db";
 
+/**
+ * Handles the create sales channel process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_SALES_CHANNEL_PROCESS = Symbol("CreateSalesChannel");
 
 @Process(CREATE_SALES_CHANNEL_PROCESS)
@@ -31,6 +36,11 @@ export class CreateSalesChannelProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: CreateSalesChannelSchema })
     context: ProcessContextType<typeof CreateSalesChannelSchema>

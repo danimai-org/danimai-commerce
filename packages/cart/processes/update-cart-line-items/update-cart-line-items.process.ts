@@ -16,10 +16,20 @@ import {
   type UpdateCartLineItemsProcessInput,
 } from "./update-cart-line-items.schema";
 
+/**
+ * Handles the update cart line items process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_CART_LINE_ITEMS_PROCESS = Symbol("UpdateCartLineItems");
 
 type LineItemIn = UpdateCartLineItemsProcessInput["line_items"][number];
 
+/**
+ * Helper: lineItemPatch.
+ * Input: function parameters for query/shape logic.
+ * Output: derived data used by the process flow.
+ */
 function lineItemPatch(row: LineItemIn): Record<string, unknown> {
   const patch: Record<string, unknown> = {};
   if (row.title !== undefined) patch.title = row.title;
@@ -43,6 +53,11 @@ export class UpdateCartLineItemsProcess
     private readonly db: Kysely<Database>
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: UpdateCartLineItemsSchema })
     context: ProcessContextType<typeof UpdateCartLineItemsSchema>

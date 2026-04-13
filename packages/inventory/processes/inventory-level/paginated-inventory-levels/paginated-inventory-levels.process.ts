@@ -16,6 +16,11 @@ import {
   type PaginatedInventoryLevelsProcessOutput,
 } from "./paginated-inventory-levels.schema";
 
+/**
+ * Handles the paginated inventory levels process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const PAGINATED_INVENTORY_LEVELS_PROCESS = Symbol("PaginatedInventoryLevels");
 
 @Process(PAGINATED_INVENTORY_LEVELS_PROCESS)
@@ -31,6 +36,11 @@ export class PaginatedInventoryLevelsProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: PaginatedInventoryLevelsSchema })
     context: ProcessContextType<typeof PaginatedInventoryLevelsSchema>

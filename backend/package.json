@@ -25,6 +25,7 @@
     "@danimai/currency": "../packages/currency",
     "@danimai/customer": "../packages/customer",
     "@danimai/inventory": "../packages/inventory",
+    "@danimai/media": "../packages/media",
     "@danimai/order": "../packages/order",
     "@danimai/pricing": "../packages/pricing",
     "@danimai/product": "../packages/product",

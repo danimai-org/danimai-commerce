@@ -27,6 +27,11 @@ const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_EXPIRY = "7d";
 const ACCESS_TOKEN_EXPIRES_IN_SECONDS = 15 * 60; // 900
 
+/**
+ * Handles the refresh token process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const REFRESH_TOKEN_PROCESS = Symbol("RefreshToken");
 
 @Process(REFRESH_TOKEN_PROCESS)
@@ -45,6 +50,11 @@ export class RefreshTokenProcess
     private readonly updateSessionProcess: UpdateSessionProcess
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: RefreshTokenSchema,
   }) context: ProcessContextType<typeof RefreshTokenSchema>) {

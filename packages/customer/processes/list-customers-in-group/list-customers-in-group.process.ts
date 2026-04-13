@@ -18,6 +18,11 @@ import {
 } from "./list-customers-in-group.schema";
 import type { Database, Customer } from "../../db/type";
 
+/**
+ * Handles the list customers in group process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const LIST_CUSTOMERS_IN_GROUP_PROCESS = Symbol("ListCustomersInGroup");
 
 @Process(LIST_CUSTOMERS_IN_GROUP_PROCESS)
@@ -31,6 +36,11 @@ export class ListCustomersInGroupProcess
     private readonly logger: Logger
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({
       schema: ListCustomersInGroupSchema,

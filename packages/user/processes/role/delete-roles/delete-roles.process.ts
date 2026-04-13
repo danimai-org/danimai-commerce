@@ -15,6 +15,11 @@ import {
 } from "./delete-roles.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the delete roles process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const DELETE_ROLES_PROCESS = Symbol("DeleteRoles");
 
 @Process(DELETE_ROLES_PROCESS)
@@ -27,6 +32,11 @@ export class DeleteRolesProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: DeleteRolesSchema,
   }) context: ProcessContextType<typeof DeleteRolesSchema>) {

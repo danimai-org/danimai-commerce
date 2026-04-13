@@ -16,6 +16,11 @@ import {
 } from "./update-permission.schema";
 import type { Database, PermissionUpdate } from "../../../db/type";
 
+/**
+ * Handles the update permission process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_PERMISSION_PROCESS = Symbol("UpdatePermission");
 
 @Process(UPDATE_PERMISSION_PROCESS)
@@ -31,6 +36,11 @@ export class UpdatePermissionProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: UpdatePermissionSchema,
   }) context: ProcessContextType<typeof UpdatePermissionSchema>) {

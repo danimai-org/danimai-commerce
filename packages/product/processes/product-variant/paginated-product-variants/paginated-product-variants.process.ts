@@ -14,6 +14,11 @@ import {
 } from "./paginated-product-variants.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the paginated product variants process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const PAGINATED_PRODUCT_VARIANTS_PROCESS = Symbol("PaginatedProductVariants");
 
 @Process(PAGINATED_PRODUCT_VARIANTS_PROCESS)
@@ -27,6 +32,11 @@ export class PaginatedProductVariantsProcess
     private readonly db: Kysely<Database>,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: PaginatedProductVariantsSchema,
   }) context: ProcessContextType<typeof PaginatedProductVariantsSchema>) {

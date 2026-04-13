@@ -16,6 +16,11 @@ import {
 } from "./update-tax-provider.schema";
 import type { Database, TaxProvider } from "@danimai/tax/db";
 
+/**
+ * Handles the update tax providers process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_TAX_PROVIDERS_PROCESS = Symbol("UpdateTaxProviders");
 
 @Process(UPDATE_TAX_PROVIDERS_PROCESS)
@@ -31,6 +36,11 @@ export class UpdateTaxProvidersProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: UpdateTaxProviderSchema })
     context: ProcessContextType<typeof UpdateTaxProviderSchema>

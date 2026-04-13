@@ -16,6 +16,11 @@ import {
 } from "./paginated-regions.schema";
 import type { Database } from "@danimai/region/db";
 
+/**
+ * Handles the paginated regions process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const PAGINATED_REGIONS_PROCESS = Symbol("PaginatedRegions");
 
 @Process(PAGINATED_REGIONS_PROCESS)
@@ -28,6 +33,11 @@ export class PaginatedRegionsProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({
       schema: PaginatedRegionsSchema,

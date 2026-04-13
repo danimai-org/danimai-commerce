@@ -14,6 +14,11 @@ import {
   type CreatePriceListProcessOutput,
 } from "./create-price-list.schema";
 
+/**
+ * Handles the create price list process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_PRICE_LIST_PROCESS = Symbol("CreatePriceList");
 
 @Process(CREATE_PRICE_LIST_PROCESS)
@@ -27,6 +32,11 @@ export class CreatePriceListProcess
     private readonly logger: Logger,
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: CreatePriceListSchema })
     context: ProcessContextType<typeof CreatePriceListSchema>,

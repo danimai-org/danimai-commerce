@@ -15,6 +15,11 @@ import {
 } from "./remove-customer-from-group.schema";
 import type { Database } from "../../db/type";
 
+/**
+ * Handles the remove customer from group process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const REMOVE_CUSTOMER_FROM_GROUP_PROCESS = Symbol(
   "RemoveCustomerFromGroup"
 );
@@ -30,6 +35,11 @@ export class RemoveCustomerFromGroupProcess
     private readonly logger: Logger
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({
       schema: RemoveCustomerFromGroupSchema,

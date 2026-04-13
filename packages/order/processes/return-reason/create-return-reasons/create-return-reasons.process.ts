@@ -14,6 +14,11 @@ import {
 } from "./create-return-reasons.schema";
 import type { Database, ReturnReason } from "@danimai/order/db";
 
+/**
+ * Handles the create return reasons process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_RETURN_REASONS_PROCESS = Symbol("CreateReturnReasons");
 
 @Process(CREATE_RETURN_REASONS_PROCESS)
@@ -26,6 +31,11 @@ export class CreateReturnReasonsProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: CreateReturnReasonsSchema })
     context: ProcessContextType<typeof CreateReturnReasonsSchema>

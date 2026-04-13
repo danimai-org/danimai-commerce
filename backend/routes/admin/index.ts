@@ -23,13 +23,13 @@ import { orderRoutes } from "./orders";
 import { cartRoutes } from "./carts";
 import { stockLocationRoutes } from "./stock-locations";
 import { priceListRoutes } from "./price-lists";
-import { uploadRoutes } from "./upload";
+import { mediaRoutes } from "./media";
 import { promotionRoutes } from "./promotions";
 import { campaignRoutes } from "./campaigns";
 
 export const routes = new Elysia()
     .group('/admin', (app) => {
-        return app.use(uploadRoutes)
+        return app.use(mediaRoutes)
             .use(productRoutes)
             .use(collectionRoutes)
             .use(productCategoryRoutes)

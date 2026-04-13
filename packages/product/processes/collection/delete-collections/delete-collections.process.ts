@@ -12,6 +12,11 @@ import type { Logger } from "@logtape/logtape";
 import { type DeleteCollectionsProcessInput, DeleteCollectionsSchema } from "./delete-collections.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the delete collections process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const DELETE_COLLECTIONS_PROCESS = Symbol("DeleteCollections");
 
 @Process(DELETE_COLLECTIONS_PROCESS)
@@ -23,6 +28,11 @@ export class DeleteCollectionsProcess implements ProcessContract<void> {
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: DeleteCollectionsSchema,
   }) context: ProcessContextType<typeof DeleteCollectionsSchema>): Promise<void> {

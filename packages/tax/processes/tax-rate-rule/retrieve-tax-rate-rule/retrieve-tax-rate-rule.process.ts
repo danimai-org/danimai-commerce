@@ -12,6 +12,11 @@ import {
 } from "./retrieve-tax-rate-rule.schema";
 import type { Database } from "@danimai/tax/db";
 
+/**
+ * Handles the retrieve tax rate rule process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_TAX_RATE_RULE_PROCESS = Symbol("RetrieveTaxRateRule");
 
 @Process(RETRIEVE_TAX_RATE_RULE_PROCESS)
@@ -25,6 +30,11 @@ export class RetrieveTaxRateRuleProcess
     private readonly db: Kysely<Database>
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: RetrieveTaxRateRuleSchema })
     context: ProcessContextType<typeof RetrieveTaxRateRuleSchema>

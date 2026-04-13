@@ -7,6 +7,11 @@ import {
   type AvailableCurrenciesProcessOutput,
 } from "./available-currencies.schema";
 
+/**
+ * Handles the available currencies process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const AVAILABLE_CURRENCIES_PROCESS = Symbol("AvailableCurrencies");
 
 @Process(AVAILABLE_CURRENCIES_PROCESS)
@@ -18,6 +23,11 @@ export class AvailableCurrenciesProcess
     private readonly db: Kysely<Database>
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: AvailableCurrenciesSchema })
     context: ProcessContextType<typeof AvailableCurrenciesSchema>

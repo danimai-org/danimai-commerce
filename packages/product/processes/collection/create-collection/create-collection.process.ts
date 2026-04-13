@@ -13,6 +13,11 @@ import { type CreateCollectionProcessInput, type CreateCollectionProcessOutput, 
 import type { Database } from "../../../db/type";
 import { slugify } from "@danimai/core";
 import { randomUUID } from "crypto";
+/**
+ * Handles the create collection process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_COLLECTION_PROCESS = Symbol("CreateCollection");
 
 @Process(CREATE_COLLECTION_PROCESS)
@@ -25,6 +30,11 @@ export class CreateCollectionProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: CreateCollectionSchema,
   }) context: ProcessContextType<typeof CreateCollectionSchema>) {

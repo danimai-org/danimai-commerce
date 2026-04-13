@@ -15,6 +15,11 @@ import {
 } from "./delete-stock-locations.schema";
 import type { Database } from "../../db";
 
+/**
+ * Handles the delete stock locations process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const DELETE_STOCK_LOCATIONS_PROCESS = Symbol("DeleteStockLocations");
 
 @Process(DELETE_STOCK_LOCATIONS_PROCESS)
@@ -31,6 +36,11 @@ export class DeleteStockLocationsProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: DeleteStockLocationsSchema })
     context: ProcessContextType<typeof DeleteStockLocationsSchema>

@@ -30,6 +30,11 @@ export class RetrieveCurrencyProcess implements ProcessContract<typeof RetrieveC
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: RetrieveCurrencySchema })
     context: ProcessContextType<typeof RetrieveCurrencySchema>

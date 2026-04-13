@@ -1,11 +1,12 @@
 import { Container } from "inversify";
-import { DANIMAI_DB, DANIMAI_LOGGER, DANIMAI_CONFIG, DANIMAI_INITIALIZED, DANIMAI_EMAIL, DANIMAI_JWT, DANIMAI_PASSWORD } from "./injection-keys";
+import { DANIMAI_DB, DANIMAI_LOGGER, DANIMAI_CONFIG, DANIMAI_INITIALIZED, DANIMAI_EMAIL, DANIMAI_JWT, DANIMAI_PASSWORD, DANIMAI_S3 } from "./injection-keys";
 import type { DanimaiInitialize, ProcessContract } from "./type";
 import { Kysely, ParseJSONResultsPlugin, type LogEvent } from "kysely";
 import { BunPostgresDialect } from "kysely-bun-sql";
 import { bindAllProcesses, getProcessClass } from "./decorators/process";
 import { ResendEmail } from "./email";
 import { Jwt, Password } from "./security";
+import { S3Client } from "@aws-sdk/client-s3";
 
 const ANSI = { blue: "\x1b[34m", red: "\x1b[31m", reset: "\x1b[0m" };
 
@@ -104,7 +105,8 @@ export const initialize = ({ db, logger, config }: DanimaiInitialize) => {
           logger.error(`  SQL: ${event.query.sql}`);
           logger.error(`  Error: ${event.error}`);
         }
-      }, plugins: [new ParseJSONResultsPlugin()] })
+      }, plugins: [new ParseJSONResultsPlugin()]
+    })
 
     container.bind(DANIMAI_DB).toConstantValue(connection);
   }
@@ -124,11 +126,20 @@ export const initialize = ({ db, logger, config }: DanimaiInitialize) => {
   if (!container.isBound(DANIMAI_PASSWORD)) {
     container.bind(DANIMAI_PASSWORD).toConstantValue(new Password(passwordConfig?.algorithm ?? "bcrypt", passwordConfig?.cost ?? 10));
   }
+  if (!container.isBound(DANIMAI_S3) && config.aws?.region) {
+    container.bind(DANIMAI_S3).toConstantValue(new S3Client({
+      region: config.aws.region,
+      credentials: {
+        accessKeyId: config.aws.accessKeyId,
+        secretAccessKey: config.aws.secretAccessKey,
+      },
+    }));
+  }
   // Auto-bind all registered process classes (may be empty if processes not imported yet)
   bindAllProcesses(container);
 };
 
-export const getProcess = <T extends ProcessContract>(processName: symbol) => {
+export const getProcess = <T extends ProcessContract<any, any>>(processName: symbol) => {
   const cont = getContainer();
 
   // Lazy binding: if process is not bound, try to bind it now

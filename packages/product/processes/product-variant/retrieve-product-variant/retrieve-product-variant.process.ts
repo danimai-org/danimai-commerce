@@ -10,6 +10,11 @@ import { Kysely } from "kysely";
 import { RetrieveProductVariantSchema, type RetrieveProductVariantProcessOutput } from "./retrieve-product-variant.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the retrieve product variant process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_PRODUCT_VARIANT_PROCESS = Symbol("RetrieveProductVariant");
 
 @Process(RETRIEVE_PRODUCT_VARIANT_PROCESS)
@@ -20,6 +25,11 @@ export class RetrieveProductVariantProcess
     private readonly db: Kysely<Database>,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: RetrieveProductVariantSchema,
   }) context: ProcessContextType<typeof RetrieveProductVariantSchema>) {

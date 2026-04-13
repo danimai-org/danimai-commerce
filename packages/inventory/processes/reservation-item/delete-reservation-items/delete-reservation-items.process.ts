@@ -15,6 +15,11 @@ import {
   type DeleteReservationItemsProcessOutput,
 } from "./delete-reservation-items.schema";
 
+/**
+ * Handles the delete reservation items process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const DELETE_RESERVATION_ITEMS_PROCESS = Symbol("DeleteReservationItems");
 
 @Process(DELETE_RESERVATION_ITEMS_PROCESS)
@@ -30,6 +35,11 @@ export class DeleteReservationItemsProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: DeleteReservationItemsSchema })
     context: ProcessContextType<typeof DeleteReservationItemsSchema>

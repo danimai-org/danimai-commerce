@@ -14,6 +14,11 @@ import {
 import type { Database } from "../../db";
 import { CURRENCIES_LIST } from "../../data/currencies-list";
 
+/**
+ * Handles the create currency process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_CURRENCY_PROCESS = Symbol("CreateCurrency");
 
 const ALLOWED_CODES = new Set(CURRENCIES_LIST.map((c) => c.code));
@@ -27,6 +32,11 @@ export class CreateCurrencyProcess
     private readonly db: Kysely<Database>
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: CreateCurrenciesSchema })
     context: ProcessContextType<typeof CreateCurrenciesSchema>

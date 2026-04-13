@@ -16,6 +16,11 @@ import {
   type CreateInventoryLevelProcessOutput,
 } from "./create-inventory-level.schema";
 
+/**
+ * Handles the create inventory level process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_INVENTORY_LEVEL_PROCESS = Symbol("CreateInventoryLevel");
 
 @Process(CREATE_INVENTORY_LEVEL_PROCESS)
@@ -31,6 +36,11 @@ export class CreateInventoryLevelProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: CreateInventoryLevelSchema })
     context: ProcessContextType<typeof CreateInventoryLevelSchema>

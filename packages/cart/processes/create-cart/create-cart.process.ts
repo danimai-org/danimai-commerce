@@ -12,6 +12,11 @@ import {
 } from "./create-cart.schema";
 import type { Database } from "@danimai/cart/db";
 
+/**
+ * Handles the create cart process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_CART_PROCESS = Symbol("CreateCart");
 
 @Process(CREATE_CART_PROCESS)
@@ -23,6 +28,11 @@ export class CreateCartProcess
     private readonly db: Kysely<Database>
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: CreateCartSchema })
     context: ProcessContextType<typeof CreateCartSchema>

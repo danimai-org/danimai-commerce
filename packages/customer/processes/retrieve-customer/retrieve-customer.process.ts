@@ -15,6 +15,11 @@ import {
 } from "./retrieve-customer.schema";
 import type { Database, Customer } from "../../db/type";
 
+/**
+ * Handles the retrieve customer process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_CUSTOMER_PROCESS = Symbol("RetrieveCustomer");
 
 @Process(RETRIEVE_CUSTOMER_PROCESS)
@@ -27,6 +32,11 @@ export class RetrieveCustomerProcess
     private readonly logger: Logger
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({
       schema: RetrieveCustomerSchema,

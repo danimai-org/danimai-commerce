@@ -13,6 +13,11 @@ import type { Logger } from "@logtape/logtape";
 import { type DeleteProductsProcessInput, DeleteProductsSchema } from "./delete-products.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the delete products process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const DELETE_PRODUCTS_PROCESS = Symbol("DeleteProducts");
 
 @Process(DELETE_PRODUCTS_PROCESS)
@@ -24,6 +29,11 @@ export class DeleteProductsProcess implements ProcessContract<typeof DeleteProdu
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: DeleteProductsSchema,
   }) context: ProcessContextType<typeof DeleteProductsSchema>) {

@@ -17,8 +17,18 @@ import { randomUUID } from "crypto";
 import type { Price, PriceSet } from "@danimai/pricing";
 import type { Static } from "@sinclair/typebox";
 
+/**
+ * Handles the create product process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_PRODUCT_PROCESS = Symbol("CreateProduct");
 
+/**
+ * Creates a product with optional variants, options, pricing, and relations.
+ * Input: validated product creation payload including optional nested entities.
+ * Output: created product row persisted with related records.
+ */
 @Process(CREATE_PRODUCT_PROCESS)
 export class CreateProductProcess
   implements ProcessContract<typeof CreateProductSchema, CreateProductProcessOutput> {
@@ -30,6 +40,11 @@ export class CreateProductProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: CreateProductSchema,
   }) context: ProcessContextType<typeof CreateProductSchema>) {
@@ -115,20 +130,22 @@ export class CreateProductProcess
       } else {
         const baseHandle = slugify(input.title);
 
+        // One prefix query avoids repeated handle lookups while still producing unique handles.
+        const existingHandles = await trx
+          .selectFrom("products")
+          .where("handle", "like", `${baseHandle}%`)
+          .where("deleted_at", "is", null)
+          .select("handle")
+          .execute();
+        const handleSet = new Set(existingHandles.map((row) => row.handle));
+
         handle = baseHandle;
-        let counter = 1;
-
-        while (true) {
-          const existing = await trx
-            .selectFrom("products")
-            .where("handle", "=", handle)
-            .where("deleted_at", "is", null)
-            .select("id")
-            .executeTakeFirst();
-
-          if (!existing) break;
+        if (handleSet.has(handle)) {
+          let counter = 1;
+          while (handleSet.has(`${baseHandle}-${counter}`)) {
+            counter++;
+          }
           handle = `${baseHandle}-${counter}`;
-          counter++;
         }
       }
 
@@ -156,6 +173,14 @@ export class CreateProductProcess
       if (!product) {
         throw new InternalServerError("Failed to create product");
       }
+
+      await this.attachMediaToOwner(trx, {
+        ownerType: "product",
+        ownerId: product.id,
+        mediaIds: input.media_ids,
+        thumbnailMediaId: input.thumbnail_media_id,
+        updateThumbnailTable: "products",
+      });
 
       // ── Create product options & option values ─────────────────────────
       // Options are global: reuse existing option by title (case-insensitive).
@@ -218,6 +243,20 @@ export class CreateProductProcess
           .values(variantsToCreate)
           .returningAll()
           .execute();
+
+        for (const variantInput of input.variants) {
+          const createdVariant = createdVariants.find((v) => v.title === variantInput.title);
+          if (!createdVariant) {
+            continue;
+          }
+          await this.attachMediaToOwner(trx, {
+            ownerType: "product_variant",
+            ownerId: createdVariant.id,
+            mediaIds: variantInput.media_ids,
+            thumbnailMediaId: variantInput.thumbnail_media_id,
+            updateThumbnailTable: "product_variants",
+          });
+        }
 
         const variantMap = new Map<string, typeof createdVariants[0]>();
         for (const variant of createdVariants) {
@@ -339,5 +378,57 @@ export class CreateProductProcess
     });
 
     return undefined;
+  }
+
+  private async attachMediaToOwner(
+    trx: Kysely<Database>,
+    options: {
+      ownerType: string;
+      ownerId: string;
+      mediaIds?: string[];
+      thumbnailMediaId?: string;
+      updateThumbnailTable?: "products" | "product_variants";
+    }
+  ) {
+    const mediaTable = trx as any;
+    const ids = new Set<string>(options.mediaIds ?? []);
+    if (options.thumbnailMediaId) {
+      ids.add(options.thumbnailMediaId);
+    }
+    if (ids.size === 0) {
+      return;
+    }
+
+    await mediaTable
+      .updateTable("media_files")
+      .set({
+        owner_type: options.ownerType,
+        owner_id: options.ownerId,
+      })
+      .where("id", "in", [...ids])
+      .where("deleted_at", "is", null)
+      .execute();
+
+    if (!options.thumbnailMediaId || !options.updateThumbnailTable) {
+      return;
+    }
+
+    const thumbnailMedia = await mediaTable
+      .selectFrom("media_files")
+      .where("id", "=", options.thumbnailMediaId)
+      .where("deleted_at", "is", null)
+      .select(["url"])
+      .executeTakeFirst();
+
+    if (!thumbnailMedia) {
+      return;
+    }
+
+    await mediaTable
+      .updateTable(options.updateThumbnailTable)
+      .set({ thumbnail: thumbnailMedia.url })
+      .where("id", "=", options.ownerId)
+      .where("deleted_at", "is", null)
+      .execute();
   }
 }

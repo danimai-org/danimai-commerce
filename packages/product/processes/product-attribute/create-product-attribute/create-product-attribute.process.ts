@@ -12,6 +12,11 @@ import { CreateProductAttributeSchema, type CreateProductAttributeProcessOutput 
 import type { Database } from "../../../db/type";
 import { randomUUID } from "crypto";
 
+/**
+ * Handles the create product attribute process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_PRODUCT_ATTRIBUTE_PROCESS = Symbol("CreateProductAttribute");
 
 @Process(CREATE_PRODUCT_ATTRIBUTE_PROCESS)
@@ -24,6 +29,11 @@ export class CreateProductAttributeProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: CreateProductAttributeSchema,
   }) context: ProcessContextType<typeof CreateProductAttributeSchema>) {

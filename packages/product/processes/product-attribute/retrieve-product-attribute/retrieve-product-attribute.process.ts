@@ -10,6 +10,11 @@ import { Kysely } from "kysely";
 import { type RetrieveProductAttributeProcessInput, type RetrieveProductAttributeProcessOutput, RetrieveProductAttributeSchema } from "./retrieve-product-attribute.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the retrieve product attribute process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_PRODUCT_ATTRIBUTE_PROCESS = Symbol("RetrieveProductAttribute");
 
 @Process(RETRIEVE_PRODUCT_ATTRIBUTE_PROCESS)
@@ -20,6 +25,11 @@ export class RetrieveProductAttributeProcess
     private readonly db: Kysely<Database>,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: RetrieveProductAttributeSchema,
   }) context: ProcessContextType<typeof RetrieveProductAttributeSchema>) {

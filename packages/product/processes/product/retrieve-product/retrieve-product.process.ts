@@ -14,6 +14,11 @@ import type { Database, Product } from "../../../db/type";
 import type { Static } from "@sinclair/typebox";
 
 
+/**
+ * Handles the retrieve product process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_PRODUCT_PROCESS = Symbol("RetrieveProduct");
 
 @Process(RETRIEVE_PRODUCT_PROCESS)
@@ -24,6 +29,11 @@ export class RetrieveProductProcess
     private readonly db: Kysely<Database>,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: RetrieveProductSchema,
   }) context: ProcessContextType<typeof RetrieveProductSchema>) {

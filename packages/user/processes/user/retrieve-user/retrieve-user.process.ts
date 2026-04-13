@@ -15,6 +15,11 @@ import {
 } from "./retrieve-user.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the retrieve user process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_USER_PROCESS = Symbol("RetrieveUser");
 
 @Process(RETRIEVE_USER_PROCESS)
@@ -27,6 +32,11 @@ export class RetrieveUserProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: RetrieveUserSchema,
   }) context: ProcessContextType<typeof RetrieveUserSchema>) {

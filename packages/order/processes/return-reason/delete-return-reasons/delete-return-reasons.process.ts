@@ -15,6 +15,11 @@ import {
 } from "./delete-return-reasons.schema";
 import type { Database } from "@danimai/order/db";
 
+/**
+ * Handles the delete return reasons process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const DELETE_RETURN_REASONS_PROCESS = Symbol("DeleteReturnReasons");
 
 @Process(DELETE_RETURN_REASONS_PROCESS)
@@ -26,6 +31,11 @@ export class DeleteReturnReasonsProcess implements ProcessContract<void> {
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: DeleteReturnReasonsSchema })
     context: ProcessContextType<typeof DeleteReturnReasonsSchema>

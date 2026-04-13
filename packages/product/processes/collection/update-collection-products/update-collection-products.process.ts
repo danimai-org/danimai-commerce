@@ -12,6 +12,11 @@ import {
 } from "./update-collection-products.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the update collection products process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_COLLECTION_PRODUCTS_PROCESS = Symbol(
   "UpdateCollectionProducts"
 );
@@ -24,6 +29,11 @@ export class UpdateCollectionProductsProcess
     private readonly db: Kysely<Database>
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: UpdateCollectionProductsSchema,
   }) context: ProcessContextType<typeof UpdateCollectionProductsSchema>) {

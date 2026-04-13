@@ -16,10 +16,20 @@ import {
 } from "./update-session.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Helper: hashToken.
+ * Input: function parameters for query/shape logic.
+ * Output: derived data used by the process flow.
+ */
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+/**
+ * Handles the update session process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_SESSION_PROCESS = Symbol("UpdateSession");
 
 @Process(UPDATE_SESSION_PROCESS)
@@ -32,6 +42,11 @@ export class UpdateSessionProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: UpdateSessionSchema,
   }) context: ProcessContextType<typeof UpdateSessionSchema>) {

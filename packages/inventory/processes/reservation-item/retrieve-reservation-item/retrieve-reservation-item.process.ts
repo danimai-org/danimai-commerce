@@ -12,6 +12,11 @@ import {
   type RetrieveReservationItemProcessOutput,
 } from "./retrieve-reservation-item.schema";
 
+/**
+ * Handles the retrieve reservation item process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_RESERVATION_ITEM_PROCESS = Symbol("RetrieveReservationItem");
 
 @Process(RETRIEVE_RESERVATION_ITEM_PROCESS)
@@ -25,6 +30,11 @@ export class RetrieveReservationItemProcess
     private readonly db: Kysely<Database>
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: RetrieveReservationItemSchema })
     context: ProcessContextType<typeof RetrieveReservationItemSchema>

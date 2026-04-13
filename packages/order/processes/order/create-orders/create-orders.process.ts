@@ -9,15 +9,26 @@ import {
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
-  type CreateOrderProcessInput,
   CreateOrdersSchema,
 } from "./create-orders.schema";
 import type { Database, Order } from "@danimai/order/db";
 
+/**
+ * Handles the create orders process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_ORDERS_PROCESS = Symbol("CreateOrders");
 
+/**
+ * Creates multiple orders in one execution.
+ * Input: an array of order payloads; each payload may optionally provide `display_id`.
+ * Output: created order rows in input order.
+ */
 @Process(CREATE_ORDERS_PROCESS)
-export class CreateOrdersProcess implements ProcessContract<Order[]> {
+export class CreateOrdersProcess
+  implements ProcessContract<typeof CreateOrdersSchema, Order[]>
+{
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -25,49 +36,53 @@ export class CreateOrdersProcess implements ProcessContract<Order[]> {
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: CreateOrdersSchema })
     context: ProcessContextType<typeof CreateOrdersSchema>
   ) {
     const { input } = context;
-    const created: Order[] = [];
-    for (const o of input.orders) {
-      const row = await this.createOrder(o);
-      if (row) created.push(row);
-    }
-    return created;
-  }
+    return this.db.transaction().execute(async (trx) => {
+      // Allocate display ids from one max() read to avoid per-order max lookups.
+      const row = await trx
+        .selectFrom("orders")
+        .select(({ fn }) => fn.max<number>("display_id").as("max_id"))
+        .executeTakeFirst();
+      let nextDisplayId = Number(row?.max_id ?? 0) + 1;
 
-  async getNextDisplayId(): Promise<number> {
-    const row = await this.db
-      .selectFrom("orders")
-      .select(({ fn }) => fn.max<number>("display_id").as("max_id"))
-      .executeTakeFirst();
-    return (Number(row?.max_id ?? 0) + 1) as number;
-  }
+      const created: Order[] = [];
+      for (const orderInput of input.orders) {
+        this.logger.info("Creating order", { input: orderInput });
+        const displayId = orderInput.display_id ?? nextDisplayId++;
 
-  async createOrder(input: CreateOrderProcessInput) {
-    this.logger.info("Creating order", { input });
-    const displayId =
-      input.display_id ?? (await this.getNextDisplayId());
-    return this.db
-      .insertInto("orders")
-      .values({
-        currency_code: input.currency_code,
-        status: input.status ?? "pending",
-        fulfillment_status: input.fulfillment_status ?? "not_fulfilled",
-        payment_status: input.payment_status ?? "not_paid",
-        display_id: displayId,
-        email: input.email ?? null,
-        customer_id: input.customer_id ?? null,
-        sales_channel_id: input.sales_channel_id ?? null,
-        region_id: input.region_id ?? null,
-        cart_id: input.cart_id ?? null,
-        billing_address_id: input.billing_address_id ?? null,
-        shipping_address_id: input.shipping_address_id ?? null,
-        metadata: input.metadata ?? null,
-      })
-      .returningAll()
-      .executeTakeFirst();
+        const row = await trx
+          .insertInto("orders")
+          .values({
+            currency_code: orderInput.currency_code,
+            status: orderInput.status ?? "pending",
+            fulfillment_status: orderInput.fulfillment_status ?? "not_fulfilled",
+            payment_status: orderInput.payment_status ?? "not_paid",
+            display_id: displayId,
+            email: orderInput.email ?? null,
+            customer_id: orderInput.customer_id ?? null,
+            sales_channel_id: orderInput.sales_channel_id ?? null,
+            region_id: orderInput.region_id ?? null,
+            cart_id: orderInput.cart_id ?? null,
+            billing_address_id: orderInput.billing_address_id ?? null,
+            shipping_address_id: orderInput.shipping_address_id ?? null,
+            metadata: orderInput.metadata ?? null,
+          })
+          .returningAll()
+          .executeTakeFirst();
+
+        if (row) created.push(row);
+      }
+
+      return created;
+    });
   }
 }

@@ -15,6 +15,11 @@ import {
 } from "./create-role.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the create role process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_ROLE_PROCESS = Symbol("CreateRole");
 
 @Process(CREATE_ROLE_PROCESS)
@@ -27,6 +32,11 @@ export class CreateRoleProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: CreateRoleSchema,
   }) context: ProcessContextType<typeof CreateRoleSchema>) {

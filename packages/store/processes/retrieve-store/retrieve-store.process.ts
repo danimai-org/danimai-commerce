@@ -16,6 +16,11 @@ import {
 } from "./retrieve-store.schema";
 import type { Database, Store } from "@danimai/store/db";
 
+/**
+ * Handles the retrieve store process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_STORE_PROCESS = Symbol("RetrieveStore");
 
 @Process(RETRIEVE_STORE_PROCESS)
@@ -27,6 +32,11 @@ export class RetrieveStoreProcess implements ProcessContract<typeof RetrieveStor
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: RetrieveStoreSchema })
     context: ProcessContextType<typeof RetrieveStoreSchema>

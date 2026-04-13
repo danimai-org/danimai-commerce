@@ -15,6 +15,11 @@ import {
 } from "./update-customer-group.schema";
 import type { Database, CustomerGroup } from "@danimai/customer/db";
 
+/**
+ * Handles the update customer group process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_CUSTOMER_GROUP_PROCESS = Symbol("UpdateCustomerGroup");
 
 @Process(UPDATE_CUSTOMER_GROUP_PROCESS)
@@ -26,6 +31,11 @@ export class UpdateCustomerGroupProcess implements ProcessContract<CustomerGroup
     private readonly logger: Logger
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: UpdateCustomerGroupSchema })
     context: ProcessContextType<typeof UpdateCustomerGroupSchema>

@@ -20,6 +20,11 @@ import type { Database } from "../../../db/type";
 
 const INVITE_EXPIRY_DAYS = 7;
 
+/**
+ * Handles the create invite process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_INVITE_PROCESS = Symbol("CreateInvite");
 
 @Process(CREATE_INVITE_PROCESS)
@@ -36,6 +41,11 @@ export class CreateInviteProcess implements ProcessContract<
     private readonly emailService: EmailInterface,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({
       schema: CreateInviteSchema,

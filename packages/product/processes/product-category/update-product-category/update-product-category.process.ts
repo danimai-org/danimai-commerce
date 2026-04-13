@@ -13,8 +13,18 @@ import type { Logger } from "@logtape/logtape";
 import { type UpdateProductCategoryProcessOutput, UpdateProductCategorySchema } from "./update-product-category.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the update product category process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_PRODUCT_CATEGORY_PROCESS = Symbol("UpdateProductCategory");
 
+/**
+ * Updates a product category and validates parent hierarchy constraints.
+ * Input: category id with partial mutable fields.
+ * Output: updated category row.
+ */
 @Process(UPDATE_PRODUCT_CATEGORY_PROCESS)
 export class UpdateProductCategoryProcess
   implements ProcessContract<typeof UpdateProductCategorySchema, UpdateProductCategoryProcessOutput> {
@@ -25,6 +35,11 @@ export class UpdateProductCategoryProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: UpdateProductCategorySchema,
   }) context: ProcessContextType<typeof UpdateProductCategorySchema>) {
@@ -107,19 +122,25 @@ export class UpdateProductCategoryProcess
   private async getCategoryDescendants(categoryId: string): Promise<string[]> {
     const descendants: string[] = [];
     const queue = [categoryId];
+    const categories = await this.db
+      .selectFrom("product_categories")
+      .where("deleted_at", "is", null)
+      .select(["id", "parent_id"])
+      .execute();
+    const childrenByParent = new Map<string, string[]>();
+    for (const category of categories) {
+      if (!category.parent_id) continue;
+      const childIds = childrenByParent.get(category.parent_id) ?? [];
+      childIds.push(category.id);
+      childrenByParent.set(category.parent_id, childIds);
+    }
 
     while (queue.length > 0) {
       const currentId = queue.shift()!;
-      const children = await this.db
-        .selectFrom("product_categories")
-        .where("parent_id", "=", currentId)
-        .where("deleted_at", "is", null)
-        .select("id")
-        .execute();
-
-      for (const child of children) {
-        descendants.push(child.id);
-        queue.push(child.id);
+      const children = childrenByParent.get(currentId) ?? [];
+      for (const childId of children) {
+        descendants.push(childId);
+        queue.push(childId);
       }
     }
 

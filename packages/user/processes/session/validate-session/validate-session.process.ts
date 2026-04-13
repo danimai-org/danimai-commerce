@@ -16,10 +16,20 @@ import {
 } from "./validate-session.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Helper: hashToken.
+ * Input: function parameters for query/shape logic.
+ * Output: derived data used by the process flow.
+ */
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+/**
+ * Handles the validate session process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const VALIDATE_SESSION_PROCESS = Symbol("ValidateSession");
 
 @Process(VALIDATE_SESSION_PROCESS)
@@ -35,6 +45,11 @@ export class ValidateSessionProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: ValidateSessionSchema,
   }) context: ProcessContextType<typeof ValidateSessionSchema>) {

@@ -13,6 +13,11 @@ import { randomUUID } from "crypto";
 import { type UpdateProductProcessInput, UpdateProductSchema } from "./update-product.schema";
 import type { Database, Product, ProductStatusEnum } from "../../../db/type";
 
+/**
+ * Handles the update product process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_PRODUCT_PROCESS = Symbol("UpdateProduct");
 
 @Process(UPDATE_PRODUCT_PROCESS)
@@ -25,6 +30,11 @@ export class UpdateProductProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: UpdateProductSchema,
   }) context: ProcessContextType<typeof UpdateProductSchema>) {
@@ -59,6 +69,7 @@ export class UpdateProductProcess
     if (input.collection_ids !== undefined) {
       await this.syncProductCollections(input.id, input.collection_ids);
     }
+    await this.syncProductMedia(input.id, input.media_ids, input.thumbnail_media_id);
     return updated ?? (await this.db.selectFrom("products").where("id", "=", input.id).where("deleted_at", "is", null).selectAll().executeTakeFirst());
   }
 
@@ -177,6 +188,9 @@ export class UpdateProductProcess
 
     if (input.thumbnail !== undefined) {
       updateData.thumbnail = input.thumbnail ?? null;
+    }
+    if (input.thumbnail_media_id === null) {
+      updateData.thumbnail = null;
     }
 
     if (input.external_id !== undefined) {
@@ -405,5 +419,42 @@ export class UpdateProductProcess
       .values(relations)
       .onConflict((oc) => oc.columns(["product_id", "product_collection_id"]).doNothing())
       .execute();
+  }
+
+  async syncProductMedia(productId: string, mediaIds?: string[], thumbnailMediaId?: string | null) {
+    const mediaDb = this.db as any;
+    const ids = new Set<string>(mediaIds ?? []);
+    if (thumbnailMediaId) {
+      ids.add(thumbnailMediaId);
+    }
+
+    if (ids.size > 0) {
+      await mediaDb
+        .updateTable("media_files")
+        .set({
+          owner_type: "product",
+          owner_id: productId,
+        })
+        .where("id", "in", [...ids])
+        .where("deleted_at", "is", null)
+        .execute();
+    }
+
+    if (thumbnailMediaId) {
+      const thumbnailMedia = await mediaDb
+        .selectFrom("media_files")
+        .where("id", "=", thumbnailMediaId)
+        .where("deleted_at", "is", null)
+        .select(["url"])
+        .executeTakeFirst();
+      if (thumbnailMedia?.url) {
+        await this.db
+          .updateTable("products")
+          .set({ thumbnail: thumbnailMedia.url })
+          .where("id", "=", productId)
+          .where("deleted_at", "is", null)
+          .execute();
+      }
+    }
   }
 }

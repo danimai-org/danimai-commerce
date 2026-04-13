@@ -10,6 +10,11 @@ import { Kysely } from "kysely";
 import { type RetrieveProductTagProcessOutput, RetrieveProductTagSchema } from "./retrieve-product-tag.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the retrieve product tag process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_PRODUCT_TAG_PROCESS = Symbol("RetrieveProductTag");
 
 @Process(RETRIEVE_PRODUCT_TAG_PROCESS)
@@ -20,6 +25,11 @@ export class RetrieveProductTagProcess
     private readonly db: Kysely<Database>,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: RetrieveProductTagSchema,
   }) context: ProcessContextType<typeof RetrieveProductTagSchema>) {

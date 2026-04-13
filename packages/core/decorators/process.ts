@@ -5,6 +5,14 @@ import { wrapMethodsWithProcessContext } from "./process-context";
 // Store process classes for later binding
 const processClasses = new Map<symbol, any>();
 
+/**
+ * Purpose: Registers a process class in the container and wires method-level ProcessContext validation.
+ * Target: class
+ * Arguments: `name` (symbol process identifier, required, unique per process class)
+ * Runtime behavior: runs at class definition time; marks class injectable, wraps decorated methods, and stores class by symbol.
+ * Side effects: metadata-driven method wrapping and registration in in-memory process class map used for IoC binding.
+ * Example: `@Process(CREATE_ORDER_PROCESS) export class CreateOrderProcess { ... }`
+ */
 export const Process = (name: symbol) => {
     return (target: any) => {
         // Apply injectable decorator

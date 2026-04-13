@@ -21,6 +21,8 @@ export const UpdateProductSchema = Type.Object({
   discountable: Type.Optional(Type.Boolean()),
   status: Type.Optional(Type.Union([Type.Literal("draft"), Type.Literal("proposed"), Type.Literal("published"), Type.Literal("rejected")])),
   thumbnail: Type.Optional(Type.String()),
+  thumbnail_media_id: Type.Optional(Type.Union([Type.String({ format: "uuid" }), Type.Null()])),
+  media_ids: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
   external_id: Type.Optional(Type.String()),
   category_id: Type.Optional(Type.String()),
   attribute_group_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),

@@ -16,6 +16,11 @@ import {
 } from "./paginated-orders.schema";
 import type { Database, Order } from "@danimai/order/db";
 
+/**
+ * Handles the paginated orders process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const PAGINATED_ORDERS_PROCESS = Symbol("PaginatedOrders");
 
 @Process(PAGINATED_ORDERS_PROCESS)
@@ -28,6 +33,11 @@ export class PaginatedOrdersProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: PaginatedOrdersQuerySchema })
     context: ProcessContextType<typeof PaginatedOrdersQuerySchema>

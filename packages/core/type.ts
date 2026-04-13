@@ -16,6 +16,13 @@ export interface DanimaiInitialize {
     jwt: {
       secret: string;
     }
+    aws?: {
+      accessKeyId: string;
+      secretAccessKey: string;
+      region: string;
+      s3Bucket: string;
+      mediaCloudfrontUrl?: string;
+    }
     password?: {
       algorithm: Bun.Password.AlgorithmLabel;
       cost: number;

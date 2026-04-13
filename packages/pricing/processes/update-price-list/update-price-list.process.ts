@@ -16,6 +16,11 @@ import {
   type UpdatePriceListProcessOutput,
 } from "./update-price-list.schema";
 
+/**
+ * Handles the update price list process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_PRICE_LIST_PROCESS = Symbol("UpdatePriceList");
 
 @Process(UPDATE_PRICE_LIST_PROCESS)
@@ -29,6 +34,11 @@ export class UpdatePriceListProcess
     private readonly logger: Logger,
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: UpdatePriceListSchema })
     context: ProcessContextType<typeof UpdatePriceListSchema>,

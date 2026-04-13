@@ -27,6 +27,8 @@ const ProductVariantSchema = Type.Object({
   manage_inventory: Type.Optional(Type.Boolean()),
   variant_rank: Type.Optional(Type.Number()),
   thumbnail: Type.Optional(Type.String()),
+  thumbnail_media_id: Type.Optional(Type.String({ format: "uuid" })),
+  media_ids: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
   prices: Type.Optional(Type.Array(ProductVariantPriceSchema)),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
 });
@@ -47,6 +49,8 @@ export const CreateProductSchema = Type.Object({
   discountable: Type.Boolean({ default: true }),
   status: Type.Enum(ProductStatusEnum, { default: ProductStatusEnum.DRAFT }),
   thumbnail: Type.Optional(Type.String()),
+  thumbnail_media_id: Type.Optional(Type.String({ format: "uuid" })),
+  media_ids: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
   external_id: Type.Optional(Type.String()),
   category_id: Type.Optional(Type.String({ format: "uuid" })),
   attribute_group_id: Type.Optional(Type.String({ format: "uuid" })),

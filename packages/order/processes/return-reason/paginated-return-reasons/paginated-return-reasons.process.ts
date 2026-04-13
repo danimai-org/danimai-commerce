@@ -17,6 +17,11 @@ import {
 } from "./paginated-return-reasons.schema";
 import type { Database, ReturnReason } from "@danimai/order/db";
 
+/**
+ * Handles the paginated return reasons process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const PAGINATED_RETURN_REASONS_PROCESS = Symbol("PaginatedReturnReasons");
 
 @Process(PAGINATED_RETURN_REASONS_PROCESS)
@@ -29,6 +34,11 @@ export class PaginatedReturnReasonsProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: PaginatedReturnReasonsSchema })
     context: ProcessContextType<typeof PaginatedReturnReasonsSchema>

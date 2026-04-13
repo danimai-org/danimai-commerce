@@ -14,6 +14,11 @@ import {
   type UpdateInventoryItemProcessOutput,
 } from "./update-inventory-item.schema";
 
+/**
+ * Handles the update inventory item process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_INVENTORY_ITEM_PROCESS = Symbol("UpdateInventoryItem");
 
 @Process(UPDATE_INVENTORY_ITEM_PROCESS)
@@ -29,6 +34,11 @@ export class UpdateInventoryItemProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: UpdateInventoryItemSchema })
     context: ProcessContextType<typeof UpdateInventoryItemSchema>

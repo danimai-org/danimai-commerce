@@ -17,6 +17,11 @@ import type { Database, CustomerGroup } from "../../db/type";
 
 export type RetrieveCustomerGroupResult = CustomerGroup & { customer_count: number };
 
+/**
+ * Handles the retrieve customer group process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_CUSTOMER_GROUP_PROCESS = Symbol("RetrieveCustomerGroup");
 
 @Process(RETRIEVE_CUSTOMER_GROUP_PROCESS)
@@ -30,6 +35,11 @@ export class RetrieveCustomerGroupProcess
     private readonly logger: Logger
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({
       schema: RetrieveCustomerGroupSchema,

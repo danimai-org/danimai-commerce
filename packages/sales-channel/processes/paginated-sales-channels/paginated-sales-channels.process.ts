@@ -16,6 +16,11 @@ import {
 } from "./paginated-sales-channels.schema";
 import type { Database } from "@danimai/sales-channel/db";
 
+/**
+ * Handles the paginated sales channels process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const PAGINATED_SALES_CHANNELS_PROCESS = Symbol("PaginatedSalesChannels");
 
 @Process(PAGINATED_SALES_CHANNELS_PROCESS)
@@ -31,6 +36,11 @@ export class PaginatedSalesChannelsProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: PaginatedSalesChannelsSchema })
     context: ProcessContextType<typeof PaginatedSalesChannelsSchema>

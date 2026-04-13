@@ -16,6 +16,11 @@ import {
 } from "./delete-sales-channels.schema";
 import type { Database } from "@danimai/sales-channel/db";
 
+/**
+ * Handles the delete sales channels process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const DELETE_SALES_CHANNELS_PROCESS = Symbol("DeleteSalesChannels");
 
 @Process(DELETE_SALES_CHANNELS_PROCESS)
@@ -31,6 +36,11 @@ export class DeleteSalesChannelsProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: DeleteSalesChannelsSchema })
     context: ProcessContextType<typeof DeleteSalesChannelsSchema>

@@ -15,6 +15,11 @@ import {
   type DeletePriceListsProcessOutput,
 } from "./delete-price-lists.schema";
 
+/**
+ * Handles the delete price lists process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const DELETE_PRICE_LISTS_PROCESS = Symbol("DeletePriceLists");
 
 @Process(DELETE_PRICE_LISTS_PROCESS)
@@ -29,6 +34,11 @@ export class DeletePriceListsProcess
     private readonly logger: Logger,
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: DeletePriceListsSchema })
     context: ProcessContextType<typeof DeletePriceListsSchema>,

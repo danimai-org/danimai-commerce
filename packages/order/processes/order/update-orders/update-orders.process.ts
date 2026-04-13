@@ -15,6 +15,11 @@ import {
 } from "./update-orders.schema";
 import type { Database, Order, OrderUpdate } from "@danimai/order/db";
 
+/**
+ * Handles the update orders process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_ORDERS_PROCESS = Symbol("UpdateOrders");
 
 @Process(UPDATE_ORDERS_PROCESS)
@@ -26,6 +31,11 @@ export class UpdateOrdersProcess implements ProcessContract<Order | undefined> {
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: UpdateOrderSchema })
     context: ProcessContextType<typeof UpdateOrderSchema>

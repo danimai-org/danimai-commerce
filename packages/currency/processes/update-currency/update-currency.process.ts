@@ -17,6 +17,11 @@ import {
 } from "./update-currency.schema";
 import type { Database } from "../../db";
 
+/**
+ * Handles the update currency process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_CURRENCY_PROCESS = Symbol("UpdateCurrency");
 
 @Process(UPDATE_CURRENCY_PROCESS)
@@ -28,6 +33,11 @@ export class UpdateCurrencyProcess implements ProcessContract<typeof UpdateCurre
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: UpdateCurrencyBodySchema })
     context: ProcessContextType<typeof UpdateCurrencyBodySchema>

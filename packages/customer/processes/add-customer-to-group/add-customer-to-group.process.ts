@@ -15,6 +15,11 @@ import {
 } from "./add-customer-to-group.schema";
 import type { Database, CustomerGroupCustomer } from "../../db/type";
 
+/**
+ * Handles the add customer to group process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const ADD_CUSTOMER_TO_GROUP_PROCESS = Symbol("AddCustomerToGroup");
 
 @Process(ADD_CUSTOMER_TO_GROUP_PROCESS)
@@ -28,6 +33,11 @@ export class AddCustomerToGroupProcess
     private readonly logger: Logger
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({
       schema: AddCustomerToGroupSchema,

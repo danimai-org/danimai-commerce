@@ -15,6 +15,11 @@ import {
 } from "./retrieve-permission.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the retrieve permission process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_PERMISSION_PROCESS = Symbol("RetrievePermission");
 
 @Process(RETRIEVE_PERMISSION_PROCESS)
@@ -30,6 +35,11 @@ export class RetrievePermissionProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: RetrievePermissionSchema,
   }) context: ProcessContextType<typeof RetrievePermissionSchema>) {

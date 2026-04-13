@@ -18,6 +18,11 @@ import {
 import type { Database } from "../../db";
 import type { Static } from "@sinclair/typebox";
 
+/**
+ * Handles the paginated stock locations process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const PAGINATED_STOCK_LOCATIONS_PROCESS = Symbol(
   "PaginatedStockLocations",
 );
@@ -36,6 +41,11 @@ export class PaginatedStockLocationsProcess
     private readonly logger: Logger,
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: PaginatedStockLocationsSchema })
     context: ProcessContextType<typeof PaginatedStockLocationsSchema>,

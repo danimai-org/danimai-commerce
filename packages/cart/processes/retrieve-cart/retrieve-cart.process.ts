@@ -13,6 +13,11 @@ import {
 } from "./retrieve-cart.schema";
 import type { Database } from "@danimai/cart/db";
 
+/**
+ * Helper: loadCartWithRelations.
+ * Input: function parameters for query/shape logic.
+ * Output: derived data used by the process flow.
+ */
 export async function loadCartWithRelations(
   db: Kysely<Database>,
   id: string
@@ -73,6 +78,11 @@ export async function loadCartWithRelations(
   } as CartWithRelations;
 }
 
+/**
+ * Handles the retrieve cart process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_CART_PROCESS = Symbol("RetrieveCart");
 
 @Process(RETRIEVE_CART_PROCESS)
@@ -84,6 +94,11 @@ export class RetrieveCartProcess
     private readonly db: Kysely<Database>
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: RetrieveCartSchema })
     context: ProcessContextType<typeof RetrieveCartSchema>

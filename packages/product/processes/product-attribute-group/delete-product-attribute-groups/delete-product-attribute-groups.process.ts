@@ -13,6 +13,11 @@ import type { Logger } from "@logtape/logtape";
 import { type DeleteProductAttributeGroupsProcessInput, DeleteProductAttributeGroupsSchema } from "./delete-product-attribute-groups.schema";
 import type { Database } from "../../../db/type";
 
+/**
+ * Handles the delete product attribute groups process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const DELETE_PRODUCT_ATTRIBUTE_GROUPS_PROCESS = Symbol("DeleteProductAttributeGroups");
 
 @Process(DELETE_PRODUCT_ATTRIBUTE_GROUPS_PROCESS)
@@ -24,6 +29,11 @@ export class DeleteProductAttributeGroupsProcess implements ProcessContract<type
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: DeleteProductAttributeGroupsSchema,
   }) context: ProcessContextType<typeof DeleteProductAttributeGroupsSchema>) {

@@ -15,6 +15,11 @@ import {
 } from "./update-return-reasons.schema";
 import type { Database, ReturnReason } from "@danimai/order/db";
 
+/**
+ * Handles the update return reasons process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_RETURN_REASONS_PROCESS = Symbol("UpdateReturnReasons");
 
 @Process(UPDATE_RETURN_REASONS_PROCESS)
@@ -27,6 +32,11 @@ export class UpdateReturnReasonsProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: UpdateReturnReasonSchema })
     context: ProcessContextType<typeof UpdateReturnReasonSchema>

@@ -16,6 +16,11 @@ import {
 } from "./delete-tax-providers.schema";
 import type { Database } from "@danimai/tax/db";
 
+/**
+ * Handles the delete tax providers process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const DELETE_TAX_PROVIDERS_PROCESS = Symbol("DeleteTaxProviders");
 
 @Process(DELETE_TAX_PROVIDERS_PROCESS)
@@ -31,6 +36,11 @@ export class DeleteTaxProvidersProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: DeleteTaxProvidersSchema })
     context: ProcessContextType<typeof DeleteTaxProvidersSchema>

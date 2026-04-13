@@ -16,6 +16,11 @@ import {
 } from "./create-tax-provider.schema";
 import type { Database, TaxProvider } from "@danimai/tax/db";
 
+/**
+ * Handles the create tax provider process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const CREATE_TAX_PROVIDER_PROCESS = Symbol("CreateTaxProvider");
 
 @Process(CREATE_TAX_PROVIDER_PROCESS)
@@ -31,6 +36,11 @@ export class CreateTaxProviderProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: CreateTaxProviderSchema })
     context: ProcessContextType<typeof CreateTaxProviderSchema>

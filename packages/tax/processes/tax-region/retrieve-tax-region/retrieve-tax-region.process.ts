@@ -12,6 +12,11 @@ import {
 } from "./retrieve-tax-region.schema";
 import type { Database } from "@danimai/tax/db";
 
+/**
+ * Handles the retrieve tax region process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_TAX_REGION_PROCESS = Symbol("RetrieveTaxRegion");
 
 @Process(RETRIEVE_TAX_REGION_PROCESS)
@@ -25,6 +30,11 @@ export class RetrieveTaxRegionProcess
     private readonly db: Kysely<Database>
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: RetrieveTaxRegionSchema })
     context: ProcessContextType<typeof RetrieveTaxRegionSchema>

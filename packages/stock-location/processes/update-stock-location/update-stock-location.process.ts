@@ -16,6 +16,11 @@ import {
 } from "./update-stock-location.schema";
 import type { Database } from "../../db/type";
 
+/**
+ * Handles the update stock location process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_STOCK_LOCATION_PROCESS = Symbol("UpdateStockLocation");
 
 @Process(UPDATE_STOCK_LOCATION_PROCESS)
@@ -33,6 +38,11 @@ export class UpdateStockLocationProcess
     private readonly logger: Logger,
   ) {}
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: UpdateStockLocationSchema })
     context: ProcessContextType<typeof UpdateStockLocationSchema>,

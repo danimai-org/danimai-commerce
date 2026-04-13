@@ -13,6 +13,11 @@ import {
   type RetrieveInventoryItemProcessOutput,
 } from "./retrieve-inventory-item.schema";
 
+/**
+ * Handles the retrieve inventory item process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const RETRIEVE_INVENTORY_ITEM_PROCESS = Symbol("RetrieveInventoryItem");
 
 @Process(RETRIEVE_INVENTORY_ITEM_PROCESS)
@@ -23,6 +28,11 @@ export class RetrieveInventoryItemProcess
     private readonly db: Kysely<Database>
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(
     @ProcessContext({ schema: RetrieveInventoryItemSchema })
     context: ProcessContextType<typeof RetrieveInventoryItemSchema>

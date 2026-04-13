@@ -13,6 +13,11 @@ import { type UpdateProductVariantProcessInput, UpdateProductVariantSchema } fro
 import type { Database, ProductVariant, Product } from "../../../db/type";
 import { randomUUID } from "crypto";
 
+/**
+ * Handles the update product variants process.
+ * Input: validated process context input for this operation.
+ * Output: process-specific result data for downstream callers.
+ */
 export const UPDATE_PRODUCT_VARIANTS_PROCESS = Symbol("UpdateProductVariants");
 
 @Process(UPDATE_PRODUCT_VARIANTS_PROCESS)
@@ -25,6 +30,11 @@ export class UpdateProductVariantsProcess
     private readonly logger: Logger
   ) { }
 
+  /**
+   * Executes the process business logic.
+   * Input: validated process context and request payload.
+   * Output: operation result object or entity payload.
+   */
   async runOperations(@ProcessContext({
     schema: UpdateProductVariantSchema,
   }) context: ProcessContextType<typeof UpdateProductVariantSchema>) {
@@ -38,6 +48,7 @@ export class UpdateProductVariantsProcess
       if (input.prices !== undefined) {
         await this.syncVariantPrices(trx, input.id, input.prices);
       }
+      await this.syncVariantMedia(trx, input.id, input.media_ids, input.thumbnail_media_id);
       return variant;
     });
   }
@@ -144,6 +155,9 @@ export class UpdateProductVariantsProcess
     if (input.thumbnail !== undefined) {
       updateData.thumbnail = input.thumbnail ?? null;
     }
+    if (input.thumbnail_media_id === null) {
+      updateData.thumbnail = null;
+    }
 
     if (input.metadata !== undefined) {
       updateData.metadata = input.metadata;
@@ -226,6 +240,49 @@ export class UpdateProductVariantsProcess
           }))
         )
         .execute();
+    }
+  }
+
+  async syncVariantMedia(
+    trx: Kysely<Database>,
+    variantId: string,
+    mediaIds?: string[],
+    thumbnailMediaId?: string | null
+  ) {
+    const mediaDb = trx as any;
+    const ids = new Set<string>(mediaIds ?? []);
+    if (thumbnailMediaId) {
+      ids.add(thumbnailMediaId);
+    }
+
+    if (ids.size > 0) {
+      await mediaDb
+        .updateTable("media_files")
+        .set({
+          owner_type: "product_variant",
+          owner_id: variantId,
+        })
+        .where("id", "in", [...ids])
+        .where("deleted_at", "is", null)
+        .execute();
+    }
+
+    if (thumbnailMediaId) {
+      const thumbnailMedia = await mediaDb
+        .selectFrom("media_files")
+        .where("id", "=", thumbnailMediaId)
+        .where("deleted_at", "is", null)
+        .select(["url"])
+        .executeTakeFirst();
+
+      if (thumbnailMedia?.url) {
+        await mediaDb
+          .updateTable("product_variants")
+          .set({ thumbnail: thumbnailMedia.url })
+          .where("id", "=", variantId)
+          .where("deleted_at", "is", null)
+          .execute();
+      }
     }
   }
 }
