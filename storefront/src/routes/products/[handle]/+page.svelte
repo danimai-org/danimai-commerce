@@ -9,6 +9,7 @@
 		type VariantItem,
 		type AccordionItem
 	} from '$lib/components/product';
+	import type { ProductGridItem } from '../../store/+page.ts';
 
 	let { data } = $props();
 	const product = $derived(data?.product ?? null);
@@ -26,12 +27,13 @@
 		}
 	});
 
-	const selectedVariant = $derived(variants.find((v) => v.id === selectedVariantId) ?? variants[0]);
+	const selectedVariant = $derived(variants.find((v) => v.id === selectedVariantId) ?? variants[0] ?? null);
 	const galleryImages = $derived([
 		product?.thumbnail,
 		...(variants.map((v) => v.thumbnail).filter(Boolean) as string[])
 	].filter((url): url is string => !!url));
 	const mainImage = $derived(selectedImageUrl ?? product?.thumbnail ?? selectedVariant?.thumbnail ?? galleryImages[0] ?? null);
+	
 
 	const variantItems: VariantItem[] = $derived(
 		variants.map((v) => ({ id: v.id, title: v.title ?? '', priceDisplay: v.priceDisplay ?? '—' }))
@@ -97,7 +99,7 @@
 		{#if otherProducts.length > 0}
 			<section class="also-like">
 				<h2 class="also-like-title">You May Also Like</h2>
-				<ProductGridSection products={otherProducts} title="" subtitle="" />
+				<ProductGridSection products={otherProducts as unknown as ProductGridItem[]} title="" subtitle="" />
 			</section>
 		{/if}
 	</main>

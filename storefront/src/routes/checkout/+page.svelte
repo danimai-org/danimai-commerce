@@ -5,7 +5,6 @@
 	import { client } from '$lib/api/client.js';
 	import { cart } from '$lib/stores/cart';
 	import type { CartLineItem } from '$lib/stores/cart';
-
 	type CheckoutStep = 'addresses' | 'delivery' | 'payment' | 'review';
 	const CART_STORAGE_KEY = 'dm_sf_cart_id';
 	const ORDER_CACHE_KEY_PREFIX = 'dm_sf_order_';

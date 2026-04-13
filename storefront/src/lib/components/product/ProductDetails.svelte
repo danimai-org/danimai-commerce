@@ -40,6 +40,7 @@
 		cart.addItem({
 			href: productHref || `/products/${title.toLowerCase().replace(/\s+/g, '-')}`,
 			name: title,
+			variantId: selectedVariantId ?? undefined,
 			priceDisplay: priceLabel,
 			priceValue,
 			image: productImage,
@@ -53,6 +54,7 @@
 <div class="product-details">
 	<h1 class="product-title">{title}</h1>
 	<p class="product-price">{priceLabel}</p>
+	
 
 	<ProductVariantSelect variants={variants} bind:selectedVariantId />
 

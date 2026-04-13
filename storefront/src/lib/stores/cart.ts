@@ -4,6 +4,7 @@ export interface CartLineItem {
   key: string;
   href: string;
   name: string;
+  variantId?: string;
   priceDisplay: string;
   priceValue: number;
   image: string | null;
@@ -25,7 +26,8 @@ function createCartStore() {
     addItem: (
       item: Omit<CartLineItem, "key" | "quantity"> & { quantity?: number },
     ) => {
-      const key = item.href || `${item.name}-${item.variant}`;
+      const variantKey = item.variantId ?? item.variant ?? "default";
+      const key = `${item.href || item.name}-${variantKey}`;
       update((s) => {
         const existing = s.items.find((i) => i.key === key);
         const items = existing

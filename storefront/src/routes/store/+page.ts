@@ -6,13 +6,15 @@ import {
 
 export type ProductGridItem = {
   name: string;
-  price: number | null;
+  price: {
+    amount: number;
+    currency_code: string;
+  };
   href: string;
   bg: string;
   image?: string | null;
   currency_code?: string | null;
 };
-
 type ApiProduct = {
   id: string;
   title: string;
@@ -104,7 +106,7 @@ export async function load() {
     for (let i = 0; i < list.length; i++) {
       const p = list[i];
       const firstVariantId = p.variants?.[0]?.id ?? variantMap.get(p.id);
-      let price = null;
+      let price: number | null = null;
       let currency_code: string | null = null;
       if (firstVariantId && priceIndex < prices.length) {
         const pr = prices[priceIndex];
@@ -122,7 +124,10 @@ export async function load() {
       }
       products.push({
         name: p.title,
-        price: price,
+        price: {
+          amount: price ?? 0,
+          currency_code: currency_code ?? "USD",
+        },
         currency_code: currency_code,
         href: `/products/${p.handle}`,
         bg: pickBg(i),

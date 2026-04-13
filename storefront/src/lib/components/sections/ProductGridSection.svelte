@@ -52,8 +52,9 @@
 		cart.addItem({
 			href: product.href,
 			name: product.name,
-			priceDisplay: `$${parsePrice(product.price)}`,
-			priceValue: parsePrice(product.price),
+			variantId: 'default',
+			priceDisplay: `$${parsePrice(product.price.amount)}`,
+			priceValue: parsePrice(product.price.amount),
 			image: product.image ?? null,
 			variant: 'Default'
 		});
@@ -81,7 +82,7 @@
 						<div class="product-meta">
 							<h3 class="product-name">{product.name}</h3>
 							<p class="product-price">
-								{displayPrice(product.price)}
+								{displayPrice(product.price.amount)}
 							</p>
 						</div>
 					</a>
@@ -110,7 +111,7 @@
 							</div>
 							<p class="retail-mrp">
 								<span class="mrp-label">Price</span>
-								<span class="mrp-value">{displayPrice(product.price)}</span>
+								<span class="mrp-value">{displayPrice(product.price.amount)}</span>
 							</p>
 							
 						</div>

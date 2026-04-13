@@ -8,6 +8,8 @@
 		variants: VariantItem[];
 		selectedVariantId?: string | null;
 	} = $props();
+	const selectedVariant = $derived(variants.find((v) => v.id === selectedVariantId) ?? variants[0] ?? null);
+
 </script>
 
 {#if variants.length > 0}
@@ -19,10 +21,10 @@
 					<button
 						type="button"
 						class="option-btn"
-						class:selected={selectedVariantId === v.id}
+						class:selected={selectedVariant?.id === v.id}
 						onclick={() => (selectedVariantId = v.id)}
 					>
-						{v.title} — {v.priceDisplay}
+						{v.title} — {selectedVariant?.priceDisplay ?? '—'}
 					</button>
 				{/each}
 			</div>

@@ -13,7 +13,6 @@
 	import { goto } from '$app/navigation';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import type { ProductGridItem } from '../../store/+page.ts';
-	
 	type ProductRow = {
 		id: string;
 		title: string;
@@ -36,7 +35,6 @@
 	function pickBg(index: number) {
 		return FALLBACK_BGS[index % FALLBACK_BGS.length];
 	}
-
 function slugify(value: string): string {
 	return value
 		.toLowerCase()
@@ -51,7 +49,6 @@ function prettyHandle(handle: string): string {
 		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 		.join(' ');
 }
-
 	function emptyPagination(): PaginationMeta {
 		return {
 			total: 0,
@@ -162,7 +159,6 @@ function prettyHandle(handle: string): string {
 			keySuffix: () => [page.params.handle ?? '']
 		}
 	);
-
 	const { query } = paginateState;
 
 	const loading = $derived(paginateState.loading);

@@ -22,7 +22,12 @@ const DEFAULT_COLLECTION_IMAGES = [
 function imageFromMetadata(metadata: unknown): string | null {
   if (!metadata || typeof metadata !== "object") return null;
   const m = metadata as Record<string, unknown>;
-  for (const key of ["image", "cover_image", "thumbnail", "hero_image"] as const) {
+  for (const key of [
+    "image",
+    "cover_image",
+    "thumbnail",
+    "hero_image",
+  ] as const) {
     const v = m[key];
     if (typeof v === "string" && v.trim()) return v.trim();
   }
@@ -35,8 +40,13 @@ async function loadAllCollections(): Promise<HomeCollectionCard[]> {
   const limit = 100;
   let totalPages = 1;
   do {
-    const params = new URLSearchParams({ limit: String(limit), page: String(page) });
-    const res = await fetch(`${API_BASE}/collections?${params}`, { cache: "no-store" });
+    const params = new URLSearchParams({
+      limit: String(limit),
+      page: String(page),
+    });
+    const res = await fetch(`${API_BASE}/collections?${params}`, {
+      cache: "no-store",
+    });
     if (!res.ok) return out;
     const data = await res.json();
     const { rows } = rowsFromPaginated<ApiCollectionRow>(data);
@@ -49,7 +59,9 @@ async function loadAllCollections(): Promise<HomeCollectionCard[]> {
         handle,
         image:
           imageFromMetadata(row.metadata) ??
-          DEFAULT_COLLECTION_IMAGES[out.length % DEFAULT_COLLECTION_IMAGES.length],
+          DEFAULT_COLLECTION_IMAGES[
+            out.length % DEFAULT_COLLECTION_IMAGES.length
+          ],
       });
     }
     const pag = (data as { pagination?: { total_pages?: number } }).pagination;
@@ -84,7 +96,7 @@ async function fetchVariantPrice(
     if (prices.length === 0) return null;
     const p = prices[0];
     const amount = parseInt(p.amount, 10) / 100;
-    return { amount, currency_code: p.currency_code };
+    return { amount: amount ?? 0, currency_code: p.currency_code ?? "USD" };
   } catch {
     return null;
   }
@@ -104,22 +116,25 @@ export async function load() {
     const { rows: list } = data;
     for (let i = 0; i < list.length; i++) {
       const p = list[i];
-      let priceStr = "—";
+      let price = 0;
       if (p.variants?.[0]?.id) {
         const pr = await fetchVariantPrice(API_BASE, p.variants[0].id);
         if (pr) {
-          priceStr =
+          price =
             pr.currency_code === "USD"
-              ? `$${pr.amount.toFixed(2)}`
-              : `${pr.currency_code.toUpperCase()} ${pr.amount.toFixed(2)}`;
+              ? parseFloat(String(pr.amount).replace(/[^0-9.]/g, ""))
+              : pr.amount;
         }
       }
       products.push({
         name: p.title,
-        price: priceStr,
+        price: {
+          amount: price ?? 0,
+          currency_code: "USD",
+        },
         href: `/products/${p.handle}`,
         bg: pickBg(i),
-        image: p.thumbnail || null,
+        image: p.thumbnail ?? null,
       });
     }
   } catch (e) {

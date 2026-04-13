@@ -2,9 +2,11 @@
 	import { SiteHeader, SiteFooter } from '$lib/components/layout';
 	import { ProductGridSection } from '$lib/components/sections';
 
+	
 	let { data } = $props();
 	const products = $derived(data?.products ?? []);	
 	const error = $derived(data?.error ?? null);
+
 </script>
 
 <SiteHeader />
