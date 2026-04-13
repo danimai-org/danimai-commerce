@@ -12,7 +12,8 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
-
+	import type { ProductGridItem } from '../../store/+page.ts';
+	
 	type ProductRow = {
 		id: string;
 		title: string;
@@ -230,35 +231,29 @@ const productCount = $derived((pagination?.total ?? 0) > 0 ? (pagination?.total 
 		<section class="collection-hero" aria-label={heroTitle}>
 			<h1 class="collection-hero-title">{heroTitle}</h1>
 		</section>
-		<div class="catalog-layout">
-			<div class="catalog-sidebar">
-				<CatalogToolbar
-					loading={loading}
-					start={start}
-					end={end}
-					total={pagination?.total ?? 0}
-					totalPages={pagination?.total_pages ?? 0}
-					page={pagination?.page ?? 1}
-					hasNextPage={pagination?.has_next_page ?? false}
-					hasPreviousPage={pagination?.has_previous_page ?? false}
-					productCount={productCount}
-					currentSort={currentSort}
-					currentAvailability={currentAvailability}
-					currentPrice={currentPrice}
-					currentColor={currentColor}
-					sortOptions={sortOptions}
-					onSort={applySort}
-					onAvailability={applyAvailability}
-					onPrice={applyPrice}
-					onColor={applyColor}
-					onPrevious={() => goToPage((pagination?.page ?? 1) - 1)}
-					onNext={() => goToPage((pagination?.page ?? 1) + 1)}
-				/>
-			</div>
-			<div class="collection-grid">
-				<ProductGridSection products={gridProducts} title="" subtitle="" catalogMode={false} />
-			</div>
-		</div>
+		<CatalogToolbar
+			loading={loading}
+			start={start}
+			end={end}
+			total={pagination?.total ?? 0}
+			totalPages={pagination?.total_pages ?? 0}
+			page={pagination?.page ?? 1}
+			hasNextPage={pagination?.has_next_page ?? false}
+			hasPreviousPage={pagination?.has_previous_page ?? false}
+			productCount={productCount}
+			currentSort={currentSort}
+			currentAvailability={currentAvailability}
+			currentPrice={currentPrice}
+			currentColor={currentColor}
+			sortOptions={sortOptions}
+			onSort={applySort}
+			onAvailability={applyAvailability}
+			onPrice={applyPrice}
+			onColor={applyColor}
+			onPrevious={() => goToPage((pagination?.page ?? 1) - 1)}
+			onNext={() => goToPage((pagination?.page ?? 1) + 1)}
+		/>
+		<ProductGridSection products={gridProducts as unknown as ProductGridItem[] | undefined} title="" subtitle="" />
 	</main>
 {/if}
 
@@ -281,36 +276,6 @@ const productCount = $derived((pagination?.total ?? 0) > 0 ? (pagination?.total 
 		font-weight: 700;
 		color: #ffffff;
 		letter-spacing: 0.02em;
-	}
-	.collection-grid {
-		--section-padding-y: 0;
-	}
-	.catalog-layout {
-		max-width: 1200px;
-		margin: 1.25rem auto 0;
-		padding: 0 1.5rem 1.5rem;
-		display: grid;
-		grid-template-columns: 260px minmax(0, 1fr);
-		gap: 1.5rem;
-		align-items: start;
-		box-sizing: border-box;
-	}
-	.catalog-sidebar {
-		position: sticky;
-		top: 1rem;
-	}
-	.collection-grid :global(section.products-section) {
-		max-width: none;
-		padding: 0;
-	}
-	@media (max-width: 1024px) {
-		.catalog-layout {
-			grid-template-columns: 1fr;
-			gap: 1rem;
-		}
-		.catalog-sidebar {
-			position: static;
-		}
 	}
 	.collection-error {
 		max-width: 1200px;

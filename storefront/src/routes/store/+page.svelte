@@ -3,7 +3,7 @@
 	import { ProductGridSection } from '$lib/components/sections';
 
 	let { data } = $props();
-	const products = $derived(data?.products ?? []);
+	const products = $derived(data?.products ?? []);	
 	const error = $derived(data?.error ?? null);
 </script>
 

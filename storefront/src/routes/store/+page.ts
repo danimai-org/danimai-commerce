@@ -6,10 +6,11 @@ import {
 
 export type ProductGridItem = {
   name: string;
-  price: string;
+  price: number | null;
   href: string;
   bg: string;
   image?: string | null;
+  currency_code?: string | null;
 };
 
 type ApiProduct = {
@@ -17,18 +18,33 @@ type ApiProduct = {
   title: string;
   handle: string;
   thumbnail?: string | null;
-  variants?: Array<{ id: string }>;
+  variants?: Array<{ id: string }> | undefined;
+  price?: number | string | null;
+  currency_code?: string | null;
 };
 
 type ApiVariant = {
   id: string;
-  prices?: Array<{ amount: string; currency_code: string }>;
+  prices?: Array<{ amount: string; currency_code: string }> | undefined;
 };
 
 const FALLBACK_BGS = ["#e8e0d5", "#4a4a4a", "#f5f0eb", "#6b7c5c"];
 
 function pickBg(index: number): string {
   return FALLBACK_BGS[index % FALLBACK_BGS.length];
+}
+
+function normalizePrice(
+  value: number | string | null | undefined,
+): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "string") {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 }
 
 async function fetchVariantPrice(
@@ -77,26 +93,37 @@ export async function load() {
     const pricePromises = variantIds.map((id) =>
       fetchVariantPrice(API_BASE, id),
     );
-    const prices = await Promise.all(pricePromises);
+    const prices = await Promise.all(
+      pricePromises.filter(
+        (p): p is Promise<{ amount: number; currency_code: string } | null> =>
+          !!p,
+      ),
+    );
 
     let priceIndex = 0;
     for (let i = 0; i < list.length; i++) {
       const p = list[i];
       const firstVariantId = p.variants?.[0]?.id ?? variantMap.get(p.id);
-      let priceStr = "—";
+      let price = null;
+      let currency_code: string | null = null;
       if (firstVariantId && priceIndex < prices.length) {
         const pr = prices[priceIndex];
         priceIndex++;
         if (pr) {
-          priceStr =
-            pr.currency_code === "USD"
-              ? `$${pr.amount.toFixed(2)}`
-              : `${pr.currency_code.toUpperCase()} ${pr.amount.toFixed(2)}`;
+          price = pr.amount;
+          currency_code = pr.currency_code;
         }
+      }
+      if (price == null) {
+        price = normalizePrice(p.price);
+      }
+      if (currency_code == null) {
+        currency_code = p.currency_code ?? null;
       }
       products.push({
         name: p.title,
-        price: priceStr,
+        price: price,
+        currency_code: currency_code,
         href: `/products/${p.handle}`,
         bg: pickBg(i),
         image: p.thumbnail || null,

@@ -9,7 +9,7 @@
 		createPaginationQuery,
 		type PaginationMeta
 	} from '$lib/api/pagination.svelte';
-	
+	import type { ProductGridItem } from '../../store/+page.ts';
 	import { client } from '$lib/api/client.js';
 	import {
 		type CategoryNavRow,
@@ -252,7 +252,7 @@
 			onPrevious={() => goToPage((pagination?.page ?? 1) - 1)}
 			onNext={() => goToPage((pagination?.page ?? 1) + 1)}
 		/>
-		<ProductGridSection products={products} title="" subtitle="" />
+		<ProductGridSection products={products as unknown as ProductGridItem[] | undefined} title="" subtitle="" />
 	</main>
 {/if}
 

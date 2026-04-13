@@ -14,39 +14,46 @@
 		catalogMode?: boolean;
 	} = $props();
 
-	function parsePrice(priceInput: string | number | null | undefined): number {
-		if (typeof priceInput === 'number') {
-			return Number.isFinite(priceInput) ? priceInput : 0;
+	function parsePrice(price: string | number | null | undefined): number {
+		if (typeof price === 'number') {
+			return Number.isFinite(price) ? price : 0;
 		}
-		if (typeof priceInput !== 'string') {
-			return 0;
+		if (typeof price === 'string') {
+			const trimmed = price.trim();
+			if (!trimmed || trimmed === '—') {
+				return 0;
+			}
+			const n = parseFloat(trimmed.replace(/[^0-9.]/g, ''));
+			return Number.isFinite(n) ? n : 0;
 		}
-		const n = parseFloat(priceInput.replace(/[^0-9.]/g, ''));
-		return Number.isFinite(n) ? n : 0;
+		return 0;
 	}
 
-	function cartPriceDisplay(product: ProductGridItem): string {
-		const raw = product.price;
-		if (typeof raw === 'string' && raw.trim() && raw !== '—') {
-			return raw;
+	function displayPrice(price: string | number | null | undefined): string {
+		if (typeof price === 'number') {
+			return Number.isFinite(price) ? `$${price.toFixed(2)}` : '—';
 		}
-		const n = parsePrice(raw);
-		return n > 0 ? `$${n.toFixed(2)}` : '—';
-	}
-	function cartPriceValue(product: ProductGridItem): number {
-		const raw = product.price;
-		if (typeof raw === 'string' && raw.trim() && raw !== '—') {
-			return parsePrice(raw);
+		if (typeof price === 'string') {
+			const trimmed = price.trim();
+			if (!trimmed || trimmed === '—') {
+				return '—';
+			}
+			if (/^[$A-Za-z]/.test(trimmed)) {
+				return trimmed;
+			}
+			const parsed = parsePrice(trimmed);
+			return parsed > 0 ? `$${parsed.toFixed(2)}` : '—';
 		}
-		return parsePrice(raw);
+		return '—';
 	}
+
 	function quickAdd(e: MouseEvent, product: ProductGridItem) {
 		e.preventDefault();
 		cart.addItem({
 			href: product.href,
 			name: product.name,
-			priceDisplay: cartPriceDisplay(product),
-			priceValue: cartPriceValue(product),
+			priceDisplay: `$${parsePrice(product.price)}`,
+			priceValue: parsePrice(product.price),
 			image: product.image ?? null,
 			variant: 'Default'
 		});
@@ -74,9 +81,7 @@
 						<div class="product-meta">
 							<h3 class="product-name">{product.name}</h3>
 							<p class="product-price">
-								{typeof product.price === 'string' && product.price.trim()
-									? product.price
-									: `$${parsePrice(product.price).toFixed(2)}`}
+								{displayPrice(product.price)}
 							</p>
 						</div>
 					</a>
@@ -104,8 +109,8 @@
 								</a>
 							</div>
 							<p class="retail-mrp">
-								<span class="mrp-label">MRP</span>
-								<span class="mrp-value">{cartPriceValue(product).toFixed(2)}</span>
+								<span class="mrp-label">Price</span>
+								<span class="mrp-value">{displayPrice(product.price)}</span>
 							</p>
 							
 						</div>
