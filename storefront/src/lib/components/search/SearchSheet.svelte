@@ -1,14 +1,21 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { API_BASE, firstVariantIdByProductIds, rowsFromPaginated } from '../../api/storefront-api';
+	import { client } from '$lib/api/client.js';
 	import { search } from '$lib/stores/search';
-	import type { ProductGridItem } from '../../../routes/store/+page.ts';
+	type SearchResult = {
+		name: string;
+		price: string;
+		href: string;
+		bg: string;
+		image?: string | null;
+	};
 
 	let { persistent = false }: { persistent?: boolean } = $props();
 
 	let searchState = $state({ open: false });
 	let query = $state('');
-	let results = $state<ProductGridItem[]>([]);
+	let results = $state<SearchResult[]>([]);
 	let loading = $state(false);
 	let inputEl = $state<HTMLInputElement | undefined>(undefined);
 	let prevStoreOpen = false;
@@ -63,17 +70,18 @@
 	async function fetchResults(q: string) {
 		loading = true;
 		try {
-			const params = new URLSearchParams({
-				search: q,
-				limit: '20',
-				page: '1'
+			const res = await client.products.get({
+				query: {
+					search: q,
+					limit: '20',
+					page: '1'
+				}
 			});
-			const res = await fetch(`${API_BASE}/products?${params}`, { cache: 'no-store' });
-			if (!res.ok) {
+			if (res.error) {
 				results = [];
 				return;
 			}
-			const raw = await res.json();
+			const raw = res.data as unknown;
 			const { rows: list } = rowsFromPaginated<{
 				id: string;
 				title: string;
@@ -91,11 +99,15 @@
 			type PriceObj = { amount: string; currency_code: string } | null;
 			const prices: PriceObj[] = await Promise.all(
 				variantIds.map((id) =>
-					fetch(`${API_BASE}/product-variants/${id}`, { cache: 'no-store' })
-						.then((r) => r.json())
-						.then(
-							(d: { prices?: Array<{ amount: string; currency_code: string }> }) =>
-								d.prices?.[0] ?? null
+					client['product-variants']({ id }).get()
+						.then((r) => (r.error ? null : r.data))
+						.then((variant) =>
+							(
+								variant as
+									| { prices?: Array<{ amount: string; currency_code: string }> }
+									| null
+									| undefined
+							)?.prices?.[0] ?? null
 						)
 						.catch(() => null)
 				)

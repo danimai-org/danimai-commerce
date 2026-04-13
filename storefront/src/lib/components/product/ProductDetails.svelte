@@ -6,29 +6,30 @@
 	import type { VariantItem } from './ProductVariantSelect.svelte';
 	import type { AccordionItem } from './ProductAccordions.svelte';
 
+	type ProductDetailsProps = {
+		title: string;
+		priceLabel: string;
+		tagline?: string;
+		variants: VariantItem[];
+		selectedVariantId?: string | null;
+		quantity: number;
+		accordionItems: AccordionItem[];
+		productHref?: string;
+		productImage: string | null;
+		selectedVariantTitle: string;
+	}
 	let {
 		title = '',
 		priceLabel = '—',
 		tagline = '',
-		variants = [] as VariantItem[],
+		variants = [],
 		selectedVariantId = $bindable(null as string | null),
 		quantity = $bindable(1),
-		accordionItems = [] as AccordionItem[],
+		accordionItems = [],
 		productHref = '',
 		productImage = null as string | null,
 		selectedVariantTitle = ''
-	}: {
-		title?: string;
-		priceLabel?: string;
-		tagline?: string;
-		variants?: VariantItem[];
-		selectedVariantId?: string | null;
-		quantity?: number;
-		accordionItems?: AccordionItem[];
-		productHref?: string;
-		productImage?: string | null;
-		selectedVariantTitle?: string;
-	} = $props();
+	}: ProductDetailsProps = $props();	
 
 	function parsePrice(str: string): number {
 		const n = parseFloat(str.replace(/[^0-9.]/g, ''));

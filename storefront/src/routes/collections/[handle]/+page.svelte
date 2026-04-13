@@ -60,13 +60,12 @@ function prettyHandle(handle: string): string {
 		};
 	}
 	async function fetchVariantPrice(
-		apiBase: string,
 		variantId: string
 	): Promise<{ amount: number; currency_code: string } | null> {
 		try {
-			const res = await fetch(`${apiBase}/product-variants/${variantId}`, { cache: 'no-store' });
-			if (!res.ok) return null;
-			const data = (await res.json()) as ApiVariant;
+			const res = await client['product-variants']({ id: variantId }).get();
+			if (res.error) return null;
+			const data = res.data as ApiVariant;
 			const first = data.prices?.[0];
 			if (!first) return null;
 			const amount = parseInt(first.amount, 10) / 100;
@@ -124,7 +123,7 @@ function prettyHandle(handle: string): string {
 			const variantIds = productRows
 				.map((p) => p.variants?.[0]?.id ?? variantMap.get(p.id))
 				.filter((id): id is string => !!id);
-			const prices = await Promise.all(variantIds.map((id) => fetchVariantPrice(API_BASE, id)));
+			const prices = await Promise.all(variantIds.map((id) => fetchVariantPrice(id)));
 			let priceIndex = 0;
 			const gridRows: GridProduct[] = productRows.map((p, i) => {
 				const firstVariantId = p.variants?.[0]?.id ?? variantMap.get(p.id);

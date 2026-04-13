@@ -1,5 +1,6 @@
 import type { ProductGridItem } from "./store/+page.ts";
-import { API_BASE, rowsFromPaginated } from "../lib/api/storefront-api";
+import { rowsFromPaginated } from "../lib/api/storefront-api";
+import { client } from "$lib/api/client.js";
 
 export type HomeCollectionCard = {
   title: string;
@@ -38,17 +39,12 @@ async function loadAllCollections(): Promise<HomeCollectionCard[]> {
   const out: HomeCollectionCard[] = [];
   let page = 1;
   const limit = 100;
-  let totalPages = 1;
-  do {
-    const params = new URLSearchParams({
-      limit: String(limit),
-      page: String(page),
+  for (;;) {
+    const res = await client.collections.get({
+      query: { limit: String(limit), page: String(page) },
     });
-    const res = await fetch(`${API_BASE}/collections?${params}`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return out;
-    const data = await res.json();
+    if (res.error) return out;
+    const data = res.data as unknown;
     const { rows } = rowsFromPaginated<ApiCollectionRow>(data);
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -64,10 +60,11 @@ async function loadAllCollections(): Promise<HomeCollectionCard[]> {
           ],
       });
     }
-    const pag = (data as { pagination?: { total_pages?: number } }).pagination;
-    totalPages = pag?.total_pages ?? 1;
-    page++;
-  } while (page <= totalPages);
+    const pag = (data as { pagination?: { has_next_page?: boolean } }).pagination;
+    if (!pag?.has_next_page) break;
+    page += 1;
+    if (page > 500) break;
+  }
   return out;
 }
 
@@ -83,15 +80,12 @@ function pickBg(index: number): string {
 }
 
 async function fetchVariantPrice(
-  apiBase: string,
   variantId: string,
 ): Promise<{ amount: number; currency_code: string } | null> {
   try {
-    const res = await fetch(`${apiBase}/product-variants/${variantId}`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as ApiVariant;
+    const res = await client["product-variants"]({ id: variantId }).get();
+    if (res.error) return null;
+    const data = res.data as ApiVariant;
     const prices = data.prices ?? [];
     if (prices.length === 0) return null;
     const p = prices[0];
@@ -108,17 +102,22 @@ export async function load() {
   let error: string | null = null;
 
   try {
-    const params = new URLSearchParams({ limit: "8", page: "1" });
-    const res = await fetch(`${API_BASE}/products?${params}`, {
-      cache: "no-store",
+    const res = await client.products.get({
+      query: { limit: "8", page: "1" },
     });
-    const data = await res.json();
-    const { rows: list } = data;
+    if (res.error) throw new Error("Failed to load products");
+    const data = res.data as unknown;
+    const { rows: list } = rowsFromPaginated<{
+      title: string;
+      handle: string;
+      thumbnail?: string | null;
+      variants?: Array<{ id: string }>;
+    }>(data);
     for (let i = 0; i < list.length; i++) {
       const p = list[i];
       let price = 0;
       if (p.variants?.[0]?.id) {
-        const pr = await fetchVariantPrice(API_BASE, p.variants[0].id);
+        const pr = await fetchVariantPrice(p.variants[0].id);
         if (pr) {
           price =
             pr.currency_code === "USD"

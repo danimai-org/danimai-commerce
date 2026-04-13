@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { cart } from '$lib/stores/cart';
-	import type { ProductGridItem } from '../../../routes/store/+page.ts';
+		import type { ProductGridItem } from '../../../routes/store/+page.svelte';
+
 
 	let {
 		products = [] as ProductGridItem[] | undefined,
