@@ -60,7 +60,8 @@ async function loadAllCollections(): Promise<HomeCollectionCard[]> {
           ],
       });
     }
-    const pag = (data as { pagination?: { has_next_page?: boolean } }).pagination;
+    const pag = (data as { pagination?: { has_next_page?: boolean } })
+      .pagination;
     if (!pag?.has_next_page) break;
     page += 1;
     if (page > 500) break;
@@ -100,8 +101,7 @@ export async function load() {
     for (let i = 0; i < list.length; i++) {
       const p = list[i];
       const pr = p.variant?.price;
-      const amount =
-        pr?.amount != null ? parseInt(pr.amount, 10) / 100 : 0;
+      const amount = pr?.amount != null ? parseInt(pr.amount, 10) / 100 : 0;
       const currency_code = pr?.currency_code ?? "USD";
       products.push({
         name: p.title,
