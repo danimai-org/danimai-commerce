@@ -9,13 +9,13 @@
 		type VariantItem,
 		type AccordionItem
 	} from '$lib/components/product';
-	import type { ProductGridItem } from '../../store/+page.ts';
 
 	let { data } = $props();
 	const product = $derived(data?.product ?? null);
 	const variants = $derived(data?.variants ?? []);
 	const otherProducts = $derived(data?.otherProducts ?? []);
 	const error = $derived(data?.error ?? null);
+	const canShowProduct = $derived(Boolean(product) && variants.length > 0);
 
 	let selectedVariantId = $state<string | null>(null);
 	let quantity = $state(1);
@@ -27,13 +27,22 @@
 		}
 	});
 
-	const selectedVariant = $derived(variants.find((v) => v.id === selectedVariantId) ?? variants[0] ?? null);
+	const selectedVariant = $derived(
+		variants.length > 0
+			? (variants.find((v) => v.id === selectedVariantId) ?? variants[0])
+			: undefined
+	);
 	const galleryImages = $derived([
 		product?.thumbnail,
 		...(variants.map((v) => v.thumbnail).filter(Boolean) as string[])
 	].filter((url): url is string => !!url));
-	const mainImage = $derived(selectedImageUrl ?? product?.thumbnail ?? selectedVariant?.thumbnail ?? galleryImages[0] ?? null);
-	
+	const mainImage = $derived(
+		selectedImageUrl ??
+			product?.thumbnail ??
+			selectedVariant?.thumbnail ??
+			galleryImages[0] ??
+			null
+	);
 
 	const variantItems: VariantItem[] = $derived(
 		variants.map((v) => ({ id: v.id, title: v.title ?? '', priceDisplay: v.priceDisplay ?? '—' }))
@@ -69,7 +78,7 @@
 
 <SiteHeader />
 
-{#if error || !product}
+{#if error || !product || !canShowProduct}
 	<ProductError message={error ?? 'Product not found'} />
 {:else}
 	<main class="product-page">
@@ -99,7 +108,7 @@
 		{#if otherProducts.length > 0}
 			<section class="also-like">
 				<h2 class="also-like-title">You May Also Like</h2>
-				<ProductGridSection products={otherProducts as unknown as ProductGridItem[]} title="" subtitle="" />
+				<ProductGridSection products={otherProducts} title="" subtitle="" />
 			</section>
 		{/if}
 	</main>

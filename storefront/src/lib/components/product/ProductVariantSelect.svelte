@@ -24,7 +24,7 @@
 						class:selected={selectedVariant?.id === v.id}
 						onclick={() => (selectedVariantId = v.id)}
 					>
-						{v.title} — {selectedVariant?.priceDisplay ?? '—'}
+						{v.title} — {v.priceDisplay}
 					</button>
 				{/each}
 			</div>

@@ -1,5 +1,5 @@
 import type { ProductGridItem } from "./store/+page.ts";
-import { rowsFromPaginated } from "../lib/api/storefront-api";
+import { API_BASE, rowsFromPaginated } from "../lib/api/storefront-api";
 import { client } from "$lib/api/client.js";
 
 export type HomeCollectionCard = {
@@ -68,33 +68,20 @@ async function loadAllCollections(): Promise<HomeCollectionCard[]> {
   return out;
 }
 
-type ApiVariant = {
-  id: string;
-  prices?: Array<{ amount: string; currency_code: string }>;
-};
-
 const FALLBACK_BGS = ["#e8e0d5", "#4a4a4a", "#f5f0eb", "#6b7c5c"];
 
 function pickBg(index: number): string {
   return FALLBACK_BGS[index % FALLBACK_BGS.length];
 }
 
-async function fetchVariantPrice(
-  variantId: string,
-): Promise<{ amount: number; currency_code: string } | null> {
-  try {
-    const res = await client["product-variants"]({ id: variantId }).get();
-    if (res.error) return null;
-    const data = res.data as ApiVariant;
-    const prices = data.prices ?? [];
-    if (prices.length === 0) return null;
-    const p = prices[0];
-    const amount = parseInt(p.amount, 10) / 100;
-    return { amount: amount ?? 0, currency_code: p.currency_code ?? "USD" };
-  } catch {
-    return null;
-  }
-}
+type StorefrontProductRow = {
+  title: string;
+  handle: string;
+  variant: {
+    thumbnail: string | null;
+    price: { amount: string; currency_code: string } | null;
+  } | null;
+};
 
 export async function load() {
   const products: ProductGridItem[] = [];
@@ -102,38 +89,26 @@ export async function load() {
   let error: string | null = null;
 
   try {
-    const res = await client.products.get({
-      query: { limit: "8", page: "1" },
-    });
-    if (res.error) throw new Error("Failed to load products");
-    const data = res.data as unknown;
-    const { rows: list } = rowsFromPaginated<{
-      title: string;
-      handle: string;
-      thumbnail?: string | null;
-      variants?: Array<{ id: string }>;
-    }>(data);
+    const root = API_BASE.replace(/\/admin\/?$/, "");
+    const sfRes = await fetch(
+      `${root}/storefront/products?${new URLSearchParams({ limit: "8", page: "1" })}`,
+      { cache: "no-store" },
+    );
+    if (!sfRes.ok) throw new Error("Failed to load products");
+    const sfData = (await sfRes.json()) as unknown;
+    const { rows: list } = rowsFromPaginated<StorefrontProductRow>(sfData);
     for (let i = 0; i < list.length; i++) {
       const p = list[i];
-      let price = 0;
-      if (p.variants?.[0]?.id) {
-        const pr = await fetchVariantPrice(p.variants[0].id);
-        if (pr) {
-          price =
-            pr.currency_code === "USD"
-              ? parseFloat(String(pr.amount).replace(/[^0-9.]/g, ""))
-              : pr.amount;
-        }
-      }
+      const pr = p.variant?.price;
+      const amount =
+        pr?.amount != null ? parseInt(pr.amount, 10) / 100 : 0;
+      const currency_code = pr?.currency_code ?? "USD";
       products.push({
         name: p.title,
-        price: {
-          amount: price ?? 0,
-          currency_code: "USD",
-        },
+        price: { amount, currency_code },
         href: `/products/${p.handle}`,
         bg: pickBg(i),
-        image: p.thumbnail ?? null,
+        image: p.variant?.thumbnail ?? null,
       });
     }
   } catch (e) {

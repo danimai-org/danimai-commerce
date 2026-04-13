@@ -2,7 +2,7 @@
 	import { SiteHeader, SiteFooter } from '$lib/components/layout';
 	import { ProductGridSection } from '$lib/components/sections';
 	import CatalogToolbar from '$lib/components/sections/CatalogToolbar.svelte';
-	import { API_BASE, firstVariantIdByProductIds } from '$lib/api/storefront-api';
+	import { API_BASE, rowsFromPaginated } from '$lib/api/storefront-api';
 	import {
 		createPagination,
 		createPaginationQuery,
@@ -13,23 +13,14 @@
 	import { goto } from '$app/navigation';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import type { ProductGridItem } from '../../store/+page.ts';
-	type ProductRow = {
-		id: string;
+	type CollectionRow = { id: string; title: string; handle?: string; slug?: string };
+	type StorefrontProductRow = {
 		title: string;
 		handle: string;
-		thumbnail?: string | null;
-		variants?: Array<{ id?: string }>;
-	};
-	type CollectionRow = { id: string; title: string; handle?: string; slug?: string };
-	type GridProduct = {
-		name: string;
-		price: string;
-		href: string;
-		bg: string;
-		image?: string | null;
-	};
-	type ApiVariant = {
-		prices?: Array<{ amount: string; currency_code: string }>;
+		variant: {
+			thumbnail: string | null;
+			price: { amount: string; currency_code: string } | null;
+		} | null;
 	};
 	const FALLBACK_BGS = ['#e8e0d5', '#4a4a4a', '#f5f0eb', '#6b7c5c'];
 	function pickBg(index: number) {
@@ -59,21 +50,6 @@ function prettyHandle(handle: string): string {
 			has_previous_page: false
 		};
 	}
-	async function fetchVariantPrice(
-		variantId: string
-	): Promise<{ amount: number; currency_code: string } | null> {
-		try {
-			const res = await client['product-variants']({ id: variantId }).get();
-			if (res.error) return null;
-			const data = res.data as ApiVariant;
-			const first = data.prices?.[0];
-			if (!first) return null;
-			const amount = parseInt(first.amount, 10) / 100;
-			return { amount, currency_code: first.currency_code };
-		} catch {
-			return null;
-		}
-	}
 	const paginateState = createPagination(
 		async () => {
 			const requestedHandle = (page.params.handle ?? '').trim().toLowerCase();
@@ -102,53 +78,48 @@ function prettyHandle(handle: string): string {
 					collectionTitle: prettyHandle(requestedHandle)
 				};
 			}
-			const productsRes = await client.products.get({
-				query: {
-					...createPaginationQuery(new SvelteURLSearchParams(page.url.search)),
-					filters: {
-						collection_ids: [collection.id]
-					}
-				}
+			const root = API_BASE.replace(/\/admin\/?$/, '');
+			const pq = createPaginationQuery(new SvelteURLSearchParams(page.url.search));
+			const pageStr =
+				pq.page != null && String(pq.page) !== '' ? String(pq.page) : '1';
+			const limitStr =
+				pq.limit != null && String(pq.limit) !== '' ? String(pq.limit) : '10';
+			const sp = new URLSearchParams({
+				page: pageStr,
+				limit: limitStr,
+				sorting_field: 'products.title',
+				sorting_direction: 'asc'
 			});
-			if (productsRes.error) {
-				const err = productsRes.error as { value?: { message?: string } };
-				throw new Error(err?.value?.message ?? String(productsRes.error));
+			sp.set('filters[collection_ids]', collection.id);
+			const productsRes = await fetch(`${root}/storefront/products?${sp}`, {
+				cache: 'no-store'
+			});
+			if (!productsRes.ok) {
+				throw new Error('Failed to load collection products');
 			}
-			const payload = productsRes.data as { rows?: ProductRow[]; pagination?: PaginationMeta } | undefined;
-			const productRows = payload?.rows ?? [];
-			const variantMap = await firstVariantIdByProductIds(
-				API_BASE,
-				productRows.map((p) => p.id)
-			);
-			const variantIds = productRows
-				.map((p) => p.variants?.[0]?.id ?? variantMap.get(p.id))
-				.filter((id): id is string => !!id);
-			const prices = await Promise.all(variantIds.map((id) => fetchVariantPrice(id)));
-			let priceIndex = 0;
-			const gridRows: GridProduct[] = productRows.map((p, i) => {
-				const firstVariantId = p.variants?.[0]?.id ?? variantMap.get(p.id);
-				let price = '—';
-				if (firstVariantId && priceIndex < prices.length) {
-					const pr = prices[priceIndex];
-					priceIndex++;
-					if (pr) {
-						price =
-							pr.currency_code === 'USD'
-								? `$${pr.amount.toFixed(2)}`
-								: `${pr.currency_code.toUpperCase()} ${pr.amount.toFixed(2)}`;
-					}
-				}
+			const raw = (await productsRes.json()) as unknown;
+			const { rows: productRows } = rowsFromPaginated<StorefrontProductRow>(raw);
+			const pagination =
+				(raw as { pagination?: PaginationMeta }).pagination ?? emptyPagination();
+			const gridRows: ProductGridItem[] = productRows.map((p, i) => {
+				const pr = p.variant?.price;
+				const amount =
+					pr?.amount != null ? parseInt(pr.amount, 10) / 100 : Number.NaN;
+				const currency_code = pr?.currency_code ?? 'USD';
 				return {
 					name: p.title,
-					price,
+					price: {
+						amount: Number.isFinite(amount) ? amount : Number.NaN,
+						currency_code
+					},
 					href: `/products/${p.handle}`,
 					bg: pickBg(i),
-					image: p.thumbnail ?? null
+					image: p.variant?.thumbnail ?? null
 				};
 			});
 			return {
 				rows: gridRows,
-				pagination: payload?.pagination ?? emptyPagination(),
+				pagination,
 				collectionTitle: collection.title
 			};
 		},
@@ -162,7 +133,7 @@ function prettyHandle(handle: string): string {
 
 	const loading = $derived(paginateState.loading);
 	const fetchError = $derived(paginateState.error);
-	const rows = $derived((query.data?.rows ?? []) as GridProduct[]);
+	const rows = $derived((query.data?.rows ?? []) as ProductGridItem[]);
 	const pagination = $derived(paginateState.pagination);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
@@ -248,7 +219,7 @@ const productCount = $derived((pagination?.total ?? 0) > 0 ? (pagination?.total 
 			onPrevious={() => goToPage((pagination?.page ?? 1) - 1)}
 			onNext={() => goToPage((pagination?.page ?? 1) + 1)}
 		/>
-		<ProductGridSection products={gridProducts as unknown as ProductGridItem[] | undefined} title="" subtitle="" />
+		<ProductGridSection products={gridProducts} title="" subtitle="" />
 	</main>
 {/if}
 

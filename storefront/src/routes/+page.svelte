@@ -35,7 +35,7 @@
 		{#if error}
 			<p class="products-error">{error}</p>
 		{/if}
-		<ProductGridSection {products} />
+		<ProductGridSection {products}  />
 
 		<StorySection />
 

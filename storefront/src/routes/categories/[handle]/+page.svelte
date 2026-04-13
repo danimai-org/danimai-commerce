@@ -10,6 +10,7 @@
 		type PaginationMeta
 	} from '$lib/api/pagination.svelte';
 	import type { ProductGridItem } from '../../store/+page.ts';
+	import { API_BASE, rowsFromPaginated } from '$lib/api/storefront-api';
 	import { client } from '$lib/api/client.js';
 	import {
 		type CategoryNavRow,
@@ -17,18 +18,17 @@
 		isChildCategory
 	} from '$lib/category-nav';
 
-	type ProductRow = { id: string; title: string; handle: string };
-
-	type GridProduct = {
-		name: string;
-		price: string;
-		href: string;
-		bg: string;
-		image?: string | null;
+	type StorefrontProductRow = {
+		title: string;
+		handle: string;
+		variant: {
+			thumbnail: string | null;
+			price: { amount: string; currency_code: string } | null;
+		} | null;
 	};
 
 	type CategoryPageData = {
-		rows: GridProduct[];
+		rows: ProductGridItem[];
 		pagination: PaginationMeta;
 		categoryTitle: string;
 		categoryNotFound: boolean;
@@ -155,33 +155,47 @@
 				};
 			}
 
-			const sort = { sorting_field: 'products.title', sorting_direction: 'desc' };
-
-			const pq = productsListQuery(page.url);
-			const pres = await client.products.get({
-				query: {
-					...pq,
-					sorting_field: sort.sorting_field,
-					
-					filters: { category_ids: categoryIds }
-				}
+			const root = API_BASE.replace(/\/admin\/?$/, '');
+			const pq = productsListQuery(page.url) as Record<string, string>;
+			const pageStr = pq.page != null && String(pq.page) !== '' ? String(pq.page) : '1';
+			const limitStr =
+				pq.limit != null && String(pq.limit) !== '' ? String(pq.limit) : '24';
+			const sp = new URLSearchParams({
+				page: pageStr,
+				limit: limitStr,
+				sorting_field: 'products.title',
+				sorting_direction: 'desc'
 			});
-			if (pres.error) {
-				const err = pres.error as { value?: { message?: string } };
-				throw new Error(err?.value?.message ?? String(pres.error));
+			sp.set('filters[category_ids]', categoryIds.join(','));
+			const pres = await fetch(`${root}/storefront/products?${sp}`, {
+				cache: 'no-store'
+			});
+			if (!pres.ok) {
+				throw new Error('Failed to load category products');
 			}
-			const pdata = pres.data as { rows?: ProductRow[]; pagination?: PaginationMeta } | undefined;
-			const productRows = pdata?.rows ?? [];
-			const grid: GridProduct[] = productRows.map((p, i) => ({
-				name: p.title,
-				price: '—',
-				href: `/products/${p.handle}`,
-				bg: pickBg(i),
-				image: null
-			}));
+			const raw = (await pres.json()) as unknown;
+			const { rows: productRows } = rowsFromPaginated<StorefrontProductRow>(raw);
+			const pagination =
+				(raw as { pagination?: PaginationMeta }).pagination ?? emptyPagination();
+			const grid: ProductGridItem[] = productRows.map((p, i) => {
+				const pr = p.variant?.price;
+				const amount =
+					pr?.amount != null ? parseInt(pr.amount, 10) / 100 : Number.NaN;
+				const currency_code = pr?.currency_code ?? 'USD';
+				return {
+					name: p.title,
+					price: {
+						amount: Number.isFinite(amount) ? amount : Number.NaN,
+						currency_code
+					},
+					href: `/products/${p.handle}`,
+					bg: pickBg(i),
+					image: p.variant?.thumbnail ?? null
+				};
+			});
 			return {
 				rows: grid,
-				pagination: pdata?.pagination ?? emptyPagination(),
+				pagination,
 				categoryTitle: resolvedTitle,
 				categoryNotFound: false
 			};
@@ -198,7 +212,7 @@
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
 
-	const products = $derived((query.data?.rows ?? []) as GridProduct[]);
+	const products = $derived((query.data?.rows ?? []) as ProductGridItem[]);
 	const productCount = $derived((pagination?.total ?? 0) > 0 ? (pagination?.total ?? 0) : products.length);
 	const categoryNotFound = $derived(query.data?.categoryNotFound === true);
 	const categoryTitle = $derived(
@@ -252,7 +266,7 @@
 			onPrevious={() => goToPage((pagination?.page ?? 1) - 1)}
 			onNext={() => goToPage((pagination?.page ?? 1) + 1)}
 		/>
-		<ProductGridSection products={products as unknown as ProductGridItem[] | undefined} title="" subtitle="" />
+		<ProductGridSection products={products} title="" subtitle="" />
 	</main>
 {/if}
 

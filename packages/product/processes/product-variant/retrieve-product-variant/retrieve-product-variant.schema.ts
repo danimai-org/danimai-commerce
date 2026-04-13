@@ -24,6 +24,14 @@ export const ProductVariantResponseSchema = Type.Object({
   created_at: Type.Date(),
   updated_at: Type.Date(),
   deleted_at: Type.Union([Type.Date(), Type.Null()]),
+  prices: Type.Optional(
+    Type.Array(
+      Type.Object({
+        amount: Type.String(),
+        currency_code: Type.String(),
+      }),
+    ),
+  ),
 });
 
 export const RetrieveProductVariantResponseSchema = Type.Union([
