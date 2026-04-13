@@ -5,6 +5,7 @@ import { swagger } from "@elysiajs/swagger";
 import { initialize } from "@danimai/core";
 import { getLogger } from "./logger";
 import { routes as adminRoutes } from "./routes/admin";
+import { storefrontRoutes } from "./routes/storefront";
 
 const logger = getLogger();
 
@@ -110,6 +111,7 @@ const app = new Elysia()
     }),
   )
   .use(adminRoutes)
+  .use(storefrontRoutes)
   .listen(8000, () => {
     logger.info("Server started on http://localhost:8000");
     logger.info(
