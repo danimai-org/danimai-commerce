@@ -37,6 +37,7 @@
 		allow_backorder: boolean;
 		variant_rank: number;
 		priceAmount: string;
+		
 	};
 
 	function cartesian<T>(arrays: T[][]): T[][] {
@@ -321,6 +322,8 @@
 		createAttributeEntries = [];
 		createMediaUrl = '';
 		createMediaFile = null;
+		createMediaImageUrl = '';
+		createMediaChosenFile = null;
 		createError = null;
 		submitPending = false;
 		variantSearch = '';
@@ -621,7 +624,8 @@
 				.map((entry) => ({
 					attribute_id: entry.attributeId,
 					value: entry.value.trim()
-				}))
+				})),
+			thumbnail: createMediaUrl.trim() || undefined
 		});
 		submitPending = true;
 		createFormElement?.requestSubmit();
@@ -813,6 +817,7 @@
 			<input type="hidden" name="variants" value={createVariantsJson} />
 			<input type="hidden" name="attribute_group_id" value={createAttributeGroupId} />
 			<input type="hidden" name="attributes" value={createAttributesJson} />
+			<input type="hidden" name="thumbnail" value={createMediaUrl} />
 
 			<div class="flex shrink-0 flex-wrap justify-end gap-2 border-t p-4">
 				<Button type="button" variant="outline" onclick={closeCreate}>Cancel</Button>

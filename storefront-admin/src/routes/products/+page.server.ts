@@ -10,6 +10,7 @@ const ProductCreateSchema = z.object({
 	subtitle: z.string().max(255, 'Subtitle is too long').optional(),
 	handle: z.string().max(255, 'Handle is too long').optional(),
 	description: z.string().max(4000, 'Description is too long').optional(),
+	thumbnail: z.string().max(25_000_000, 'Thumbnail data is too large').optional(),
 	status: z.enum(['draft', 'published']),
 	discountable: z.coerce.boolean().default(true),
 	collection_ids: z.preprocess(
@@ -117,6 +118,7 @@ export const actions = {
 			const data = productCreateForm.data;
 			const cleanHandle = data.handle?.trim() ? data.handle.trim() : undefined;
 			const cleanDescription = data.description?.trim() ? data.description.trim() : undefined;
+			const cleanThumbnail = data.thumbnail?.trim() ? data.thumbnail.trim() : undefined;
 			const cleanCategoryId = data.category_id?.trim() ? data.category_id : undefined;
 			const cleanCollectionIds =
 				data.collection_ids.length > 0
@@ -175,6 +177,7 @@ export const actions = {
 				title: data.title.trim(),
 				handle: cleanHandle,
 				description: cleanDescription,
+				thumbnail: cleanThumbnail,
 				status: data.status,
 				is_giftcard: false,
 				discountable: data.discountable,

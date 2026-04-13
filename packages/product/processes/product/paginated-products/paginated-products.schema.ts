@@ -27,6 +27,7 @@ const PaginatedProductItemSchema = Type.Object({
   title: Type.String(),
   handle: Type.String(),
   status: Type.Enum(ProductStatusEnum),
+  thumbnail: Type.Union([Type.String(), Type.Null()]),
   variant_count: Type.Number(),
   category: Type.Union([
     Type.Object({
