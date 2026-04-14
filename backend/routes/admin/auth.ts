@@ -31,40 +31,31 @@ import {
 import { loginRateLimitMacro } from "../../macros/login-rate-limit";
 
 const CreateSessionRouteBodySchema = Type.Object({
-  expired_session_id: Type.Optional(
-    Type.String({
-      format: "uuid",
-      description:
-        "Optional id of a session that is already expired; new row gets parent_id set for continuity",
-    })
-  ),
   ip_address: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   user_agent: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 });
 
-const loginRoute = new Elysia()
-  .use(loginRateLimitMacro)
-  .post(
-    "/login",
-    async ({ body }: { body: StaticDecode<typeof LoginSchema> }) => {
-      const process = getService<LoginProcess>(LOGIN_PROCESS);
-      return process.runOperations({ input: body });
+const loginRoute = new Elysia().use(loginRateLimitMacro).post(
+  "/login",
+  async ({ body }: { body: StaticDecode<typeof LoginSchema> }) => {
+    const process = getService<LoginProcess>(LOGIN_PROCESS);
+    return process.runOperations({ input: body });
+  },
+  {
+    body: LoginSchema,
+    rateLimit: true,
+    response: {
+      200: AuthTokensResponseSchema,
+      400: ValidationErrorResponseSchema,
+      500: InternalErrorResponseSchema,
     },
-    {
-      body: LoginSchema,
-      rateLimit: true,
-      response: {
-        200: AuthTokensResponseSchema,
-        400: ValidationErrorResponseSchema,
-        500: InternalErrorResponseSchema,
-      },
-      detail: {
-        tags: ["Auth"],
-        summary: "Login",
-        description: "Login with email and password",
-      },
-    }
-  );
+    detail: {
+      tags: ["Auth"],
+      summary: "Login",
+      description: "Login with email and password",
+    },
+  },
+);
 export const authRoutes = new Elysia({ prefix: "/auth" })
   .use(bearer())
   .onError(({ error, set }) => handleProcessError(error, set))
@@ -81,7 +72,6 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
       const process = getService<CreateSessionProcess>(CREATE_SESSION_PROCESS);
       return process.runOperations({
         input: {
-          expired_session_id: body.expired_session_id,
           ip_address: body.ip_address ?? null,
           user_agent:
             body.user_agent ?? request.headers.get("user-agent") ?? null,
@@ -101,7 +91,7 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         description:
           "Create a session and return its id for use as session_id when creating a cart.",
       },
-    }
+    },
   )
   .post(
     "/refresh",
@@ -121,19 +111,28 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         summary: "Refresh token",
         description: "Exchange refresh token for new access and refresh tokens",
       },
-    }
+    },
   )
   .post(
     "/logout",
     async ({ bearer, set }) => {
       if (!bearer) {
         set.status = 401;
-        return { error: "Unauthorized", message: "Missing Authorization header" };
+        return {
+          error: "Unauthorized",
+          message: "Missing Authorization header",
+        };
       }
-      const verifyProcess = getService<VerifyAccessTokenProcess>(VERIFY_ACCESS_TOKEN_PROCESS);
-      const { sid } = await verifyProcess.runOperations({ input: { access_token: bearer } });
+      const verifyProcess = getService<VerifyAccessTokenProcess>(
+        VERIFY_ACCESS_TOKEN_PROCESS,
+      );
+      const { sid } = await verifyProcess.runOperations({
+        input: { access_token: bearer },
+      });
       if (sid) {
-        const expireProcess = getService<ExpireSessionProcess>(EXPIRE_SESSION_PROCESS);
+        const expireProcess = getService<ExpireSessionProcess>(
+          EXPIRE_SESSION_PROCESS,
+        );
         await expireProcess.runOperations({ input: { id: sid } });
       }
       set.status = 204;
@@ -147,20 +146,30 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
       detail: {
         tags: ["Auth"],
         summary: "Logout",
-        description: "Expire current session (Bearer token required). Sets logged_out_at and expires session.",
+        description:
+          "Expire current session (Bearer token required). Sets logged_out_at and expires session.",
       },
-    }
+    },
   )
   .get(
     "/me",
     async ({ bearer, set }) => {
       if (!bearer) {
         set.status = 401;
-        return { error: "Unauthorized", message: "Missing or invalid Authorization header" };
+        return {
+          error: "Unauthorized",
+          message: "Missing or invalid Authorization header",
+        };
       }
-      const verifyProcess = getService<VerifyAccessTokenProcess>(VERIFY_ACCESS_TOKEN_PROCESS);
-      const { id } = await verifyProcess.runOperations({ input: { access_token: bearer } });
-      const retrieveProcess = getService<RetrieveUserProcess>(RETRIEVE_USER_PROCESS);
+      const verifyProcess = getService<VerifyAccessTokenProcess>(
+        VERIFY_ACCESS_TOKEN_PROCESS,
+      );
+      const { id } = await verifyProcess.runOperations({
+        input: { access_token: bearer },
+      });
+      const retrieveProcess = getService<RetrieveUserProcess>(
+        RETRIEVE_USER_PROCESS,
+      );
       const user = await retrieveProcess.runOperations({ input: { id } });
       if (!user) return user;
       const { password_hash: _p, ...rest } = user;
@@ -175,7 +184,8 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
       detail: {
         tags: ["Auth"],
         summary: "Current user",
-        description: "Get current user from access token (Authorization: Bearer <token>)",
+        description:
+          "Get current user from access token (Authorization: Bearer <token>)",
       },
-    }
+    },
   );

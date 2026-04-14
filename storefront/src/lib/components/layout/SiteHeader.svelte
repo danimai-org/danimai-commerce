@@ -93,7 +93,7 @@
 
 	const productCategoriesState = createPagination(
 		async () => {
-			const res = await client['product-categories'].get({
+			const res = await client.admin['product-categories'].get({
 				query: createPaginationQuery(NAV_PARAMS)
 			});
 			if (res.error) {
@@ -112,7 +112,7 @@
 
 	const collectionsState = createPagination(
 		async () => {
-			const res = await client['collections'].get({
+			const res = await client.admin['collections'].get({
 				query: createPaginationQuery(NAV_PARAMS)
 			});
 			if (res.error) {

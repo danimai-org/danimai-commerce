@@ -99,16 +99,8 @@
 			type PriceObj = { amount: string; currency_code: string } | null;
 			const prices: PriceObj[] = await Promise.all(
 				variantIds.map((id) =>
-					client['product-variants']({ id }).get()
-						.then((r) => (r.error ? null : r.data))
-						.then((variant) =>
-							(
-								variant as
-									| { prices?: Array<{ amount: string; currency_code: string }> }
-									| null
-									| undefined
-							)?.prices?.[0] ?? null
-						)
+					client.admin['product-variants']({ id }).get().then((r: any) => (r.error ? null : r.data))
+						.then((variant: any) => variant?.prices?.[0] ?? null)
 						.catch(() => null)
 				)
 			);

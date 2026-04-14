@@ -1,9 +1,12 @@
 <script lang="ts">
 	import { SiteHeader, SiteFooter } from '$lib/components/layout';
 	import { client } from '$lib/api/client.js';
-	import { cart, type CartLineItem } from '$lib/stores/cart';
+	import { getUserCart, useCart } from '$lib/hooks/use-cart.hook';
+	import type { Cart } from '$lib/hooks/use-cart.hook';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { API_BASE, firstVariantIdByProductIds, rowsFromPaginated } from '$lib/api/storefront-api';
+
+	const { refetchCart } = useCart();
 
 	const SESSION_STORAGE_KEY = 'dm_sf_session_id';
 	const CART_STORAGE_KEY = 'dm_sf_cart_id';
@@ -53,12 +56,9 @@
 
 	const queryClient = useQueryClient();
 	let {} = $props();
-	let localCartItems = $state([] as CartLineItem[]);
+
 	$effect(() => {
-		const unsub = cart.subscribe((s) => {
-			localCartItems = s.items;
-		});
-		return unsub;
+		refetchCart.refetch();
 	});
 	const listQuery = { page: 1, limit: 100 } as const;
 	const productsQuery = createQuery(() => ({
@@ -224,19 +224,18 @@
 		});
 	});
 	const localItems = $derived.by((): CartRowView[] => {
-		if (!localCartItems.length) return [];
-		return localCartItems.map((item) => ({
-			key: `local:${item.key}`,
-			lineId: item.key,
+		if (!getUserCart()?.line_items?.length) return [];
+		return getUserCart()?.line_items?.map((item: Cart) => ({
+			key: `local:${item.id}`,
+			lineId: item.id,
 			source: 'local',
 			href: item.href,
 			name: item.name,
-			priceDisplay: item.priceDisplay,
+			priceDisplay: `$${item.priceValue.toFixed(2)}`,
 			priceValue: item.priceValue,
 			image: item.image,
 			quantity: item.quantity,
 			variant: item.variant
-
 		}));
 	});
 	const displayItems = $derived((cartItems.length > 0 ? cartItems : localItems));
@@ -469,11 +468,11 @@
 								<p class="line-item-variant">{item.variant}</p>
 								<div class="line-item-actions">
 									<div class="quantity-controls">
-										<button type="button" class="qty-btn" onclick={() => item.source === 'api' ? void changeLineQuantity(item.lineId, -1) : cart.updateQuantity(item.lineId, -1)} aria-label="Decrease quantity">−</button>
+										<button type="button" class="qty-btn" onclick={() => void changeLineQuantity(item.lineId, -1)} aria-label="Decrease quantity">−</button>
 										<span class="qty-value">{item.quantity}</span>
-										<button type="button" class="qty-btn" onclick={() => item.source === 'api' ? void changeLineQuantity(item.lineId, 1) : cart.updateQuantity(item.lineId, 1)} aria-label="Increase quantity">+</button>
+										<button type="button" class="qty-btn" onclick={() => void changeLineQuantity(item.lineId, 1)} aria-label="Increase quantity">+</button>
 									</div>
-									<button type="button" class="remove-btn" onclick={() => item.source === 'api' ? void removeLine(item.lineId) : cart.removeItem(item.lineId)} aria-label="Remove item">
+									<button type="button" class="remove-btn" onclick={() => void removeLine(item.lineId)} aria-label="Remove item">
 										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
 									</button>
 								</div>

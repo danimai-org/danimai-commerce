@@ -54,7 +54,7 @@ function prettyHandle(handle: string): string {
 	const paginateState = createPagination(
 		async () => {
 			const requestedHandle = (page.params.handle ?? '').trim().toLowerCase();
-			const collectionRes = await client['collections'].get({
+			const collectionRes = await client.admin['collections'].get({
 				query: {
 					...createPaginationQuery(new URLSearchParams({ page: '1', limit: '100' }))
 				}

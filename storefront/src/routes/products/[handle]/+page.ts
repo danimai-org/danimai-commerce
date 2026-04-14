@@ -40,7 +40,7 @@ async function fetchVariantPrice(
   variantId: string,
 ): Promise<{ amount: number; currency_code: string } | null> {
   try {
-    const res = await client["product-variants"]({ id: variantId }).get();
+    const res = await client.admin["product-variants"]({ id: variantId }).get();
     if (res.error) return null;
     const data = res.data as unknown;
     const prices =
@@ -197,7 +197,7 @@ export const load: PageLoad = async ({ params }) => {
   const handle = handleRaw;
 
   try {
-    const listRes = await client.products.get({
+    const listRes = await client.admin["products"].get({
       query: { search: handle, limit: "50", page: "1" },
     });
     if (listRes.error) {
@@ -227,7 +227,8 @@ export const load: PageLoad = async ({ params }) => {
       };
     }
 
-    const detailRes = await client.products({ id: row.id }).get();
+    const detailRes = await client.admin["products"]({ id: row.id }).get();
+
     if (detailRes.error || !detailRes.data) {
       return {
         product: null,

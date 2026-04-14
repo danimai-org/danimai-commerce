@@ -1,40 +1,33 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { getUserCart, useCart } from '$lib/hooks/use-cart.hook';
 	import { cart } from '$lib/stores/cart';
-	import type { CartLineItem } from '$lib/stores/cart';
 
-	let cartState = $state({ open: false, items: [] as CartLineItem[] });
+	let cartOpen = $state(false);
+	const { refetchCart, updateCartLineItems } = useCart();
 	$effect(() => {
-		const unsub = cart.subscribe((s) => {
-			cartState = { open: s.open, items: s.items };
-		});
-		return unsub;
-	});
-	$effect(() => {
-		if (!cartState.open) return;
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key === 'Escape') cart.close();
-		};
-		document.addEventListener('keydown', onKey);
-		return () => document.removeEventListener('keydown', onKey);
+		refetchCart.refetch();
 	});
 
+	const cartItems = $derived((getUserCart()?.line_items ?? []) as any[]);
 	const subtotal = $derived(
-		cartState.items.reduce((sum, i) => sum + i.priceValue * i.quantity, 0)
+		cartItems.reduce((sum: number, i: any) => sum + i.priceValue * i.quantity, 0)
 	);
 	const subtotalDisplay = $derived(`$${subtotal.toFixed(2)}`);
 
 	function handleClose() {
 		cart.close();
+		refetchCart.refetch();
 	}
 
 	function goToCart() {
 		cart.close();
+		refetchCart.refetch();
 		goto('/cart');
 	}
 </script>
 
-{#if cartState.open}
+{#if cartOpen}
 	<div
 		class="backdrop"
 		onclick={handleClose}
@@ -49,11 +42,11 @@
 			<button type="button" class="sheet-close" onclick={handleClose} aria-label="Close">×</button>
 		</header>
 		<div class="sheet-body">
-			{#if cartState.items.length === 0}
+			{#if cartItems.length === 0}
 				<p class="empty">Your cart is empty.</p>
 			{:else}
 				<ul class="line-items">
-					{#each cartState.items as item (item.key)}
+					{#each cartItems as item (item.key)}
 						<li class="line-card">
 							<div class="line-card-media">
 								{#if item.image}
@@ -74,11 +67,11 @@
 								</p>
 								<div class="line-card-actions">
 									<div class="quantity-controls">
-										<button type="button" class="qty-btn" onclick={() => cart.updateQuantity(item.key, -1)} aria-label="Decrease quantity">−</button>
+										<button type="button" class="qty-btn" onclick={() => void updateCartLineItems.mutate({ id: getUserCart()?.id ?? '', lineItems: [{ key: item.key, 	quantity: item.quantity - 1 }] })} aria-label="Decrease quantity">−</button>
 										<span class="qty-value">{item.quantity}</span>
-										<button type="button" class="qty-btn" onclick={() => cart.updateQuantity(item.key, 1)} aria-label="Increase quantity">+</button>
+										<button type="button" class="qty-btn" onclick={() => void updateCartLineItems.mutate({ id: getUserCart()?.id ?? '', lineItems: [{ key: item.key, quantity: item.quantity + 1 }] })} aria-label="Increase quantity">+</button>
 									</div>
-									<button type="button" class="remove-btn" onclick={() => cart.removeItem(item.key)} aria-label="Remove item">
+									<button type="button" class="remove-btn" onclick={() => void updateCartLineItems.mutate({ id: getUserCart()?.id ?? '', lineItems: [{ key: item.key, quantity: 0 }] })} aria-label="Remove item">
 										<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
 									</button>
 								</div>
@@ -88,7 +81,7 @@
 				</ul>
 			{/if}
 		</div>
-		{#if cartState.items.length > 0}
+		{#if cartItems.length > 0}
 			<footer class="sheet-footer">
 				<div class="subtotal-row">
 					<span>Subtotal</span>

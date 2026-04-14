@@ -8,6 +8,7 @@ export type ProductGridItem = {
     currency_code: string;
   };
   href: string;
+  variantId?: string;
   bg: string;
   image?: string | null;
   currency_code?: string | null;
@@ -36,7 +37,7 @@ async function fetchVariantPrice(
   variantId: string,
 ): Promise<{ amount: number; currency_code: string } | null> {
   try {
-    const res = await client["product-variants"]({ id: variantId }).get();
+    const res = await client.admin["product-variants"]({ id: variantId }).get();
     if (res.error) return null;
     const data = res.data as unknown;
     const prices =
@@ -56,7 +57,7 @@ export async function load() {
   let error: string | null = null;
 
   try {
-    const res = await client.products.get({
+    const res = await client.admin["products"].get({
       query: { limit: "100", page: "1" },
     });
     if (res.error) {
@@ -71,10 +72,8 @@ export async function load() {
       thumbnail?: string | null;
       variants?: Array<{ id: string }>;
     }>(data);
-    const variantMap = await client["product-variants"].get({
+    const variantMap = await client.admin["product-variants"].get({
       query: {
-        limit: "100",
-        page: "1",
         filters: { product_id: list.map((p) => p.id) },
       },
     });
@@ -107,6 +106,7 @@ export async function load() {
           currency_code: price?.currency_code ?? "USD",
         },
         href: `/products/${p.handle}`,
+        variantId: firstVariantId ?? undefined,
         bg: pickBg(i),
         image: p.thumbnail || null,
       });

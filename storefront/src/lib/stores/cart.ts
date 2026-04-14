@@ -26,7 +26,7 @@ function createCartStore() {
       return [] as CartLineItem[];
     }
   })();
-  const { subscribe, set, update } = writable<{
+  const { subscribe, update } = writable<{
     open: boolean;
     items: CartLineItem[];
   }>({ open: false, items: initialItems });

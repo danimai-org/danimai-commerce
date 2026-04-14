@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { getUserCart, useCart } from '$lib/hooks/use-cart.hook';
 	import { cart } from '$lib/stores/cart';
 	import type { ProductGridItem } from '../../../routes/store/+page.ts';
 
-
+	const { updateCartLineItems, refetchCart } = useCart();	
 	let {
 		products = [] as ProductGridItem[] | undefined,
 		title = 'Essential essentials for everyday.',
@@ -48,17 +49,20 @@
 		return '—';
 	}
 
-	function quickAdd(e: MouseEvent, product: ProductGridItem) {
+	async function quickAdd(e: MouseEvent, product: ProductGridItem) {
 		e.preventDefault();
-		cart.addItem({
-			href: product.href,
-			name: product.name,
-			variantId: 'default',
-			priceDisplay: `$${parsePrice(product.price.amount)}`,
-			priceValue: parsePrice(product.price.amount),
-			image: product.image ?? null,
-			variant: 'Default'
+		if (!product.variantId) return;
+		const cartId = getUserCart()?.id;
+		if (!cartId) return;
+		cart.open();
+		await updateCartLineItems.mutateAsync({
+			id: cartId,
+			lineItems: [{
+				variant_id: product.variantId,
+				quantity: 1,
+			}]
 		});
+		await refetchCart.refetch();
 	}
 
 </script>

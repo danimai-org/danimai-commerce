@@ -144,7 +144,7 @@
 				};
 			}
 
-			const catRes = await client['product-categories'].get({
+			const catRes = await client.admin['product-categories'].get({
 				query: createPaginationQuery(new URLSearchParams({ page: '1', limit: '200' }))
 			});
 			if (catRes.error) {

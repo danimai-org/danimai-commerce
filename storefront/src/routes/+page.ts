@@ -1,6 +1,7 @@
 import type { ProductGridItem } from "./store/+page.ts";
 import { API_BASE, rowsFromPaginated } from "../lib/api/storefront-api";
 import { client } from "$lib/api/client.js";
+import type { PageLoad } from "./$types";
 
 export type HomeCollectionCard = {
   title: string;
@@ -40,7 +41,7 @@ async function loadAllCollections(): Promise<HomeCollectionCard[]> {
   let page = 1;
   const limit = 100;
   for (;;) {
-    const res = await client.collections.get({
+    const res = await client.admin.collections.get({
       query: { limit: String(limit), page: String(page) },
     });
     if (res.error) return out;
@@ -84,7 +85,7 @@ type StorefrontProductRow = {
   } | null;
 };
 
-export async function load() {
+export const load: PageLoad = async ({ fetch }) => {
   const products: ProductGridItem[] = [];
   const collections = await loadAllCollections();
   let error: string | null = null;
@@ -116,4 +117,4 @@ export async function load() {
   }
 
   return { products, collections, error };
-}
+};
