@@ -6,6 +6,7 @@ import { initialize } from "@danimai/core";
 import { getLogger } from "./logger";
 import { routes as adminRoutes } from "./routes/admin";
 import { storefrontRoutes } from "./routes/storefront";
+import { lambda } from 'danimai-elysia-lambda'
 
 const logger = getLogger();
 
@@ -28,11 +29,11 @@ initialize({
       secret: Bun.env.JWT_SECRET || "",
     },
     aws: {
-      accessKeyId: Bun.env.AWS_ACCESS_KEY_ID || "",
-      secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY || "",
-      region: Bun.env.AWS_REGION || "",
-      s3Bucket: Bun.env.AWS_S3_BUCKET || "",
-      mediaCloudfrontUrl: Bun.env.MEDIA_CLOUDFRONT_URL || "",
+      accessKeyId: Bun.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY,
+      region: Bun.env.AWS_REGION,
+      s3Bucket: Bun.env.AWS_S3_BUCKET,
+      mediaCloudfrontUrl: Bun.env.MEDIA_CLOUDFRONT_URL,
     },
   },
 });
@@ -92,6 +93,7 @@ const serverLogger = new Elysia({ name: "server-logger" })
 const corsOrigin = process.env.CORS_ORIGIN || "*";
 
 const app = new Elysia()
+  .use(lambda())
   .use(
     cors({
       origin: corsOrigin,
@@ -112,12 +114,6 @@ const app = new Elysia()
   )
   .use(adminRoutes)
   .use(storefrontRoutes)
-  .listen(8000, () => {
-    logger.info("Server started on http://localhost:8000");
-    logger.info(
-      "Swagger documentation available at http://localhost:8000/swagger",
-    );
-  });
 
 const server = (
   app as { server?: { stop?: (force?: boolean) => Promise<void> } }
@@ -136,3 +132,11 @@ process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
 export type App = typeof app;
+
+app
+  .listen(8000, () => {
+    logger.info(`🦊 Elysia is running locally at http://${app.server?.hostname}:${app.server?.port}`);
+    logger.info(
+      "Swagger documentation available at http://localhost:8000/swagger",
+    );
+  });

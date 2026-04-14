@@ -1,0 +1,9 @@
+deploy: main.ts
+name: danimai-commerce
+region: ap-south-1
+memory: "1024"
+arch: x86_64
+description: Danimai Backend Commerce
+role: ${env:LAMBDA_ROLE_ARN}
+layers:
+  - ${env:LAMBDA_LAYER_ARN}
