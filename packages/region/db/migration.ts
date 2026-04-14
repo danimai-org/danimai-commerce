@@ -1,25 +1,25 @@
 import { Country } from "country-state-city";
-import { alpha2ToAlpha3, alpha2ToNumeric } from "i18n-iso-countries";
+// import { alpha2ToAlpha3, alpha2ToNumeric } from "i18n-iso-countries";
 import { Kysely, sql } from "kysely";
 
-function seedCountryRows() {
-  return Country.getAllCountries().map((c) => {
-    const iso3 = alpha2ToAlpha3(c.isoCode);
-    const numStr = alpha2ToNumeric(c.isoCode);
-    if (!iso3 || !numStr) {
-      throw new Error(`Missing ISO 3166-1 alpha-3 / numeric for ${c.isoCode}`);
-    }
-    return {
-      iso_2: c.isoCode.toLowerCase(),
-      iso_3: iso3.toLowerCase(),
-      num_code: parseInt(numStr, 10),
-      name: c.name.toUpperCase(),
-      display_name: c.name,
-      region_id: null,
-      metadata: null,
-    };
-  });
-}
+// function seedCountryRows() {
+//   return Country.getAllCountries().map((c) => {
+//     const iso3 = alpha2ToAlpha3(c.isoCode);
+//     const numStr = alpha2ToNumeric(c.isoCode);
+//     if (!iso3 || !numStr) {
+//       throw new Error(`Missing ISO 3166-1 alpha-3 / numeric for ${c.isoCode}`);
+//     }
+//     return {
+//       iso_2: c.isoCode.toLowerCase(),
+//       iso_3: iso3.toLowerCase(),
+//       num_code: parseInt(numStr, 10),
+//       name: c.name.toUpperCase(),
+//       display_name: c.name,
+//       region_id: null,
+//       metadata: null,
+//     };
+//   });
+// }
 
 export async function up(db: Kysely<any>) {
   // Regions
@@ -60,7 +60,7 @@ export async function up(db: Kysely<any>) {
     .addColumn("deleted_at", "timestamptz")
     .execute();
 
-  await db.insertInto("countries").values(seedCountryRows()).execute();
+  // await db.insertInto("countries").values(seedCountryRows()).execute();
 }
 
 export async function down(db: Kysely<any>) {

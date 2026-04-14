@@ -126,13 +126,13 @@ export const initialize = ({ db, logger, config }: DanimaiInitialize) => {
   if (!container.isBound(DANIMAI_PASSWORD)) {
     container.bind(DANIMAI_PASSWORD).toConstantValue(new Password(passwordConfig?.algorithm ?? "bcrypt", passwordConfig?.cost ?? 10));
   }
-  if (!container.isBound(DANIMAI_S3) && config.aws?.region) {
+  if (!container.isBound(DANIMAI_S3)) {
     container.bind(DANIMAI_S3).toConstantValue(new S3Client({
-      region: config.aws.region,
-      credentials: {
-        accessKeyId: config.aws.accessKeyId,
-        secretAccessKey: config.aws.secretAccessKey,
-      },
+      region: config.aws?.region,
+      credentials: config.aws ? {
+        accessKeyId: config.aws?.accessKeyId,
+        secretAccessKey: config.aws?.secretAccessKey,
+      } : undefined,
     }));
   }
   // Auto-bind all registered process classes (may be empty if processes not imported yet)
