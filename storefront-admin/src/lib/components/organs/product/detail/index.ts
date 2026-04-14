@@ -7,3 +7,5 @@ export { default as EditProductSheet } from './EditProductSheet.svelte';
 export { default as ProductOrganisationSheet } from './ProductOrganisationSheet.svelte';
 export { default as EditAttributesSheet } from './EditAttributesSheet.svelte';
 export { default as ProductListingCard } from './ProductListingCard.svelte';
+export { default as ProductMediaCard } from './ProductMediaCard.svelte';
+export { default as EditProductMediaSheet } from './EditProductMediaSheet.svelte';

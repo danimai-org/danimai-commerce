@@ -9,11 +9,10 @@
 		ProductSalesChannel,
 		ProductAttribute,
 		ProductVariant,
+		ProductMediaCard,
 		MetadataComponent,
 		JSONComponent
 	} from '$lib/components/organs/index.js';
-	import Upload from '@lucide/svelte/icons/upload-cloud';
-	import Pencil from '@lucide/svelte/icons/pencil';
 	import { resolve } from '$app/paths';
 	import type { PageData } from './$types';
 	import { setDetailContext, useDetailQuery } from '$lib/hooks';
@@ -81,37 +80,7 @@
 					</div>
 
 					<div class="flex min-w-0 flex-col gap-6">
-						<div class="rounded-lg border bg-card p-6 shadow-sm">
-							<div class="flex items-center justify-between">
-								<h2 class="font-semibold">Media</h2>
-								<Button
-									variant="ghost"
-									size="icon"
-									class="size-8 shrink-0"
-									onclick={() => {}}
-									aria-label="Edit media"
-								>
-									<Pencil class="size-4" />
-								</Button>
-							</div>
-							{#if product.title}
-								<div class="mt-4">
-									<img
-										src={product.title}
-										alt="Product"
-										class="size-24 rounded-md border object-cover"
-									/>
-								</div>
-							{:else}
-								<div
-									class="mt-4 flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-muted-foreground/25 bg-muted/30 py-8 text-center text-sm text-muted-foreground"
-								>
-									<Upload class="size-8" />
-									<p>No media yet</p>
-									<p class="text-xs">Add media to the product to showcase it in your storefront.</p>
-								</div>
-							{/if}
-						</div>
+						<ProductMediaCard productId={product?.id as string} />
 
 						<ProductVariant />
 					</div>

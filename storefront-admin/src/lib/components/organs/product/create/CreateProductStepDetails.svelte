@@ -37,6 +37,44 @@
 		createMediaFile: File | null;
 		onEnableVariants?: () => void;
 	} = $props();
+
+	let filePreviewSrc = $state<string | null>(null);
+
+	$effect(() => {
+		const f = createMediaFile;
+		if (!f) {
+			filePreviewSrc = null;
+			return;
+		}
+		const url = URL.createObjectURL(f);
+		filePreviewSrc = url;
+		return () => URL.revokeObjectURL(url);
+	});
+
+	const mediaPreviewSrc = $derived(createMediaUrl.trim() || (filePreviewSrc ?? ''));
+	const dialogPreviewSrc = $derived(createMediaImageUrl.trim());
+
+	let dialogFilePreviewSrc = $state<string | null>(null);
+
+	$effect(() => {
+		const f = createMediaChosenFile;
+		if (!f) {
+			dialogFilePreviewSrc = null;
+			return;
+		}
+		const url = URL.createObjectURL(f);
+		dialogFilePreviewSrc = url;
+		return () => URL.revokeObjectURL(url);
+	});
+
+	function readFileAsDataUrl(file: File): Promise<string> {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(String(reader.result));
+			reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
+			reader.readAsDataURL(file);
+		});
+	}
 </script>
 
 <div class="flex-1 overflow-auto p-4 pt-4 sm:p-6 sm:pt-4">
@@ -91,20 +129,36 @@
 				role="button"
 				tabindex="0"
 				aria-label="Media upload"
-				class="flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:bg-muted/50"
+				class="flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:bg-muted/50"
 				onclick={() => {
 					createMediaImageUrl = createMediaUrl;
 					createMediaChosenFile = createMediaFile;
 					createMediaModalOpen = true;
 				}}
-				onkeydown={(e) => e.key === 'Enter' && (createMediaModalOpen = true)}
+				onkeydown={(e) => {
+					if (e.key !== 'Enter' && e.key !== ' ') return;
+					e.preventDefault();
+					createMediaImageUrl = createMediaUrl;
+					createMediaChosenFile = createMediaFile;
+					createMediaModalOpen = true;
+				}}
 			>
-				<Upload class="size-8 text-muted-foreground" />
-				<p>Drag and drop images here or click to upload.</p>
-				{#if createMediaUrl || createMediaFile}
-					<p class="text-xs text-muted-foreground">
-						{createMediaUrl ? 'Image URL set' : (createMediaFile?.name ?? '1 image selected')}
-					</p>
+				{#if mediaPreviewSrc}
+					<div class="flex w-full max-w-xs flex-col items-center gap-2">
+						<img
+							src={mediaPreviewSrc}
+							alt=""
+							class="max-h-40 w-full rounded-md border border-border object-contain bg-background"
+							onerror={(ev) => ((ev.currentTarget as HTMLImageElement).style.display = 'none')}
+						/>
+						<p class="text-xs text-muted-foreground">
+							{createMediaUrl.trim() ? createMediaUrl.trim() : (createMediaFile?.name ?? '')}
+						</p>
+						<p class="text-xs font-medium text-foreground">Click to change</p>
+					</div>
+				{:else}
+					<Upload class="size-8 text-muted-foreground" />
+					<p>Drag and drop images here or click to upload.</p>
 				{/if}
 			</div>
 			<Dialog.Root bind:open={createMediaModalOpen}>
@@ -123,8 +177,19 @@
 								placeholder="https://..."
 								bind:value={createMediaImageUrl}
 								class="w-full"
+								oninput={() => (createMediaChosenFile = null)}
 							/>
 						</div>
+						{#if dialogPreviewSrc || dialogFilePreviewSrc}
+							<div class="flex justify-center rounded-md border bg-muted/30 p-3">
+								<img
+									src={dialogFilePreviewSrc ?? dialogPreviewSrc}
+									alt="Preview"
+									class="max-h-36 w-full max-w-xs rounded object-contain"
+									onerror={(ev) => ((ev.currentTarget as HTMLImageElement).style.display = 'none')}
+								/>
+							</div>
+						{/if}
 						<p class="text-sm text-muted-foreground">Or choose file</p>
 						<div class="flex items-center gap-2">
 							<input
@@ -152,14 +217,23 @@
 						</Button>
 						<Button
 							type="button"
-							onclick={() => {
-								if (createMediaImageUrl.trim()) {
-									createMediaUrl = createMediaImageUrl.trim();
+							onclick={async () => {
+								const file = createMediaChosenFile;
+								const url = createMediaImageUrl.trim();
+								if (file) {
+									try {
+										createMediaUrl = await readFileAsDataUrl(file);
+										createMediaFile = null;
+									} catch {
+										createMediaUrl = '';
+										createMediaFile = null;
+									}
+								} else if (url) {
+									createMediaUrl = url;
 									createMediaFile = null;
-								}
-								if (createMediaChosenFile) {
-									createMediaFile = createMediaChosenFile;
+								} else {
 									createMediaUrl = '';
+									createMediaFile = null;
 								}
 								createMediaModalOpen = false;
 							}}
