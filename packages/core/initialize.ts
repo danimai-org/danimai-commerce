@@ -2,11 +2,12 @@ import { Container } from "inversify";
 import { DANIMAI_DB, DANIMAI_LOGGER, DANIMAI_CONFIG, DANIMAI_INITIALIZED, DANIMAI_EMAIL, DANIMAI_JWT, DANIMAI_PASSWORD, DANIMAI_S3 } from "./injection-keys";
 import type { DanimaiInitialize, ProcessContract } from "./type";
 import { Kysely, ParseJSONResultsPlugin, type LogEvent } from "kysely";
-import { BunPostgresDialect } from "kysely-bun-sql";
+import { NeonDialect } from 'kysely-neon';
 import { bindAllProcesses, getProcessClass } from "./decorators/process";
 import { ResendEmail } from "./email";
 import { Jwt, Password } from "./security";
 import { S3Client } from "@aws-sdk/client-s3";
+import { neon } from "@neondatabase/serverless";
 
 const ANSI = { blue: "\x1b[34m", red: "\x1b[31m", reset: "\x1b[0m" };
 
@@ -77,7 +78,7 @@ export const initialize = ({ db, logger, config }: DanimaiInitialize) => {
   }
   if (!container.isBound(DANIMAI_DB)) {
     const connection = new Kysely({
-      dialect: new BunPostgresDialect(db),
+      dialect: new NeonDialect({ neon: neon(db.url ?? "") }),
       log: (event: LogEvent) => {
         let caller = getQueryCaller();
         if (!caller && event.query.sql) {
