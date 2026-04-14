@@ -43,6 +43,7 @@ export const RetrieveProductResponseSchema = Type.Object({
   id: Type.String(),
   title: Type.String(),
   handle: Type.String(),
+  thumbnail: Type.Union([Type.String(), Type.Null()]),
   description: Type.Union([Type.String(), Type.Null()]),
   created_at: Type.Date(),
   updated_at: Type.Date(),

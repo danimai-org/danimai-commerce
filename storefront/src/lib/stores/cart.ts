@@ -13,10 +13,28 @@ export interface CartLineItem {
 }
 
 function createCartStore() {
+  const isBrowser = typeof window !== "undefined";
+  const CART_ITEMS_STORAGE_KEY = "dm_sf_local_cart_items";
+  const initialItems = (() => {
+    if (!isBrowser) return [] as CartLineItem[];
+    const raw = window.localStorage.getItem(CART_ITEMS_STORAGE_KEY);
+    if (!raw) return [] as CartLineItem[];
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return Array.isArray(parsed) ? (parsed as CartLineItem[]) : [];
+    } catch {
+      return [] as CartLineItem[];
+    }
+  })();
   const { subscribe, set, update } = writable<{
     open: boolean;
     items: CartLineItem[];
-  }>({ open: false, items: [] });
+  }>({ open: false, items: initialItems });
+
+  const persistItems = (items: CartLineItem[]) => {
+    if (!isBrowser) return;
+    window.localStorage.setItem(CART_ITEMS_STORAGE_KEY, JSON.stringify(items));
+  };
 
   return {
     subscribe,
@@ -45,6 +63,7 @@ function createCartStore() {
                 quantity: item.quantity ?? 1,
               } as CartLineItem,
             ];
+        persistItems(items);
         return { ...s, items, open: true };
       });
     },
@@ -57,14 +76,19 @@ function createCartStore() {
               : i,
           )
           .filter((i) => i.quantity > 0);
+        persistItems(items);
         return { ...s, items };
       });
     },
     removeItem: (key: string) => {
-      update((s) => ({
-        ...s,
-        items: s.items.filter((i) => i.key !== key),
-      }));
+      update((s) => {
+        const items = s.items.filter((i) => i.key !== key);
+        persistItems(items);
+        return {
+          ...s,
+          items,
+        };
+      });
     },
   };
 }

@@ -34,10 +34,9 @@
 					class:collection-card--large={featureLayout && i === 0}
 				>
 					<div class="collection-bg" style="background-image: url({collection.image});"></div>
+					<img src={collection.image} alt="" class="collection-image" aria-hidden="true" />
 					<div class="collection-overlay"></div>
 					<span class="collection-title">{collection.title}</span>
-					<img src={collection.image} alt={collection.title} class="collection-image" />
-				
 				</a>
 			{/each}
 		</div>
@@ -93,30 +92,45 @@
 	.collection-bg {
 		position: absolute;
 		inset: 0;
+		z-index: 0;
 		background-size: cover;
 		background-position: center;
 		transition: transform 0.5s ease;
 	}
-	.collection-card:hover .collection-bg {
+	.collection-image {
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		transition: transform 0.5s ease;
+		pointer-events: none;
+	}
+	.collection-card:hover .collection-bg,
+	.collection-card:hover .collection-image {
 		transform: scale(1.04);
 	}
 	.collection-overlay {
 		position: absolute;
 		inset: 0;
+		z-index: 1;
 		background: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.45) 100%);
 	}
-	.collection-label {
+	.collection-title {
 		position: relative;
-		z-index: 1;
+		z-index: 2;
 		padding: 1.25rem 1.5rem;
 		font-size: clamp(1rem, 2.5vw, 1.125rem);
 		font-weight: 500;
 		letter-spacing: 0.02em;
 		text-align: center;
 		width: 100%;
+		margin-top: auto;
+		text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
 	}
 	@media (min-width: 768px) {
-		.collection-label {
+		.collection-title {
 			font-size: 1.125rem;
 			text-align: left;
 		}
@@ -137,7 +151,7 @@
 			aspect-ratio: 16 / 10;
 			min-height: 200px;
 		}
-		.collection-label {
+		.collection-title {
 			text-align: center;
 			padding: 1.5rem 1rem;
 		}

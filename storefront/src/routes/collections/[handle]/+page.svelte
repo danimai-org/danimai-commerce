@@ -17,6 +17,7 @@
 	type StorefrontProductRow = {
 		title: string;
 		handle: string;
+		thumbnail: string | null;
 		variant: {
 			thumbnail: string | null;
 			price: { amount: string; currency_code: string } | null;
@@ -44,7 +45,7 @@ function prettyHandle(handle: string): string {
 		return {
 			total: 0,
 			page: 1,
-			limit: 10,
+			limit: 24,
 			total_pages: 0,
 			has_next_page: false,
 			has_previous_page: false
@@ -90,7 +91,7 @@ function prettyHandle(handle: string): string {
 				sorting_field: 'products.title',
 				sorting_direction: 'asc'
 			});
-			sp.set('filters[collection_ids]', collection.id);
+			sp.set('filters', JSON.stringify({ collection_ids: collection.id }));
 			const productsRes = await fetch(`${root}/storefront/products?${sp}`, {
 				cache: 'no-store'
 			});
@@ -114,7 +115,7 @@ function prettyHandle(handle: string): string {
 					},
 					href: `/products/${p.handle}`,
 					bg: pickBg(i),
-					image: p.variant?.thumbnail ?? null
+					image: p.thumbnail ?? p.variant?.thumbnail ?? null
 				};
 			});
 			return {
@@ -126,7 +127,7 @@ function prettyHandle(handle: string): string {
 		['collection-products'],
 		createPaginationQuery(new SvelteURLSearchParams(page.url.search)),
 		{
-			keySuffix: () => [page.params.handle ?? '']
+			keySuffix: () => [page.params.handle ?? '', page.url.search]
 		}
 	);
 	const { query } = paginateState;

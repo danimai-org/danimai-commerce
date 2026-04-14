@@ -176,7 +176,7 @@
 
 <header class="site-header">
 	<nav class="nav" class:nav--mobile-search-open={searchOpen && !navWide}>
-		<a href="/" class="brand">DENIMAI</a>
+		<a href="/" class="brand">DANIMAI STORE</a>
 		<ul class="nav-links nav-links--desktop">
 			<li class="nav-dropdown">
 				<button type="button" class="nav-item">

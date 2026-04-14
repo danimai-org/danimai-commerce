@@ -1,14 +1,18 @@
 <script lang="ts">
 	import { SiteHeader, SiteFooter } from '$lib/components/layout';
+	import { goto } from '$app/navigation';
+
+	const handleLogin = async (e: Event) => {
+		e.preventDefault();
+		await goto('/account');
+		return false;
+	};
 </script>
 
 <svelte:head>
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-	<link
-		href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap"
-		rel="stylesheet"
-	/>
+	
+	
 	<title>Login — Denimai</title>
 </svelte:head>
 
@@ -21,7 +25,7 @@
 			<p class="auth-subtitle">Welcome back to Denimai.</p>
 		</header>
 
-		<form class="auth-form" method="post" action="/login" onsubmit={(e) => e.preventDefault()}>
+		<form class="auth-form" method="post" action="/login" onsubmit={handleLogin}>
 			<div class="field">
 				<label for="login-email">Email</label>
 				<input
@@ -42,7 +46,7 @@
 					placeholder="Enter your password"
 				/>
 			</div>
-			<button type="submit" class="auth-submit">Login</button>
+			<button type="submit" class="auth-submit">LOGIN</button>
 		</form>
 
 		<p class="auth-footer">

@@ -1,15 +1,31 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { SiteHeader, SiteFooter } from '$lib/components/layout';
-	import { CheckoutOrderSummary, CheckoutDeliveryStep, CheckoutPaymentStep } from '$lib/components/checkout';
+	import {
+		CheckoutOrderSummary,
+		CheckoutAddressStep,
+		CheckoutDeliveryStep,
+		CheckoutPaymentStep
+	} from '$lib/components/checkout';
 	import { client } from '$lib/api/client.js';
 	import { cart } from '$lib/stores/cart';
 	import type { CartLineItem } from '$lib/stores/cart';
 	type CheckoutStep = 'addresses' | 'delivery' | 'payment' | 'review';
 	const CART_STORAGE_KEY = 'dm_sf_cart_id';
+	const SESSION_STORAGE_KEY = 'dm_sf_session_id';
 	const ORDER_CACHE_KEY_PREFIX = 'dm_sf_order_';
-	type ApiCartLineItem = { id: string };
-	type ApiCart = { id: string; line_items?: ApiCartLineItem[] };
+	const DEFAULT_CART_CURRENCY_CODE = 'usd';
+	type ApiCartLineItem = {
+		id: string;
+		title?: string | null;
+		description?: string | null;
+		thumbnail?: string | null;
+		variant_id?: string | null;
+		product_id?: string | null;
+		quantity?: number | null;
+		unit_price?: string | null;
+	};
+	type ApiCart = { id: string; currency_code?: string | null; line_items?: ApiCartLineItem[] };
 	type LineItemPut = {
 		title?: string | null;
 		description?: string | null;
@@ -125,6 +141,27 @@
 		if (res.error) throw new Error(treatyErrorMessage(res.error));
 	}
 
+	async function createCartWithCurrency(sessionId: string): Promise<string> {
+		const res = await client.carts.post({
+			session_id: sessionId,
+			currency_code: DEFAULT_CART_CURRENCY_CODE
+		});
+		if (res.error) throw new Error(treatyErrorMessage(res.error));
+		return (res.data as { id: string }).id;
+	}
+
+	function lineItemsFromApiCart(apiCart: ApiCart): LineItemPut[] {
+		return (apiCart.line_items ?? []).map((item) => ({
+			title: item.title ?? null,
+			description: item.description ?? null,
+			thumbnail: item.thumbnail ?? null,
+			variant_id: item.variant_id ?? null,
+			product_id: item.product_id ?? null,
+			quantity: item.quantity ?? 0,
+			unit_price: item.unit_price ?? null
+		}));
+	}
+
 	async function ensureCartHasLineItems(cartId: string) {
 		const apiCart = await fetchCartJson(cartId);
 		if ((apiCart.line_items?.length ?? 0) > 0) return;
@@ -146,6 +183,29 @@
 		await putLineItems(cartId, line_items);
 	}
 
+	async function ensureCheckoutCartReady(cartId: string): Promise<string> {
+		const apiCart = await fetchCartJson(cartId);
+		if (apiCart.currency_code) {
+			await ensureCartHasLineItems(cartId);
+			return cartId;
+		}
+
+		const sessionId = localStorage.getItem(SESSION_STORAGE_KEY);
+		if (!sessionId) {
+			throw new Error('Cart currency is missing. Please return to cart and try again.');
+		}
+
+		const replacementCartId = await createCartWithCurrency(sessionId);
+		const apiLineItems = lineItemsFromApiCart(apiCart).filter((item) => (item.quantity ?? 0) > 0);
+		if (apiLineItems.length > 0) {
+			await putLineItems(replacementCartId, apiLineItems);
+		} else {
+			await ensureCartHasLineItems(replacementCartId);
+		}
+		localStorage.setItem(CART_STORAGE_KEY, replacementCartId);
+		return replacementCartId;
+	}
+
 	async function placeOrder() {
 		if (isPlacingOrder) return;
 		placeOrderError = '';
@@ -158,9 +218,9 @@
 
 		isPlacingOrder = true;
 		try {
-			await ensureCartHasLineItems(cartId);
+			const readyCartId = await ensureCheckoutCartReady(cartId);
 			const res = await client.orders['from-cart'].post({
-				cart_id: cartId,
+				cart_id: readyCartId,
 				metadata: {
 					shipping_method: shippingMethodLabel,
 					payment_method: paymentMethodLabel
@@ -254,72 +314,12 @@
 			</header>
 
 			{#if currentStep === 'addresses'}
-				<form class="addresses-form" onsubmit={(e) => { e.preventDefault(); goNext(); }}>
-					<fieldset class="fieldset-shipping">
-						<legend class="visually-hidden">Shipping address</legend>
-						<div class="form-row form-row-two">
-							<div class="field">
-								<label for="shipping-first-name">First Name</label>
-								<input id="shipping-first-name" type="text" bind:value={shipping.firstName} placeholder="First name" />
-							</div>
-							<div class="field">
-								<label for="shipping-last-name">Last Name</label>
-								<input id="shipping-last-name" type="text" bind:value={shipping.lastName} placeholder="Last name" />
-							</div>
-						</div>
-						<div class="field">
-							<label for="shipping-company">Company</label>
-							<input id="shipping-company" type="text" bind:value={shipping.company} placeholder="Company name" />
-						</div>
-						<div class="field">
-							<label for="shipping-address1">Address Line 1</label>
-							<input id="shipping-address1" type="text" bind:value={shipping.address1} placeholder="Address line 1" />
-						</div>
-						<div class="field">
-							<label for="shipping-address2">Address Line 2</label>
-							<input id="shipping-address2" type="text" bind:value={shipping.address2} placeholder="Address line 2" />
-						</div>
-						<div class="form-row form-row-three">
-							<div class="field">
-								<label for="shipping-city">City</label>
-								<input id="shipping-city" type="text" bind:value={shipping.city} placeholder="City" />
-							</div>
-							<div class="field">
-								<label for="shipping-state">State / Province</label>
-								<input id="shipping-state" type="text" bind:value={shipping.state} placeholder="State / Province" />
-							</div>
-							<div class="field">
-								<label for="shipping-postal">Postal Code</label>
-								<input id="shipping-postal" type="text" bind:value={shipping.postalCode} placeholder="Postal code" />
-							</div>
-						</div>
-						<div class="field">
-							<label for="shipping-country">Country</label>
-							<select id="shipping-country" bind:value={shipping.country}>
-								<option>United States</option>
-								<option>Canada</option>
-								<option>United Kingdom</option>
-							</select>
-						</div>
-						<div class="field">
-							<label for="shipping-phone">Phone</label>
-							<input id="shipping-phone" type="tel" bind:value={shipping.phone} placeholder="Phone number" />
-						</div>
-					</fieldset>
-
-					<label class="checkbox-row">
-						<input type="checkbox" bind:checked={billingSameAsShipping} />
-						<span>Billing address is the same as shipping address</span>
-					</label>
-
-					<div class="field email-field">
-						<label for="email">Email Address</label>
-						<input id="email" type="email" bind:value={email} placeholder="Email address" />
-						<p class="field-hint">You'll receive order updates to this email</p>
-					</div>
-
-					<button type="submit" class="next-btn full-width">Next</button>
-				</form>
+				<CheckoutAddressStep
+					bind:shipping={shipping}
+					bind:billingSameAsShipping={billingSameAsShipping}
+					bind:email={email}
+					onNext={goNext}
+				/>
 			{:else if currentStep === 'delivery'}
 				<CheckoutDeliveryStep bind:shippingMethod={shippingMethod} onBack={goBack} onNext={goNext} />
 			{:else if currentStep === 'payment'}

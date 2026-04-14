@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { superForm } from 'sveltekit-superforms/client';
+
 	type Props = {
 		shippingMethod?: string;
 		onBack: () => void;
@@ -6,19 +8,35 @@
 	};
 
 	let { shippingMethod = $bindable('standard-worldwide'), onBack, onNext }: Props = $props();
+
+	const initialFormData = $state.snapshot({
+		shippingMethod
+	});
+
+	const { form, enhance } = superForm(initialFormData, {
+		SPA: true,
+		resetForm: false,
+		onSubmit: () => {
+			shippingMethod = $form.shippingMethod;
+			onNext();
+		}
+	});
 </script>
 
 <form
 	class="delivery-form"
-	onsubmit={(e) => {
-		e.preventDefault();
-		onNext();
-	}}
+	method="POST"
+	use:enhance
 >
 	<fieldset class="fieldset-delivery">
 		<legend class="visually-hidden">Shipping method</legend>
 		<label class="shipping-method">
-			<input type="radio" name="shipping-method" value="standard-worldwide" bind:group={shippingMethod} />
+			<input
+				type="radio"
+				name="shipping-method"
+				value="standard-worldwide"
+				bind:group={$form.shippingMethod}
+			/>
 			<span>Standard Worldwide Shipping</span>
 		</label>
 	</fieldset>

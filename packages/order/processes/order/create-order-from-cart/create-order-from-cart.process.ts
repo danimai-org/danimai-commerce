@@ -218,7 +218,7 @@ export class CreateOrderFromCartProcess implements ProcessContract<
             unit_price: li.unit_price ?? "0",
             quantity: li.quantity ?? 1,
             metadata: li.metadata ?? null,
-          }))
+          })),
         )
         .returning("id")
         .execute();
@@ -248,7 +248,10 @@ export class CreateOrderFromCartProcess implements ProcessContract<
       });
 
       if (orderTaxLinesToInsert.length > 0) {
-        await trx.insertInto("order_line_item_tax_lines").values(orderTaxLinesToInsert).execute();
+        await trx
+          .insertInto("order_line_item_tax_lines")
+          .values(orderTaxLinesToInsert)
+          .execute();
       }
 
       await trx

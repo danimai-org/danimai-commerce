@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { superForm } from 'sveltekit-superforms/client';
+
 	type Props = {
 		paymentMethod?: string;
 		onBack: () => void;
@@ -6,20 +8,31 @@
 	};
 
 	let { paymentMethod = $bindable('manual'), onBack, onNext }: Props = $props();
+
+	const initialFormData = $state.snapshot({
+		paymentMethod
+	});
+
+	const { form, enhance } = superForm(initialFormData, {
+		SPA: true,
+		resetForm: false,
+		onSubmit: () => {
+			paymentMethod = $form.paymentMethod;
+			onNext();
+		}
+	});
 </script>
 
 <form
 	class="payment-form"
-	onsubmit={(e) => {
-		e.preventDefault();
-		onNext();
-	}}
+	method="POST"
+	use:enhance
 >
 	<p class="payment-lead">Select a payment method. You won't be charged until you place your order.</p>
 	<fieldset class="fieldset-payment">
 		<legend class="visually-hidden">Payment method</legend>
 		<label class="payment-method">
-			<input type="radio" name="payment-method" value="manual" bind:group={paymentMethod} />
+			<input type="radio" name="payment-method" value="manual" bind:group={$form.paymentMethod} />
 			<span class="payment-method-label">Manual Payment</span>
 			<span class="payment-method-icon" aria-hidden="true">
 				<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">

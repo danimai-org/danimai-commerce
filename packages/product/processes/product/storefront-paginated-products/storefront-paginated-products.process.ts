@@ -146,6 +146,7 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
         "products.title as title",
         "products.status as status",
         "products.handle as handle",
+        "products.thumbnail as product_thumbnail",
         (eb) => sql<number>`count(product_variants.id)::int`.as("variant_count"),
         (eb) => sql<{
           id: string;
@@ -170,7 +171,14 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
             )
           END
         `.as('category'),
-      ]).groupBy(["products.id", "products.title", "products.status", "products.handle", "product_categories.id"])
+      ]).groupBy([
+        "products.id",
+        "products.title",
+        "products.status",
+        "products.handle",
+        "products.thumbnail",
+        "product_categories.id",
+      ])
       .execute();
 
     const variants = await this.db
@@ -191,6 +199,30 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
       .execute();
 
     const variantIds = variants.map((variant) => variant.id);
+
+    const imageRows = await this.db
+      .selectFrom("product_images")
+      .where("product_id", "in", productIds)
+      .where("deleted_at", "is", null)
+      .select(["product_id", "variant_id", "url", "rank"])
+      .orderBy("product_id", "asc")
+      .orderBy("rank", "asc")
+      .execute();
+
+    const firstImageByVariantId = new Map<string, string>();
+    const firstProductLevelImageByProductId = new Map<string, string>();
+    for (const img of imageRows) {
+      const pid = img.product_id;
+      if (!pid) continue;
+      if (img.variant_id) {
+        if (!firstImageByVariantId.has(img.variant_id)) {
+          firstImageByVariantId.set(img.variant_id, img.url);
+        }
+      } else if (!firstProductLevelImageByProductId.has(pid)) {
+        firstProductLevelImageByProductId.set(pid, img.url);
+      }
+    }
+
     const variantPrices = await this.db
       .selectFrom("price_sets")
       .innerJoin("prices", (join) =>
@@ -242,10 +274,33 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
       });
     }
 
-    const productsWithVariants = products.map((product) => ({
-      ...product,
-      variant: variantsByProduct.get(product.id) ?? null,
-    }));
+    type ProductAggRow = (typeof products)[number] & {
+      product_thumbnail: string | null;
+    };
+
+    const productsWithVariants = products.map((row) => {
+      const { product_thumbnail, ...productBase } = row as ProductAggRow;
+      const variant = variantsByProduct.get(row.id) ?? null;
+      const variantThumb =
+        variant?.thumbnail ??
+        (variant ? firstImageByVariantId.get(variant.id) ?? null : null);
+      const productThumb =
+        product_thumbnail ??
+        firstProductLevelImageByProductId.get(row.id) ??
+        null;
+      const thumbnail = variantThumb ?? productThumb ?? null;
+      const variantOut = variant
+        ? {
+            ...variant,
+            thumbnail: variantThumb ?? productThumb,
+          }
+        : null;
+      return {
+        ...productBase,
+        thumbnail,
+        variant: variantOut,
+      };
+    });
 
     return paginationResponse(productsWithVariants, total, input);
   }

@@ -9,7 +9,7 @@
 	</div>
 	<div class="footer-columns">
 		<div class="footer-col footer-brand">
-			<div class="footer-brand-name">DENIMAI</div>
+			<div class="footer-brand-name">DANIMAI STORE</div>
 			<p class="footer-brand-desc">Premium athleisure designed for movement. Thoughtfully crafted essentials that move seamlessly from studio to street.</p>
 			<div class="footer-region">
 				<label for="region">REGION</label>
@@ -54,7 +54,7 @@
 	</div>
 	<div class="footer-bottom">
 		<div class="footer-bottom-left">
-			<span class="footer-copy">© 2026 Denimai. All rights reserved.</span>
+			<span class="footer-copy">© 2026 Danimai Store. All rights reserved.</span>
 			<a href="/privacy">Privacy Policy</a>
 			<a href="/terms">Terms of Service</a>
 		</div>

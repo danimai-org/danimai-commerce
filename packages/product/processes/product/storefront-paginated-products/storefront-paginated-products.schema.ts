@@ -25,6 +25,7 @@ const StorefrontPaginatedProductItemSchema = Type.Object({
   id: Type.String(),
   title: Type.String(),
   handle: Type.String(),
+  thumbnail: Type.Union([Type.String(), Type.Null()]),
   status: Type.Enum(ProductStatusEnum),
   variant_count: Type.Number(),
   category: Type.Union([

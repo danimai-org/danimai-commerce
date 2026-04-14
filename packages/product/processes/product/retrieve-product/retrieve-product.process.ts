@@ -111,6 +111,7 @@ export class RetrieveProductProcess
        "products.status",
        "products.discountable",
        "products.is_giftcard",
+       "products.thumbnail",
        () =>  sql<Static<typeof RetrieveProductSchema["category"]> | null>`
         CASE
           WHEN product_categories.id IS NULL THEN NULL
@@ -175,9 +176,15 @@ export class RetrieveProductProcess
         "products.id",
         "products.title",
         "products.handle",
+        "products.description",
+        "products.created_at",
+        "products.updated_at",
         "product_categories.id",
         "products.status",
         "products.metadata",
+        "products.discountable",
+        "products.is_giftcard",
+        "products.thumbnail",
       ])
       .executeTakeFirst();
 
@@ -185,6 +192,18 @@ export class RetrieveProductProcess
       throw new NotFoundError("Product not found");
     }
 
-    return product;
+    let thumbnail: string | null = product.thumbnail ?? null;
+    if (!thumbnail) {
+      const firstImage = await this.db
+        .selectFrom("product_images")
+        .where("product_id", "=", product.id)
+        .where("deleted_at", "is", null)
+        .select("url")
+        .orderBy("rank", "asc")
+        .executeTakeFirst();
+      thumbnail = firstImage?.url ?? null;
+    }
+
+    return { ...product, thumbnail };
   }
 }

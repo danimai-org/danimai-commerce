@@ -14,6 +14,7 @@
 	import { client } from '$lib/api/client.js';
 	import {
 		type CategoryNavRow,
+		categoryParentId,
 		isBottomCategory,
 		isChildCategory
 	} from '$lib/category-nav';
@@ -21,6 +22,7 @@
 	type StorefrontProductRow = {
 		title: string;
 		handle: string;
+		thumbnail: string | null;
 		variant: {
 			thumbnail: string | null;
 			price: { amount: string; currency_code: string } | null;
@@ -40,6 +42,41 @@
 		{ value: 'title-asc', label: 'Title A–Z' },
 		{ value: 'title-desc', label: 'Title Z–A' }
 	];
+
+	const STOREFRONT_SORT: Record<string, { field: string; dir: 'asc' | 'desc' }> = {
+		'best-selling': { field: 'products.title', dir: 'desc' },
+		newest: { field: 'products.handle', dir: 'desc' },
+		'title-asc': { field: 'products.title', dir: 'asc' },
+		'title-desc': { field: 'products.title', dir: 'desc' }
+	};
+
+	function descendantCategoryIds(rootId: string, all: CategoryNavRow[]): string[] {
+		const byParent = new Map<string, CategoryNavRow[]>();
+		for (const c of all) {
+			const pid = categoryParentId(c);
+			if (!pid) continue;
+			const list = byParent.get(pid);
+			if (list) list.push(c);
+			else byParent.set(pid, [c]);
+		}
+		const out: string[] = [];
+		const stack = [rootId];
+		while (stack.length) {
+			const id = stack.pop()!;
+			out.push(id);
+			const kids = byParent.get(id);
+			if (kids) for (const k of kids) stack.push(k.id);
+		}
+		return out;
+	}
+
+	function expandCategoryIds(ids: string[], all: CategoryNavRow[]): string[] {
+		const seen = new Set<string>();
+		for (const id of ids) {
+			for (const x of descendantCategoryIds(id, all)) seen.add(x);
+		}
+		return [...seen];
+	}
 
 
 	const FALLBACK_BGS = ['#e8e0d5', '#4a4a4a', '#f5f0eb', '#6b7c5c'];
@@ -127,10 +164,16 @@
 			let resolvedTitle = '';
 
 			if (handle === 'all-tops') {
-				categoryIds = topChildren.map((c) => c.id);
+				categoryIds = expandCategoryIds(
+					topChildren.map((c) => c.id),
+					categories
+				);
 				resolvedTitle = 'All Tops';
 			} else if (handle === 'all-bottoms') {
-				categoryIds = bottomChildren.map((c) => c.id);
+				categoryIds = expandCategoryIds(
+					bottomChildren.map((c) => c.id),
+					categories
+				);
 				resolvedTitle = 'All Bottoms';
 			} else {
 				const category = categories.find((c) => c.handle === handle);
@@ -142,7 +185,7 @@
 						categoryNotFound: true
 					};
 				}
-				categoryIds = [category.id];
+				categoryIds = expandCategoryIds([category.id], categories);
 				resolvedTitle = category.value;
 			}
 
@@ -160,13 +203,15 @@
 			const pageStr = pq.page != null && String(pq.page) !== '' ? String(pq.page) : '1';
 			const limitStr =
 				pq.limit != null && String(pq.limit) !== '' ? String(pq.limit) : '24';
+			const sortKey = page.url.searchParams.get('sort') ?? 'best-selling';
+			const sortCfg = STOREFRONT_SORT[sortKey] ?? STOREFRONT_SORT['best-selling'];
 			const sp = new URLSearchParams({
 				page: pageStr,
 				limit: limitStr,
-				sorting_field: 'products.title',
-				sorting_direction: 'desc'
+				sorting_field: sortCfg.field,
+				sorting_direction: sortCfg.dir
 			});
-			sp.set('filters[category_ids]', categoryIds.join(','));
+			sp.set('filters', JSON.stringify({ category_ids: categoryIds.join(',') }));
 			const pres = await fetch(`${root}/storefront/products?${sp}`, {
 				cache: 'no-store'
 			});
@@ -190,7 +235,7 @@
 					},
 					href: `/products/${p.handle}`,
 					bg: pickBg(i),
-					image: p.variant?.thumbnail ?? null
+					image: p.thumbnail ?? p.variant?.thumbnail ?? null
 				};
 			});
 			return {
@@ -223,10 +268,11 @@
 	const currentAvailability = $derived(page.url.searchParams.get('availability') ?? 'all');
 	const currentPrice = $derived(page.url.searchParams.get('price') ?? 'all');
 	const currentColor = $derived(page.url.searchParams.get('color') ?? 'all');
+	const storeName = $derived(page.data?.storeName ?? 'Store');
 </script>
 
 <svelte:head>
-	<title>{categoryTitle} – ESSENTIALS</title>
+	<title>{categoryTitle} – {storeName}</title>
 </svelte:head>
 
 <SiteHeader />

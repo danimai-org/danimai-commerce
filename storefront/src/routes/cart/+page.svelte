@@ -3,9 +3,11 @@
 	import { client } from '$lib/api/client.js';
 	import { cart, type CartLineItem } from '$lib/stores/cart';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
+	import { API_BASE, firstVariantIdByProductIds, rowsFromPaginated } from '$lib/api/storefront-api';
 
 	const SESSION_STORAGE_KEY = 'dm_sf_session_id';
 	const CART_STORAGE_KEY = 'dm_sf_cart_id';
+	const DEFAULT_CART_CURRENCY_CODE = 'usd';
 
 	const shippingDisplay = $state('$0.00');
 	const discountDisplay = $state('$0.00');
@@ -64,12 +66,38 @@
 		queryFn: () => client['products'].get({ query: listQuery }),
 	}));
 
-	const products = $derived((productsQuery.data?.data?.rows ?? []) as { id: string; title: string; handle: string }[]);
+	type ProductRow = { id: string; title: string; handle: string; thumbnail?: string | null };
+	const products = $derived.by((): ProductRow[] => {
+		const root = productsQuery.data as unknown;
+		const direct = (
+			root as { data?: { rows?: ProductRow[] } } | null | undefined
+		)?.data?.rows;
+		if (Array.isArray(direct) && direct.length > 0) return direct as ProductRow[];
+		const qd = root as { data?: unknown } | null | undefined;
+		const raw = qd?.data;
+		if (raw == null) return [];
+		let { rows } = rowsFromPaginated<ProductRow>(raw);
+		if (rows.length === 0 && raw && typeof raw === 'object' && 'data' in raw) {
+			rows = rowsFromPaginated<ProductRow>((raw as { data: unknown }).data).rows;
+		}
+		return rows;
+	});
+
+	type LookExtra = { image: string | null; priceDisplay: string };
+	let lookExtrasByProductId = $state(new Map<string, LookExtra>());
 	const handleByProductId = $derived.by(() => {
 		const m = new Map<string, string>();
 		for (const p of products) m.set(p.id, p.handle);
 		return m;
 	});
+	const thumbnailByProductId = $derived.by(() => {
+		const m = new Map<string, string | null>();
+		for (const p of products) m.set(p.id, p.thumbnail ?? null);
+		return m;
+	});
+
+	type VariantDetail = { title: string; thumbnail: string | null };
+	let variantDetailsById = $state(new Map<string, VariantDetail>());
 
 	function treatyErrorMessage(err: unknown): string {
 		const o = err as { value?: { message?: string } };
@@ -88,7 +116,10 @@
 	}
 
 	async function createCartRow(sessionId: string): Promise<string> {
-		const res = await client.carts.post({ session_id: sessionId });
+		const res = await client.carts.post({
+			session_id: sessionId,
+			currency_code: DEFAULT_CART_CURRENCY_CODE
+		});
 		if (res.error) throw new Error(treatyErrorMessage(res.error));
 		const row = res.data as { id: string };
 		localStorage.setItem(CART_STORAGE_KEY, row.id);
@@ -128,17 +159,56 @@
 		() => queryClient
 	);
 
+	$effect(() => {
+		const lineItems = cartQuery.data?.line_items;
+		if (!lineItems?.length) {
+			variantDetailsById = new Map();
+			return;
+		}
+		const ids = [
+			...new Set(lineItems.map((li) => li.variant_id).filter((id): id is string => Boolean(id)))
+		];
+		if (ids.length === 0) {
+			variantDetailsById = new Map();
+			return;
+		}
+		let cancelled = false;
+		void (async () => {
+			const next = new Map<string, VariantDetail>();
+			await Promise.all(
+				ids.map(async (id) => {
+					const res = await client['product-variants']({ id }).get();
+					if (res.error || !res.data) return;
+					const d = res.data as { title: string; thumbnail?: string | null };
+					next.set(id, { title: d.title, thumbnail: d.thumbnail ?? null });
+				})
+			);
+			if (!cancelled) variantDetailsById = next;
+		})();
+		return () => {
+			cancelled = true;
+		};
+	});
+
 	const cartPending = $derived(cartQuery.isPending && cartQuery.data === undefined);
 	const cartFailed = $derived(cartQuery.isError);
 	const cartItems = $derived.by((): CartRowView[] => {
 		const cart = cartQuery.data;
 		const map = handleByProductId;
+		const thumbs = thumbnailByProductId;
+		const vmap = variantDetailsById;
 		if (!cart?.line_items?.length) return [];
 		return cart.line_items.map((li) => {
 			const handle = li.product_id ? map.get(li.product_id) : undefined;
 			const href = handle ? `/products/${handle}` : '/';
 			const qty = li.quantity ?? 0;
 			const pv = parsePrice(li.unit_price ?? '0');
+			const vd = li.variant_id ? vmap.get(li.variant_id) : undefined;
+			const productThumb = li.product_id ? thumbs.get(li.product_id) ?? null : null;
+			const variantLabel =
+				(vd?.title && vd.title.trim()) ||
+				(li.description && String(li.description).trim()) ||
+				'';
 			return {
 				key: `api:${li.id}`,
 				lineId: li.id,
@@ -147,9 +217,9 @@
 				name: li.title ?? 'Item',
 				priceDisplay: `$${pv.toFixed(2)}`,
 				priceValue: pv,
-				image: li.thumbnail,
+				image: li.thumbnail ?? vd?.thumbnail ?? productThumb,
 				quantity: qty,
-				variant: li.variant_id ? 'Variant' : 'Default'
+				variant: variantLabel || (li.variant_id ? 'Variant' : '—')
 			};
 		});
 	});
@@ -222,6 +292,71 @@
 		const rows = (res.data as { rows?: Array<{ id?: string | null }> })?.rows ?? [];
 		return rows[0]?.id ?? null;
 	}
+
+	async function fetchVariantLineMeta(variantId: string): Promise<{
+		title: string;
+		thumbnail: string | null;
+		unitPrice: string;
+	} | null> {
+		const res = await client['product-variants']({ id: variantId }).get();
+		if (res.error || !res.data) return null;
+		const d = res.data as {
+			title: string;
+			thumbnail?: string | null;
+			prices?: Array<{ amount: string }>;
+		};
+		const raw = d.prices?.[0]?.amount;
+		let unitPrice = '0';
+		if (raw != null && raw !== '') {
+			const cents = parseInt(raw, 10);
+			unitPrice = Number.isFinite(cents) ? String(cents / 100) : '0';
+		}
+		return {
+			title: d.title,
+			thumbnail: d.thumbnail ?? null,
+			unitPrice
+		};
+	}
+
+	$effect(() => {
+		const slice = products.slice(0, 4);
+		if (slice.length === 0) {
+			lookExtrasByProductId = new Map();
+			return;
+		}
+		let cancelled = false;
+		void (async () => {
+			try {
+				const variantByProduct = await firstVariantIdByProductIds(
+					API_BASE,
+					slice.map((p) => p.id)
+				);
+				const next = new Map<string, LookExtra>();
+				await Promise.all(
+					slice.map(async (p) => {
+						const vid = variantByProduct.get(p.id);
+						if (!vid) {
+							next.set(p.id, { image: p.thumbnail ?? null, priceDisplay: '—' });
+							return;
+						}
+						const meta = await fetchVariantLineMeta(vid);
+						const up = meta?.unitPrice != null ? parseFloat(meta.unitPrice) : Number.NaN;
+						next.set(p.id, {
+							image: meta?.thumbnail ?? p.thumbnail ?? null,
+							priceDisplay: Number.isFinite(up) ? `$${up.toFixed(2)}` : '—'
+						});
+					})
+				);
+				if (!cancelled) lookExtrasByProductId = next;
+			} catch {
+				if (!cancelled) lookExtrasByProductId = new Map();
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	});
+
 	function currentCart(): ApiCart | undefined {
 		return queryClient.getQueryData<ApiCart>(['storefront-cart']);
 	}
@@ -269,6 +404,8 @@
 		}
 		const variant_id = await firstVariantIdByProductId(product.id);
 		if (!variant_id) return;
+		const meta = await fetchVariantLineMeta(variant_id);
+		const fallbackThumb = thumbnailByProductId.get(product.id) ?? null;
 		const existing = cart.line_items.find((li) => li.variant_id === variant_id);
 		let line_items: LineItemPut[];
 		if (existing) {
@@ -284,9 +421,10 @@
 					variant_id,
 					product_id: product.id,
 					title: product.title,
+					description: meta?.title ?? null,
 					quantity: 1,
-					unit_price: '0',
-					thumbnail: null
+					unit_price: meta?.unitPrice ?? '0',
+					thumbnail: meta?.thumbnail ?? fallbackThumb
 				}
 			];
 		}
@@ -405,10 +543,19 @@
 			<h2 class="complete-look-title">Complete Your Look</h2>
 			<div class="complete-look-grid">
 				{#each products.slice(0, 4) as product}
+					{@const extra = lookExtrasByProductId.get(product.id)}
+					{@const imgUrl = extra?.image ?? product.thumbnail ?? null}
 					<a href={`/products/${product.handle}`} class="look-card" aria-label={product.title}>
+						<div class="look-image">
+							{#if imgUrl}
+								<img src={imgUrl} alt="" />
+							{:else}
+								<div class="look-image-placeholder" aria-hidden="true"></div>
+							{/if}
+						</div>
 						<button type="button" class="look-quick-add" onclick={(e) => void quickAdd(e, { id: product.id, title: product.title, handle: product.handle })}>QUICK ADD</button>
 						<h3 class="look-name">{product.title}</h3>
-						<p class="look-price">$0.00</p>
+						<p class="look-price">{extra?.priceDisplay ?? '—'}</p>
 					</a>
 				{/each}
 			</div>
@@ -778,6 +925,12 @@
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+	}
+	.look-image-placeholder {
+		width: 100%;
+		height: 100%;
+		min-height: 100%;
+		background: #f5f0eb;
 	}
 	.look-quick-add {
 		position: absolute;
