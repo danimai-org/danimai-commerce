@@ -17,7 +17,7 @@ export class DeleteMediaProcess {
   constructor(
     @InjectDB() private readonly db: Kysely<Database>,
     @InjectS3() private readonly s3: S3Client,
-  ) {}
+  ) { }
 
   /**
    * Deletes media objects from S3 and removes their DB records.
