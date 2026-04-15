@@ -1,18 +1,9 @@
 import { rowsFromPaginated } from "$lib/api/storefront-api";
 import { client } from "$lib/api/client.js";
 
-export type ProductGridItem = {
-  name: string;
-  price: {
-    amount: number;
-    currency_code: string;
-  };
-  href: string;
-  variantId?: string;
-  bg: string;
-  image?: string | null;
-  currency_code?: string | null;
-};
+export type ProductGridItem = Awaited<
+  ReturnType<(typeof client)["storefront"]["products"]["get"]>
+>["data"];
 
 const FALLBACK_BGS = ["#e8e0d5", "#4a4a4a", "#f5f0eb", "#6b7c5c"];
 
@@ -53,16 +44,16 @@ async function fetchVariantPrice(
 }
 
 export async function load() {
-  const products: ProductGridItem[] = [];
-  let error: string | null = null;
+  const products: ProductGridItem[] | null = null;
+  const error: string | null = null;
 
   try {
-    const res = await client.admin["products"].get({
+    const res = await client.storefront["products"].get({
       query: { limit: "100", page: "1" },
     });
     if (res.error) {
-      error = "Products failed";
-      return { products, error };
+      const error = "Products failed";
+      return { products: null, error };
     }
     const data = res.data as unknown;
     const { rows: list } = rowsFromPaginated<{
@@ -74,7 +65,7 @@ export async function load() {
     }>(data);
     const variantMap = await client.admin["product-variants"].get({
       query: {
-        filters: { product_id: list.map((p) => p.id) },
+        filters: { product_id: list.map((p) => p.id).join(",") },
       },
     });
     if (variantMap.error) throw new Error("Failed to load variants");
@@ -88,7 +79,6 @@ export async function load() {
     );
     const prices = await Promise.all(pricePromises);
 
-    let priceIndex = 0;
     for (let i = 0; i < list.length; i++) {
       const p = list[i];
       const firstVariantId =
@@ -97,23 +87,10 @@ export async function load() {
           (v: { id: string }) => v.id === p.id,
         )?.id ??
         null;
-      const price = prices[priceIndex];
-      priceIndex++;
-      products.push({
-        name: p.title,
-        price: {
-          amount: price?.amount ?? 0,
-          currency_code: price?.currency_code ?? "USD",
-        },
-        href: `/products/${p.handle}`,
-        variantId: firstVariantId ?? undefined,
-        bg: pickBg(i),
-        image: p.thumbnail || null,
-      });
     }
   } catch (e) {
-    error = e instanceof Error ? e.message : "Failed to load products";
+    const error = e instanceof Error ? e.message : "Failed to load products";
   }
 
-  return { products, error };
+  return { products: products ?? [], error };
 }

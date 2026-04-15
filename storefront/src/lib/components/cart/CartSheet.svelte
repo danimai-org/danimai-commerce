@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { getUserCart, useCart } from '$lib/hooks/use-cart.hook';
-	import { cart } from '$lib/stores/cart';
-
+	import { closeCart } from '$lib/hooks/use-cart.hook';
 	let cartOpen = $state(false);
 	const { refetchCart, updateCartLineItems } = useCart();
 	$effect(() => {
@@ -16,14 +15,15 @@
 	const subtotalDisplay = $derived(`$${subtotal.toFixed(2)}`);
 
 	function handleClose() {
-		cart.close();
 		refetchCart.refetch();
+		closeCart();
+		cartOpen = false;
 	}
 
 	function goToCart() {
-		cart.close();
 		refetchCart.refetch();
 		goto('/cart');
+		cartOpen = false;
 	}
 </script>
 

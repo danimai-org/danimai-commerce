@@ -70,7 +70,7 @@
 	async function fetchResults(q: string) {
 		loading = true;
 		try {
-			const res = await client.products.get({
+			const res = await client.admin.products.get({
 				query: {
 					search: q,
 					limit: '20',

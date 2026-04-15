@@ -63,7 +63,7 @@
 	const listQuery = { page: 1, limit: 100 } as const;
 	const productsQuery = createQuery(() => ({
 		queryKey: ['products', listQuery.page, listQuery.limit],
-		queryFn: () => client['products'].get({ query: listQuery }),
+		queryFn: () => client.admin['products'].get({ query: listQuery }),
 	}));
 
 	type ProductRow = { id: string; title: string; handle: string; thumbnail?: string | null };
@@ -107,7 +107,7 @@
 	async function ensureSessionId(): Promise<string> {
 		let sid = localStorage.getItem(SESSION_STORAGE_KEY);
 		if (sid) return sid;
-		const res = await client.auth.sessions.post({});
+		const res = await client.admin.auth.sessions.post({});
 		if (res.error) throw new Error(treatyErrorMessage(res.error));
 		const j = res.data as { id: string };
 		sid = j.id;
@@ -116,7 +116,7 @@
 	}
 
 	async function createCartRow(sessionId: string): Promise<string> {
-		const res = await client.carts.post({
+		const res = await client.admin.carts.post({
 			session_id: sessionId,
 			currency_code: DEFAULT_CART_CURRENCY_CODE
 		});
@@ -127,7 +127,7 @@
 	}
 
 	async function fetchCartJson(cartId: string): Promise<ApiCart> {
-		const res = await client.carts({ id: cartId }).get();
+		const res = await client.admin.carts({ id: cartId }).get();
 		if (res.error) throw new Error(treatyErrorMessage(res.error));
 		return res.data as ApiCart;
 	}
@@ -177,7 +177,7 @@
 			const next = new Map<string, VariantDetail>();
 			await Promise.all(
 				ids.map(async (id) => {
-					const res = await client['product-variants']({ id }).get();
+					const res = await client.admin['product-variants']({ id }).get();
 					if (res.error || !res.data) return;
 					const d = res.data as { title: string; thumbnail?: string | null };
 					next.set(id, { title: d.title, thumbnail: d.thumbnail ?? null });
@@ -223,24 +223,8 @@
 			};
 		});
 	});
-	const localItems = $derived.by((): CartRowView[] => {
-		if (!getUserCart()?.line_items?.length) return [];
-		return getUserCart()?.line_items?.map((item: Cart) => ({
-			key: `local:${item.id}`,
-			lineId: item.id,
-			source: 'local',
-			href: item.href,
-			name: item.name,
-			priceDisplay: `$${item.priceValue.toFixed(2)}`,
-			priceValue: item.priceValue,
-			image: item.image,
-			quantity: item.quantity,
-			variant: item.variant
-		}));
-	});
-	const displayItems = $derived((cartItems.length > 0 ? cartItems : localItems));
-
-	const subtotal = $derived(displayItems.reduce((sum, i) => sum + i.priceValue * i.quantity, 0));
+	const displayItems = $derived(cartItems);
+	const subtotal = $derived(displayItems.reduce((sum: number, i: CartRowView) => sum + i.priceValue * i.quantity, 0));
 	const subtotalDisplay = $derived(`$${subtotal.toFixed(2)}`);
 	const totalDisplay = $derived(`$${subtotal.toFixed(2)}`);
 
@@ -278,13 +262,13 @@
 	}
 	async function putLineItems(cartId: string, line_items: LineItemPut[]) {
 		const res = await client
-			.carts({ id: cartId })
+			.admin.carts({ id: cartId })
 			['line-items'].put({ line_items });
 		if (res.error) throw new Error(treatyErrorMessage(res.error));
 	}
 
 	async function firstVariantIdByProductId(productId: string): Promise<string | null> {
-		const res = await client['product-variants'].get({
+		const res = await client.admin['product-variants'].get({
 			query: { page: 1, limit: 1, filters: { product_id: productId } }
 		});
 		if (res.error) throw new Error(treatyErrorMessage(res.error));
@@ -297,7 +281,7 @@
 		thumbnail: string | null;
 		unitPrice: string;
 	} | null> {
-		const res = await client['product-variants']({ id: variantId }).get();
+		const res = await client.admin['product-variants']({ id: variantId }).get();
 		if (res.error || !res.data) return null;
 		const d = res.data as {
 			title: string;

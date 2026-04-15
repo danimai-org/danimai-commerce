@@ -30,9 +30,9 @@
 		<div class="footer-col">
 			<div class="footer-heading">SHOP</div>
 			<ul class="footer-links">
-				<li><a href="/products">All Products</a></li>
-				<li><a href="/tops">Tops</a></li>
-				<li><a href="/bottoms">Bottoms</a></li>
+				<li><a href="/store">Shop All</a></li>
+				<li><a href="/categories/all-tops">Tops</a></li>
+				<li><a href="/categories/all-bottoms">Bottoms</a></li>
 			</ul>
 		</div>
 		<div class="footer-col">

@@ -5,13 +5,14 @@
 	import ProductAccordions from './ProductAccordions.svelte';
 	import type { VariantItem } from './ProductVariantSelect.svelte';
 	import type { AccordionItem } from './ProductAccordions.svelte';
+	
 
 	type ProductDetailsProps = {
 		title: string;
 		priceLabel: string;
 		tagline?: string;
 		variants: VariantItem[];
-		selectedVariantId?: string | null;
+		selectedVariantId: string | null;
 		quantity: number;
 		accordionItems: AccordionItem[];
 		productHref?: string;

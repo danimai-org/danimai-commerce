@@ -1,49 +1,33 @@
 import { writable } from "svelte/store";
 
-export interface CartLineItem {
-  key: string;
-  href: string;
-  name: string;
-  variantId?: string;
-  priceDisplay: string;
-  priceValue: number;
-  image: string | null;
-  quantity: number;
-  variant: string;
-}
-
 function createCartStore() {
   const isBrowser = typeof window !== "undefined";
   const CART_ITEMS_STORAGE_KEY = "dm_sf_local_cart_items";
   const initialItems = (() => {
-    if (!isBrowser) return [] as CartLineItem[];
+    if (!isBrowser) return [];
     const raw = window.localStorage.getItem(CART_ITEMS_STORAGE_KEY);
-    if (!raw) return [] as CartLineItem[];
+    if (!raw) return [];
     try {
       const parsed = JSON.parse(raw) as unknown;
-      return Array.isArray(parsed) ? (parsed as CartLineItem[]) : [];
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return [] as CartLineItem[];
+      return [];
     }
   })();
   const { subscribe, update } = writable<{
     open: boolean;
-    items: CartLineItem[];
+    items: any[];
   }>({ open: false, items: initialItems });
-
-  const persistItems = (items: CartLineItem[]) => {
+  const persistItems = (items: any[]) => {
     if (!isBrowser) return;
     window.localStorage.setItem(CART_ITEMS_STORAGE_KEY, JSON.stringify(items));
   };
-
   return {
     subscribe,
     open: () => update((s) => ({ ...s, open: true })),
     close: () => update((s) => ({ ...s, open: false })),
     toggle: () => update((s) => ({ ...s, open: !s.open })),
-    addItem: (
-      item: Omit<CartLineItem, "key" | "quantity"> & { quantity?: number },
-    ) => {
+    addItem: (item: Omit<any, "key" | "quantity"> & { quantity?: number }) => {
       const variantKey = item.variantId ?? item.variant ?? "default";
       const key = `${item.href || item.name}-${variantKey}`;
       update((s) => {
@@ -61,7 +45,7 @@ function createCartStore() {
                 key,
                 href: item.href ?? "",
                 quantity: item.quantity ?? 1,
-              } as CartLineItem,
+              } as any,
             ];
         persistItems(items);
         return { ...s, items, open: true };
@@ -92,5 +76,4 @@ function createCartStore() {
     },
   };
 }
-
 export const cart = createCartStore();

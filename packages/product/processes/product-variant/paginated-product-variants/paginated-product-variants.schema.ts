@@ -6,7 +6,7 @@ import {
 import { ProductVariantResponseSchema } from "../retrieve-product-variant/retrieve-product-variant.schema";
 
 export const PaginatedProductVariantsSchema = createPaginationSchema(
-  Type.Object({}),
+  Type.Object({product_id: Type.String({ format: "uuid" })}),
   [
     "id",
     "title",

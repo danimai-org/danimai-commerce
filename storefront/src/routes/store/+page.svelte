@@ -20,6 +20,7 @@
 	{/if}
 	<ProductGridSection
 		products={products}
+		
 	/>
 </main>
 

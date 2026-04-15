@@ -2,7 +2,6 @@
 	import { getUserCart, useCart } from '$lib/hooks/use-cart.hook';
 	import { cart } from '$lib/stores/cart';
 	import type { ProductGridItem } from '../../../routes/store/+page.ts';
-
 	const { updateCartLineItems, refetchCart } = useCart();	
 	let {
 		products = [] as ProductGridItem[] | undefined,
@@ -51,14 +50,14 @@
 
 	async function quickAdd(e: MouseEvent, product: ProductGridItem) {
 		e.preventDefault();
-		if (!product.variantId) return;
+		if (!product?.variantId) return;
 		const cartId = getUserCart()?.id;
 		if (!cartId) return;
 		cart.open();
 		await updateCartLineItems.mutateAsync({
 			id: cartId,
 			lineItems: [{
-				variant_id: product.variantId,
+				
 				quantity: 1,
 			}]
 		});
@@ -78,7 +77,7 @@
 		{#each products as product}
 			{#if catalogMode}
 				<article class="product-card catalog-card">
-					<a href={product.href} class="product-card-link" aria-label={product.name}>
+					<a href={product?.href} class="product-card-link" aria-label={product?.name}>
 						<div class="product-image" style="background-color: {product.bg};">
 							{#if product.image}
 								<img src={product.image} alt="" class="product-img" />

@@ -1,152 +1,149 @@
 <script lang="ts">
-	import { SiteHeader, SiteFooter } from '$lib/components/layout';
-	import { ProductGridSection } from '$lib/components/sections';
-	import {
-		ProductGallery,
-		ProductDetails,
-		ProductInfoBlocks,
-		ProductError,
-		type VariantItem,
-		type AccordionItem
-	} from '$lib/components/product';
+    import { SiteHeader, SiteFooter } from '$lib/components/layout';
+    import { ProductGridSection } from '$lib/components/sections';
+    import {
+        ProductGallery,
+        ProductDetails,
+        ProductInfoBlocks,
+        ProductError
+    } from '$lib/components/product';
 
-	let { data } = $props();
-	const product = $derived(data?.product ?? null);
-	const variants = $derived(data?.variants ?? []);
+    let { data } = $props();
+    
+    const variants = $derived(data?.variantRows ?? []);
+    const productBase = $derived(data?.product);
 	const otherProducts = $derived(data?.otherProducts ?? []);
-	const error = $derived(data?.error ?? null);
-	const canShowProduct = $derived(Boolean(product) && variants.length > 0);
+    let selectedVariantId = $state<string | null>(null);
+    let quantity = $state(1);
+    let selectedImageUrl = $state<string | null>(null);
+    const selectedVariant = $derived(
+        variants.find((v) => v?.id === selectedVariantId) ?? variants[0] ?? null
+    );
 
-	let selectedVariantId = $state<string | null>(null);
-	let quantity = $state(1);
-	let selectedImageUrl = $state<string | null>(null);
+    $effect(() => {
+        if (!selectedVariantId && variants.length > 0) {
+            selectedVariantId = variants[0]?.id ?? null;
+        }
+    });
 
-	$effect(() => {
-		if (variants.length > 0 && selectedVariantId === null) {
-			selectedVariantId = variants[0].id;
-		}
-	});
+    function formatPrice(
+        amount: number | string | null | undefined,
+        currencyCode: string | null | undefined
+    ): string {
+        if (amount === null || amount === undefined) return '—';
+        const parsed =
+            typeof amount === 'number'
+                ? amount
+                : Number.parseFloat(String(amount).replace(/[^0-9.-]/g, ''));
+        if (!Number.isFinite(parsed)) return '—';
+        const decimalAmount = parsed > 1000 ? parsed / 100 : parsed;
+        const currency = currencyCode && currencyCode.trim() ? currencyCode : 'USD';
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency
+        }).format(decimalAmount);
+    }
 
-	const selectedVariant = $derived(
-		variants.length > 0
-			? (variants.find((v) => v.id === selectedVariantId) ?? variants[0])
-			: undefined
-	);
-	const galleryImages = $derived([
-		product?.thumbnail,
-		...(variants.map((v) => v.thumbnail).filter(Boolean) as string[])
-	].filter((url): url is string => !!url));
-	const mainImage = $derived(
-		selectedImageUrl ??
-			product?.thumbnail ??
-			selectedVariant?.thumbnail ??
-			galleryImages[0] ??
-			null
-	);
+	const priceLabel = $derived(
+        formatPrice(
+            selectedVariant?.prices?.[0]?.amount ?? productBase?.variant?.price?.amount,
+            selectedVariant?.prices?.[0]?.currency_code ?? productBase?.variant?.price?.currency_code
+        )
+    );
+  
+    const galleryImages = $derived([
+        productBase?.thumbnail,
+        ...variants.map((v) => v?.thumbnail ?? null)
+    ].filter((url): url is string => !!url));
+    const mainImage = $derived(
+        selectedImageUrl ??
+        variants.find((v) => v?.id === selectedVariantId)?.thumbnail ??
+        productBase?.thumbnail ??
+        galleryImages[0] ??
+        null
+    );
+    const variantOptions = $derived(
+        variants.map((v) => ({
+            id: v?.id ?? '' as string,
+            title: v?.title ?? '' as string,
+            priceDisplay: formatPrice(
+                v?.prices?.[0]?.amount ?? productBase?.variant?.price?.amount,
+                v?.prices?.[0]?.currency_code ?? productBase?.variant?.price?.currency_code
+            )
+        }))
+    );
+    const accordionItems = [
+        { key: 'details', title: 'PRODUCT DETAILS', content: '<p>Premium materials, designed for everyday wear.</p>' },
+        { key: 'shipping', title: 'SHIPPING', content: '<p>Free standard shipping on all orders.</p>' }
+    ];
 
-	const variantItems: VariantItem[] = $derived(
-		variants.map((v) => ({ id: v.id, title: v.title ?? '', priceDisplay: v.priceDisplay ?? '—' }))
-	);
-
-	const accordionItems: AccordionItem[] = $derived([
-		{
-			key: 'details',
-			title: 'PRODUCT DETAILS',
-			content: '<p>Premium materials, designed for everyday wear. See Fabric & Care for composition.</p>'
-		},
-		{
-			key: 'fit',
-			title: 'FIT & SIZE',
-			content: '<p>Regular fit. We recommend ordering your usual size. For guidance, see our size guide.</p>'
-		},
-		{
-			key: 'fabric',
-			title: 'FABRIC & CARE',
-			content: '<p>Check the care label on your garment for specific instructions. Machine wash cold, tumble dry low.</p>'
-		},
-		{
-			key: 'shipping',
-			title: 'SHIPPING & RETURNS',
-			content: '<p><strong>Free Shipping</strong> — Enjoy free standard shipping on all orders. Express shipping available at an additional cost.</p><p><strong>Hassle-Free Returns</strong> — Not completely satisfied? We\'ll gladly offer you a refund within 30 days of your purchase. Return shipping is not included.</p>'
-		}
-	]);
-
-	const tagline = $derived(
-		product?.subtitle || (product?.description ? product.description.replace(/<[^>]+>/g, '').slice(0, 200) : '') || ''
-	);
 </script>
 
 <SiteHeader />
-
-{#if error || !product || !canShowProduct}
-	<ProductError message={error ?? 'Product not found'} />
+{#if data.error || variants.length === 0}
+    <ProductError message={data.error ?? 'Product not found'} />
 {:else}
-	<main class="product-page">
-		<div class="product-layout">
-			<ProductGallery
-				images={galleryImages}
-				mainImage={mainImage ?? ''}
-				alt={product.title}
-				bind:selectedImageUrl
-			/>
-			<ProductDetails
-				title={product.title}
-				priceLabel={selectedVariant?.priceDisplay ?? product.priceLabel ?? '—'}
-				tagline={tagline}
-				variants={variantItems}
-				bind:selectedVariantId
-				bind:quantity
-				accordionItems={accordionItems}
-				productHref={product ? `/products/${product.handle}` : ''}
-				productImage={mainImage}
-				selectedVariantTitle={selectedVariant?.title ?? ''}
-			/>
-		</div>
+    <main class="product-page">
+        <div class="product-layout">
+            <ProductGallery
+                images={galleryImages}
+                {mainImage}
+                alt={productBase?.title ?? 'Product Image'}
+                bind:selectedImageUrl
+            />
 
-		<ProductInfoBlocks />
+            <ProductDetails
+                title={productBase?.title ?? 'Loading...'}
+                priceLabel={priceLabel ?? '—'}
+                variants={variantOptions}
+                bind:selectedVariantId
+                bind:quantity
+                {accordionItems}
+                productHref={`/products/${productBase?.handle}`}
+                productImage={mainImage}
+                selectedVariantTitle={variants.find((v) => v?.id === selectedVariantId)?.title ?? ''}
+            />
+        </div>
 
-		{#if otherProducts.length > 0}
-			<section class="also-like">
-				<h2 class="also-like-title">You May Also Like</h2>
-				<ProductGridSection products={otherProducts} title="" subtitle="" />
-			</section>
-		{/if}
-	</main>
+        <ProductInfoBlocks />
+        <section class="also-like">
+            <h2 class="also-like-title">You May Also Like</h2>
+            <ProductGridSection 
+                products={otherProducts.map((v) => ({
+                    name: v?.title ?? '',
+                    bg: '#f4f4f4',
+                    price: {
+                        amount: parseFloat(v?.variant?.price?.amount ?? '0') / 100,
+                        currency_code: v?.variant?.price?.currency_code ?? 'USD'
+                    },
+                    href: `/products/${productBase?.handle ?? ''}`,
+                    image: v?.thumbnail ?? null,	
+                }))} 
+            />
+        </section>
+    </main>
 {/if}
-
-<SiteFooter />
-
+<SiteFooter  />
 <style>
-	.product-page {
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 2rem 1.5rem 4rem;
-	}
-	.product-layout {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 3rem;
-		align-items: start;
-	}
-	.also-like {
-		margin-top: 4rem;
-	}
-	.also-like-title {
-		font-size: 1.5rem;
-		font-weight: 700;
-		margin: 0 0 1.5rem;
-		text-align: center;
-		color: #1a1a1a;
-	}
-	:global(.also-like .section-title) {
-		display: none;
-	}
-	:global(.also-like .section-subtitle) {
-		display: none;
-	}
-	@media (max-width: 900px) {
-		.product-layout {
-			grid-template-columns: 1fr;
-		}
-	}
+    .product-page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem 4rem;
+    }
+    .product-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3rem;
+        align-items: start;
+    }
+    .also-like { margin-top: 4rem; }
+    .also-like-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+    @media (max-width: 900px) {
+        .product-layout { grid-template-columns: 1fr; }
+    }
 </style>

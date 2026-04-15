@@ -1,28 +1,38 @@
 import { getContext, setContext } from "svelte";
 import { client } from "$lib/api/client";
 import { createMutation, createQuery } from "@tanstack/svelte-query";
+import { writable } from "svelte/store";
 
+export const cart = writable<Cart[]>([]);
 export type Cart = Awaited<
   ReturnType<ReturnType<(typeof client)["admin"]["carts"]>["get"]>
 >["data"];
 
 const USER_CART = Symbol("user_cart");
-
 export function setUserCart(cart: Cart) {
   setContext(USER_CART, cart);
 }
-
 export function getUserCart() {
   return getContext<Cart>(USER_CART);
 }
-
 function getCartId(): string | null {
   return getUserCart()?.id ?? null;
 }
-
 export const saveInLocalStorage = (cart: Cart) => {
   if (typeof window === "undefined") return;
   localStorage.setItem("dm_sf_cart_id", cart?.id ?? "undefined");
+};
+
+export const openCart = () => {
+  setContext(USER_CART, null);
+  localStorage.removeItem("dm_sf_cart_id");
+};
+
+export const closeCart = () => {
+  setContext(USER_CART, null);
+};
+export const isCartOpen = () => {
+  return getContext<Cart>(USER_CART) !== null;
 };
 
 export const useCart = () => {
@@ -87,6 +97,17 @@ export const useCart = () => {
   //   },
   // }));
 
+  const openCart = createMutation(() => ({
+    mutationFn: async ({ sessionId }: { sessionId: string }) => {
+      const res = await client.admin.carts.post({
+        session_id: sessionId,
+      });
+      if (res.error)
+        throw new Error(res.error.value?.message ?? "Unknown error");
+      setUserCart(res.data as Cart);
+      return res.data as Cart;
+    },
+  }));
   const createCart = createMutation(() => ({
     mutationFn: async ({ sessionId }: { sessionId: string }) => {
       const res = await client.admin.carts.post({
@@ -117,5 +138,6 @@ export const useCart = () => {
     updateCartAddresses,
     createCart,
     refetchCart,
+    openCart,
   };
 };

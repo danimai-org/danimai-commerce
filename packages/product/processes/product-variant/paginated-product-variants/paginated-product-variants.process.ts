@@ -19,35 +19,45 @@ import type { Database } from "../../../db/type";
  * Input: validated process context input for this operation.
  * Output: process-specific result data for downstream callers.
  */
-export const PAGINATED_PRODUCT_VARIANTS_PROCESS = Symbol("PaginatedProductVariants");
+export const PAGINATED_PRODUCT_VARIANTS_PROCESS = Symbol(
+  "PaginatedProductVariants",
+);
 
 @Process(PAGINATED_PRODUCT_VARIANTS_PROCESS)
-export class PaginatedProductVariantsProcess
-  implements ProcessContract<
-    typeof PaginatedProductVariantsSchema,
-    PaginatedProductVariantsProcessOutput
-  > {
+export class PaginatedProductVariantsProcess implements ProcessContract<
+  typeof PaginatedProductVariantsSchema,
+  PaginatedProductVariantsProcessOutput
+> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
-  ) { }
+  ) {}
 
-  /**
-   * Executes the process business logic.
-   * Input: validated process context and request payload.
-   * Output: operation result object or entity payload.
-   */
-  async runOperations(@ProcessContext({
-    schema: PaginatedProductVariantsSchema,
-  }) context: ProcessContextType<typeof PaginatedProductVariantsSchema>) {
+  async runOperations(
+    @ProcessContext({
+      schema: PaginatedProductVariantsSchema,
+    })
+    context: ProcessContextType<typeof PaginatedProductVariantsSchema>,
+  ) {
     const { input } = context;
-    const { page = 1, limit = 10, sorting_field = "created_at", sorting_direction = SortOrder.DESC, search } = input;
+    const {
+      page = 1,
+      limit = 10,
+      sorting_field = "created_at",
+      sorting_direction = SortOrder.DESC,
+      search,
+    } = input;
+    const { product_id } = input.filters ?? {};
 
     let query = this.db
       .selectFrom("product_variants")
       .where("deleted_at", "is", null);
 
-    if(search && search.trim()) {
+    if (product_id) {
+      query = query.where("product_id", "=", product_id);
+    }
+
+    if (search && search.trim()) {
       query = query.where("title", "ilike", `%${search.trim()}%`);
     }
 
