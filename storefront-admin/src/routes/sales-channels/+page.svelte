@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto,  invalidateAll} from '$app/navigation';
 	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
@@ -13,14 +13,21 @@
 	} from '$lib/components/organs/index.js';
 	import Share2 from '@lucide/svelte/icons/share-2';
 	import { client } from '$lib/client.js';
-	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
+	import { createPaginationState } from '$lib/api/pagination.svelte.js';
 	import { resolve } from '$app/paths';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
-	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+	import type { PageProps } from './$types';
 
-	const paginateState = createPagination(async () => {
-		return client['sales-channels'].get({ query: paginationQuery });
-	}, ['sales-channels']);
+	
+	const { data }: PageProps = $props();
+
+	const refetch = $derived(() => {
+		invalidateAll();
+	});
+	
+	const paginateState = createPaginationState<NonNullable<NonNullable<typeof data.salesChannels>['rows']>[number]>((() => {
+		refetch();
+	}));
 
 	function goToPage(pageNum: number) {
 		const params = new SvelteURLSearchParams(page.url.searchParams);
@@ -28,22 +35,22 @@
 		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
-	const rows = $derived(paginateState.query.data?.data?.rows ?? []);
+	const rows = $derived(data?.salesChannels?.rows ?? []);
 	type SalesChannelRow = (typeof rows)[number];
-	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
-	const start = $derived(paginateState.start);
-	const end = $derived(paginateState.end);
+	const pagination = $derived(data?.salesChannels?.pagination ?? null);
+	const start = $derived(data?.salesChannels?.pagination?.start ?? 0);
+	const end = $derived(data?.salesChannels?.pagination?.end ?? 0);
+	
 	const openCreate = $derived(paginateState.openCreate);
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
 	const deleteItem = $derived(paginateState.deleteItem);
 	const deleteError = $derived(paginateState.deleteError);
 	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
 	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
-	const refetch = $derived(paginateState.refetch);
 
 	async function handleFormSaved() {
 		paginateState.closeForm();
-		await paginateState.refetch();
+		 refetch();
 	}
 
 	const tableColumns: TableColumn[] = [
@@ -77,10 +84,6 @@
 	];
 </script>
 
-<svelte:head>
-	<title>Sales Channels</title>
-	<meta name="description" content="Manage sales channels." />
-</svelte:head>
 
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
@@ -92,17 +95,6 @@
 			<Button size="sm" onclick={openCreate}>Create</Button>
 		</div>
 		<PaginationTable>
-			{#if paginateState.error}
-				<div
-					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-				>
-					{paginateState.error}
-				</div>
-			{:else if paginateState.loading}
-				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
-					<p class="text-muted-foreground">Loading…</p>
-				</div>
-			{:else}
 				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
 					<table class="w-full text-sm">
 						<TableHead columns={tableColumns} />
@@ -111,7 +103,6 @@
 				</div>
 
 				<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
-			{/if}
 		</PaginationTable>
 	</div>
 </div>

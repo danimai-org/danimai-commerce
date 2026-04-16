@@ -3,12 +3,16 @@ import { client } from "$lib/api/client";
 import { createMutation, createQuery } from "@tanstack/svelte-query";
 import { writable } from "svelte/store";
 
-export const cart = writable<Cart[]>([]);
-export type Cart = Awaited<
+export type Cart = NonNullable<Awaited<
   ReturnType<ReturnType<(typeof client)["admin"]["carts"]>["get"]>
->["data"];
+>["data"]>;
+
+
+export type CartLineItem = Cart["line_items"][number];
+export type CartShippingAddress = Cart["shipping_address"];
 
 const USER_CART = Symbol("user_cart");
+
 export function setUserCart(cart: Cart) {
   setContext(USER_CART, cart);
 }
@@ -37,10 +41,17 @@ export const isCartOpen = () => {
 
 export const useCart = () => {
   const updateCartLineItems = createMutation(() => ({
-    mutationFn: async ({ id, lineItems }: { id: string; lineItems: any[] }) => {
+    mutationFn: async ({ lineItems }: { lineItems: CartLineItem[] }) => {
+      const cartId = getCartId();
+      if (!cartId) return null;
+
       const res = await client.admin
-        .carts({ id })
-        ["line-items"].put({ line_items: lineItems });
+        .carts({ id: cartId })
+      ["line-items"].put({
+        line_items: lineItems.map(item => ({
+
+        }))
+      });
       if (res.error)
         throw new Error(res.error.value?.message ?? "Unknown error");
       return res.data;

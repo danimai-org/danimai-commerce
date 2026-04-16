@@ -14,21 +14,21 @@ const SalesChannelCreateSchema = z.object({
 
 
 export const load: PageServerLoad = async () => {
-        const salesChannelCreateForm = await superValidate(
-            {
-                name: '',
-                description: '',
-                is_default: false
-            },
-            zod4(SalesChannelCreateSchema)
-        );
+    const salesChannelCreateForm = await superValidate(
+        {
+            name: '',
+            description: '',
+            is_default: false
+        },
+        zod4(SalesChannelCreateSchema)
+    );
     return { salesChannelCreateForm };
 };
 
 export const actions = {
 
     create: async ({ request }) => {
-        const salesChannelCreateForm = await superValidate(request, zod4(SalesChannelCreateSchema));    
+        const salesChannelCreateForm = await superValidate(request, zod4(SalesChannelCreateSchema));
 
         if (!salesChannelCreateForm.valid) {
             return fail(400, { salesChannelCreateForm });

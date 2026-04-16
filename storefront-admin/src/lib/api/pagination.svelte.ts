@@ -202,3 +202,121 @@ export const createPagination = <T>(
 		}
 	};
 };
+
+
+
+export const createPaginationState = <T>(reload: () => void) => {
+	let searchText = $state('');
+	const form = $state({
+		sheetOpen: false,
+		mode: 'create' as 'create' | 'edit',
+		item: null as T | null
+	});
+	const deleteState = $state({
+		confirmOpen: false,
+		submitting: false,
+		item: null as T | null,
+		error: null as string | null
+	});
+
+	function openCreate() {
+		form.mode = 'create';
+		form.item = null;
+		form.sheetOpen = true;
+	}
+
+	function openEdit(item: T) {
+		form.mode = 'edit';
+		form.item = item;
+		form.sheetOpen = true;
+	}
+
+	function closeForm() {
+		form.sheetOpen = false;
+		form.item = null;
+	}
+
+	function openDeleteConfirm(item: T) {
+		deleteState.item = item;
+		deleteState.error = null;
+		deleteState.confirmOpen = true;
+	}
+
+	function closeDeleteConfirm() {
+		if (!deleteState.submitting) {
+			deleteState.confirmOpen = false;
+			deleteState.item = null;
+			deleteState.error = null;
+		}
+	}
+
+	async function confirmDelete(deleteFn: (item: T) => Promise<void>) {
+		if (deleteState.item == null) return;
+		deleteState.submitting = true;
+		deleteState.error = null;
+		try {
+			await deleteFn(deleteState.item);
+			deleteState.confirmOpen = false;
+			deleteState.item = null;
+			reload();
+		} catch (e) {
+			deleteState.error = e instanceof Error ? e.message : String(e);
+		} finally {
+			deleteState.submitting = false;
+		}
+	}
+
+	return {
+		get formSheetOpen() {
+			return form.sheetOpen;
+		},
+		set formSheetOpen(value: boolean) {
+			form.sheetOpen = value;
+		},
+		get formMode() {
+			return form.mode;
+		},
+		get formItem() {
+			return form.item;
+		},
+		get openCreate() {
+			return openCreate;
+		},
+		get openEdit() {
+			return openEdit;
+		},
+		get closeForm() {
+			return closeForm;
+		},
+		get deleteConfirmOpen() {
+			return deleteState.confirmOpen;
+		},
+		set deleteConfirmOpen(value: boolean) {
+			deleteState.confirmOpen = value;
+		},
+		get deleteSubmitting() {
+			return deleteState.submitting;
+		},
+		get deleteItem() {
+			return deleteState.item;
+		},
+		get deleteError() {
+			return deleteState.error;
+		},
+		get searchText() {
+			return searchText;
+		},
+		set searchText(value: string) {
+			searchText = value;
+		},
+		get openDeleteConfirm() {
+			return openDeleteConfirm;
+		},
+		get closeDeleteConfirm() {
+			return closeDeleteConfirm;
+		},
+		get confirmDelete() {
+			return confirmDelete;
+		},
+	};
+};
