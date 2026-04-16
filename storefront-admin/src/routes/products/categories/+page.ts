@@ -3,16 +3,12 @@ import type { PageLoad } from './$types';
 import { client } from '$lib/client';
 import { createPaginationResponse } from '$lib/api/pagination';
 
-export const load: PageLoad = async ({ url }) => {
+export const load: PageLoad = async ({ url, data }) => {
 	const paginationQuery = createPaginationQuery(url.searchParams);
-	const salesChannels = await client['sales-channels'].get({ query: paginationQuery });
+	const categories = await client['product-categories'].get({ query: paginationQuery });
 
-	if (!salesChannels || !salesChannels.data) {
-		return {
-			salesChannels: null
-		};
-	}
 	return {
-		salesChannels: createPaginationResponse(salesChannels.data)
+		...data,
+		categories: categories?.data ? createPaginationResponse(categories.data) : null
 	};
 };

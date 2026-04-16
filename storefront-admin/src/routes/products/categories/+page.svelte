@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -14,34 +13,29 @@
 	} from '$lib/components/organs/index.js';
 	import GripVertical from '@lucide/svelte/icons/grip-vertical';
 	import FolderTree from '@lucide/svelte/icons/folder-tree';
-	import { createPagination, createPaginationQuery } from '$lib/api';
 	import { client } from '$lib/client.js';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
+	import { createPaginationState } from '$lib/api';
+	import { goto, invalidateAll } from '$app/navigation';
+	import type { PageProps } from './$types';
+	const { data }: PageProps = $props();
+	const refetch = $derived(() => {
+		invalidateAll();
+	});
+	const paginateState = createPaginationState<
+		NonNullable<NonNullable<typeof data.categories>['rows']>[number]
+	>(() => {
+		refetch();
+	});
 
-	const paginateState = createPagination(
-		async () =>
-			client['product-categories'].get({
-				query: createPaginationQuery(page.url.searchParams)
-			}),
-		['product-categories'],
-		createPaginationQuery(page.url.searchParams)
-	);
-
-	const { query } = paginateState;
-
-	const loading = $derived(paginateState.loading);
-	const error = $derived(paginateState.error);
-	const rows = $derived(query.data?.data?.rows ?? []);
+	const rows = $derived(data.categories?.rows ?? []);
 	type CategoryRow = (typeof rows)[number];
 
-	const pagination = $derived(query.data?.data?.pagination ?? null);
-	const start = $derived(
-		pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0
-	);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
-	);
+	const pagination = $derived(data.categories?.pagination ?? null);
+	const start = $derived(data.categories?.pagination?.start ?? 0);
+	const end = $derived(data?.categories?.pagination?.end ?? 0);
+
 	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
 	const deleteItem = $derived(paginateState.deleteItem);
 
@@ -56,7 +50,10 @@
 	function openCreateSheet() {
 		createSheetOpen = true;
 	}
-
+	async function handleFormSaved() {
+		paginateState.closeForm();
+		refetch();
+	}
 	function getHandle(category: CategoryRow): string {
 		const h = category.handle;
 		if (h) return h.startsWith('/') ? h : `/${h}`;
@@ -125,40 +122,23 @@
 			</div>
 		</div>
 		<PaginationTable>
-			{#if error}
-				<div
-					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-				>
-					{error}
-				</div>
-			{:else if loading}
-				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
-					<p class="text-muted-foreground">Loading…</p>
-				</div>
-			{:else}
-				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-					<table class="w-full text-sm">
-						<TableHead columns={tableColumns} />
-						<TableBody
-							rows={rowsForTable}
-							columns={tableColumns as TableColumn[]}
-							emptyMessage="No categories found."
-						/>
-					</table>
-				</div>
+			<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+				<table class="w-full text-sm">
+					<TableHead columns={tableColumns} />
+					<TableBody
+						rows={rowsForTable}
+						columns={tableColumns as TableColumn[]}
+						emptyMessage="No categories found."
+					/>
+				</table>
+			</div>
 
-				<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
-			{/if}
+			<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
 		</PaginationTable>
 	</div>
 </div>
 
-<CategoryFormSheet
-	bind:open={createSheetOpen}
-	onSuccess={() => {
-		void query.refetch();
-	}}
-/>
+<CategoryFormSheet bind:open={createSheetOpen} onSuccess={handleFormSaved} />
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}

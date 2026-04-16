@@ -5,7 +5,6 @@
 		starts_at: string | null;
 		ends_at: string | null;
 	};
-
 	const detailQuery = getDetailContext<PriceList>();
 	const priceList = $derived(detailQuery?.data ?? null);
 
@@ -25,7 +24,6 @@
 			return '—';
 		}
 	}
-
 	const startsLabel = $derived(priceList?.starts_at ? formatDateTime(priceList.starts_at) : '—');
 	const endsLabel = $derived(priceList?.ends_at ? formatDateTime(priceList.ends_at) : '—');
 </script>
@@ -33,18 +31,13 @@
 <div class="rounded-lg border bg-card p-6 shadow-sm">
 	<h2 class="text-sm font-semibold">Configuration</h2>
 	<div class="mt-4 grid gap-3">
-		<div
-			class="flex items-center justify-between gap-4 rounded-md border bg-muted/20 px-3 py-2"
-		>
+		<div class="flex items-center justify-between gap-4 rounded-md border bg-muted/20 px-3 py-2">
 			<span class="text-xs text-muted-foreground">Start date</span>
 			<span class="text-sm font-medium">{startsLabel}</span>
 		</div>
-		<div
-			class="flex items-center justify-between gap-4 rounded-md border bg-muted/20 px-3 py-2"
-		>
+		<div class="flex items-center justify-between gap-4 rounded-md border bg-muted/20 px-3 py-2">
 			<span class="text-xs text-muted-foreground">End date</span>
 			<span class="text-sm font-medium">{endsLabel}</span>
 		</div>
 	</div>
 </div>
-

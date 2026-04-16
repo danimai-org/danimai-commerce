@@ -13,6 +13,7 @@
 	import PriceListHeroCard from '$lib/components/organs/price-list/detail/PriceListHeroCard.svelte';
 	import PriceListConfigurationCard from '$lib/components/organs/price-list/detail/PriceListConfigurationCard.svelte';
 	import { setPriceListUpdateFormContext } from '$lib/hooks/price-list-edit-context';
+	import { EditPriceList } from '$lib/components/organs/index.js';
 	let { data }: { data: PageData } = $props();
 	$effect(() => {
 		setPriceListUpdateFormContext(data.priceListUpdateForm);
@@ -47,6 +48,8 @@
 	const priceList = $derived(detailQuery?.data ?? null);
 	const error = $derived(detailQuery?.error);
 	const isPending = $derived(detailQuery?.isPending);
+
+	let editOpen = $state(false);
 </script>
 
 <svelte:head>
@@ -107,7 +110,14 @@
 						}
 					}}
 				/>
-
+				<EditPriceList
+					bind:open={editOpen}
+					priceListUpdateForm={data?.priceListUpdateForm ?? null}
+					list={priceList}
+					onSuccess={() => {
+						void detailQuery?.refetch();
+					}}
+				/>
 				<JSONComponent
 					product={priceList as unknown as Record<string, unknown>}
 					options={[]}

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto,  invalidateAll} from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
@@ -18,16 +18,17 @@
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import type { PageProps } from './$types';
 
-	
 	const { data }: PageProps = $props();
 
 	const refetch = $derived(() => {
 		invalidateAll();
 	});
-	
-	const paginateState = createPaginationState<NonNullable<NonNullable<typeof data.salesChannels>['rows']>[number]>((() => {
+
+	const paginateState = createPaginationState<
+		NonNullable<NonNullable<typeof data.salesChannels>['rows']>[number]
+	>(() => {
 		refetch();
-	}));
+	});
 
 	function goToPage(pageNum: number) {
 		const params = new SvelteURLSearchParams(page.url.searchParams);
@@ -40,7 +41,7 @@
 	const pagination = $derived(data?.salesChannels?.pagination ?? null);
 	const start = $derived(data?.salesChannels?.pagination?.start ?? 0);
 	const end = $derived(data?.salesChannels?.pagination?.end ?? 0);
-	
+
 	const openCreate = $derived(paginateState.openCreate);
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
 	const deleteItem = $derived(paginateState.deleteItem);
@@ -50,7 +51,7 @@
 
 	async function handleFormSaved() {
 		paginateState.closeForm();
-		 refetch();
+		refetch();
 	}
 
 	const tableColumns: TableColumn[] = [
@@ -84,7 +85,6 @@
 	];
 </script>
 
-
 <div class="flex h-full flex-col">
 	<div class="flex min-h-0 flex-1 flex-col p-6">
 		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
@@ -95,14 +95,14 @@
 			<Button size="sm" onclick={openCreate}>Create</Button>
 		</div>
 		<PaginationTable>
-				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-					<table class="w-full text-sm">
-						<TableHead columns={tableColumns} />
-						<TableBody {rows} columns={tableColumns} emptyMessage="No sales channels found." />
-					</table>
-				</div>
+			<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+				<table class="w-full text-sm">
+					<TableHead columns={tableColumns} />
+					<TableBody {rows} columns={tableColumns} emptyMessage="No sales channels found." />
+				</table>
+			</div>
 
-				<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
+			<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
 		</PaginationTable>
 	</div>
 </div>

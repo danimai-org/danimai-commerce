@@ -5,14 +5,14 @@ import { createPaginationResponse } from '$lib/api/pagination';
 
 export const load: PageLoad = async ({ url }) => {
 	const paginationQuery = createPaginationQuery(url.searchParams);
-	const salesChannels = await client['sales-channels'].get({ query: paginationQuery });
+	const regions = await client['regions'].get({ query: paginationQuery });
 
-	if (!salesChannels || !salesChannels.data) {
+	if (!regions || !regions.data) {
 		return {
-			salesChannels: null
+			regions: null
 		};
 	}
 	return {
-		salesChannels: createPaginationResponse(salesChannels.data)
+		regions: createPaginationResponse(regions.data)
 	};
 };
