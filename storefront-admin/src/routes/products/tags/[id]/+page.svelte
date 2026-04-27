@@ -10,16 +10,19 @@
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 	import { resolve } from '$app/paths';
 	import { setDetailContext, useDetailQuery } from '$lib/hooks';
+	import EditTag from '$lib/components/organs/tag/update/EditTag.svelte';
 
 	const tagId = $derived(page.params?.id ?? '');
 	const productListingFilter = $derived({ tag_ids: [tagId] });
-	const detailQuery = useDetailQuery(async () => {
-		const res = await client['product-tags']({ id: tagId }).get();
-		return res.data;
-	}, () => ['tag-detail', tagId]);
+	const detailQuery = useDetailQuery(
+		async () => {
+			const res = await client['product-tags']({ id: tagId }).get();
+			return res.data;
+		},
+		() => ['tag-detail', tagId]
+	);
 
 	setDetailContext(detailQuery);
-
 	const error = $derived(detailQuery?.error);
 	const isPending = $derived(detailQuery?.isPending);
 
@@ -109,3 +112,10 @@
 		</div>
 	{/if}
 </div>
+<EditTag
+	open={true}
+	tag={detailQuery?.data as { id: string; value: string } | null}
+	onSaved={() => {
+		void detailQuery?.refetch?.();
+	}}
+/>

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -12,47 +11,35 @@
 		type TableColumn,
 		AttributeFormSheet
 	} from '$lib/components/organs/index.js';
-	import EditAttribute from '$lib/components/organs/attribute/update/EditAttributeHero.svelte';
 	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
-	import { createPagination, createPaginationQuery } from '$lib/api';
+	import { createPaginationState } from '$lib/api';
 	import { client } from '$lib/client.js';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
+	import { goto, invalidateAll } from '$app/navigation';
+	import type { PageProps } from './$types';
+	const { data }: PageProps = $props();
+	const refetch = $derived(() => {
+		invalidateAll();
+	});
+	const paginateState = createPaginationState<
+		NonNullable<NonNullable<typeof data.attributes>['rows']>[number]
+	>(() => {
+		refetch();
+	});
 
-	const paginateState = createPagination(
-		async () =>
-			client['product-attributes'].get({
-				query: createPaginationQuery(page.url.searchParams)
-			}),
-		['product-attributes'],
-		createPaginationQuery(page.url.searchParams)
-	);
-	const { query } = paginateState;
-	const refetch = $derived(paginateState.refetch);
-	const loading = $derived(paginateState.loading);
-	const error = $derived(paginateState.error);
-	const rows = $derived(query.data?.data?.rows ?? []);
+	const rows = $derived(data.attributes?.rows ?? []);
+	const pagination = $derived(data.attributes?.pagination ?? null);
 	type AttributeRow = (typeof rows)[number];
-
-	const pagination = $derived(query.data?.data?.pagination ?? null);
-	const start = $derived(
-		pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0
-	);
-	const end = $derived(
-		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
-	);
 	const openDeleteConfirm = $derived(paginateState.openDeleteConfirm);
+	const start = $derived(data.attributes?.pagination?.start ?? 0);
+	const end = $derived(data?.attributes?.pagination?.end ?? 0);
 	const deleteItem = $derived(paginateState.deleteItem);
-
 	const formMode = $derived(paginateState.formMode);
-	const formItem = $derived(paginateState.formItem);
 	const openCreate = $derived(paginateState.openCreate);
 	async function handleFormSaved() {
 		paginateState.closeForm();
 		void refetch();
-	}
-	function handleEditClosed() {
-		paginateState.closeForm();
 	}
 	function goToPage(pageNum: number) {
 		const params = new SvelteURLSearchParams(page.url.searchParams);
@@ -106,42 +93,22 @@
 			<Button size="sm" onclick={openCreate}>Create</Button>
 		</div>
 		<PaginationTable>
-			{#if error}
-				<div
-					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-				>
-					{error}
-				</div>
-			{:else if loading}
-				<div class="flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-card">
-					<p class="text-muted-foreground">Loading…</p>
-				</div>
-			{:else}
-				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-					<table class="w-full text-sm">
-						<TableHead columns={tableColumns} />
-						<TableBody
-							{rows}
-							columns={tableColumns as TableColumn[]}
-							emptyMessage="No attributes found."
-						/>
-					</table>
-				</div>
-				<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
-			{/if}
+			<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+				<table class="w-full text-sm">
+					<TableHead columns={tableColumns} />
+					<TableBody
+						{rows}
+						columns={tableColumns as TableColumn[]}
+						emptyMessage="No attributes found."
+					/>
+				</table>
+			</div>
+			<TablePagination {pagination} {start} {end} onPageChange={goToPage} />
 		</PaginationTable>
 	</div>
 </div>
 {#if formMode === 'create'}
 	<AttributeFormSheet bind:open={paginateState.formSheetOpen} onSuccess={handleFormSaved} />
-{/if}
-{#if formMode === 'edit'}
-	<EditAttribute
-		bind:open={paginateState.formSheetOpen}
-		attribute={(formItem as AttributeRow | null) ?? null}
-		onSuccess={handleFormSaved}
-		onClosed={handleEditClosed}
-	/>
 {/if}
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}

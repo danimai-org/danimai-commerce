@@ -20,12 +20,13 @@ import type { Database } from "@danimai/cart/db";
 export const CREATE_CART_PROCESS = Symbol("CreateCart");
 
 @Process(CREATE_CART_PROCESS)
-export class CreateCartProcess
-  implements ProcessContract<typeof CreateCartSchema, CreateCartProcessOutput>
-{
+export class CreateCartProcess implements ProcessContract<
+  typeof CreateCartSchema,
+  CreateCartProcessOutput
+> {
   constructor(
     @InjectDB()
-    private readonly db: Kysely<Database>
+    private readonly db: Kysely<Database>,
   ) {}
 
   /**
@@ -35,7 +36,7 @@ export class CreateCartProcess
    */
   async runOperations(
     @ProcessContext({ schema: CreateCartSchema })
-    context: ProcessContextType<typeof CreateCartSchema>
+    context: ProcessContextType<typeof CreateCartSchema>,
   ) {
     const { input } = context;
 

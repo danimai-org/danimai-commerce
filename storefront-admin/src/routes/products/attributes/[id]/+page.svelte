@@ -96,3 +96,10 @@
 		</div>
 	{/if}
 </div>
+
+<EditAttribute
+	bind:open={paginateState.formSheetOpen}
+	attribute={(formItem as AttributeRow | null) ?? null}
+	onSuccess={handleFormSaved}
+	onClosed={handleEditClosed}
+/>

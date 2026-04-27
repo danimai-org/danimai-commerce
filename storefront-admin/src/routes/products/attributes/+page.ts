@@ -5,15 +5,15 @@ import { createPaginationResponse } from '$lib/api/pagination';
 
 export const load: PageLoad = async ({ url, data }) => {
 	const paginationQuery = createPaginationQuery(url.searchParams);
-	const regions = await client['regions'].get({ query: paginationQuery });
+	const attributes = await client['product-attributes'].get({ query: paginationQuery });
 
-	if (!regions || !regions.data) {
+	if (!attributes || !attributes.data) {
 		return {
-			regions: null
+			attributes: null
 		};
 	}
 	return {
 		...data,
-		regions: createPaginationResponse(regions.data)
+		attributes: createPaginationResponse(attributes.data)
 	};
 };

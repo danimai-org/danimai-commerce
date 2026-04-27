@@ -9,7 +9,7 @@
 		TablePagination,
 		type TableColumn
 	} from '$lib/components/organs/index.js';
-	// import CreateRegion from '$lib/components/organs/region/create/create-region.svelte';
+
 	import Globe from '@lucide/svelte/icons/globe';
 	import { client } from '$lib/client.js';
 	import { createPaginationState } from '$lib/api/pagination.svelte.js';
@@ -17,6 +17,7 @@
 	import { resolve } from '$app/paths';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { goto, invalidateAll } from '$app/navigation';
+	// import CreateRegion from '$lib/components/organs/region/create/create-region.svelte';
 	const { data }: PageProps = $props();
 
 	async function refetch() {
@@ -27,7 +28,6 @@
 	>(() => {
 		refetch();
 	});
-
 	function goToPage(pageNum: number) {
 		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.set('page', String(Math.max(1, pageNum)));
@@ -51,11 +51,13 @@
 	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
 	const confirmDelete = $derived(paginateState.confirmDelete);
 
-	function handleOpenCreate() {
-		paginateState.formSheetOpen = true;
+	// let createSheetOpen = $state(false);
+
+	function openCreateSheet() {
+		// createSheetOpen = true;
 	}
-	// function handleFormSaved() {
-	// 	paginateState.formSheetOpen = false;
+	// async function handleFormSaved() {
+	// 	paginateState.closeForm();
 	// 	refetch();
 	// }
 	const tableColumns: TableColumn[] = [
@@ -99,7 +101,7 @@
 				<Globe class="size-4" />
 				<span class="font-semibold">Regions</span>
 			</div>
-			<Button size="sm" onclick={handleOpenCreate}>Create</Button>
+			<Button size="sm" onclick={openCreateSheet}>Create</Button>
 		</div>
 		<PaginationTable>
 			<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
@@ -118,7 +120,7 @@
 	</div>
 </div>
 
-<!-- <CreateRegion bind:open={paginateState.formSheetOpen} onSuccess={handleFormSaved} /> -->
+<!-- <CreateRegion open={createSheetOpen} onSuccess={handleFormSaved} /> -->
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
