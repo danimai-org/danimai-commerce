@@ -50,7 +50,11 @@ export class CreateProductProcess
   }) context: ProcessContextType<typeof CreateProductSchema>) {
     const { input } = context;
 
-    const product = await this.db.transaction().execute(async (trx) => {
+    const trx = this.db;
+
+    await sql`begin`.execute(trx);
+
+    try {
 
       // ── Validate category ──────────────────────────────────────────────
       // Ensure the referenced category exists before attaching it to the product
@@ -374,8 +378,15 @@ export class CreateProductProcess
           .execute();
       }
 
-      return product;
-    });
+      await sql`commit`.execute(trx);
+    } catch (error) {
+      try {
+        await sql`rollback`.execute(trx);
+      } catch {
+        // Ignore rollback errors and preserve original failure.
+      }
+      throw error;
+    }
 
     return undefined;
   }

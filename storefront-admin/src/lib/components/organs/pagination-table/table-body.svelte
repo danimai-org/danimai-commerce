@@ -176,7 +176,7 @@
 											<DropdownMenu.Item
 												textValue={action.label}
 												class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 {action.key === 'delete' ? 'text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive' : ''}"
-												onSelect={() => action.onClick(row)}
+												onclick={() => action.onClick(row)}
 											>
 												{action.label}
 											</DropdownMenu.Item>
@@ -203,7 +203,7 @@
 											<DropdownMenu.Item
 												textValue="Edit"
 												class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-												onSelect={() => openEdit(row)}
+												onclick={() => openEdit(row)}
 											>
 												<Pencil class="size-4" />
 												Edit
@@ -213,7 +213,7 @@
 											<DropdownMenu.Item
 												textValue="Delete"
 												class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors outline-none select-none hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50"
-												onSelect={() => openDeleteConfirm(row)}
+												onclick={() => openDeleteConfirm(row)}
 											>
 												<Trash2 class="size-4" />
 												Delete

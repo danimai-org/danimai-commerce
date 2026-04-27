@@ -14,6 +14,32 @@
 	const thumbnail = $derived(
 		(product as { thumbnail?: string | null } | null)?.thumbnail?.trim() || ''
 	);
+const mediaUrls = $derived.by(() => {
+	const current = (product as Record<string, unknown> | null) ?? null;
+	if (!current) return thumbnail ? [thumbnail] : [];
+
+	const buckets = [
+		current.media,
+		current.media_files,
+		current.images
+	] as unknown[];
+
+	const urls: string[] = [];
+	for (const bucket of buckets) {
+		if (!Array.isArray(bucket)) continue;
+		for (const entry of bucket) {
+			if (!entry || typeof entry !== 'object') continue;
+			const item = entry as { url?: unknown };
+			const url = typeof item.url === 'string' ? item.url.trim() : '';
+			if (url) urls.push(url);
+		}
+	}
+
+	if (thumbnail) {
+		urls.unshift(thumbnail);
+	}
+	return [...new Set(urls)];
+});
 
 	let mediaSheetOpen = $state(false);
 
@@ -40,14 +66,23 @@
 			<Pencil class="size-4" />
 		</Button>
 	</div>
-	{#if thumbnail}
+	{#if mediaUrls.length > 0}
 		<button
 			type="button"
-			class="mt-4 block cursor-pointer rounded-md border-0 bg-transparent p-0 text-left transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+			class="mt-4 block w-full cursor-pointer rounded-md border-0 bg-transparent p-0 text-left transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
 			onclick={openMediaSheet}
 			aria-label="Edit media"
 		>
-			<img src={thumbnail} alt="" class="size-24 rounded-md border object-cover" />
+			<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+				{#each mediaUrls as mediaUrl (mediaUrl)}
+					<img
+						src={mediaUrl}
+						alt=""
+						class="aspect-square w-full rounded-md border object-cover"
+						onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
+					/>
+				{/each}
+			</div>
 		</button>
 	{:else}
 		<button

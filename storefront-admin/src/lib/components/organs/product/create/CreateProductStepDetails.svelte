@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import Upload from '@lucide/svelte/icons/upload-cloud';
 	import Info from '@lucide/svelte/icons/info';
+	import Image from '@lucide/svelte/icons/image';
+	import X from '@lucide/svelte/icons/x';
 	import { cn } from '$lib/utils.js';
 
 	let {
@@ -16,10 +16,9 @@
 		createHasVariants = $bindable(true),
 		createMediaModalOpen = $bindable(false),
 		createMediaImageUrl = $bindable(''),
-		createMediaChosenFile = $bindable(null as File | null),
+		createMediaChosenFiles = $bindable([] as File[]),
 		createMediaFileInput = $bindable(undefined as HTMLInputElement | undefined),
-		createMediaUrl = $bindable(''),
-		createMediaFile = $bindable(null as File | null),
+		createMediaUrls = $bindable([] as string[]),
 		onEnableVariants = () => {}
 	}: {
 		createTitle: string;
@@ -31,41 +30,24 @@
 		createHasVariants: boolean;
 		createMediaModalOpen: boolean;
 		createMediaImageUrl: string;
-		createMediaChosenFile: File | null;
+		createMediaChosenFiles: File[];
 		createMediaFileInput: HTMLInputElement | undefined;
-		createMediaUrl: string;
-		createMediaFile: File | null;
+		createMediaUrls: string[];
 		onEnableVariants?: () => void;
 	} = $props();
 
-	let filePreviewSrc = $state<string | null>(null);
-
-	$effect(() => {
-		const f = createMediaFile;
-		if (!f) {
-			filePreviewSrc = null;
-			return;
-		}
-		const url = URL.createObjectURL(f);
-		filePreviewSrc = url;
-		return () => URL.revokeObjectURL(url);
-	});
-
-	const mediaPreviewSrc = $derived(createMediaUrl.trim() || (filePreviewSrc ?? ''));
-	const dialogPreviewSrc = $derived(createMediaImageUrl.trim());
-
-	let dialogFilePreviewSrc = $state<string | null>(null);
-
-	$effect(() => {
-		const f = createMediaChosenFile;
-		if (!f) {
-			dialogFilePreviewSrc = null;
-			return;
-		}
-		const url = URL.createObjectURL(f);
-		dialogFilePreviewSrc = url;
-		return () => URL.revokeObjectURL(url);
-	});
+	const mediaPreviewSrcs = $derived(createMediaUrls.filter((url) => url.trim().length > 0));
+	const primaryMediaUrl = $derived(mediaPreviewSrcs[0] ?? '');
+	const mediaFileRows = $derived(
+		mediaPreviewSrcs.map((url, index) => ({
+			url,
+			file: createMediaChosenFiles[index],
+			name: createMediaChosenFiles[index]?.name ?? `Image ${index + 1}`,
+			sizeLabel: createMediaChosenFiles[index]
+				? `${(createMediaChosenFiles[index].size / 1024).toFixed(1)} KB`
+				: 'Uploaded image'
+		}))
+	);
 
 	function readFileAsDataUrl(file: File): Promise<string> {
 		return new Promise((resolve, reject) => {
@@ -74,6 +56,41 @@
 			reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
 			reader.readAsDataURL(file);
 		});
+	}
+
+	async function handleSelectedFiles(files: File[]) {
+		if (!files.length) return;
+		try {
+			const fileUrls = await Promise.all(files.map((file) => readFileAsDataUrl(file)));
+			createMediaUrls = [...createMediaUrls, ...fileUrls];
+			createMediaChosenFiles = [...createMediaChosenFiles, ...files];
+		} catch {
+			// Ignore malformed files and keep existing images.
+		}
+		createMediaImageUrl = '';
+		createMediaModalOpen = false;
+	}
+
+	function removeMediaAt(index: number) {
+		createMediaUrls = createMediaUrls.filter((_, i) => i !== index);
+		createMediaChosenFiles = createMediaChosenFiles.filter((_, i) => i !== index);
+	}
+
+	function setPrimaryMedia(index: number) {
+		if (index <= 0 || index >= createMediaUrls.length) return;
+		const nextUrls = [...createMediaUrls];
+		const [primary] = nextUrls.splice(index, 1);
+		nextUrls.unshift(primary);
+		createMediaUrls = nextUrls;
+
+		if (createMediaChosenFiles.length) {
+			const nextFiles = [...createMediaChosenFiles];
+			const [primaryFile] = nextFiles.splice(index, 1);
+			if (primaryFile) {
+				nextFiles.unshift(primaryFile);
+				createMediaChosenFiles = nextFiles;
+			}
+		}
 	}
 </script>
 
@@ -87,7 +104,10 @@
 				id="create-title"
 				bind:value={createTitle}
 				placeholder="e.g. Winter jacket"
-				class={cn('h-9', (createError === 'Title is required' || titleError) && 'border-destructive')}
+				class={cn(
+					'h-9',
+					(createError === 'Title is required' || titleError) && 'border-destructive'
+				)}
 			/>
 			{#if titleError}
 				<p class="text-xs text-destructive">{titleError}</p>
@@ -97,7 +117,12 @@
 			<label for="create-subtitle" class="text-sm font-medium">
 				Subtitle <span class="font-normal text-muted-foreground">(Optional)</span>
 			</label>
-			<Input id="create-subtitle" bind:value={createSubtitle} placeholder="e.g. Warm and cosy" class="h-9" />
+			<Input
+				id="create-subtitle"
+				bind:value={createSubtitle}
+				placeholder="e.g. Warm and cosy"
+				class="h-9"
+			/>
 		</div>
 		<div class="flex flex-col gap-2">
 			<label for="create-handle" class="flex items-center gap-1.5 text-sm font-medium">
@@ -130,119 +155,100 @@
 				tabindex="0"
 				aria-label="Media upload"
 				class="flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:bg-muted/50"
+				ondragover={(event) => event.preventDefault()}
+				ondrop={async (event) => {
+					event.preventDefault();
+					const files = Array.from(event.dataTransfer?.files ?? []).filter((file) =>
+						file.type.startsWith('image/')
+					);
+					await handleSelectedFiles(files);
+				}}
 				onclick={() => {
-					createMediaImageUrl = createMediaUrl;
-					createMediaChosenFile = createMediaFile;
-					createMediaModalOpen = true;
+					createMediaImageUrl = '';
+					createMediaFileInput?.click();
 				}}
 				onkeydown={(e) => {
 					if (e.key !== 'Enter' && e.key !== ' ') return;
 					e.preventDefault();
-					createMediaImageUrl = createMediaUrl;
-					createMediaChosenFile = createMediaFile;
-					createMediaModalOpen = true;
+					createMediaImageUrl = '';
+					createMediaFileInput?.click();
 				}}
 			>
-				{#if mediaPreviewSrc}
-					<div class="flex w-full max-w-xs flex-col items-center gap-2">
-						<img
-							src={mediaPreviewSrc}
-							alt=""
-							class="max-h-40 w-full rounded-md border border-border object-contain bg-background"
-							onerror={(ev) => ((ev.currentTarget as HTMLImageElement).style.display = 'none')}
-						/>
-						<p class="text-xs text-muted-foreground">
-							{createMediaUrl.trim() ? createMediaUrl.trim() : (createMediaFile?.name ?? '')}
-						</p>
-						<p class="text-xs font-medium text-foreground">Click to change</p>
-					</div>
-				{:else}
-					<Upload class="size-8 text-muted-foreground" />
-					<p>Drag and drop images here or click to upload.</p>
-				{/if}
+				<Upload class="size-8 text-muted-foreground" />
+				<p>Upload images</p>
+				<p class="text-xs">Drag and drop images here or click to upload.</p>
 			</div>
-			<Dialog.Root bind:open={createMediaModalOpen}>
-				<Dialog.Content
-					class="mx-auto my-auto h-max max-h-[90dvh] w-full max-w-md overflow-auto rounded-lg border shadow-lg"
-				>
-					<Dialog.Header>
-						<Dialog.Title>Provide an image</Dialog.Title>
-					</Dialog.Header>
-					<div class="grid gap-4 p-[10px]">
-						<div class="flex flex-col gap-2">
-							<label for="create-media-url" class="text-sm font-medium">Image URL</label>
-							<Input
-								id="create-media-url"
-								type="url"
-								placeholder="https://..."
-								bind:value={createMediaImageUrl}
-								class="w-full"
-								oninput={() => (createMediaChosenFile = null)}
+			<input
+				type="file"
+				accept="image/*"
+				multiple
+				class="hidden"
+				bind:this={createMediaFileInput}
+				onchange={async (e) => {
+					const input = e.currentTarget as HTMLInputElement | null;
+					const files = Array.from(input?.files ?? []);
+					await handleSelectedFiles(files);
+					if (input) input.value = '';
+				}}
+			/>
+			{#if mediaPreviewSrcs.length > 0}
+				<div class="flex flex-col gap-3 rounded-md border bg-muted/20 p-3">
+					<div class="flex items-center justify-between">
+						<p class="text-xs text-muted-foreground">{mediaPreviewSrcs.length} image(s) selected</p>
+						<p class="text-xs text-muted-foreground">First image is used as thumbnail</p>
+					</div>
+					{#if primaryMediaUrl}
+						<div class="overflow-hidden rounded-md border bg-background">
+							<img
+								src={primaryMediaUrl}
+								alt="Primary media preview"
+								class="aspect-video w-full object-cover"
+								onerror={(ev) => ((ev.currentTarget as HTMLImageElement).style.display = 'none')}
 							/>
 						</div>
-						{#if dialogPreviewSrc || dialogFilePreviewSrc}
-							<div class="flex justify-center rounded-md border bg-muted/30 p-3">
+					{/if}
+					<div class="flex max-h-56 flex-col gap-2 overflow-auto">
+						{#each mediaFileRows as mediaRow, index (mediaRow.url)}
+							<div class="flex items-center gap-3 rounded-md border bg-background p-2">
 								<img
-									src={dialogFilePreviewSrc ?? dialogPreviewSrc}
-									alt="Preview"
-									class="max-h-36 w-full max-w-xs rounded object-contain"
+									src={mediaRow.url}
+									alt=""
+									class="size-12 rounded-md border object-cover"
 									onerror={(ev) => ((ev.currentTarget as HTMLImageElement).style.display = 'none')}
 								/>
+								<div class="min-w-0 flex-1">
+									<p class="truncate text-sm font-medium">{mediaRow.name}</p>
+									<p class="text-xs text-muted-foreground">{mediaRow.sizeLabel}</p>
+								</div>
+								{#if index === 0}
+									<span
+										class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
+									>
+										<Image class="size-3" />
+										Primary
+									</span>
+								{:else}
+									<button
+										type="button"
+										class="rounded-md border px-2 py-1 text-xs transition-colors hover:bg-muted"
+										onclick={() => setPrimaryMedia(index)}
+									>
+										Set primary
+									</button>
+								{/if}
+								<button
+									type="button"
+									class="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+									onclick={() => removeMediaAt(index)}
+									aria-label={`Remove ${mediaRow.name}`}
+								>
+									<X class="size-4" />
+								</button>
 							</div>
-						{/if}
-						<p class="text-sm text-muted-foreground">Or choose file</p>
-						<div class="flex items-center gap-2">
-							<input
-								type="file"
-								accept="image/*"
-								class="hidden"
-								bind:this={createMediaFileInput}
-								onchange={(e) => {
-									const f = e.currentTarget.files?.[0];
-									if (f) createMediaChosenFile = f;
-									e.currentTarget.value = '';
-								}}
-							/>
-							<Button type="button" variant="outline" onclick={() => createMediaFileInput?.click()}>
-								Choose file
-							</Button>
-							<span class="text-sm text-muted-foreground">
-								{createMediaChosenFile?.name ?? 'No file chosen'}
-							</span>
-						</div>
+						{/each}
 					</div>
-					<Dialog.Footer class="flex flex-row justify-end gap-2 border-t p-4">
-						<Button type="button" variant="outline" onclick={() => (createMediaModalOpen = false)}>
-							Cancel
-						</Button>
-						<Button
-							type="button"
-							onclick={async () => {
-								const file = createMediaChosenFile;
-								const url = createMediaImageUrl.trim();
-								if (file) {
-									try {
-										createMediaUrl = await readFileAsDataUrl(file);
-										createMediaFile = null;
-									} catch {
-										createMediaUrl = '';
-										createMediaFile = null;
-									}
-								} else if (url) {
-									createMediaUrl = url;
-									createMediaFile = null;
-								} else {
-									createMediaUrl = '';
-									createMediaFile = null;
-								}
-								createMediaModalOpen = false;
-							}}
-						>
-							Save
-						</Button>
-					</Dialog.Footer>
-				</Dialog.Content>
-			</Dialog.Root>
+				</div>
+			{/if}
 		</div>
 		<div class="flex flex-col gap-2">
 			<label for="create-has-variants" class="text-sm font-medium">Variants</label>

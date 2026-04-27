@@ -6,7 +6,6 @@ import {
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  ValidationError,
 } from "@danimai/core";
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
@@ -58,37 +57,35 @@ export class DeleteProductCategoriesProcess implements ProcessContract<typeof De
 
 
   async deleteCategories(input: DeleteProductCategoriesProcessInput) {
-    await this.db.transaction().execute(async (trx) => {
-      const rows = await trx
-        .withRecursive("category_hierarchy", (qb) =>
-          qb
-            .selectFrom("product_categories")
-            .select("id")
-            .where("id", "in", input.category_ids)
-            .unionAll((qb) =>
-              qb
-                .selectFrom("product_categories as c")
-                .innerJoin("category_hierarchy as ch", (join) =>
-                  join.onRef("c.parent_id", "=", "ch.id")
-                )
-                .select("c.id")
-            )
-        )
-        .selectFrom("category_hierarchy")
-        .select("id")
-        .execute();
+    const rows = await this.db
+      .withRecursive("category_hierarchy", (qb) =>
+        qb
+          .selectFrom("product_categories")
+          .select("id")
+          .where("id", "in", input.category_ids)
+          .unionAll((qb) =>
+            qb
+              .selectFrom("product_categories as c")
+              .innerJoin("category_hierarchy as ch", (join) =>
+                join.onRef("c.parent_id", "=", "ch.id")
+              )
+              .select("c.id")
+          )
+      )
+      .selectFrom("category_hierarchy")
+      .select("id")
+      .execute();
 
-      const ids = rows.map((r) => r.id);
-      if (ids.length === 0) return;
+    const ids = rows.map((r) => r.id);
+    if (ids.length === 0) return;
 
-      await trx
-        .updateTable("products")
-        .set({ category_id: null })
-        .where("category_id", "in", ids)
-        .execute();
+    await this.db
+      .updateTable("products")
+      .set({ category_id: null })
+      .where("category_id", "in", ids)
+      .execute();
 
-      await trx.deleteFrom("product_categories").where("id", "in", ids).execute();
-    });
+    await this.db.deleteFrom("product_categories").where("id", "in", ids).execute();
   }
 
 }

@@ -40,9 +40,7 @@ export class DeleteProductsProcess implements ProcessContract<typeof DeleteProdu
     const { input } = context;
 
     await this.validateProducts(input);
-    await this.db.transaction().execute(async (trx) => {
-      await this.deleteProducts(trx, input);
-    });
+    await this.deleteProducts(input);
   }
 
   async validateProducts(input: DeleteProductsProcessInput) {
@@ -71,14 +69,14 @@ export class DeleteProductsProcess implements ProcessContract<typeof DeleteProdu
     return products;
   }
 
-  async deleteProducts(trx: Kysely<Database>, input: DeleteProductsProcessInput) {
+  async deleteProducts(input: DeleteProductsProcessInput) {
     this.logger.info("Hard deleting products", {
       product_ids: input.product_ids,
     });
 
     const productIds = input.product_ids;
 
-    const variantIds = await trx
+    const variantIds = await this.db
       .selectFrom("product_variants")
       .where("product_id", "in", productIds)
       .select("id")
@@ -86,47 +84,47 @@ export class DeleteProductsProcess implements ProcessContract<typeof DeleteProdu
       .then((rows) => rows.map((r) => r.id));
 
     if (variantIds.length > 0) {
-      await trx
+      await this.db
         .deleteFrom("product_variant_option_relations")
         .where("variant_id", "in", variantIds)
         .execute();
-      await trx
+      await this.db
         .deleteFrom("product_variant_image_relations")
         .where("variant_id", "in", variantIds)
         .execute();
     }
 
-    await trx
+    await this.db
       .deleteFrom("product_variants")
       .where("product_id", "in", productIds)
       .execute();
 
-    await trx
+    await this.db
       .deleteFrom("product_option_values")
       .where("product_id", "in", productIds)
       .execute();
 
-    await trx
+    await this.db
       .deleteFrom("product_attribute_values")
       .where("product_id", "in", productIds)
       .execute();
 
-    await trx
+    await this.db
       .deleteFrom("product_tag_relations")
       .where("product_id", "in", productIds)
       .execute();
 
-    await trx
+    await this.db
       .deleteFrom("product_collection_relations")
       .where("product_id", "in", productIds)
       .execute();
 
-    await trx
+    await this.db
       .deleteFrom("product_images")
       .where("product_id", "in", productIds)
       .execute();
 
-    await trx
+    await this.db
       .deleteFrom("products")
       .where("id", "in", productIds)
       .execute();

@@ -37,7 +37,6 @@
 		allow_backorder: boolean;
 		variant_rank: number;
 		priceAmount: string;
-		
 	};
 
 	function cartesian<T>(arrays: T[][]): T[][] {
@@ -113,10 +112,9 @@
 	let createHasVariants = $state(true);
 	let createMediaModalOpen = $state(false);
 	let createMediaImageUrl = $state('');
-	let createMediaChosenFile = $state<File | null>(null);
+	let createMediaChosenFiles = $state<File[]>([]);
 	let createMediaFileInput = $state<HTMLInputElement | undefined>();
-	let createMediaUrl = $state('');
-	let createMediaFile = $state<File | null>(null);
+	let createMediaUrls = $state<string[]>([]);
 
 	let createDiscountable = $state(true);
 	let createCollectionIds = $state<string[]>([]);
@@ -320,10 +318,9 @@
 		createOptions = [];
 		createAttributeGroupId = '';
 		createAttributeEntries = [];
-		createMediaUrl = '';
-		createMediaFile = null;
+		createMediaUrls = [];
 		createMediaImageUrl = '';
-		createMediaChosenFile = null;
+		createMediaChosenFiles = [];
 		createError = null;
 		submitPending = false;
 		variantSearch = '';
@@ -625,7 +622,7 @@
 					attribute_id: entry.attributeId,
 					value: entry.value.trim()
 				})),
-			thumbnail: createMediaUrl.trim() || undefined
+			thumbnail: createMediaUrls.find((url) => url.trim().length > 0)?.trim() || undefined
 		});
 		submitPending = true;
 		createFormElement?.requestSubmit();
@@ -742,10 +739,9 @@
 					bind:createHasVariants
 					bind:createMediaModalOpen
 					bind:createMediaImageUrl
-					bind:createMediaChosenFile
+					bind:createMediaChosenFiles
 					bind:createMediaFileInput
-					bind:createMediaUrl
-					bind:createMediaFile
+					bind:createMediaUrls
 					onEnableVariants={syncVariantsFromOptions}
 				/>
 			{/if}
@@ -817,7 +813,11 @@
 			<input type="hidden" name="variants" value={createVariantsJson} />
 			<input type="hidden" name="attribute_group_id" value={createAttributeGroupId} />
 			<input type="hidden" name="attributes" value={createAttributesJson} />
-			<input type="hidden" name="thumbnail" value={createMediaUrl} />
+			<input
+				type="hidden"
+				name="thumbnail"
+				value={createMediaUrls.find((url) => url.trim().length > 0)?.trim() ?? ''}
+			/>
 
 			<div class="flex shrink-0 flex-wrap justify-end gap-2 border-t p-4">
 				<Button type="button" variant="outline" onclick={closeCreate}>Cancel</Button>
