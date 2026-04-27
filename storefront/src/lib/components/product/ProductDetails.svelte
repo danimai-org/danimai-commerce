@@ -5,7 +5,8 @@
 	import ProductAccordions from './ProductAccordions.svelte';
 	import type { VariantItem } from './ProductVariantSelect.svelte';
 	import type { AccordionItem } from './ProductAccordions.svelte';
-	
+	import { ensureCartId, useCart } from '$lib/hooks/use-cart.hook';
+	const { updateCartLineItems } = useCart();
 
 	type ProductDetailsProps = {
 		title: string;
@@ -32,22 +33,14 @@
 		selectedVariantTitle = ''
 	}: ProductDetailsProps = $props();	
 
-	function parsePrice(str: string): number {
-		const n = parseFloat(str.replace(/[^0-9.]/g, ''));
-		return Number.isFinite(n) ? n : 0;
-	}
-
-	function addToCart() {
-		const priceValue = parsePrice(priceLabel);
-		cart.addItem({
-			href: productHref || `/products/${title.toLowerCase().replace(/\s+/g, '-')}`,
-			name: title,
-			variantId: selectedVariantId ?? undefined,
-			priceDisplay: priceLabel,
-			priceValue,
-			image: productImage,
-			variant: selectedVariantTitle || 'Default',
-			quantity
+	async function addToCart() {
+		const cartId = await ensureCartId();
+		await updateCartLineItems.mutateAsync({
+			id: cartId,
+			lineItems: [{
+				variant_id: selectedVariantId ?? undefined,
+				quantity: 1,
+			} as never]
 		});
 		cart.open();
 	}

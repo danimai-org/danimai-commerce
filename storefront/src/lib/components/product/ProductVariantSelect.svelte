@@ -9,22 +9,81 @@
 		selectedVariantId?: string | null;
 	} = $props();
 	const selectedVariant = $derived(variants.find((v) => v.id === selectedVariantId) ?? variants[0] ?? null);
+	const sizePattern = /^(xxs|xs|s|m|l|xl|xxl|xxxl|[0-9]{1,2})$/i;
+
+	function splitVariantTitle(title: string): { size: string; color: string | null } {
+		const parts = title
+			.split(/[\/|-]/g)
+			.map((part) => part.trim())
+			.filter(Boolean);
+
+		if (parts.length === 0) return { size: title, color: null };
+		if (parts.length === 1) return { size: parts[0], color: null };
+
+		const sizePart = parts.find((part) => sizePattern.test(part)) ?? parts[0];
+		const colorPart = parts.find((part) => part !== sizePart) ?? null;
+		return { size: sizePart, color: colorPart };
+	}
+
+	const normalizedVariants = $derived(
+		variants.map((variant) => {
+			const parsed = splitVariantTitle(variant.title);
+			return {
+				...variant,
+				size: parsed.size,
+				color: parsed.color
+			};
+		})
+	);
+
+	const colors = $derived(
+		[...new Set(normalizedVariants.map((variant) => variant.color).filter((value): value is string => Boolean(value)))]
+	);
+
+	const activeColor = $derived(selectedVariant ? splitVariantTitle(selectedVariant.title).color : (colors[0] ?? null));
+
+	const visibleSizeVariants = $derived(
+		activeColor
+			? normalizedVariants.filter((variant) => variant.color === activeColor)
+			: normalizedVariants
+	);
 
 </script>
 
 {#if variants.length > 0}
 	<div class="product-options">
+		{#if colors.length > 0}
+			<div class="option-group">
+				<span class="option-label">Select Color</span>
+				<div class="option-buttons color-list">
+					{#each colors as color}
+						<button
+							type="button"
+							class="option-btn color-btn"
+							class:selected={activeColor === color}
+							onclick={() => {
+								const firstMatching = normalizedVariants.find((variant) => variant.color === color);
+								if (firstMatching) selectedVariantId = firstMatching.id;
+							}}
+						>
+							{color}
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
 		<div class="option-group">
-			<span class="option-label">Variant</span>
+			<span class="option-label">Select Size</span>
 			<div class="option-buttons variant-list">
-				{#each variants as v}
+				{#each visibleSizeVariants as v}
 					<button
 						type="button"
 						class="option-btn"
 						class:selected={selectedVariant?.id === v.id}
 						onclick={() => (selectedVariantId = v.id)}
 					>
-						{v.title} — {v.priceDisplay}
+						{v.size}
 					</button>
 				{/each}
 			</div>
@@ -36,37 +95,61 @@
 	.product-options {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 1.25rem;
 	}
 	.option-group {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 0.625rem;
 	}
 	.option-label {
-		font-size: 0.75rem;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
-		color: #555;
-		font-weight: 600;
+		font-size: 1.125rem;
+		color: #1f1f23;
+		font-weight: 400;
+	}
+	.option-buttons.color-list {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 0.625rem;
 	}
 	.option-buttons.variant-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 0.625rem;
 	}
 	.option-btn {
-		padding: 0.5rem 1rem;
-		border: 1px solid #ccc;
+		padding: 0.5rem;
+		border: 1px solid #d7d8dd;
 		background: #fff;
-		font-size: 0.875rem;
+		font-size: 1.3rem;
 		cursor: pointer;
-		border-radius: 4px;
-		text-align: left;
+		border-radius: 0;
+		text-align: center;
+		color: #4a4a50;
+		font-weight: 300;
+	
+	}
+	.color-btn {
+		font-size: 1.3rem;
+	}
+	.option-btn:hover {
+		border-color: #b9bac2;
 	}
 	.option-btn.selected {
-		border-color: #1a1a1a;
-		background: #1a1a1a;
-		color: #fff;
+		border-color: #22232a;
+		background: #f7f7f8;
+		color: #22232a;
+	}
+	@media (max-width: 720px) {
+		.option-label {
+			font-size: 1.25rem;
+		}
+		.option-btn {
+			font-size: 1rem;
+			min-height: 2.875rem;
+		}
+		.color-btn {
+			font-size: 1rem;
+		}
 	}
 </style>

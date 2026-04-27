@@ -1,7 +1,16 @@
 <script lang="ts">
-	import { getUserCart, useCart } from '$lib/hooks/use-cart.hook';
+	import { ensureCartId, useCart } from '$lib/hooks/use-cart.hook';
 	import { cart } from '$lib/stores/cart';
-	import type { ProductGridItem } from '../../../routes/store/+page.ts';
+	import { goto } from '$app/navigation';
+
+	type ProductGridItem = {
+		name: string;
+		price: { amount: number; currency_code: string };
+		href: string;
+		bg: string;
+		image: string | null;
+		variantId?: string | null;
+	};
 	const { updateCartLineItems, refetchCart } = useCart();	
 	let {
 		products = [] as ProductGridItem[] | undefined,
@@ -50,18 +59,28 @@
 
 	async function quickAdd(e: MouseEvent, product: ProductGridItem) {
 		e.preventDefault();
+		e.stopPropagation();
 		if (!product?.variantId) return;
-		const cartId = getUserCart()?.id;
-		if (!cartId) return;
-		cart.open();
+		const cartId = await ensureCartId();
 		await updateCartLineItems.mutateAsync({
 			id: cartId,
 			lineItems: [{
-				
+				variant_id: product.variantId,
 				quantity: 1,
-			}]
+			} as never]
 		});
-		await refetchCart.refetch();
+		cart.open();
+	}
+
+	function openProduct(href: string) {
+		if (!href) return;
+		void goto(href);
+	}
+
+	function handleCardKeydown(e: KeyboardEvent, href: string) {
+		if (e.key !== 'Enter' && e.key !== ' ') return;
+		e.preventDefault();
+		openProduct(href);
 	}
 
 </script>
@@ -77,7 +96,7 @@
 		{#each products as product}
 			{#if catalogMode}
 				<article class="product-card catalog-card">
-					<a href={product?.href} class="product-card-link" aria-label={product?.name}>
+					<a href={product.href} class="product-card-link" aria-label={product.name}>
 						<div class="product-image" style="background-color: {product.bg};">
 							{#if product.image}
 								<img src={product.image} alt="" class="product-img" />
@@ -96,7 +115,13 @@
 				</article>
 			{:else}
 				<article class="product-card retail-card">
-					<div class="retail-card-surface">
+					<div
+						class="retail-card-surface"
+						role="link"
+						tabindex="0"
+						onclick={() => openProduct(product.href)}
+						onkeydown={(e) => handleCardKeydown(e, product.href)}
+					>
 						<a href={product.href} class="retail-image-link" aria-label={`View ${product.name}`}>
 							<div
 								class="retail-product-image"

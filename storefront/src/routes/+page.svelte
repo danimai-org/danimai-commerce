@@ -35,11 +35,11 @@
 		{#if error}
 			<p class="products-error">{error}</p>
 		{/if}
-		<ProductGridSection {products}  />
+		<ProductGridSection products={products} title="" subtitle="" />
 
 		<StorySection />
 
-		<CollectionsSection {collections} />
+		<CollectionsSection collections={collections} title=""  />
 
 		<VideoSection />
 

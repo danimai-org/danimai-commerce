@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
+	import { getUserCart, useCart } from '$lib/hooks/use-cart.hook';
 	import { cart } from '$lib/stores/cart';
 	import { search } from '$lib/stores/search';
 	import SearchSheet from '$lib/components/search/SearchSheet.svelte';
@@ -25,6 +26,8 @@
 	let menuOpen = $state(false);
 	let accountMenuOpen = $state(false);
 	let navWide = $state(false);
+	const { refetchCart } = useCart();
+	let didInitialCartFetch = $state(false);
 
 
 	afterNavigate(() => {
@@ -44,10 +47,13 @@
 	});
 
 	$effect(() => {
-		const unsub = cart.subscribe((s) => {
-			cartCount = s.items.reduce((n, i) => n + i.quantity, 0);
-		});
-		return unsub;
+		if (didInitialCartFetch) return;
+		didInitialCartFetch = true;
+		void refetchCart.refetch();
+	});
+	$effect(() => {
+		const lineItems = refetchCart.data?.line_items ?? getUserCart()?.line_items ?? [];
+		cartCount = lineItems.reduce((n, i) => n + (i.quantity ?? 0), 0);
 	});
 	$effect(() => {
 		const unsub = search.subscribe((s) => {

@@ -102,7 +102,7 @@ function prettyHandle(handle: string): string {
 			const { rows: productRows } = rowsFromPaginated<StorefrontProductRow>(raw);
 			const pagination =
 				(raw as { pagination?: PaginationMeta }).pagination ?? emptyPagination();
-			const gridRows: ProductGridItem[] = productRows.map((p, i) => {
+			const gridProducts = productRows.map((p, i) => {
 				const pr = p.variant?.price;
 				const amount =
 					pr?.amount != null ? parseInt(pr.amount, 10) / 100 : Number.NaN;
@@ -119,7 +119,7 @@ function prettyHandle(handle: string): string {
 				};
 			});
 			return {
-				rows: gridRows,
+				rows: gridProducts,
 				pagination,
 				collectionTitle: collection.title
 			};
@@ -134,7 +134,7 @@ function prettyHandle(handle: string): string {
 
 	const loading = $derived(paginateState.loading);
 	const fetchError = $derived(paginateState.error);
-	const rows = $derived((query.data?.rows ?? []) as ProductGridItem[]);
+	const rows = $derived(query.data?.rows ?? []);
 	const pagination = $derived(paginateState.pagination);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);

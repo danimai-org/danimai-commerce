@@ -6,8 +6,6 @@
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { API_BASE, firstVariantIdByProductIds, rowsFromPaginated } from '$lib/api/storefront-api';
 
-	const { refetchCart } = useCart();
-
 	const SESSION_STORAGE_KEY = 'dm_sf_session_id';
 	const CART_STORAGE_KEY = 'dm_sf_cart_id';
 	const DEFAULT_CART_CURRENCY_CODE = 'usd';
@@ -57,9 +55,6 @@
 	const queryClient = useQueryClient();
 	let {} = $props();
 
-	$effect(() => {
-		refetchCart.refetch();
-	});
 	const listQuery = { page: 1, limit: 100 } as const;
 	const productsQuery = createQuery(() => ({
 		queryKey: ['products', listQuery.page, listQuery.limit],

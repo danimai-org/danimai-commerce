@@ -1,29 +1,59 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { getUserCart, useCart } from '$lib/hooks/use-cart.hook';
-	import { closeCart } from '$lib/hooks/use-cart.hook';
+	import { cart } from '$lib/stores/cart';
 	let cartOpen = $state(false);
-	const { refetchCart, updateCartLineItems } = useCart();
+	const { updateCartLineItems } = useCart();
+	
+
 	$effect(() => {
-		refetchCart.refetch();
+		const unsub = cart.subscribe((s) => {
+			cartOpen = s.open;
+		});
+		return unsub;
 	});
 
-	const cartItems = $derived((getUserCart()?.line_items ?? []) as any[]);
+	const cartItems = $derived(
+		((getUserCart()?.line_items ?? []) as any[]).map((item) => {
+			const amount = Number.parseFloat(String(item.unit_price ?? '0'));
+			const priceValue = Number.isFinite(amount) ? amount : 0;
+			return {
+				...item,
+				key: item.id ?? `${item.variant_id ?? 'variant'}-${item.title ?? 'item'}`,
+				name: item.title ?? 'Item',
+				variant: item.description ?? (item.variant_id ? 'Variant' : '—'),
+				image: item.thumbnail ?? null,
+				priceValue,
+				priceDisplay: `$${priceValue.toFixed(2)}`
+			};
+		})
+	);
 	const subtotal = $derived(
 		cartItems.reduce((sum: number, i: any) => sum + i.priceValue * i.quantity, 0)
 	);
 	const subtotalDisplay = $derived(`$${subtotal.toFixed(2)}`);
 
 	function handleClose() {
-		refetchCart.refetch();
-		closeCart();
-		cartOpen = false;
+		cart.close();
 	}
 
 	function goToCart() {
-		refetchCart.refetch();
 		goto('/cart');
-		cartOpen = false;
+		cart.close();
+	}
+
+	async function setQuantity(item: any, quantity: number) {
+		const rawItems = (getUserCart()?.line_items ?? []) as any[];
+		const next = rawItems
+			.map((line) => {
+				if (line.id !== item.id) return line;
+				return { ...line, quantity };
+			})
+			.filter((line) => (line.quantity ?? 0) > 0);
+		await updateCartLineItems.mutateAsync({
+			id: getUserCart()?.id ?? '',
+			lineItems: next
+		});
 	}
 </script>
 
@@ -67,11 +97,11 @@
 								</p>
 								<div class="line-card-actions">
 									<div class="quantity-controls">
-										<button type="button" class="qty-btn" onclick={() => void updateCartLineItems.mutate({ id: getUserCart()?.id ?? '', lineItems: [{ key: item.key, 	quantity: item.quantity - 1 }] })} aria-label="Decrease quantity">−</button>
+										<button type="button" class="qty-btn" onclick={() => void setQuantity(item, item.quantity - 1)} aria-label="Decrease quantity">−</button>
 										<span class="qty-value">{item.quantity}</span>
-										<button type="button" class="qty-btn" onclick={() => void updateCartLineItems.mutate({ id: getUserCart()?.id ?? '', lineItems: [{ key: item.key, quantity: item.quantity + 1 }] })} aria-label="Increase quantity">+</button>
+										<button type="button" class="qty-btn" onclick={() => void setQuantity(item, item.quantity + 1)} aria-label="Increase quantity">+</button>
 									</div>
-									<button type="button" class="remove-btn" onclick={() => void updateCartLineItems.mutate({ id: getUserCart()?.id ?? '', lineItems: [{ key: item.key, quantity: 0 }] })} aria-label="Remove item">
+									<button type="button" class="remove-btn" onclick={() => void setQuantity(item, 0)} aria-label="Remove item">
 										<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
 									</button>
 								</div>

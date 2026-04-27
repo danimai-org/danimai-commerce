@@ -9,7 +9,6 @@
 		createPaginationQuery,
 		type PaginationMeta
 	} from '$lib/api/pagination.svelte';
-	import type { ProductGridItem } from '../../store/+page.ts';
 	import { API_BASE, rowsFromPaginated } from '$lib/api/storefront-api';
 	import { client } from '$lib/api/client.js';
 	import {
@@ -27,6 +26,15 @@
 			thumbnail: string | null;
 			price: { amount: string; currency_code: string } | null;
 		} | null;
+	};
+
+	type ProductGridItem = {
+		name: string;
+		price: { amount: number; currency_code: string };
+		href: string;
+		bg: string;
+		image: string | null;
+		variantId?: string | null;
 	};
 
 	type CategoryPageData = {
@@ -222,7 +230,7 @@
 			const { rows: productRows } = rowsFromPaginated<StorefrontProductRow>(raw);
 			const pagination =
 				(raw as { pagination?: PaginationMeta }).pagination ?? emptyPagination();
-			const grid: ProductGridItem[] = productRows.map((p, i) => {
+			const grid = productRows.map((p, i) => {
 				const pr = p.variant?.price;
 				const amount =
 					pr?.amount != null ? parseInt(pr.amount, 10) / 100 : Number.NaN;
@@ -239,7 +247,7 @@
 				};
 			});
 			return {
-				rows: grid,
+				rows: grid as unknown as unknown as ProductGridItem[],
 				pagination,
 				categoryTitle: resolvedTitle,
 				categoryNotFound: false
@@ -256,19 +264,25 @@
 	const pagination = $derived(paginateState.pagination);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
-
-	const products = $derived((query.data?.rows ?? []) as ProductGridItem[]);
-	const productCount = $derived((pagination?.total ?? 0) > 0 ? (pagination?.total ?? 0) : products.length);
-	const categoryNotFound = $derived(query.data?.categoryNotFound === true);
+const pageData = $derived.by((): CategoryPageData | null => {
+	const raw = query.data as CategoryPageData | Array<CategoryPageData | null> | null | undefined;
+	if (Array.isArray(raw)) {
+		return raw.find((entry): entry is CategoryPageData => entry != null) ?? null;
+	}
+	return raw ?? null;
+});
+const rows = $derived.by((): ProductGridItem[] => pageData?.rows ?? []);
+	const productCount = $derived((pagination?.total ?? 0) > 0 ? (pagination?.total ?? 0) : rows.length);
+const categoryNotFound = $derived(pageData?.categoryNotFound === true);
 	const categoryTitle = $derived(
-		query.data?.categoryTitle ?? page.params.handle ?? 'Category'
+	pageData?.categoryTitle ?? page.params.handle ?? 'Category'
 	);
-
 	const currentSort = $derived(page.url.searchParams.get('sort') ?? 'best-selling');
 	const currentAvailability = $derived(page.url.searchParams.get('availability') ?? 'all');
 	const currentPrice = $derived(page.url.searchParams.get('price') ?? 'all');
 	const currentColor = $derived(page.url.searchParams.get('color') ?? 'all');
 	const storeName = $derived(page.data?.storeName ?? 'Store');
+	
 </script>
 
 <svelte:head>
@@ -312,7 +326,7 @@
 			onPrevious={() => goToPage((pagination?.page ?? 1) - 1)}
 			onNext={() => goToPage((pagination?.page ?? 1) + 1)}
 		/>
-		<ProductGridSection products={products} title="" subtitle="" />
+		<ProductGridSection products={rows} title="" subtitle="" />
 	</main>
 {/if}
 

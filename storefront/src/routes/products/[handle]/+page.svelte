@@ -9,23 +9,12 @@
     } from '$lib/components/product';
 
     let { data } = $props();
-    
+    const product = $derived(data?.product);
     const variants = $derived(data?.variantRows ?? []);
-    const productBase = $derived(data?.product);
-	const otherProducts = $derived(data?.otherProducts ?? []);
+    const otherProducts = $derived(data?.otherProducts ?? []);
     let selectedVariantId = $state<string | null>(null);
     let quantity = $state(1);
     let selectedImageUrl = $state<string | null>(null);
-    const selectedVariant = $derived(
-        variants.find((v) => v?.id === selectedVariantId) ?? variants[0] ?? null
-    );
-
-    $effect(() => {
-        if (!selectedVariantId && variants.length > 0) {
-            selectedVariantId = variants[0]?.id ?? null;
-        }
-    });
-
     function formatPrice(
         amount: number | string | null | undefined,
         currencyCode: string | null | undefined
@@ -46,19 +35,19 @@
 
 	const priceLabel = $derived(
         formatPrice(
-            selectedVariant?.prices?.[0]?.amount ?? productBase?.variant?.price?.amount,
-            selectedVariant?.prices?.[0]?.currency_code ?? productBase?.variant?.price?.currency_code
+            product?.variant?.price?.amount ?? product?.variant?.price?.amount,
+            product?.variant?.price?.currency_code ?? product?.variant?.price?.currency_code
         )
     );
   
     const galleryImages = $derived([
-        productBase?.thumbnail,
+        product?.thumbnail,
         ...variants.map((v) => v?.thumbnail ?? null)
     ].filter((url): url is string => !!url));
     const mainImage = $derived(
         selectedImageUrl ??
         variants.find((v) => v?.id === selectedVariantId)?.thumbnail ??
-        productBase?.thumbnail ??
+        product?.thumbnail ??
         galleryImages[0] ??
         null
     );
@@ -67,8 +56,8 @@
             id: v?.id ?? '' as string,
             title: v?.title ?? '' as string,
             priceDisplay: formatPrice(
-                v?.prices?.[0]?.amount ?? productBase?.variant?.price?.amount,
-                v?.prices?.[0]?.currency_code ?? productBase?.variant?.price?.currency_code
+                v?.prices?.[0]?.amount ?? product?.variant?.price?.amount,
+                v?.prices?.[0]?.currency_code ?? product?.variant?.price?.currency_code
             )
         }))
     );
@@ -88,18 +77,18 @@
             <ProductGallery
                 images={galleryImages}
                 {mainImage}
-                alt={productBase?.title ?? 'Product Image'}
+                alt={product?.title ?? 'Product Image'}
                 bind:selectedImageUrl
             />
 
             <ProductDetails
-                title={productBase?.title ?? 'Loading...'}
+                title={product?.title ?? 'Loading...'}
                 priceLabel={priceLabel ?? '—'}
                 variants={variantOptions}
                 bind:selectedVariantId
                 bind:quantity
                 {accordionItems}
-                productHref={`/products/${productBase?.handle}`}
+                productHref={`/products/${product?.handle}`}
                 productImage={mainImage}
                 selectedVariantTitle={variants.find((v) => v?.id === selectedVariantId)?.title ?? ''}
             />
@@ -114,12 +103,11 @@
                     bg: '#f4f4f4',
                     price: {
                         amount: parseFloat(v?.variant?.price?.amount ?? '0') / 100,
-                        currency_code: v?.variant?.price?.currency_code ?? 'USD'
+                        currency_code: v?.variant?.price?.currency_code ?? 'AUD'
                     },
-                    href: `/products/${productBase?.handle ?? ''}`,
+                    href: `/products/${v?.handle ?? ''}`,
                     image: v?.thumbnail ?? null,	
-                }))} 
-            />
+                }))} title="" subtitle="" />
         </section>
     </main>
 {/if}
