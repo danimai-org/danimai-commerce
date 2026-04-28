@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { SiteHeader, SiteFooter } from '$lib/components/layout';
 	import { ProductGridSection } from '$lib/components/sections';
-
 	
 	let { data } = $props();
 	const products = $derived(data?.products ?? []);	
@@ -25,7 +24,6 @@
 </main>
 
 <SiteFooter />
-
 <style>
 	.store-main {
 		min-height: 40vh;

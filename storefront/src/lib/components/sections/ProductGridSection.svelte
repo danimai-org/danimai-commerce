@@ -11,7 +11,7 @@
 		image: string | null;
 		variantId?: string | null;
 	};
-	const { updateCartLineItems, refetchCart } = useCart();	
+	const { updateCartLineItems, } = useCart();	
 	let {
 		products = [] as ProductGridItem[] | undefined,
 		title = 'Essential essentials for everyday.',
@@ -23,7 +23,6 @@
 		subtitle?: string;
 		catalogMode?: boolean;
 	} = $props();
-
 	function parsePrice(price: string | number | null | undefined): number {
 		if (typeof price === 'number') {
 			return Number.isFinite(price) ? price : 0;
@@ -38,7 +37,6 @@
 		}
 		return 0;
 	}
-
 	function displayPrice(price: string | number | null | undefined): string {
 		if (typeof price === 'number') {
 			return Number.isFinite(price) ? `$${price.toFixed(2)}` : '—';
