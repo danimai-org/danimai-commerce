@@ -5,9 +5,7 @@ import { ProductStatusEnum } from "../../../db/type";
 export const RetrieveProductSchema = Type.Object({
   id: Type.String(),
 });
-export type RetrieveProductProcessInput = Static<
-  typeof RetrieveProductSchema
->;
+export type RetrieveProductProcessInput = Static<typeof RetrieveProductSchema>;
 
 // response schema
 const RetrieveProductCategorySchema = Type.Object({
@@ -39,11 +37,18 @@ const RetrieveSalesChannelSchema = Type.Object({
   name: Type.String(),
 });
 
+const RetrieveProductMediaSchema = Type.Object({
+  id: Type.String(),
+  url: Type.String(),
+  rank: Type.Number(),
+});
+
 export const RetrieveProductResponseSchema = Type.Object({
   id: Type.String(),
   title: Type.String(),
   handle: Type.String(),
   thumbnail: Type.Union([Type.String(), Type.Null()]),
+  media: Type.Array(RetrieveProductMediaSchema),
   description: Type.Union([Type.String(), Type.Null()]),
   created_at: Type.Date(),
   updated_at: Type.Date(),
@@ -53,7 +58,18 @@ export const RetrieveProductResponseSchema = Type.Object({
   tags: Type.Array(RetrieveProductTagSchema),
   status: Type.Enum(ProductStatusEnum),
   sales_channels: Type.Array(RetrieveSalesChannelSchema),
-  metadata: Type.Union([Type.Null(), Type.Record(Type.String(), Type.Union([Type.String(), Type.Number(), Type.Array(Type.String()), Type.Array(Type.Number())]))]),
+  metadata: Type.Union([
+    Type.Null(),
+    Type.Record(
+      Type.String(),
+      Type.Union([
+        Type.String(),
+        Type.Number(),
+        Type.Array(Type.String()),
+        Type.Array(Type.Number()),
+      ]),
+    ),
+  ]),
 });
 
 export type RetrieveProductProcessOutput = Static<

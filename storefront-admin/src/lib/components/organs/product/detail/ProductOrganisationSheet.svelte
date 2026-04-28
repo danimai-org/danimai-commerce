@@ -38,7 +38,6 @@
 		if (Array.isArray(payload?.data)) return payload.data;
 		return [];
 	}
-
 	function uniqById(options: Option[]): Option[] {
 		const map = new SvelteMap<string, Option>();
 		for (const option of options) map.set(option.id, option);

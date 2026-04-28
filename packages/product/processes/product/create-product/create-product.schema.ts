@@ -68,9 +68,9 @@ export type CreateProductProcessInput = Static<
   typeof CreateProductSchema
 >;
 
-export const CreateProductResponseSchema = Type.Union([
-  Type.Undefined(),
-]);
+export const CreateProductResponseSchema = Type.Object({
+  id: Type.String(),
+});
 export type CreateProductProcessOutput = Static<
   typeof CreateProductResponseSchema
 >;

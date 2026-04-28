@@ -63,11 +63,13 @@
 	},
 	"dependencies": {
 		"@danimai/backend": "../backend",
+		"@rodrigodagostino/svelte-sortable-list": "^2.1.16",
 		"@tanstack/svelte-query": "^6.0.18",
 		"@tanstack/svelte-table": "^8.21.3",
 		"country-state-city": "^3.2.1",
 		"highlight.js": "^11.11.1",
 		"slugify": "^1.6.6",
+		"svelte-dnd-action": "^0.9.69",
 		"svelte-sonner": "^1.1.0",
 		"sveltekit-superforms": "^2.30.0",
 		"zod": "^4.3.6"

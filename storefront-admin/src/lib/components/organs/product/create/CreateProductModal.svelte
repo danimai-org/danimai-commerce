@@ -75,6 +75,26 @@
 	let createFormElement = $state<HTMLFormElement | null>(null);
 	let submitStatus = $state<'draft' | 'published'>('draft');
 	let submitPending = $state(false);
+	let createdProductId = $state<string | null>(null);
+	const apiBaseUrl = 'http://localhost:8000';
+
+	async function uploadProductImages(productId: string, files: File[]) {
+		if (!files.length) return [] as Array<{ id: string; url: string }>;
+		const body = new FormData();
+		for (const file of files) body.append('files', file);
+		const response = await fetch(`${apiBaseUrl}/admin/products/${productId}/images`, {
+			method: 'POST',
+			body
+		});
+		if (!response.ok) {
+			const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+			throw new Error(payload?.message ?? 'Failed to upload product images');
+		}
+		const payload = (await response.json()) as {
+			uploaded?: Array<{ id: string; url: string }>;
+		};
+		return payload.uploaded ?? [];
+	}
 
 	const {
 		form: createFormData,
@@ -89,16 +109,40 @@
 			if (result.type === 'failure') {
 				const data = result.data as { error?: string } | undefined;
 				createError = data?.error ?? 'Failed to create product';
+				createdProductId = null;
 				submitPending = false;
 			}
+			if (result.type === 'success') {
+				const data = result.data as { createdId?: string } | undefined;
+				createdProductId = data?.createdId ?? null;
+			}
 		},
-		onUpdated: ({ form }) => {
+		onUpdated: async ({ form }) => {
 			if (!submitPending) return;
 			submitPending = false;
 			if (form.valid) {
-				createError = null;
-				closeCreate();
-				onSuccess?.();
+				try {
+					if (!createdProductId && createMediaChosenFiles.length > 0) {
+						throw new Error('Product created but media upload could not start (missing product id).');
+					}
+					if (createdProductId && createMediaChosenFiles.length > 0) {
+						const uploaded = await uploadProductImages(createdProductId, createMediaChosenFiles);
+						if (uploaded.length > 0) {
+							const res = await client.products({ id: createdProductId }).put({
+								thumbnail_media_id: uploaded[0]?.id
+							});
+							if (res.error) {
+								const err = res.error as { value?: { message?: string } };
+								throw new Error(err?.value?.message ?? String(res.error));
+							}
+						}
+					}
+					createError = null;
+					closeCreate();
+					onSuccess?.();
+				} catch (error) {
+					createError = error instanceof Error ? error.message : 'Failed to upload product media';
+				}
 				return;
 			}
 			createError = 'Please fix the highlighted fields and try again.';
@@ -323,6 +367,7 @@
 		createMediaChosenFiles = [];
 		createError = null;
 		submitPending = false;
+		createdProductId = null;
 		variantSearch = '';
 		variantPage = 1;
 		syncVariantsFromOptions();
@@ -622,8 +667,9 @@
 					attribute_id: entry.attributeId,
 					value: entry.value.trim()
 				})),
-			thumbnail: createMediaUrls.find((url) => url.trim().length > 0)?.trim() || undefined
+			thumbnail: undefined
 		});
+		createdProductId = null;
 		submitPending = true;
 		createFormElement?.requestSubmit();
 	}

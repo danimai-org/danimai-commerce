@@ -5,46 +5,37 @@
 	import EditProductMediaSheet from './EditProductMediaSheet.svelte';
 	import { getDetailContext } from '$lib/hooks';
 	import type { Product } from '../type';
-
 	let { productId }: { productId: string } = $props();
-
 	const detailQuery = getDetailContext<Product>();
 	const product = $derived(detailQuery?.data ?? null);
-
 	const thumbnail = $derived(
 		(product as { thumbnail?: string | null } | null)?.thumbnail?.trim() || ''
 	);
-const mediaUrls = $derived.by(() => {
-	const current = (product as Record<string, unknown> | null) ?? null;
-	if (!current) return thumbnail ? [thumbnail] : [];
-
-	const buckets = [
-		current.media,
-		current.media_files,
-		current.images
-	] as unknown[];
-
-	const urls: string[] = [];
-	for (const bucket of buckets) {
-		if (!Array.isArray(bucket)) continue;
-		for (const entry of bucket) {
-			if (!entry || typeof entry !== 'object') continue;
-			const item = entry as { url?: unknown };
-			const url = typeof item.url === 'string' ? item.url.trim() : '';
-			if (url) urls.push(url);
-		}
-	}
-
-	if (thumbnail) {
-		urls.unshift(thumbnail);
-	}
-	return [...new Set(urls)];
-});
+	const mediaItems = $derived.by(() => {
+		const current = (product as { media?: Array<{ id?: string; url?: string; rank?: number }> } | null)
+			?.media;
+		const items = Array.isArray(current)
+			? current
+					.map((item, index) => {
+						const url = typeof item?.url === 'string' ? item.url.trim() : '';
+						if (!url) return null;
+						return {
+							id: item?.id ?? `${index}`,
+							url,
+							rank: typeof item?.rank === 'number' && Number.isFinite(item.rank) ? item.rank : index
+						};
+					})
+					.filter((item): item is { id: string; url: string; rank: number } => item !== null)
+					.sort((a, b) => a.rank - b.rank)
+			: [];
+		if (items.length > 0) return items;
+		return thumbnail ? [{ id: 'thumbnail', url: thumbnail, rank: 0 }] : [];
+	});
 
 	let mediaSheetOpen = $state(false);
 
-	function refetch() {
-		void detailQuery?.refetch?.();
+	async function refetch() {
+		await detailQuery?.refetch?.();
 	}
 
 	function openMediaSheet() {
@@ -66,19 +57,19 @@ const mediaUrls = $derived.by(() => {
 			<Pencil class="size-4" />
 		</Button>
 	</div>
-	{#if mediaUrls.length > 0}
+	{#if mediaItems.length > 0}
 		<button
 			type="button"
 			class="mt-4 block w-full cursor-pointer rounded-md border-0 bg-transparent p-0 text-left transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
 			onclick={openMediaSheet}
 			aria-label="Edit media"
 		>
-			<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-				{#each mediaUrls as mediaUrl (mediaUrl)}
+			<div class="mt-4 flex flex-wrap gap-4">
+				{#each mediaItems as mediaItem (mediaItem.id)}
 					<img
-						src={mediaUrl}
+						src={mediaItem.url}
 						alt=""
-						class="aspect-square w-full rounded-md border object-cover"
+						class="size-36 rounded-xl border bg-muted object-cover"
 						onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
 					/>
 				{/each}
@@ -99,10 +90,5 @@ const mediaUrls = $derived.by(() => {
 </div>
 
 {#if productId}
-	<EditProductMediaSheet
-		bind:open={mediaSheetOpen}
-		{productId}
-		thumbnail={thumbnail}
-		onSaved={refetch}
-	/>
+	<EditProductMediaSheet bind:open={mediaSheetOpen} {productId} {thumbnail} onSaved={refetch} />
 {/if}

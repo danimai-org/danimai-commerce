@@ -49,6 +49,7 @@ export class CreateProductProcess
     schema: CreateProductSchema,
   }) context: ProcessContextType<typeof CreateProductSchema>) {
     const { input } = context;
+    let createdProductId = "";
 
     const trx = this.db;
 
@@ -177,6 +178,7 @@ export class CreateProductProcess
       if (!product) {
         throw new InternalServerError("Failed to create product");
       }
+      createdProductId = product.id;
 
       await this.attachMediaToOwner(trx, {
         ownerType: "product",
@@ -388,7 +390,7 @@ export class CreateProductProcess
       throw error;
     }
 
-    return undefined;
+    return { id: createdProductId };
   }
 
   private async attachMediaToOwner(

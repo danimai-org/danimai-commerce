@@ -202,8 +202,9 @@ export const actions = {
 					error: error.value?.message ?? 'Failed to create product'
 				});
 			}
-
-			return message(productCreateForm, 'Product created successfully');
+			const createdProduct = productResponse.data as { id?: string } | undefined;
+			const out = message(productCreateForm, 'Product created successfully');
+			return { ...out, createdId: createdProduct?.id };
 		} catch (error) {
 			const errorMessage =
 				error &&
