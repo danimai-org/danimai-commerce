@@ -58,13 +58,26 @@
 
 	const product = $derived(getDetailContext<Product>()?.data ?? null);
 
-	const selectedTags = $derived(product?.tags?.map((t) => ({ id: t.id, value: t.value })) ?? []);
+	const selectedTags = $derived(
+		(product as { tags?: Array<{ id: string; value: string }> } | null)?.tags?.map((t) => ({
+			id: t.id,
+			value: t.value
+		})) ?? []
+	);
 	const selectedCollections = $derived(
-		product?.collections?.map((c) => ({ id: c.id, value: c.title })) ?? []
+		(product as { collections?: Array<{ id: string; title: string }> } | null)?.collections?.map(
+			(c) => ({ id: c.id, value: c.title })
+		) ?? []
 	);
 	const selectedCategories = $derived<Option[]>(
-		product?.category?.id && product?.category?.value
-			? [{ id: product.category.id, value: product.category.value }]
+		(product as { category?: { id: string; value: string } } | null)?.category?.id &&
+			(product as { category?: { id: string; value: string } } | null)?.category?.value
+			? [
+					{
+						id: (product as { category?: { id: string } } | null)?.category?.id ?? '',
+						value: (product as { category?: { value: string } } | null)?.category?.value ?? ''
+					}
+				]
 			: []
 	);
 
@@ -76,9 +89,16 @@
 	const collectionsOptions = $derived(uniqById([...fetchedCollections, ...selectedCollections]));
 	const categoriesOptions = $derived(uniqById([...fetchedCategories, ...selectedCategories]));
 
-	const productCategoryId = $derived(product?.category?.id ?? '');
-	const productCollectionIds = $derived(product?.collections?.map((c) => c.id) ?? []);
-	const productTagIds = $derived(product?.tags?.map((t) => t.id) ?? []);
+	const productCategoryId = $derived(
+		(product as { category?: { id: string } } | null)?.category?.id ?? ''
+	);
+	const productCollectionIds = $derived(
+		(product as { collections?: Array<{ id: string }> } | null)?.collections?.map((c) => c.id) ?? []
+	);
+	const productTagIds = $derived(
+		(product as { tags?: Array<{ id: string }> } | null)?.tags?.map((t) => t.id) ?? []
+	);
+	const productId = $derived((product as { id?: string } | null)?.id ?? '');
 
 	let {
 		open = $bindable(false),
@@ -93,6 +113,11 @@
 	});
 
 	let optionsLoaded = $state(false);
+	let selectedCategoryId = $state('');
+	let selectedCollectionIds = $state<string[]>([]);
+	let selectedTagIds = $state<string[]>([]);
+	let submitting = $state(false);
+	let saveError = $state<string | null>(null);
 
 	async function loadOptions() {
 		if (optionsLoaded) return;
@@ -132,6 +157,40 @@
 	$effect(() => {
 		if (open) loadOptions();
 	});
+
+	$effect(() => {
+		if (!open) return;
+		selectedCategoryId = productCategoryId;
+		selectedCollectionIds = [...productCollectionIds];
+		selectedTagIds = [...productTagIds];
+		saveError = null;
+	});
+
+	async function saveOrganisation() {
+		if (!productId || submitting) return;
+		submitting = true;
+		saveError = null;
+		try {
+			const response = await client.products({ id: productId }).put({
+				category_id: selectedCategoryId || undefined,
+				collection_ids: selectedCollectionIds,
+				tag_ids: selectedTagIds
+			});
+
+			if (response.error) {
+				const err = response.error as { value?: { message?: string } };
+				saveError = err.value?.message ?? 'Failed to update product organisation';
+				return;
+			}
+
+			await onSaved();
+			open = false;
+		} catch (error) {
+			saveError = error instanceof Error ? error.message : String(error);
+		} finally {
+			submitting = false;
+		}
+	}
 </script>
 
 <Sheet.Root bind:open>
@@ -149,24 +208,29 @@
 			</div>
 		</Sheet.Header>
 		<div class="flex flex-1 flex-col gap-4 overflow-auto px-4 pb-4">
+			{#if saveError}
+				<p class="text-sm text-destructive">{saveError}</p>
+			{/if}
 			<div class="flex flex-col gap-2">
 				<label for="org-categories" class="text-sm font-medium">Category</label>
 				<Combobox
 					id="org-categories"
-					value={productCategoryId}
+					bind:value={selectedCategoryId}
 					options={categoriesOptions}
 					placeholder="Search categories…"
 					emptyMessage="No categories found"
+					disabled={submitting}
 				/>
 			</div>
 			<div class="flex flex-col gap-3">
 				<h3 class="text-sm font-medium">Collections</h3>
 				<MultiSelectCombobox
 					id="org-collections"
-					value={productCollectionIds}
+					bind:value={selectedCollectionIds}
 					options={collectionsOptions}
 					placeholder="Search collections…"
 					emptyMessage="No collections yet."
+					disabled={submitting}
 				/>
 			</div>
 			<div class="flex flex-col gap-2">
@@ -188,22 +252,18 @@
 				</div>
 				<MultiSelectCombobox
 					id="org-tags"
-					value={productTagIds}
+					bind:value={selectedTagIds}
 					options={tagsOptions}
 					placeholder="Type to search…"
 					emptyMessage="No tags found"
+					disabled={submitting}
 				/>
 			</div>
 		</div>
 		<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-			<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
-			<Button
-				onclick={async () => {
-					await onSaved();
-					open = false;
-				}}
-			>
-				Save
+			<Button variant="outline" onclick={() => (open = false)} disabled={submitting}>Cancel</Button>
+			<Button onclick={saveOrganisation} disabled={submitting}>
+				{submitting ? 'Saving…' : 'Save'}
 			</Button>
 		</Sheet.Footer>
 	</Sheet.Content>

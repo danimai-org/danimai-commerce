@@ -62,25 +62,25 @@
 	});
 
 	$effect(() => {
-		if (!open || !product?.id) {
+		if (!open || !(product as { id?: string } | null)?.id) {
 			initializedForId = null;
 			return;
 		}
-		if (initializedForId === product.id) return;
-		initializedForId = product.id;
+		if (initializedForId === (product as { id?: string } | undefined)?.id) return;
+		initializedForId = (product as { id?: string } | undefined)?.id ?? '';
 		apiError = null;
 		const p = product as {
-			id: string;
-			title?: string | null;
-			subtitle?: string | null;
-			handle?: string | null;
-			description?: string | null;
-			discountable?: boolean | null;
-			status?: string | null;
+			id?: string;
+			title?: string;
+			subtitle?: string;
+			handle?: string;
+			description?: string;
+			discountable?: boolean;
+			status?: string;
 		};
 		reset({
 			data: {
-				id: p.id,
+				id: p.id ?? '',
 				status: normalizeStatus(p.status),
 				title: p.title ?? '',
 				subtitle: p.subtitle ?? '',

@@ -23,7 +23,8 @@
 		>;
 	} = $props();
 
-	const product = $derived(getDetailContext<Product>()?.data ?? null);
+	const detailQuery = getDetailContext<Product>();
+	const product = $derived(detailQuery?.data ?? null);
 
 	let orgSheetOpen = $state(false);
 </script>
@@ -46,13 +47,17 @@
 	<dl class="mt-4 grid gap-3 text-sm">
 		<div>
 			<dt class="font-medium text-muted-foreground">Category</dt>
-			<dd class="mt-0.5">{product?.category?.value || '—'}</dd>
+			<dd class="mt-0.5">
+				{(product as { category?: { value: string } } | null)?.category?.value ?? '—'}
+			</dd>
 		</div>
 		<div>
 			<dt class="font-medium text-muted-foreground">Collections</dt>
 			<dd class="mt-0.5">
-				{#if product?.collections?.length}
-					{product.collections.map((c) => c.title).join(', ')}
+				{#if (product as { collections?: Array<{ title: string }> } | null)?.collections?.length}
+					{(product as { collections?: Array<{ title: string }> } | null)?.collections
+						?.map((c) => c.title)
+						.join(', ')}
 				{:else}
 					—
 				{/if}
@@ -61,8 +66,10 @@
 		<div>
 			<dt class="font-medium text-muted-foreground">Tags</dt>
 			<dd class="mt-0.5">
-				{#if product?.tags?.length}
-					{product.tags.map((t) => t.value).join(', ')}
+				{#if (product as { tags?: Array<{ value: string }> } | null | undefined)?.tags?.length}
+					{(product as { tags?: Array<{ value: string }> } | null)?.tags
+						?.map((t) => t.value)
+						.join(', ')}
 				{:else}
 					—
 				{/if}
@@ -74,5 +81,5 @@
 <ProductOrganisationSheet
 	bind:open={orgSheetOpen}
 	{productOrganisationForm}
-	onSaved={() => void getDetailContext<Product>()?.refetch?.()}
+	onSaved={() => void detailQuery?.refetch?.()}
 />

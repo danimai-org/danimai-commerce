@@ -7,7 +7,6 @@
 	import { SvelteSet } from 'svelte/reactivity';
 
 	export type SalesChannel = { id: string; name: string; title?: string; is_default?: boolean };
-
 	type Props = {
 		open: boolean;
 		channels?: SalesChannel[];
@@ -26,7 +25,7 @@
 		onSave,
 		onCancel,
 		submitting = false
-		}: Props = $props();
+	}: Props = $props();
 
 	let searchQuery = $state('');
 
@@ -43,6 +42,7 @@
 		} else {
 			newSet.add(channel.id);
 		}
+		selectedIds = newSet;
 		onSelectedIdsChange(newSet);
 	}
 </script>
@@ -57,9 +57,7 @@
 				</p>
 				<div class="mt-6 flex flex-col gap-4">
 					<div class="relative">
-						<Search
-							class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-						/>
+						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 						<Input
 							type="search"
 							placeholder="Search sales channels"
@@ -69,9 +67,7 @@
 					</div>
 					<div class="flex flex-col gap-2">
 						{#if filteredChannels.length === 0}
-							<p class="py-8 text-center text-sm text-muted-foreground">
-								No sales channels found.
-							</p>
+							<p class="py-8 text-center text-sm text-muted-foreground">No sales channels found.</p>
 						{:else}
 							{#each filteredChannels as channel (channel.id)}
 								<div class="flex items-center justify-between rounded-md border p-3">
@@ -95,9 +91,7 @@
 										<span
 											class={cn(
 												'pointer-events-none block size-5 shrink-0 rounded-full border border-input bg-white shadow ring-0 transition-transform',
-												selectedIds.has(channel.id)
-													? 'translate-x-5'
-													: 'translate-x-[1px]'
+												selectedIds.has(channel.id) ? 'translate-x-5' : 'translate-x-[1px]'
 											)}
 										></span>
 									</button>
@@ -108,9 +102,7 @@
 				</div>
 			</div>
 			<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-				<Button variant="outline" onclick={onCancel} disabled={submitting}>
-					Cancel
-				</Button>
+				<Button variant="outline" onclick={onCancel} disabled={submitting}>Cancel</Button>
 				<Button onclick={onSave} disabled={submitting}>
 					{submitting ? 'Saving…' : 'Save'}
 				</Button>

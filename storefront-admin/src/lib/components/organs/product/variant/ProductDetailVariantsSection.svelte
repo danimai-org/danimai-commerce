@@ -144,67 +144,83 @@
 	});
 </script>
 
-<!-- Options & Variants card (merged) -->
-<div class="rounded-lg border bg-card p-6 shadow-sm">
-	<div class="flex items-center justify-between">
-		<h2 class="font-semibold">Options & Variants</h2>
-		<Button
-			variant="ghost"
-			size="icon"
-			class="size-8 shrink-0"
-			onclick={onEditOptionsAndVariants}
-			aria-label="Edit options and variants"
-		>
-			<Pencil class="size-4" />
-		</Button>
+<div class="flex min-w-0 flex-col gap-6">
+	<!-- Options card -->
+	<div class="rounded-lg border bg-card p-6 shadow-sm">
+		<div class="flex items-center justify-between">
+			<h2 class="font-semibold">Options</h2>
+			<Button
+				variant="ghost"
+				size="icon"
+				class="size-8 shrink-0"
+				onclick={onEditOptionsAndVariants}
+				aria-label="Edit options"
+			>
+				<Pencil class="size-4" />
+			</Button>
+		</div>
+
+		{#if optionsWithValues.length === 0}
+			<p class="mt-4 text-sm text-muted-foreground">No options defined.</p>
+		{:else}
+			<div class="mt-4 flex flex-col gap-4">
+				{#each optionsWithValues as { option: opt, values: vals } (opt.id)}
+					<div>
+						<p class="text-sm font-medium text-muted-foreground">{opt.title}</p>
+						<div class="mt-1.5 flex flex-wrap gap-1.5">
+							{#each vals as val (val)}
+								<span
+									class="inline-flex items-center rounded-md border bg-muted/50 px-2.5 py-1 text-sm"
+								>
+									{val}
+								</span>
+							{/each}
+						</div>
+					</div>
+				{/each}
+			</div>
+		{/if}
 	</div>
 
-	<!-- Options section -->
-	{#if optionsWithValues.length === 0}
-		<p class="mt-4 text-sm text-muted-foreground">No options defined.</p>
-	{:else}
-		<div class="mt-4 flex flex-col gap-4">
-			{#each optionsWithValues as { option: opt, values: vals } (opt.id)}
-				<div>
-					<p class="text-sm font-medium text-muted-foreground">{opt.title}</p>
-					<div class="mt-1.5 flex flex-wrap gap-1.5">
-						{#each vals as val (val)}
-							<span
-								class="inline-flex items-center rounded-md border bg-muted/50 px-2.5 py-1 text-sm"
-							>
-								{val}
-							</span>
-						{/each}
-					</div>
-				</div>
-			{/each}
+	<!-- Variants card -->
+	<div class="rounded-lg border bg-card p-6 shadow-sm">
+		<div class="flex items-center justify-between">
+			<h2 class="font-semibold">Variants</h2>
+			<Button
+				variant="ghost"
+				size="icon"
+				class="size-8 shrink-0"
+				onclick={onEditOptionsAndVariants}
+				aria-label="Edit variants"
+			>
+				<Pencil class="size-4" />
+			</Button>
 		</div>
-	{/if}
 
-	<!-- Variants section -->
-	<div class="mt-4">
-		<PaginationTable
-			searchQuery={variantSearchQuery}
-			searchPlaceholder="Search variants…"
-			showFilter={false}
-			showSort={false}
-		>
-			<div class="overflow-x-auto rounded-lg border bg-card">
-				<table class="w-full text-sm">
-					<TableHead columns={variantTableColumns} />
-					<TableBody
-						rows={variantTableRows}
-						columns={variantTableColumns}
-						emptyMessage="No variants."
-					/>
-				</table>
-			</div>
-			<TablePagination
-				pagination={variantPagination}
-				start={variantStart}
-				end={variantEnd}
-				onPageChange={goToVariantPage}
-			/>
-		</PaginationTable>
+		<div class="mt-4">
+			<PaginationTable
+				searchQuery={variantSearchQuery}
+				searchPlaceholder="Search variants…"
+				showFilter={false}
+				showSort={false}
+			>
+				<div class="overflow-x-auto rounded-lg border bg-card">
+					<table class="w-full text-sm">
+						<TableHead columns={variantTableColumns} />
+						<TableBody
+							rows={variantTableRows}
+							columns={variantTableColumns}
+							emptyMessage="No variants."
+						/>
+					</table>
+				</div>
+				<TablePagination
+					pagination={variantPagination}
+					start={variantStart}
+					end={variantEnd}
+					onPageChange={goToVariantPage}
+				/>
+			</PaginationTable>
+		</div>
 	</div>
 </div>

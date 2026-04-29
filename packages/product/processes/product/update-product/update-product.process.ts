@@ -55,6 +55,9 @@ export class UpdateProductProcess
     if (input.collection_ids !== undefined) {
       await this.validateCollectionIds(input.collection_ids);
     }
+    if (input.sales_channel_ids !== undefined) {
+      await this.validateSalesChannelIds(input.sales_channel_ids);
+    }
 
     const updated = await this.updateProduct(input, category, handle);
     if (input.attribute_groups !== undefined) {
@@ -68,6 +71,9 @@ export class UpdateProductProcess
     }
     if (input.collection_ids !== undefined) {
       await this.syncProductCollections(input.id, input.collection_ids);
+    }
+    if (input.sales_channel_ids !== undefined) {
+      await this.syncProductSalesChannels(input.id, input.sales_channel_ids);
     }
     await this.syncProductMedia(input.id, input.media_ids, input.thumbnail_media_id);
     return updated ?? (await this.db.selectFrom("products").where("id", "=", input.id).where("deleted_at", "is", null).selectAll().executeTakeFirst());
@@ -215,7 +221,10 @@ export class UpdateProductProcess
 
     return this.db
       .updateTable("products")
-      .set(updateData)
+      .set({
+        ...updateData,
+        metadata: updateData.metadata as Record<string, unknown> | null,
+      })
       .where("id", "=", input.id)
       .where("deleted_at", "is", null)
       .returningAll()
@@ -324,7 +333,7 @@ export class UpdateProductProcess
   ) {
     await this.db
       .deleteFrom("product_attribute_values")
-      .where("product_attribute_id", "=", productId)
+      .where("id", "in", attributes.map((a) => a.attribute_id))
       .execute();
 
     if (attributes.length === 0) return;
@@ -418,6 +427,46 @@ export class UpdateProductProcess
       .insertInto("product_collection_relations")
       .values(relations)
       .onConflict((oc) => oc.columns(["product_id", "product_collection_id"]).doNothing())
+      .execute();
+  }
+
+  async validateSalesChannelIds(salesChannelIds: string[]) {
+    if (salesChannelIds.length === 0) return;
+    const existing = await this.db
+      .selectFrom("sales_channels")
+      .where("id", "in", salesChannelIds)
+      .where("deleted_at", "is", null)
+      .select("id")
+      .execute();
+    const found = new Set(existing.map((r) => r.id));
+    const missing = salesChannelIds.filter((id) => !found.has(id));
+    if (missing.length > 0) {
+      throw new ValidationError("One or more sales channels not found", [{
+        type: "not_found",
+        message: `Sales channels not found: ${missing.join(", ")}`,
+        path: "sales_channel_ids",
+      }]);
+    }
+  }
+
+  async syncProductSalesChannels(productId: string, salesChannelIds: string[]) {
+    await this.db
+      .deleteFrom("product_sales_channels")
+      .where("product_id", "=", productId)
+      .execute();
+
+    if (salesChannelIds.length === 0) return;
+
+    await this.db
+      .insertInto("product_sales_channels")
+      .values(
+        salesChannelIds.map((sales_channel_id) => ({
+          id: randomUUID(),
+          product_id: productId,
+          sales_channel_id,
+        }))
+      )
+      .onConflict((oc) => oc.doNothing())
       .execute();
   }
 

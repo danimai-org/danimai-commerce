@@ -9,9 +9,13 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import type { Product } from '../type';
 
-	const product = $derived(getDetailContext<Product>()?.data ?? null);
+	const detailQuery = getDetailContext<Product>();
+	const product = $derived(detailQuery?.data ?? null);
 
-	const salesChannels = $derived(product?.sales_channels ?? []);
+	const salesChannels = $derived(
+		(product as { sales_channels?: Array<{ id: string; name: string }> } | null)?.sales_channels ??
+			[]
+	);
 	const salesChannelsQuery = createQuery(() => ({
 		queryKey: ['sales-channels', 'product-detail-sheet'],
 		queryFn: async () =>
@@ -41,14 +45,50 @@
 			is_default: channel.is_default
 		}));
 	});
-	const selectedIds = $derived.by(
-		() => new SvelteSet((salesChannels ?? []).map((channel: { id: string }) => channel.id))
-	);
+	let selectedIds = new SvelteSet<string>();
 	let sheetOpen = $state(false);
+	let submitting = $state(false);
+	let saveError = $state<string | null>(null);
 
 	$effect(() => {
-		void selectedIds;
+		if (!sheetOpen) return;
+		selectedIds.clear();
+		for (const channel of salesChannels ?? []) {
+			selectedIds.add((channel as { id: string }).id);
+		}
+		saveError = null;
 	});
+
+	function handleCancel() {
+		sheetOpen = false;
+		saveError = null;
+	}
+
+	async function handleSave() {
+		const productId = (product as { id?: string } | null)?.id;
+		if (!productId) return;
+
+		submitting = true;
+		saveError = null;
+		try {
+			const res = await client.products({ id: productId }).put({
+				sales_channel_ids: Array.from(selectedIds)
+			});
+
+			if (res.error) {
+				const err = res.error as { value?: { message?: string } };
+				saveError = err.value?.message ?? 'Failed to update sales channels';
+				return;
+			}
+
+			sheetOpen = false;
+			await detailQuery?.refetch?.();
+		} catch (e) {
+			saveError = e instanceof Error ? e.message : String(e);
+		} finally {
+			submitting = false;
+		}
+	}
 </script>
 
 <div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
@@ -82,6 +122,9 @@
 	<p class="mt-1 text-xs text-muted-foreground">
 		Available in {salesChannels.length} of {allSalesChannels.length || salesChannels.length} sales channels
 	</p>
+	{#if saveError}
+		<p class="mt-2 text-xs text-destructive">{saveError}</p>
+	{/if}
 </div>
 
 <ProductSalesChannelsSheet
@@ -89,10 +132,12 @@
 	channels={allSalesChannels.length ? allSalesChannels : salesChannels}
 	{selectedIds}
 	onSelectedIdsChange={(set) => {
-		void selectedIds;
-		void set;
+		selectedIds.clear();
+		for (const id of set) {
+			selectedIds.add(id);
+		}
 	}}
-	onSave={() => void 0}
-	onCancel={() => void 0}
-	submitting={salesChannelsQuery.isPending}
+	onSave={handleSave}
+	onCancel={handleCancel}
+	{submitting}
 />

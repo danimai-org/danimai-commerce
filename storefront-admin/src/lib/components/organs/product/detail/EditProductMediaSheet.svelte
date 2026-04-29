@@ -8,6 +8,7 @@
 	import { cn } from '$lib/utils.js';
 	import Upload from '@lucide/svelte/icons/upload-cloud';
 	import type { Product } from '../type';
+	import ProductMediaImage from './ProductMediaImage.svelte';
 
 	interface Props {
 		open: boolean;
@@ -25,6 +26,11 @@
 		if (!Array.isArray(list)) return [];
 		return [...list].sort((a, b) => a.rank - b.rank);
 	});
+	const thumbnailInMedia = $derived.by(() => {
+		const thumb = thumbnail?.trim?.() ?? '';
+		if (!thumb) return true; // No thumbnail configured, so don't show fallback UI.
+		return productMedia.some((item) => item.url === thumb);
+	});
 	const apiBaseUrl = 'http://localhost:8000';
 
 	let error = $state<string | null>(null);
@@ -32,6 +38,7 @@
 	let prevOpen = $state(false);
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let primaryMediaId = $state<string | null>(null);
+	let primaryDirty = $state(false);
 	let sortableMedia = $state<Array<{ id: string; url: string; rank: number }>>([]);
 
 	$effect(() => {
@@ -39,8 +46,15 @@
 			const currentMedia = untrack(() => productMedia);
 			const currentThumbnail = untrack(() => thumbnail);
 			sortableMedia = [...currentMedia];
-			const matched = currentMedia.find((item) => item.url === currentThumbnail);
-			primaryMediaId = matched?.id ?? currentMedia[0]?.id ?? null;
+			primaryDirty = false;
+
+			const thumb = currentThumbnail?.trim?.() ?? '';
+			if (thumb) {
+				const matched = currentMedia.find((item) => item.url === thumb);
+				primaryMediaId = matched?.id ?? null;
+			} else {
+				primaryMediaId = currentMedia[0]?.id ?? null;
+			}
 			error = null;
 		}
 		prevOpen = open;
@@ -50,7 +64,7 @@
 		if (!open) return;
 		const currentMedia = productMedia;
 		sortableMedia = [...currentMedia];
-		if (!currentMedia.some((item) => item.id === primaryMediaId)) {
+		if (primaryMediaId !== null && !currentMedia.some((item) => item.id === primaryMediaId)) {
 			primaryMediaId = currentMedia[0]?.id ?? null;
 		}
 	});
@@ -73,10 +87,12 @@
 		);
 		sortableMedia = reordered;
 		primaryMediaId = reordered[0]?.id ?? null;
+		primaryDirty = true;
 	}
 	function close() {
 		open = false;
 		error = null;
+		primaryDirty = false;
 	}
 	async function postImageMutation(body: FormData) {
 		const response = await fetch(`${apiBaseUrl}/admin/products/${productId}/images`, {
@@ -109,6 +125,7 @@
 			error = 'Missing product id.';
 			return;
 		}
+		if (!primaryDirty) return;
 		error = null;
 		submitting = true;
 		try {
@@ -119,6 +136,7 @@
 				const err = res.error as { value?: { message?: string } };
 				throw new Error(err?.value?.message ?? String(res.error));
 			}
+			primaryDirty = false;
 			close();
 			await onSaved();
 		} catch (e) {
@@ -131,14 +149,19 @@
 	async function removeImage(mediaId: string) {
 		if (!productId || !mediaId) return;
 		error = null;
+		const wasPrimary = primaryMediaId === mediaId;
 		submitting = true;
 		try {
 			const body = new FormData();
 			body.append('delete_ids', JSON.stringify([mediaId]));
 			await postImageMutation(body);
-			if (primaryMediaId === mediaId) {
-				const remaining = sortableMedia.filter((item) => item.id !== mediaId);
+
+			// Update local state immediately for a snappy UI; the refetch will also sync.
+			const remaining = sortableMedia.filter((item) => item.id !== mediaId);
+			sortableMedia = remaining;
+			if (wasPrimary) {
 				primaryMediaId = remaining[0]?.id ?? null;
+				primaryDirty = true;
 			}
 			await onSaved();
 		} catch (e) {
@@ -150,7 +173,7 @@
 </script>
 
 <Sheet.Root bind:open>
-	<Sheet.Content side="right" class="w-full min-w-lg">
+	<Sheet.Content side="right" class="w-full min-w-2xl">
 		<Sheet.Header class="w-full border-b px-6 py-4">
 			<Sheet.Title>Edit media</Sheet.Title>
 			<Sheet.Description class="text-sm text-muted-foreground">
@@ -201,6 +224,20 @@
 					}}
 				/>
 			</div>
+			{#if thumbnail && !thumbnailInMedia && !primaryDirty && primaryMediaId === null}
+				<div class="rounded-md border bg-muted/20 p-3">
+					<div class="mb-2 flex items-center justify-between">
+						<p class="text-sm font-medium">Primary thumbnail</p>
+						<span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
+							>Primary</span>
+					</div>
+					<ProductMediaImage
+						src={thumbnail}
+						alt=""
+						class="size-20 rounded-md border object-cover"
+					/>
+				</div>
+			{/if}
 			{#if sortableMedia.length > 0}
 				<div class="max-h-72 overflow-auto rounded-md border bg-muted/20 p-3">
 					<SortableList.Root ondragend={handleDragEnd}>
@@ -208,17 +245,16 @@
 							<SortableList.Item id={media.id} {index}>
 								<div
 									class={cn(
-										'mb-2 flex items-center gap-3 rounded-md border bg-muted/20 p-2',
+										'mb-2 grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-md border bg-muted/20 p-2',
 										primaryMediaId === media.id && 'border-primary bg-primary/5'
 									)}
 								>
-									<img
+									<ProductMediaImage
 										src={media.url}
 										alt=""
 										class="size-14 rounded-md border object-cover"
-										onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
 									/>
-									<div class="ml-auto flex items-center gap-2">
+									<div class="flex items-center">
 										{#if primaryMediaId === media.id}
 											<span
 												class="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
@@ -226,38 +262,45 @@
 												Primary
 											</span>
 										{/if}
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											class="text-destructive hover:bg-destructive/10"
-											disabled={submitting}
-											onclick={() => removeImage(media.id)}
-										>
-											Remove
-										</Button>
 									</div>
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										class="justify-self-end whitespace-nowrap text-destructive hover:bg-destructive/10"
+										disabled={submitting}
+										onclick={() => removeImage(media.id)}
+									>
+										Remove
+									</Button>
 								</div>
 							</SortableList.Item>
 						{/each}
 					</SortableList.Root>
 				</div>
 			{:else}
-				<p class="text-sm text-muted-foreground">No media uploaded yet.</p>
+				{#if thumbnail && !thumbnailInMedia && primaryMediaId === null}
+					<p class="text-sm text-muted-foreground">No additional media uploaded yet.</p>
+				{:else}
+					<p class="text-sm text-muted-foreground">No media uploaded yet.</p>
+				{/if}
 			{/if}
 		</div>
 		<div class="flex flex-wrap items-center justify-between gap-2 border-t p-4">
 			<Button
 				variant="ghost"
 				class="text-destructive hover:bg-destructive/10"
-				onclick={() => (primaryMediaId = null)}
+				onclick={() => {
+					primaryMediaId = null;
+					primaryDirty = true;
+				}}
 				disabled={submitting}
 			>
 				Clear primary
 			</Button>
 			<div class="flex gap-2">
 				<Button variant="outline" onclick={close} disabled={submitting}>Cancel</Button>
-				<Button onclick={savePrimary} disabled={submitting}>Save</Button>
+				<Button onclick={savePrimary} disabled={submitting || !primaryDirty}>Save</Button>
 			</div>
 		</div>
 	</Sheet.Content>

@@ -61,8 +61,14 @@ export const actions = {
 		if (!productUpdateForm.valid) {
 			return fail(400, { productUpdateForm });
 		}
-		const { id, ...data } = productUpdateForm.data;
-		const res = await client.products({ id }).put(data);
+		const { id, status, title, handle, description, discountable } = productUpdateForm.data;
+		const res = await client.products({ id }).put({
+			status,
+			title,
+			handle,
+			description,
+			discountable
+		});
 
 		if (res.error) {
 			const err = res.error as { value?: { message?: string } };

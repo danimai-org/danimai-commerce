@@ -3,6 +3,7 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Upload from '@lucide/svelte/icons/upload-cloud';
 	import EditProductMediaSheet from './EditProductMediaSheet.svelte';
+	import ProductMediaImage from './ProductMediaImage.svelte';
 	import { getDetailContext } from '$lib/hooks';
 	import type { Product } from '../type';
 	let { productId }: { productId: string } = $props();
@@ -28,8 +29,11 @@
 					.filter((item): item is { id: string; url: string; rank: number } => item !== null)
 					.sort((a, b) => a.rank - b.rank)
 			: [];
-		if (items.length > 0) return items;
-		return thumbnail ? [{ id: 'thumbnail', url: thumbnail, rank: 0 }] : [];
+		if (!thumbnail) return items;
+		const hasThumbnail = items.some((item) => item.url === thumbnail);
+		if (hasThumbnail) return items;
+		// Ensure the card always shows the primary thumbnail, even if it isn't part of `product.media`.
+		return [{ id: 'thumbnail', url: thumbnail, rank: -1 }, ...items].sort((a, b) => a.rank - b.rank);
 	});
 
 	let mediaSheetOpen = $state(false);
@@ -66,11 +70,10 @@
 		>
 			<div class="mt-4 flex flex-wrap gap-4">
 				{#each mediaItems as mediaItem (mediaItem.id)}
-					<img
+					<ProductMediaImage
 						src={mediaItem.url}
 						alt=""
 						class="size-36 rounded-xl border bg-muted object-cover"
-						onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
 					/>
 				{/each}
 			</div>

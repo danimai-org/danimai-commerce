@@ -23,6 +23,7 @@ export const UpdateProductSchema = Type.Object({
   thumbnail: Type.Optional(Type.String()),
   thumbnail_media_id: Type.Optional(Type.Union([Type.String({ format: "uuid" }), Type.Null()])),
   media_ids: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
+  sales_channel_ids: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
   external_id: Type.Optional(Type.String()),
   category_id: Type.Optional(Type.String()),
   attribute_group_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),

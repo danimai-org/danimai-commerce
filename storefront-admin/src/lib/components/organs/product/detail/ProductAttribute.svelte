@@ -30,7 +30,10 @@
 
 	const product = $derived(getDetailContext<Product>()?.data ?? null);
 
-	const attributes = $derived(product?.attributes ?? []);
+	const attributes = $derived(
+		(product as { attributes?: Array<{ id: string; title: string; value: string }> } | null)
+			?.attributes ?? []
+	);
 
 	let editAttributesSheetOpen = $state(false);
 </script>

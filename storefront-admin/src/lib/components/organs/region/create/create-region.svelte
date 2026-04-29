@@ -63,7 +63,10 @@
 	}));
 
 	const currenciesData = $derived(currenciesQuery.data?.data);
-	const currencies = $derived(currenciesData?.rows ?? []);
+	const currencies = $derived(
+		(currenciesData as { rows?: Array<{ code: string; name: string; symbol: string }> } | undefined)
+			?.rows ?? []
+	);
 
 	let automaticTaxes = $state(true);
 	let taxInclusivePricing = $state(false);

@@ -63,9 +63,7 @@
 
 	let selectedIds = new SvelteSet<string>();
 
-	const allRowsSelected = $derived(
-		rows.length > 0 && rows.every((c) => selectedIds.has(c.code))
-	);
+	const allRowsSelected = $derived(rows.length > 0 && rows.every((c) => selectedIds.has(c.code)));
 
 	$effect(() => {
 		if (!open) {

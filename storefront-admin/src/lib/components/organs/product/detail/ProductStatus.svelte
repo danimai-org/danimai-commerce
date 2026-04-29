@@ -1,11 +1,56 @@
 <script lang="ts">
 	import * as Select from '$lib/components/ui/select/index.js';
+	import { client } from '$lib/client';
 	import { getDetailContext } from '$lib/hooks';
 	import type { Product } from '../type';
 
-	const product = $derived(getDetailContext<Product>()?.data ?? null);
+	const detailQuery = getDetailContext<Product>();
+	const product = $derived(detailQuery?.data ?? null);
 
-	const status = $derived(product?.status ?? 'draft');
+	const status = $derived((product as { status?: string } | null)?.status ?? 'draft');
+	let submitting = $state(false);
+	let localStatus = $state<'draft' | 'proposed' | 'published' | 'rejected'>('draft');
+
+	$effect(() => {
+		if (
+			status === 'draft' ||
+			status === 'proposed' ||
+			status === 'published' ||
+			status === 'rejected'
+		) {
+			localStatus = status;
+		} else {
+			localStatus = 'draft';
+		}
+	});
+
+	async function updateStatus(nextStatus: 'draft' | 'proposed' | 'published' | 'rejected') {
+		if (
+			!product ||
+			!(product as { id?: string } | undefined)?.id ||
+			submitting ||
+			nextStatus === localStatus
+		)
+			return;
+		const previousStatus = localStatus;
+		localStatus = nextStatus;
+		submitting = true;
+		try {
+			const res = await client
+				.products({ id: (product as { id?: string } | undefined)?.id ?? '' })
+				.put({
+					status: nextStatus
+				});
+			if (res.error) {
+				throw new Error('Failed to update status');
+			}
+			await detailQuery?.refetch?.();
+		} catch {
+			localStatus = previousStatus;
+		} finally {
+			submitting = false;
+		}
+	}
 
 	function statusLabel(s: string | undefined): string {
 		if (!s) return 'Draft';
@@ -29,20 +74,20 @@
 	<h2 class="mb-4 font-semibold">Status</h2>
 	<Select.Root
 		type="single"
-		value={status ?? 'draft'}
+		value={localStatus}
 		onValueChange={(v) => {
 			if (v && (v === 'draft' || v === 'proposed' || v === 'published' || v === 'rejected')) {
-				// onStatusChange(v);
+				void updateStatus(v);
 			}
 		}}
 	>
 		<Select.Trigger class="w-full">
 			<span class="flex items-center gap-2">
 				<span
-					class={`inline-block size-2 shrink-0 rounded-full ${statusDotClass(status)}`}
+					class={`inline-block size-2 shrink-0 rounded-full ${statusDotClass(localStatus)}`}
 					aria-hidden="true"
 				></span>
-				<span>{statusLabel(status)}</span>
+				<span>{statusLabel(localStatus)}</span>
 			</span>
 		</Select.Trigger>
 		<Select.Content>
@@ -75,14 +120,14 @@
 	<h2 class="mt-6 mb-4 font-semibold">Visibility</h2>
 	<Select.Root
 		type="single"
-		value={status === 'published' ? 'public' : 'private'}
-		onValueChange={() => {
-			// if (v === 'public') onStatusChange('published');
-			// if (v === 'private') onStatusChange('draft');
+		value={localStatus === 'published' ? 'public' : 'private'}
+		onValueChange={(v) => {
+			if (v === 'public') void updateStatus('published');
+			if (v === 'private') void updateStatus('draft');
 		}}
 	>
 		<Select.Trigger class="w-full">
-			{status === 'published' ? 'Public' : 'Private'}
+			{localStatus === 'published' ? 'Public' : 'Private'}
 		</Select.Trigger>
 		<Select.Content>
 			<Select.Item value="public" label="Public">Public</Select.Item>
