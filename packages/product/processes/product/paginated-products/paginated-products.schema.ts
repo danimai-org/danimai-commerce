@@ -14,13 +14,12 @@ export const PaginatedProductsSchema = createPaginationSchema(
     sales_channel_ids: commaSeparatedIds({ format: "uuid" }),
     collection_ids: commaSeparatedIds({ format: "uuid" }),
   }),
-  ["products.title", "products.handle", "products.status"]
+  ["products.title", "products.handle", "products.status"],
 );
 
 export type PaginatedProductsProcessInput = StaticDecode<
   typeof PaginatedProductsSchema
 >;
-
 
 const PaginatedProductItemSchema = Type.Object({
   id: Type.String(),
@@ -44,7 +43,9 @@ const PaginatedProductItemSchema = Type.Object({
   ),
 });
 
-export const PaginatedProductsResponseSchema = createPaginatedResponseSchema(PaginatedProductItemSchema);
+export const PaginatedProductsResponseSchema = createPaginatedResponseSchema(
+  PaginatedProductItemSchema,
+);
 
 export type PaginatedProductsProcessOutput = Static<
   typeof PaginatedProductsResponseSchema

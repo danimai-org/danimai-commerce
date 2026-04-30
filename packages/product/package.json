@@ -14,13 +14,13 @@
   },
   "dependencies": {
     "@danimai/core": "../core",
-    "reflect-metadata": "^0.2.2",
+    "@danimai/media": "../media",
+    "@danimai/pricing": "../pricing",
+    "@danimai/sales-channel": "../sales-channel",
     "@medusajs/js-sdk": "^2.12.3",
     "@medusajs/types": "^2.12.3",
-    "@sinclair/typebox": "^0.34.48",
+    "elysia": "1.4.28",
     "kysely": "^0.28.9",
-    "@danimai/sales-channel": "../sales-channel",
-    "@danimai/pricing": "../pricing",
-    "@danimai/media": "../media"
+    "reflect-metadata": "^0.2.2"
   }
 }

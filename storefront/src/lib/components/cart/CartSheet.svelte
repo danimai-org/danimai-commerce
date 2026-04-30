@@ -1,360 +1,361 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { getUserCart, useCart } from '$lib/hooks/use-cart.hook';
-	import { cart } from '$lib/stores/cart';
-	let cartOpen = $state(false);
-	const { updateCartLineItems } = useCart();
-	
+    import { goto } from "$app/navigation";
+    import { getUserCart, useCart } from "$lib/hooks/use-cart.hook";
+    import { cart } from "$lib/stores/cart";
 
-	$effect(() => {
-		const unsub = cart.subscribe((s) => {
-			cartOpen = s.open;
-		});
-		return unsub;
-	});
+    let cartOpen = $state(false);
+    const { updateCartLineItems } = useCart();
 
-	const cartItems = $derived(
-		((getUserCart()?.line_items ?? []) as any[]).map((item) => {
-			const amount = Number.parseFloat(String(item.unit_price ?? '0'));
-			const priceValue = Number.isFinite(amount) ? amount : 0;
-			return {
-				...item,
-				key: item.id ?? `${item.variant_id ?? 'variant'}-${item.title ?? 'item'}`,
-				name: item.title ?? 'Item',
-				variant: item.description ?? (item.variant_id ? 'Variant' : '—'),
-				image: item.thumbnail ?? null,
-				priceValue,
-				priceDisplay: `$${priceValue.toFixed(2)}`
-			};
-		})
-	);
-	const subtotal = $derived(
-		cartItems.reduce((sum: number, i: any) => sum + i.priceValue * i.quantity, 0)
-	);
-	const subtotalDisplay = $derived(`$${subtotal.toFixed(2)}`);
+    $effect(() => {
+        const unsub = cart.subscribe((s) => {
+            cartOpen = s.open;
+        });
+        return unsub;
+    });
 
-	function handleClose() {
-		cart.close();
-	}
+    const cartItems = $derived(
+        ((getUserCart()?.line_items ?? []) as any[]).map((item) => {
+            const amount = Number.parseFloat(String(item.unit_price ?? "0"));
+            const priceValue = Number.isFinite(amount) ? amount : 0;
+            return {
+                ...item,
+                key:
+                    item.id ??
+                    `${item.variant_id ?? "variant"}-${item.title ?? "item"}`,
+                name: item.title ?? "Item",
+                variant:
+                    item.description ?? (item.variant_id ? "Variant" : "—"),
+                image: item.thumbnail ?? null,
+                priceValue,
+                priceDisplay: `$${priceValue.toFixed(2)}`,
+            };
+        }),
+    );
 
-	function goToCart() {
-		goto('/cart');
-		cart.close();
-	}
+    const subtotal = $derived(
+        cartItems.reduce(
+            (sum: number, i: any) => sum + i.priceValue * i.quantity,
+            0,
+        ),
+    );
+    const subtotalDisplay = $derived(`$${subtotal.toFixed(2)}`);
 
-	async function setQuantity(item: any, quantity: number) {
-		const rawItems = (getUserCart()?.line_items ?? []) as any[];
-		const next = rawItems
-			.map((line) => {
-				if (line.id !== item.id) return line;
-				return { ...line, quantity };
-			})
-			.filter((line) => (line.quantity ?? 0) > 0);
-		await updateCartLineItems.mutateAsync({
-			id: getUserCart()?.id ?? '',
-			lineItems: next
-		});
-	}
+    function handleClose() {
+        cart.close();
+    }
+
+    function goToCart() {
+        goto("/cart");
+        cart.close();
+    }
+
+    async function setQuantity(item: any, quantity: number) {
+        const rawItems = (getUserCart()?.line_items ?? []) as any[];
+        const next = rawItems
+            .map((line) => {
+                if (line.id !== item.id) return line;
+                return { ...line, quantity };
+            })
+            .filter((line) => (line.quantity ?? 0) > 0);
+
+        await updateCartLineItems.mutateAsync({
+            id: getUserCart()?.id ?? "",
+            lineItems: next,
+        });
+    }
 </script>
 
 {#if cartOpen}
-	<div
-		class="backdrop"
-		onclick={handleClose}
-		onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleClose()}
-		role="button"
-		tabindex="-1"
-		aria-label="Close cart"
-	></div>
-	<div class="sheet" role="dialog" aria-label="Shopping Cart">
-		<header class="sheet-header">
-			<h2 class="sheet-title">Shopping cart</h2>
-			<button type="button" class="sheet-close" onclick={handleClose} aria-label="Close">×</button>
-		</header>
-		<div class="sheet-body">
-			{#if cartItems.length === 0}
-				<p class="empty">Your cart is empty.</p>
-			{:else}
-				<ul class="line-items">
-					{#each cartItems as item (item.key)}
-						<li class="line-card">
-							<div class="line-card-media">
-								{#if item.image}
-									<img src={item.image} alt="" />
-								{/if}
-							</div>
-							<div class="line-card-body">
-								<p class="line-card-title">{item.name}</p>
-								<p class="line-card-meta">{item.variant}</p>
-								<p class="line-card-price">
-									<span class="line-card-price-label">Price</span>
-									<span class="line-card-price-value">{item.priceDisplay}</span>
-									<span class="line-card-qty-label">× {item.quantity}</span>
-								</p>
-								<p class="line-card-line-total">
-									<span class="line-card-line-total-label">Line total</span>
-									<strong>${(item.priceValue * item.quantity).toFixed(2)}</strong>
-								</p>
-								<div class="line-card-actions">
-									<div class="quantity-controls">
-										<button type="button" class="qty-btn" onclick={() => void setQuantity(item, item.quantity - 1)} aria-label="Decrease quantity">−</button>
-										<span class="qty-value">{item.quantity}</span>
-										<button type="button" class="qty-btn" onclick={() => void setQuantity(item, item.quantity + 1)} aria-label="Increase quantity">+</button>
-									</div>
-									<button type="button" class="remove-btn" onclick={() => void setQuantity(item, 0)} aria-label="Remove item">
-										<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-									</button>
-								</div>
-							</div>
-						</li>
-					{/each}
-				</ul>
-			{/if}
-		</div>
-		{#if cartItems.length > 0}
-			<footer class="sheet-footer">
-				<div class="subtotal-row">
-					<span>Subtotal</span>
-					<strong>{subtotalDisplay}</strong>
-				</div>
-				<button type="button" class="go-to-cart" onclick={goToCart}>View cart</button>
-			</footer>
-		{/if}
-	</div>
+    <div
+        class="backdrop"
+        onclick={handleClose}
+        onkeydown={(e) => (e.key === "Enter" || e.key === " ") && handleClose()}
+        role="button"
+        tabindex="-1"
+        aria-label="Close cart"
+    ></div>
+    <div class="sheet" role="dialog" aria-label="Shopping Cart">
+        <header class="sheet-header">
+            <h2 class="sheet-title">Shopping Cart</h2>
+            <button
+                type="button"
+                class="sheet-close"
+                onclick={handleClose}
+                aria-label="Close"
+                >×</button
+            >
+        </header>
+
+        <div class="sheet-body">
+            {#if cartItems.length === 0}
+                <p class="empty">Your cart is empty.</p>
+            {:else}
+                <ul class="line-items">
+                    {#each cartItems as item (item.key)}
+                        <li class="line-card">
+                            <div class="line-card-media">
+                                {#if item.image}
+                                    <img src={item.image} alt="" />
+                                {/if}
+                            </div>
+                            <div class="line-card-body">
+                                <p class="line-card-title">{item.name}</p>
+                                <p class="line-card-meta">{item.variant}</p>
+                                <div class="line-controls-row">
+                                    <div class="quantity-controls">
+                                        <button
+                                            type="button"
+                                            class="qty-btn"
+                                            onclick={() =>
+                                                void setQuantity(
+                                                    item,
+                                                    item.quantity - 1,
+                                                )}
+                                            aria-label="Decrease quantity"
+                                            >−</button
+                                        >
+                                        <span class="qty-value"
+                                            >{item.quantity}</span
+                                        >
+                                        <button
+                                            type="button"
+                                            class="qty-btn"
+                                            onclick={() =>
+                                                void setQuantity(
+                                                    item,
+                                                    item.quantity + 1,
+                                                )}
+                                            aria-label="Increase quantity"
+                                            >+</button
+                                        >
+                                    </div>
+                                    <span class="line-card-price"
+                                        >{item.priceDisplay}</span
+                                    >
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                class="remove-btn"
+                                onclick={() => void setQuantity(item, 0)}
+                                aria-label="Remove item"
+                            >
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    ><path
+                                        d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                                    /><line
+                                        x1="10"
+                                        y1="11"
+                                        x2="10"
+                                        y2="17"
+                                    /><line
+                                        x1="14"
+                                        y1="11"
+                                        x2="14"
+                                        y2="17"
+                                    /></svg
+                                >
+                            </button>
+                        </li>
+                    {/each}
+                </ul>
+            {/if}
+        </div>
+
+        {#if cartItems.length > 0}
+            <footer class="sheet-footer">
+                <div class="subtotal-row">
+                    <span>Subtotal</span>
+                    <strong>{subtotalDisplay}</strong>
+                </div>
+                <button type="button" class="go-to-cart" onclick={goToCart}
+                    >Go to cart</button
+                >
+            </footer>
+        {/if}
+    </div>
 {/if}
 
 <style>
-	.backdrop {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.35);
-		z-index: 1000;
-	}
-	.sheet {
-		--cart-bg: #ffffff;
-		--cart-border: #e0e0e0;
-		--cart-text: #000000;
-		--cart-muted: #757575;
-		--cart-accent: #6b6b40;
-		--cart-accent-hover: #5a5a36;
-		--cart-radius: 10px;
-		--cart-radius-sm: 8px;
-		position: fixed;
-		top: 0;
-		right: 0;
-		bottom: 0;
-		width: 100%;
-		max-width: 420px;
-		background: #fafafa;
-		box-shadow: -4px 0 28px rgba(0, 0, 0, 0.12);
-		z-index: 1001;
-		display: flex;
-		flex-direction: column;
-	}
-	.sheet-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 1.25rem 1.5rem;
-		background: var(--cart-bg);
-		border-bottom: 1px solid var(--cart-border);
-	}
-	.sheet-title {
-		font-size: 1.125rem;
-		font-weight: 700;
-		margin: 0;
-		color: var(--cart-text);
-	}
-	.sheet-close {
-		background: none;
-		border: none;
-		font-size: 1.5rem;
-		line-height: 1;
-		cursor: pointer;
-		color: var(--cart-accent);
-		padding: 0.25rem;
-		border-radius: var(--cart-radius-sm);
-	}
-	.sheet-close:hover {
-		background: rgba(107, 107, 64, 0.08);
-		color: var(--cart-accent-hover);
-	}
-	.sheet-body {
-		flex: 1;
-		overflow: auto;
-		padding: 1rem 1.25rem;
-	}
-	.empty {
-		color: var(--cart-muted);
-		text-align: center;
-		padding: 2rem;
-		margin: 0;
-		font-size: 0.9375rem;
-	}
-	.line-items {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-	.line-card {
-		display: grid;
-		grid-template-columns: 100px 1fr;
-		gap: 0;
-		border: 1px solid var(--cart-border);
-		border-radius: var(--cart-radius);
-		overflow: hidden;
-		background: var(--cart-bg);
-	}
-	.line-card-media {
-		aspect-ratio: 1;
-		background: #fff;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-right: 1px solid var(--cart-border);
-	}
-	.line-card-media img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-	.line-card-body {
-		min-width: 0;
-		padding: 0.875rem 0.875rem 0.75rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-	}
-	.line-card-title {
-		font-weight: 700;
-		font-size: 0.875rem;
-		line-height: 1.35;
-		margin: 0;
-		color: var(--cart-text);
-	}
-	.line-card-meta {
-		font-size: 0.65rem;
-		font-weight: 600;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: var(--cart-muted);
-		margin: 0;
-	}
-	.line-card-price {
-		margin: 0;
-		font-size: 0.8125rem;
-		color: var(--cart-text);
-		display: flex;
-		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 0.25rem 0.4rem;
-	}
-	.line-card-price-label {
-		font-weight: 400;
-	}
-	.line-card-price-value {
-		font-weight: 700;
-	}
-	.line-card-qty-label {
-		font-size: 0.75rem;
-		color: var(--cart-muted);
-		font-weight: 500;
-	}
-	.line-card-line-total {
-		margin: 0;
-		font-size: 0.8125rem;
-		color: var(--cart-text);
-		display: flex;
-		align-items: baseline;
-		gap: 0.4rem;
-	}
-	.line-card-line-total-label {
-		color: var(--cart-muted);
-		font-size: 0.75rem;
-	}
-	.line-card-line-total strong {
-		font-weight: 700;
-	}
-	.line-card-actions {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.75rem;
-		margin-top: 0.35rem;
-		padding-top: 0.75rem;
-		border-top: 1px solid var(--cart-border);
-	}
-	.quantity-controls {
-		display: flex;
-		align-items: center;
-		border: 1px solid var(--cart-border);
-		border-radius: var(--cart-radius-sm);
-		overflow: hidden;
-		background: #fff;
-	}
-	.qty-btn {
-		width: 32px;
-		height: 32px;
-		background: #fff;
-		border: none;
-		cursor: pointer;
-		font-size: 1rem;
-		line-height: 1;
-		color: var(--cart-accent);
-		font-weight: 600;
-	}
-	.qty-btn:hover {
-		background: rgba(107, 107, 64, 0.08);
-	}
-	.qty-value {
-		min-width: 1.5rem;
-		text-align: center;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: var(--cart-text);
-	}
-	.remove-btn {
-		background: none;
-		border: none;
-		padding: 0.3rem;
-		cursor: pointer;
-		color: var(--cart-accent);
-		border-radius: var(--cart-radius-sm);
-	}
-	.remove-btn:hover {
-		color: var(--cart-accent-hover);
-		background: rgba(107, 107, 64, 0.08);
-	}
-	.sheet-footer {
-		padding: 1.25rem 1.5rem;
-		background: var(--cart-bg);
-		border-top: 1px solid var(--cart-border);
-	}
-	.subtotal-row {
-		display: flex;
-		justify-content: space-between;
-		margin-bottom: 1rem;
-		font-size: 0.9375rem;
-		color: var(--cart-text);
-	}
-	.subtotal-row strong {
-		font-weight: 700;
-	}
-	.go-to-cart {
-		width: 100%;
-		background: var(--cart-accent);
-		color: #fff;
-		border: none;
-		padding: 0.875rem 1.5rem;
-		font-size: 0.9375rem;
-		font-weight: 700;
-		border-radius: var(--cart-radius-sm);
-		cursor: pointer;
-	}
-	.go-to-cart:hover {
-		background: var(--cart-accent-hover);
-	}
+    .backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.35);
+        z-index: 1000;
+    }
+    .sheet {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        max-width: 420px;
+        background: #f7f7f7;
+        box-shadow: -4px 0 28px rgba(0, 0, 0, 0.12);
+        z-index: 1001;
+        display: flex;
+        flex-direction: column;
+    }
+    .sheet-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.875rem 1rem;
+        background: #fff;
+        border-bottom: 1px solid #e4e4e4;
+    }
+    .sheet-title {
+        font-size: 1.625rem;
+        line-height: 1.1;
+        font-weight: 600;
+        margin: 0;
+        color: #111;
+    }
+    .sheet-close {
+        background: none;
+        border: none;
+        font-size: 1.2rem;
+        line-height: 1;
+        cursor: pointer;
+        color: #777;
+        padding: 0.2rem;
+    }
+    .sheet-body {
+        flex: 1;
+        overflow: auto;
+        padding: 0.85rem;
+    }
+    .empty {
+        color: #777;
+        text-align: center;
+        padding: 2rem;
+        margin: 0;
+        font-size: 0.9375rem;
+    }
+    .line-items {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+    }
+    .line-card {
+        display: grid;
+        grid-template-columns: 66px 1fr auto;
+        gap: 0.6rem;
+        border: 1px solid #ececec;
+        background: #fff;
+        padding: 0.45rem;
+        align-items: start;
+    }
+    .line-card-media {
+        width: 66px;
+        height: 66px;
+        background: #f2f2f2;
+        overflow: hidden;
+    }
+    .line-card-media img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .line-card-body {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.18rem;
+    }
+    .line-card-title {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #111;
+        line-height: 1.25;
+    }
+    .line-card-meta {
+        margin: 0;
+        font-size: 0.78rem;
+        color: #666;
+    }
+    .line-controls-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 0.25rem;
+    }
+    .line-card-price {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #333;
+    }
+    .quantity-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.52rem;
+    }
+    .qty-btn {
+        width: 18px;
+        height: 18px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1.1rem;
+        line-height: 1;
+        color: #555;
+        font-weight: 600;
+        padding: 0;
+    }
+    .qty-value {
+        min-width: 0.9rem;
+        text-align: center;
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #222;
+    }
+    .remove-btn {
+        background: none;
+        border: none;
+        padding: 0.1rem;
+        cursor: pointer;
+        color: #666;
+    }
+    .sheet-footer {
+        padding: 0.85rem 1rem 1rem;
+        background: #fff;
+        border-top: 1px solid #e4e4e4;
+    }
+    .subtotal-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+        font-size: 2rem;
+        line-height: 1;
+        color: #1a1a1a;
+        font-weight: 600;
+    }
+    .subtotal-row strong {
+        font-weight: 700;
+    }
+    .go-to-cart {
+        width: 100%;
+        background: #44444f;
+        color: #fff;
+        border: none;
+        padding: 0.7rem 1rem;
+        font-size: 1.05rem;
+        font-weight: 500;
+        border-radius: 0;
+        cursor: pointer;
+    }
+    .go-to-cart:hover {
+        background: #3a3a44;
+    }
 </style>

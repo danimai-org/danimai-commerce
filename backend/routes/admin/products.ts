@@ -12,7 +12,6 @@ import {
   PaginatedProductsProcess,
   PaginatedProductsResponseSchema,
   CreateProductSchema,
-
   CreateProductResponseSchema,
   RETRIEVE_PRODUCT_PROCESS,
   RetrieveProductProcess,
@@ -20,7 +19,6 @@ import {
   UPDATE_PRODUCT_IMAGES_PROCESS,
   UpdateProductImagesProcess,
   UpdateProductSchema,
-
   UpdateProductResponseSchema,
   DeleteProductsSchema,
   PaginatedProductsSchema,
@@ -38,8 +36,12 @@ export const productRoutes = new Elysia({ prefix: "/products" })
   .get(
     "/",
     async ({ query }) => {
-      const process = getService<PaginatedProductsProcess>(PAGINATED_PRODUCTS_PROCESS);
-      return process.runOperations({ input: query as StaticDecode<typeof PaginatedProductsSchema> });
+      const process = getService<PaginatedProductsProcess>(
+        PAGINATED_PRODUCTS_PROCESS,
+      );
+      return process.runOperations({
+        input: query as StaticDecode<typeof PaginatedProductsSchema>,
+      });
     },
     {
       query: PaginatedProductsSchema,
@@ -53,12 +55,14 @@ export const productRoutes = new Elysia({ prefix: "/products" })
         summary: "Get paginated products",
         description: "Gets a paginated list of products",
       },
-    }
+    },
   )
   .get(
     "/:id",
     async ({ params }) => {
-      const process = getService<RetrieveProductProcess>(RETRIEVE_PRODUCT_PROCESS);
+      const process = getService<RetrieveProductProcess>(
+        RETRIEVE_PRODUCT_PROCESS,
+      );
       return process.runOperations({ input: { id: params.id } });
     },
     {
@@ -74,13 +78,15 @@ export const productRoutes = new Elysia({ prefix: "/products" })
         summary: "Get a product by ID",
         description: "Retrieves a single product by its ID",
       },
-    }
+    },
   )
   .post(
     "/",
     async ({ body }) => {
       const process = getService<CreateProductProcess>(CREATE_PRODUCT_PROCESS);
-      return process.runOperations({ input: body as StaticDecode<typeof CreateProductSchema> });
+      return process.runOperations({
+        input: body as StaticDecode<typeof CreateProductSchema>,
+      });
     },
     {
       body: CreateProductSchema,
@@ -92,15 +98,18 @@ export const productRoutes = new Elysia({ prefix: "/products" })
       detail: {
         tags: ["Products"],
         summary: "Create a new product",
-        description: "Creates a single product with options, variants, prices, and sales channels (similar to Danimai's createProductsWorkflow)",
+        description:
+          "Creates a single product with options, variants, prices, and sales channels (similar to Danimai's createProductsWorkflow)",
       },
-    }
+    },
   )
   .post(
     "/batch",
     async ({ body }) => {
       const process = getService<CreateProductProcess>(CREATE_PRODUCT_PROCESS);
-      return process.runOperations({ input: body as StaticDecode<typeof CreateProductSchema> });
+      return process.runOperations({
+        input: body as StaticDecode<typeof CreateProductSchema>,
+      });
     },
     {
       body: CreateProductSchema,
@@ -114,7 +123,7 @@ export const productRoutes = new Elysia({ prefix: "/products" })
         summary: "Create multiple products",
         description: "Creates multiple products in a single batch operation",
       },
-    }
+    },
   )
   .put(
     "/:id",
@@ -138,12 +147,20 @@ export const productRoutes = new Elysia({ prefix: "/products" })
         summary: "Update a product",
         description: "Updates an existing product by ID",
       },
-    }
+    },
   )
   .post(
     "/:id/images",
-    async ({ params, body }: { params: { id: string }; body: { files?: File | File[]; delete_ids?: string[]; type?: string } }) => {
-      const process = getService<UpdateProductImagesProcess>(UPDATE_PRODUCT_IMAGES_PROCESS);
+    async ({
+      params,
+      body,
+    }: {
+      params: { id: string };
+      body: { files?: File | File[]; delete_ids?: string[]; type?: string };
+    }) => {
+      const process = getService<UpdateProductImagesProcess>(
+        UPDATE_PRODUCT_IMAGES_PROCESS,
+      );
       return process.runOperations({
         input: {
           id: params.id,
@@ -170,14 +187,17 @@ export const productRoutes = new Elysia({ prefix: "/products" })
       detail: {
         tags: ["Products"],
         summary: "Update product images",
-        description: "Uploads raw product images and deletes selected existing media IDs.",
+        description:
+          "Uploads raw product images and deletes selected existing media IDs.",
       },
-    }
+    },
   )
   .delete(
     "/",
     async ({ body: input, set }) => {
-      const process = getService<DeleteProductsProcess>(DELETE_PRODUCTS_PROCESS);
+      const process = getService<DeleteProductsProcess>(
+        DELETE_PRODUCTS_PROCESS,
+      );
       await process.runOperations({ input });
       set.status = 204;
       return undefined;
@@ -195,5 +215,5 @@ export const productRoutes = new Elysia({ prefix: "/products" })
         summary: "Delete products",
         description: "Deletes multiple products by their IDs",
       },
-    }
+    },
   );
