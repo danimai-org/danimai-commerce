@@ -234,7 +234,7 @@
 				const pr = p.variant?.price;
 				const amount =
 					pr?.amount != null ? parseInt(pr.amount, 10) / 100 : Number.NaN;
-				const currency_code = pr?.currency_code ?? 'USD';
+				const currency_code = pr?.currency_code ?? 'EUR';
 				return {
 					name: p.title,
 					price: {

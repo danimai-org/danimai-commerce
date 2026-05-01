@@ -5,6 +5,7 @@
         changeLineItemQuantity,
         closeCartSheet,
     } from "$lib/cart/cart-state.svelte";
+    import { formatStoreMoney } from "$lib/money";
 
     const cartItems = $derived(
         ((cartState.cart?.line_items ?? []) as any[]).map((item) => {
@@ -20,7 +21,7 @@
                     item.description ?? (item.variant_id ? "Variant" : "—"),
                 image: item.thumbnail ?? null,
                 priceValue,
-                priceDisplay: `$${priceValue.toFixed(2)}`,
+                priceDisplay: formatStoreMoney(priceValue),
             };
         }),
     );
@@ -31,7 +32,7 @@
             0,
         ),
     );
-    const subtotalDisplay = $derived(`$${subtotal.toFixed(2)}`);
+    const subtotalDisplay = $derived(formatStoreMoney(subtotal));
 
     function handleClose() {
         closeCartSheet();
@@ -43,7 +44,8 @@
     }
 
     async function setQuantity(item: any, quantity: number) {
-        await changeLineItemQuantity(item.id, quantity);
+        const nextQuantity = Math.max(0, quantity);
+        await changeLineItemQuantity(item.id, nextQuantity);
     }
 </script>
 
@@ -63,8 +65,7 @@
                 type="button"
                 class="sheet-close"
                 onclick={handleClose}
-                aria-label="Close"
-                >×</button
+                aria-label="Close">×</button
             >
         </header>
 
@@ -194,7 +195,7 @@
         border-bottom: 1px solid #e4e4e4;
     }
     .sheet-title {
-        font-size: 1.625rem;
+        font-size: 1.3rem;
         line-height: 1.1;
         font-weight: 600;
         margin: 0;
@@ -307,7 +308,7 @@
         border: none;
         padding: 0.1rem;
         cursor: pointer;
-        color: #666;
+        color: red;
     }
     .sheet-footer {
         padding: 0.85rem 1rem 1rem;
@@ -318,7 +319,7 @@
         display: flex;
         justify-content: space-between;
         margin-bottom: 0.75rem;
-        font-size: 2rem;
+        font-size: 1.2rem;
         line-height: 1;
         color: #1a1a1a;
         font-weight: 600;

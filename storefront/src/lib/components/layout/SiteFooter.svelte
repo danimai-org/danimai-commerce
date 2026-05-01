@@ -14,12 +14,12 @@
 			<div class="footer-region">
 				<label for="region">REGION</label>
 				<select id="region" name="region" class="footer-select">
+					<option selected>Europe (EUR)</option>
 					<option>United States (USD)</option>
 					<option>Canada (CAD)</option>
 					<option>United Kingdom (GBP)</option>
 					<option>Australia (AUD)</option>
 					<option>New Zealand (NZD)</option>
-					<option>Europe (EUR)</option>
 					<option>Asia (JPY)</option>
 					<option>Latin America (MXN)</option>
 					<option>Middle East (AED)</option>

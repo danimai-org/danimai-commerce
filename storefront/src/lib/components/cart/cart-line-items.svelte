@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { formatStoreMoney } from '$lib/money';
+
 	type CartRowView = {
 		key: string;
 		lineId: string;
@@ -72,7 +74,7 @@
 					</button>
 				</div>
 			</div>
-			<p class="line-item-total">${(item.priceValue * item.quantity).toFixed(2)}</p>
+			<p class="line-item-total">{formatStoreMoney(item.priceValue * item.quantity)}</p>
 		</li>
 	{/each}
 </ul>

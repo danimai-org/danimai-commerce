@@ -7,6 +7,7 @@
         ProductInfoBlocks,
         ProductError,
     } from "$lib/components/product";
+    import { formatStoreMoney } from "$lib/money";
 
     let { data } = $props();
     const product = $derived(data?.product);
@@ -17,7 +18,7 @@
     let selectedImageUrl = $state<string | null>(null);
     function formatPrice(
         amount: number | string | null | undefined,
-        currencyCode: string | null | undefined,
+        _currencyCode: string | null | undefined,
     ): string {
         if (amount === null || amount === undefined) return "—";
         const parsed =
@@ -26,12 +27,7 @@
                 : Number.parseFloat(String(amount).replace(/[^0-9.-]/g, ""));
         if (!Number.isFinite(parsed)) return "—";
         const decimalAmount = parsed > 1000 ? parsed / 100 : parsed;
-        const currency =
-            currencyCode && currencyCode.trim() ? currencyCode : "USD";
-        return new Intl.NumberFormat("en-US", {
-            style: "currency",
-            currency,
-        }).format(decimalAmount);
+        return formatStoreMoney(decimalAmount);
     }
 
     const priceLabel = $derived(
@@ -102,6 +98,7 @@
                 bind:quantity
                 {accordionItems}
                 productHref={`/products/${product?.handle}`}
+                productId={product?.id ?? null}
                 productImage={mainImage}
                 selectedVariantTitle={variants.find(
                     (v) => v?.id === selectedVariantId,
@@ -120,10 +117,11 @@
                         amount:
                             parseFloat(v?.variant?.price?.amount ?? "0") / 100,
                         currency_code:
-                            v?.variant?.price?.currency_code ?? "AUD",
+                            v?.variant?.price?.currency_code ?? "EUR",
                     },
                     href: `/products/${v?.handle ?? ""}`,
                     image: v?.thumbnail ?? null,
+                    variantId: v?.variant?.id ?? null,
                 }))}
                 title=""
                 subtitle=""

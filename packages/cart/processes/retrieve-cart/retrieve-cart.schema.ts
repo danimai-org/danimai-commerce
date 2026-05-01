@@ -30,6 +30,18 @@ export const CartLineItemTaxLineResponseSchema = Type.Object({
   deleted_at: Type.Union([Type.Date(), Type.Null()]),
 });
 
+export const CartLineItemAdjustmentResponseSchema = Type.Object({
+  id: Type.String(),
+  line_item_id: Type.Union([Type.String(), Type.Null()]),
+  code: Type.Union([Type.String(), Type.Null()]),
+  amount: Type.Union([Type.String(), Type.Null()]),
+  description: Type.Union([Type.String(), Type.Null()]),
+  metadata: Type.Union([Type.Unknown(), Type.Null()]),
+  created_at: Type.Date(),
+  updated_at: Type.Date(),
+  deleted_at: Type.Union([Type.Date(), Type.Null()]),
+});
+
 export const CartLineItemResponseSchema = Type.Object({
   id: Type.String(),
   cart_id: Type.Union([Type.String(), Type.Null()]),
@@ -44,6 +56,7 @@ export const CartLineItemResponseSchema = Type.Object({
   created_at: Type.Date(),
   updated_at: Type.Date(),
   deleted_at: Type.Union([Type.Date(), Type.Null()]),
+  adjustments: Type.Array(CartLineItemAdjustmentResponseSchema),
   tax_lines: Type.Array(CartLineItemTaxLineResponseSchema),
 });
 
@@ -69,6 +82,9 @@ export const RetrieveCartResponseBodySchema = Type.Intersect([
   Type.Object({
     shipping_address: Type.Union([CartAddressResponseSchema, Type.Null()]),
     line_items: Type.Array(CartLineItemResponseSchema),
+    subtotal: Type.String(),
+    discount_total: Type.String(),
+    total: Type.String(),
   }),
 ]);
 

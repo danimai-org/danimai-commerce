@@ -6,16 +6,22 @@
         label = "Add to Cart",
         variant = "retail",
     }: {
-        onAddToCart: (e: MouseEvent) => void;
+        onAddToCart: (e: MouseEvent) => void | Promise<void>;
         label?: string;
         variant?: AddToCartVariant;
     } = $props();
+
+    async function handleClick(e: MouseEvent) {
+        e.preventDefault();
+        e.stopPropagation();
+        await onAddToCart(e);
+    }
 </script>
 
 <button
     type="button"
     class={`add-to-cart-btn ${variant}`}
-    onclick={onAddToCart}
+    onclick={handleClick}
 >
     {label}
 </button>

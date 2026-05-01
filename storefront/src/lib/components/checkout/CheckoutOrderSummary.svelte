@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { formatStoreMoney } from '$lib/money';
+
 	type CheckoutCartItem = {
 		key: string;
 		name: string;
@@ -11,10 +13,11 @@
 	type Props = {
 		items: CheckoutCartItem[];
 		subtotalDisplay: string;
+		discountDisplay: string;
 		totalDisplay: string;
 	};
 
-	let { items, subtotalDisplay, totalDisplay }: Props = $props();
+	let { items, subtotalDisplay, discountDisplay, totalDisplay }: Props = $props();
 </script>
 
 <aside class="checkout-summary">
@@ -32,7 +35,7 @@
 					<span class="summary-item-variant">{item.variant}</span>
 					<span class="summary-item-qty">Quantity: {item.quantity}</span>
 				</div>
-				<span class="summary-item-price">${(item.priceValue * item.quantity).toFixed(2)}</span>
+				<span class="summary-item-price">{formatStoreMoney(item.priceValue * item.quantity)}</span>
 			</li>
 		{/each}
 	</ul>
@@ -43,15 +46,15 @@
 		</div>
 		<div class="summary-row">
 			<dt>Shipping</dt>
-			<dd>$0.00</dd>
+			<dd>{formatStoreMoney(0)}</dd>
 		</div>
 		<div class="summary-row">
 			<dt>Discount</dt>
-			<dd>$0.00</dd>
+			<dd>{discountDisplay}</dd>
 		</div>
 		<div class="summary-row">
 			<dt>Tax</dt>
-			<dd>$0.00</dd>
+			<dd>{formatStoreMoney(0)}</dd>
 		</div>
 	</dl>
 	<div class="summary-total">

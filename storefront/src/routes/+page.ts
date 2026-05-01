@@ -103,7 +103,7 @@ export const load: PageLoad = async ({ fetch }) => {
       const p = list[i];
       const pr = p.variant?.price;
       const amount = pr?.amount != null ? parseInt(pr.amount, 10) / 100 : 0;
-      const currency_code = pr?.currency_code ?? "USD";
+      const currency_code = pr?.currency_code ?? "EUR";
       products.push({
         name: p.title,
         price: { amount, currency_code },

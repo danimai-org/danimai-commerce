@@ -20,10 +20,6 @@
         rowsFromPaginated,
     } from "$lib/api/storefront-api";
 
-    const shippingDisplay = $state("$0.00");
-    const discountDisplay = $state("$0.00");
-    const taxDisplay = $state("$0.00");
-
     type CartRowView = {
         key: string;
         lineId: string;
@@ -88,7 +84,11 @@
         return m;
     });
 
-    type VariantDetail = { title: string; thumbnail: string | null };
+    type VariantDetail = {
+        title: string;
+        thumbnail: string | null;
+        unitPrice: number | null;
+    };
     let variantDetailsById = $state(new Map<string, VariantDetail>());
 
     $effect(() => {
@@ -124,10 +124,14 @@
                     const d = res.data as {
                         title: string;
                         thumbnail?: string | null;
+                        prices?: Array<{ amount?: string | number | null }>;
                     };
+                    const rawAmount = d.prices?.[0]?.amount;
+                    const unitPrice = parsePrice(rawAmount);
                     next.set(id, {
                         title: d.title,
                         thumbnail: d.thumbnail ?? null,
+                        unitPrice: Number.isFinite(unitPrice) ? unitPrice : null,
                     });
                 }),
             );
@@ -150,12 +154,17 @@
             const handle = li.product_id ? map.get(li.product_id) : undefined;
             const href = handle ? `/products/${handle}` : "/";
             const qty = li.quantity ?? 0;
-            const pv = parsePrice(li.unit_price ?? "0");
+            const nestedVariant = li as unknown as {
+                variant?: { title?: string | null } | null;
+            };
             const vd = li.variant_id ? vmap.get(li.variant_id) : undefined;
+            const pv = parsePrice(li.unit_price ?? vd?.unitPrice ?? "0");
             const productThumb = li.product_id
                 ? (thumbs.get(li.product_id) ?? null)
                 : null;
             const variantLabel =
+                (nestedVariant.variant?.title &&
+                    String(nestedVariant.variant.title).trim()) ||
                 (vd?.title && vd.title.trim()) ||
                 (li.description && String(li.description).trim()) ||
                 "";
@@ -181,11 +190,13 @@
         ),
     );
     const subtotalDisplay = $derived(`$${subtotal.toFixed(2)}`);
+    const shippingDisplay = $derived("$0.00");
+    const discountDisplay = $derived("$0.00");
+    const taxDisplay = $derived("—");
     const totalDisplay = $derived(`$${subtotal.toFixed(2)}`);
 
     let promoOpen = $state(false);
     let promoInput = $state("");
-
     function openPromo() {
         promoOpen = true;
     }
@@ -196,10 +207,20 @@
     }
 
     function applyPromo() {
-        // Wire to promotions / cart API when available
+        if (promoInput.trim()) {
+        }
     }
-    function parsePrice(priceStr: string): number {
-        const n = parseFloat(priceStr.replace(/[^0-9.]/g, ""));
+
+    function parsePrice(priceStr: string | number | null | undefined): number {
+        if (typeof priceStr === "number") {
+            return Number.isFinite(priceStr) ? priceStr : 0;
+        }
+        if (priceStr == null) return 0;
+        const raw = String(priceStr).trim();
+        if (!raw) return 0;
+        const n = parseFloat(raw.replace(/[^0-9.]/g, ""));
+        if (!Number.isFinite(n)) return 0;
+        if (!raw.includes(".") && n > 1000) return n / 100;
         return Number.isFinite(n) ? n : 0;
     }
 

@@ -11,7 +11,7 @@ type LineItemPayload = Partial<CartLineItem> & Record<string, unknown>;
 
 const SESSION_STORAGE_KEY = "dm_sf_session_id";
 const CART_STORAGE_KEY = "dm_sf_cart_id";
-const DEFAULT_CART_CURRENCY_CODE = "usd";
+const DEFAULT_CART_CURRENCY_CODE = "eur";
 
 export const cartState = $state({
   cart: null as Cart | null,
@@ -150,6 +150,20 @@ export async function syncLineItems(
   return cart;
 }
 
+export async function applyPromoCode(code: string, id?: string): Promise<Cart> {
+  const cartId = id ?? (await ensureCartId());
+  const res = await client.admin.carts({ id: cartId })["promo-code"].put({
+    code,
+  });
+  if (res.error || !res.data) {
+    throw new Error(res.error?.value?.message ?? "Unknown error");
+  }
+  const cart = res.data as Cart;
+  cartState.cart = cart;
+  setCartId(cart.id);
+  return cart;
+}
+
 export async function addItem(input: {
   variantId: string;
   quantity?: number;
@@ -184,6 +198,14 @@ export async function addItem(input: {
       ];
 
   return syncLineItems(next as Array<LineItemPayload>, cart.id);
+}
+
+export type AddItemInput = Parameters<typeof addItem>[0];
+
+export async function addItemAndOpenSheet(input: AddItemInput) {
+  const cart = await addItem(input);
+  openCartSheet();
+  return cart;
 }
 
 export async function removeItem(variantId: string) {

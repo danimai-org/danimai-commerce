@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { addItem, openCartSheet } from "$lib/cart/cart-state.svelte";
+    import { addItemAndOpenSheet } from "$lib/cart/cart-state.svelte";
+    import { formatStoreMoney } from "$lib/money";
     import { goto } from "$app/navigation";
     import CartImage from "../productCart/CartImage.svelte";
     import AddToCart from "../productCart/AddToCart.svelte";
@@ -12,6 +13,9 @@
         bg: string;
         image: string | null;
         variantId?: string | null;
+        variant_id?: string | null;
+        variants?: Array<{ id?: string | null }>;
+        variant?: { id?: string | null } | null;
     };
     let {
         products = [] as ProductGridItem[] | undefined,
@@ -40,12 +44,8 @@
     }
     function displayPrice(
         price: string | number | null | undefined,
-        currencyCode: string | null | undefined,
+        _currencyCode: string | null | undefined,
     ): string {
-        const currency =
-            currencyCode && currencyCode.trim()
-                ? currencyCode.trim().toUpperCase()
-                : "USD";
         if (typeof price === "string") {
             const trimmed = price.trim();
             if (!trimmed || trimmed === "—") {
@@ -56,17 +56,11 @@
             }
             const parsed = parsePrice(trimmed);
             if (!Number.isFinite(parsed)) return "—";
-            return new Intl.NumberFormat("en-US", {
-                style: "currency",
-                currency,
-            }).format(parsed);
+            return formatStoreMoney(parsed);
         }
         if (typeof price === "number") {
             if (!Number.isFinite(price)) return "—";
-            return new Intl.NumberFormat("en-US", {
-                style: "currency",
-                currency,
-            }).format(price);
+            return formatStoreMoney(price);
         }
         return "—";
     }
@@ -74,17 +68,81 @@
     async function quickAdd(e: MouseEvent, product: ProductGridItem) {
         e.preventDefault();
         e.stopPropagation();
-        if (!product?.variantId) return;
-        await addItem({
-            variantId: product.variantId,
+        const variantId = resolveVariantId(product);
+        if (!variantId) return;
+        const amount = product.price?.amount;
+        const unitPrice =
+            typeof amount === "number" && Number.isFinite(amount)
+                ? String(amount)
+                : null;
+        await addItemAndOpenSheet({
+            variantId,
             quantity: 1,
+            thumbnail: product.image ?? null,
+            title: product.name ?? null,
+            unitPrice,
         });
-        openCartSheet();
+    }
+
+    function resolveVariantId(product: ProductGridItem): string | null {
+        const directCandidates = [
+            product.variantId,
+            product.variant_id,
+            product.variant?.id,
+            product.variants?.[0]?.id,
+            (product.variants?.[0] as Record<string, unknown> | undefined)
+                ?.variant_id,
+        ];
+        for (const candidate of directCandidates) {
+            if (isUsableVariantId(candidate)) {
+                return candidate;
+            }
+        }
+
+        const queue: unknown[] = [product];
+        const visited = new Set<unknown>();
+        while (queue.length > 0) {
+            const current = queue.shift();
+            if (!current || typeof current !== "object") continue;
+            if (visited.has(current)) continue;
+            visited.add(current);
+
+            if (Array.isArray(current)) {
+                for (const item of current) queue.push(item);
+                continue;
+            }
+
+            const obj = current as Record<string, unknown>;
+            const keys = ["variantId", "variant_id", "variantID", "variant-id"];
+            for (const key of keys) {
+                const value = obj[key];
+                if (isUsableVariantId(value)) return value;
+            }
+            for (const value of Object.values(obj)) {
+                queue.push(value);
+            }
+        }
+        return null;
+    }
+
+    function isUsableVariantId(value: unknown): value is string {
+        if (typeof value !== "string") return false;
+        return value.trim().length > 0;
     }
 
     function openProduct(href: string) {
         if (!href) return;
         void goto(href);
+    }
+
+    function handleSurfaceClick(e: MouseEvent, href: string) {
+        if (e.defaultPrevented) return;
+        const target = e.target as HTMLElement | null;
+        if (!target) return;
+        if (target.closest("button, input, select, textarea, [role='button']")) {
+            return;
+        }
+        openProduct(href);
     }
 
     function handleCardKeydown(e: KeyboardEvent, href: string) {
@@ -137,7 +195,7 @@
                         class="quick-add"
                         onclick={(e) => quickAdd(e, product)}
                     >
-                        QUICK ADD
+                        Add to Cart
                     </button>
                 </article>
             {:else}
@@ -146,7 +204,7 @@
                         class="retail-card-surface"
                         role="link"
                         tabindex="0"
-                        onclick={() => openProduct(product.href)}
+                        onclick={(e) => handleSurfaceClick(e, product.href)}
                         onkeydown={(e) => handleCardKeydown(e, product.href)}
                     >
                         <a href={product.href} class="retail-card-link">
@@ -166,11 +224,9 @@
                                         )}
                                     />
                                 </div>
-                                <AddToCart
-                                    onAddToCart={(e) => quickAdd(e, product)}
-                                />
                             </div>
                         </a>
+                        <AddToCart onAddToCart={(e) => quickAdd(e, product)} />
                     </div>
                 </article>
             {/if}
@@ -278,6 +334,14 @@
         border-radius: 8px;
         overflow: hidden;
         box-sizing: border-box;
+    }
+    .retail-card-link {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        text-decoration: none;
+        color: inherit;
     }
 
     .retail-body {

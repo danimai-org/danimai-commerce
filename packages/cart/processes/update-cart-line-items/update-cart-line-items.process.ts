@@ -86,91 +86,91 @@ export class UpdateCartLineItemsProcess
       input.line_items.filter((i) => i.id != null && i.id !== "").map((i) => i.id!)
     );
 
-    await this.db.transaction().execute(async (trx) => {
-      if (keptIds.size === 0) {
-        await trx
-          .updateTable("cart_line_items")
-          .set({ deleted_at: sql<Date>`now()`, updated_at: sql<Date>`now()` })
-          .where("cart_id", "=", input.id)
-          .where("deleted_at", "is", null)
-          .execute();
-      } else {
-        await trx
-          .updateTable("cart_line_items")
-          .set({ deleted_at: sql<Date>`now()`, updated_at: sql<Date>`now()` })
-          .where("cart_id", "=", input.id)
-          .where("deleted_at", "is", null)
-          .where("id", "not in", [...keptIds])
-          .execute();
-      }
+    // Neon serverless: no Kysely interactive transactions.
+    const db = this.db;
+    if (keptIds.size === 0) {
+      await db
+        .updateTable("cart_line_items")
+        .set({ deleted_at: sql<Date>`now()`, updated_at: sql<Date>`now()` })
+        .where("cart_id", "=", input.id)
+        .where("deleted_at", "is", null)
+        .execute();
+    } else {
+      await db
+        .updateTable("cart_line_items")
+        .set({ deleted_at: sql<Date>`now()`, updated_at: sql<Date>`now()` })
+        .where("cart_id", "=", input.id)
+        .where("deleted_at", "is", null)
+        .where("id", "not in", [...keptIds])
+        .execute();
+    }
 
-      for (const item of input.line_items) {
-        if (item.id) {
-          const existing = await trx
-            .selectFrom("cart_line_items")
+    for (const item of input.line_items) {
+      if (item.id) {
+        const existing = await db
+          .selectFrom("cart_line_items")
+          .where("id", "=", item.id)
+          .where("cart_id", "=", input.id)
+          .where("deleted_at", "is", null)
+          .select("id")
+          .executeTakeFirst();
+        if (!existing) {
+          throw new ValidationError("Line item not found on this cart", [
+            {
+              type: "not_found",
+              message: "Line item not found on this cart",
+              path: "line_items",
+            },
+          ]);
+        }
+        const patch = lineItemPatch(item);
+        if (Object.keys(patch).length > 0) {
+          await db
+            .updateTable("cart_line_items")
+            .set({
+              ...patch,
+              updated_at: sql<Date>`now()`,
+            } as never)
             .where("id", "=", item.id)
-            .where("cart_id", "=", input.id)
-            .where("deleted_at", "is", null)
-            .select("id")
-            .executeTakeFirst();
-          if (!existing) {
-            throw new ValidationError("Line item not found on this cart", [
-              {
-                type: "not_found",
-                message: "Line item not found on this cart",
-                path: "line_items",
-              },
-            ]);
-          }
-          const patch = lineItemPatch(item);
-          if (Object.keys(patch).length > 0) {
-            await trx
-              .updateTable("cart_line_items")
-              .set({
-                ...patch,
-                updated_at: sql<Date>`now()`,
-              } as never)
-              .where("id", "=", item.id)
-              .execute();
-          }
-        } else {
-          const hasTitle = item.title != null && item.title !== "";
-          const hasVariant = item.variant_id != null && item.variant_id !== "";
-          if (!hasTitle && !hasVariant) {
-            throw new ValidationError(
-              "New line items require title or variant_id",
-              [
-                {
-                  type: "invalid",
-                  message: "New line items require title or variant_id",
-                  path: "line_items",
-                },
-              ]
-            );
-          }
-          await trx
-            .insertInto("cart_line_items")
-            .values({
-              cart_id: input.id,
-              title: item.title ?? null,
-              description: item.description ?? null,
-              thumbnail: item.thumbnail ?? null,
-              variant_id: item.variant_id ?? null,
-              product_id: item.product_id ?? null,
-              quantity: item.quantity ?? null,
-              unit_price: item.unit_price ?? null,
-              metadata: item.metadata ?? null,
-            })
             .execute();
         }
+      } else {
+        const hasTitle = item.title != null && item.title !== "";
+        const hasVariant = item.variant_id != null && item.variant_id !== "";
+        if (!hasTitle && !hasVariant) {
+          throw new ValidationError(
+            "New line items require title or variant_id",
+            [
+              {
+                type: "invalid",
+                message: "New line items require title or variant_id",
+                path: "line_items",
+              },
+            ]
+          );
+        }
+        await db
+          .insertInto("cart_line_items")
+          .values({
+            cart_id: input.id,
+            title: item.title ?? null,
+            description: item.description ?? null,
+            thumbnail: item.thumbnail ?? null,
+            variant_id: item.variant_id ?? null,
+            product_id: item.product_id ?? null,
+            quantity: item.quantity ?? null,
+            unit_price: item.unit_price ?? null,
+            metadata: item.metadata ?? null,
+          })
+          .execute();
       }
+    }
 
-      await trx
-        .updateTable("carts")
-        .set({ updated_at: sql<Date>`now()` })
-        .where("id", "=", input.id)
-        .execute();
-    });
+    await db
+      .updateTable("carts")
+      .set({ updated_at: sql<Date>`now()` })
+      .where("id", "=", input.id)
+      .execute();
 
     return loadCartWithRelations(this.db, input.id);
   }

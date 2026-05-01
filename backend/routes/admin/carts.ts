@@ -3,6 +3,9 @@ import { StaticDecode, Type } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   CREATE_CART_PROCESS,
+  APPLY_CART_PROMO_CODE_PROCESS,
+  ApplyCartPromoCodeProcess,
+  ApplyCartPromoCodeSchema,
   CreateCartProcess,
   CreateCartSchema,
   CreateCartResponseSchema,
@@ -29,6 +32,7 @@ import {
 const UpdateCartLineItemsBodySchema = Type.Omit(UpdateCartLineItemsSchema, ["id"]);
 const UpdateCartAddressesBodySchema = Type.Omit(UpdateCartAddressesSchema, ["id"]);
 const UpdateCartTaxLinesBodySchema = Type.Omit(UpdateCartTaxLinesSchema, ["id"]);
+const ApplyCartPromoCodeBodySchema = Type.Omit(ApplyCartPromoCodeSchema, ["id"]);
 
 export const cartRoutes = new Elysia({ prefix: "/carts" })
   .onError(({ error, set }) => handleProcessError(error, set))
@@ -97,6 +101,34 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         tags: ["Carts"],
         summary: "Update cart line items",
         description: "Syncs line items for a cart",
+      },
+    }
+  )
+  .put(
+    "/:id/promo-code",
+    async ({ params, body }) => {
+      const process = getService<ApplyCartPromoCodeProcess>(
+        APPLY_CART_PROMO_CODE_PROCESS
+      );
+      return process.runOperations({
+        input: {
+          ...body,
+          id: params.id,
+        },
+      });
+    },
+    {
+      params: Type.Object({ id: ApplyCartPromoCodeSchema.properties.id }),
+      body: ApplyCartPromoCodeBodySchema,
+      response: {
+        200: RetrieveCartResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Carts"],
+        summary: "Apply promo code",
+        description: "Validates and applies a promo code to cart line items",
       },
     }
   )
