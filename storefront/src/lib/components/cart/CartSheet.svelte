@@ -1,20 +1,13 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import { getUserCart, useCart } from "$lib/hooks/use-cart.hook";
-    import { cart } from "$lib/stores/cart";
-
-    let cartOpen = $state(false);
-    const { updateCartLineItems } = useCart();
-
-    $effect(() => {
-        const unsub = cart.subscribe((s) => {
-            cartOpen = s.open;
-        });
-        return unsub;
-    });
+    import {
+        cartState,
+        changeLineItemQuantity,
+        closeCartSheet,
+    } from "$lib/cart/cart-state.svelte";
 
     const cartItems = $derived(
-        ((getUserCart()?.line_items ?? []) as any[]).map((item) => {
+        ((cartState.cart?.line_items ?? []) as any[]).map((item) => {
             const amount = Number.parseFloat(String(item.unit_price ?? "0"));
             const priceValue = Number.isFinite(amount) ? amount : 0;
             return {
@@ -41,31 +34,20 @@
     const subtotalDisplay = $derived(`$${subtotal.toFixed(2)}`);
 
     function handleClose() {
-        cart.close();
+        closeCartSheet();
     }
 
     function goToCart() {
         goto("/cart");
-        cart.close();
+        closeCartSheet();
     }
 
     async function setQuantity(item: any, quantity: number) {
-        const rawItems = (getUserCart()?.line_items ?? []) as any[];
-        const next = rawItems
-            .map((line) => {
-                if (line.id !== item.id) return line;
-                return { ...line, quantity };
-            })
-            .filter((line) => (line.quantity ?? 0) > 0);
-
-        await updateCartLineItems.mutateAsync({
-            id: getUserCart()?.id ?? "",
-            lineItems: next,
-        });
+        await changeLineItemQuantity(item.id, quantity);
     }
 </script>
 
-{#if cartOpen}
+{#if cartState.sheetOpen}
     <div
         class="backdrop"
         onclick={handleClose}

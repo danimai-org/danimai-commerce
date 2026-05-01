@@ -6,46 +6,24 @@
         CartOrderSummary,
         CartCompleteLook,
     } from "$lib/components/cart";
-    import { createQuery, useQueryClient } from "@tanstack/svelte-query";
+    import { createQuery } from "@tanstack/svelte-query";
+    import {
+        addItem,
+        cartState,
+        changeLineItemQuantity,
+        initCartState,
+        removeLineItem,
+    } from "$lib/cart/cart-state.svelte";
     import {
         API_BASE,
         firstVariantIdByProductIds,
         rowsFromPaginated,
     } from "$lib/api/storefront-api";
 
-    const SESSION_STORAGE_KEY = "dm_sf_session_id";
-    const CART_STORAGE_KEY = "dm_sf_cart_id";
-    const DEFAULT_CART_CURRENCY_CODE = "usd";
-
     const shippingDisplay = $state("$0.00");
     const discountDisplay = $state("$0.00");
     const taxDisplay = $state("$0.00");
 
-    type ApiLineItem = {
-        id: string;
-        title: string | null;
-        description: string | null;
-        thumbnail: string | null;
-        variant_id: string | null;
-        product_id: string | null;
-        quantity: number | null;
-        unit_price: string | null;
-    };
-    type ApiCart = {
-        id: string;
-        completed_at?: string | Date | null;
-        line_items: ApiLineItem[];
-    };
-    type LineItemPut = {
-        id?: string;
-        title?: string | null;
-        description?: string | null;
-        thumbnail?: string | null;
-        variant_id?: string | null;
-        product_id?: string | null;
-        quantity?: number | null;
-        unit_price?: string | null;
-    };
     type CartRowView = {
         key: string;
         lineId: string;
@@ -59,7 +37,6 @@
         variant: string;
     };
 
-    const queryClient = useQueryClient();
     let {} = $props();
 
     const listQuery = { page: 1, limit: 100 } as const;
@@ -114,68 +91,12 @@
     type VariantDetail = { title: string; thumbnail: string | null };
     let variantDetailsById = $state(new Map<string, VariantDetail>());
 
-    function treatyErrorMessage(err: unknown): string {
-        const o = err as { value?: { message?: string } };
-        return o?.value?.message ?? String(err);
-    }
-
-    async function ensureSessionId(): Promise<string> {
-        let sid = localStorage.getItem(SESSION_STORAGE_KEY);
-        if (sid) return sid;
-        const res = await client.admin.auth.sessions.post({});
-        if (res.error) throw new Error(treatyErrorMessage(res.error));
-        const j = res.data as { id: string };
-        sid = j.id;
-        localStorage.setItem(SESSION_STORAGE_KEY, sid);
-        return sid;
-    }
-
-    async function createCartRow(sessionId: string): Promise<string> {
-        const res = await client.admin.carts.post({
-            session_id: sessionId,
-            currency_code: DEFAULT_CART_CURRENCY_CODE,
-        });
-        if (res.error) throw new Error(treatyErrorMessage(res.error));
-        const row = res.data as { id: string };
-        localStorage.setItem(CART_STORAGE_KEY, row.id);
-        return row.id;
-    }
-
-    async function fetchCartJson(cartId: string): Promise<ApiCart> {
-        const res = await client.admin.carts({ id: cartId }).get();
-        if (res.error) throw new Error(treatyErrorMessage(res.error));
-        return res.data as ApiCart;
-    }
-
-    async function loadShopperCart(): Promise<ApiCart> {
-        const sessionId = await ensureSessionId();
-        let cartId = localStorage.getItem(CART_STORAGE_KEY);
-        if (!cartId) cartId = await createCartRow(sessionId);
-        try {
-            const fetched = await fetchCartJson(cartId);
-            if (fetched.completed_at != null) {
-                localStorage.removeItem(CART_STORAGE_KEY);
-                cartId = await createCartRow(sessionId);
-                return fetchCartJson(cartId);
-            }
-            return fetched;
-        } catch {
-            localStorage.removeItem(CART_STORAGE_KEY);
-            cartId = await createCartRow(sessionId);
-            return fetchCartJson(cartId);
-        }
-    }
-
-    const cartQuery = createQuery(
-        () => ({
-            queryKey: ["storefront-cart"] as const,
-            queryFn: loadShopperCart,
-        }),
-        () => queryClient,
-    );
+    $effect(() => {
+        void initCartState();
+    });
 
     $effect(() => {
-        const lineItems = cartQuery.data?.line_items;
+        const lineItems = cartState.cart?.line_items;
         if (!lineItems?.length) {
             variantDetailsById = new Map();
             return;
@@ -217,12 +138,10 @@
         };
     });
 
-    const cartPending = $derived(
-        cartQuery.isPending && cartQuery.data === undefined,
-    );
-    const cartFailed = $derived(cartQuery.isError);
+    const cartPending = $derived(cartState.loading && cartState.cart === null);
+    const cartFailed = $derived(Boolean(cartState.error));
     const cartItems = $derived.by((): CartRowView[] => {
-        const cart = cartQuery.data;
+        const cart = cartState.cart;
         const map = handleByProductId;
         const thumbs = thumbnailByProductId;
         const vmap = variantDetailsById;
@@ -284,23 +203,9 @@
         return Number.isFinite(n) ? n : 0;
     }
 
-    function lineItemToPut(li: ApiLineItem): LineItemPut {
-        return {
-            id: li.id,
-            title: li.title,
-            description: li.description,
-            thumbnail: li.thumbnail,
-            variant_id: li.variant_id,
-            product_id: li.product_id,
-            quantity: li.quantity,
-            unit_price: li.unit_price,
-        };
-    }
-    async function putLineItems(cartId: string, line_items: LineItemPut[]) {
-        const res = await client.admin
-            .carts({ id: cartId })
-            ["line-items"].put({ line_items });
-        if (res.error) throw new Error(treatyErrorMessage(res.error));
+    function treatyErrorMessage(err: unknown): string {
+        const o = err as { value?: { message?: string } };
+        return o?.value?.message ?? String(err);
     }
 
     async function firstVariantIdByProductId(
@@ -389,42 +294,14 @@
         };
     });
 
-    function currentCart(): ApiCart | undefined {
-        return queryClient.getQueryData<ApiCart>(["storefront-cart"]);
-    }
-    async function refreshCart() {
-        await queryClient.invalidateQueries({ queryKey: ["storefront-cart"] });
-    }
     async function changeLineQuantity(lineId: string, delta: number) {
-        const cart = currentCart();
-        if (!cart?.id) return;
-        if (cart.completed_at != null) {
-            await refreshCart();
-            return;
-        }
-        const next = cart.line_items
-            .map((li) => {
-                if (li.id !== lineId) return lineItemToPut(li);
-                const q = Math.max(0, (li.quantity ?? 0) + delta);
-                return { ...lineItemToPut(li), quantity: q };
-            })
-            .filter((li) => (li.quantity ?? 0) > 0);
-        await putLineItems(cart.id, next);
-        await refreshCart();
+        const item = cartState.cart?.line_items.find((li) => li.id === lineId);
+        if (!item) return;
+        await changeLineItemQuantity(lineId, (item.quantity ?? 0) + delta);
     }
 
     async function removeLine(lineId: string) {
-        const cart = currentCart();
-        if (!cart?.id) return;
-        if (cart.completed_at != null) {
-            await refreshCart();
-            return;
-        }
-        const next = cart.line_items
-            .filter((li) => li.id !== lineId)
-            .map(lineItemToPut);
-        await putLineItems(cart.id, next);
-        await refreshCart();
+        await removeLineItem(lineId);
     }
 
     async function quickAdd(
@@ -433,42 +310,19 @@
     ) {
         e.preventDefault();
         e.stopPropagation();
-        const cart = currentCart();
-        if (!cart?.id) return;
-        if (cart.completed_at != null) {
-            await refreshCart();
-            return;
-        }
         const variant_id = await firstVariantIdByProductId(product.id);
         if (!variant_id) return;
         const meta = await fetchVariantLineMeta(variant_id);
         const fallbackThumb = thumbnailByProductId.get(product.id) ?? null;
-        const existing = cart.line_items.find(
-            (li) => li.variant_id === variant_id,
-        );
-        let line_items: LineItemPut[];
-        if (existing) {
-            line_items = cart.line_items.map((li) =>
-                li.id === existing.id
-                    ? { ...lineItemToPut(li), quantity: (li.quantity ?? 0) + 1 }
-                    : lineItemToPut(li),
-            );
-        } else {
-            line_items = [
-                ...cart.line_items.map(lineItemToPut),
-                {
-                    variant_id,
-                    product_id: product.id,
-                    title: product.title,
-                    description: meta?.title ?? null,
-                    quantity: 1,
-                    unit_price: meta?.unitPrice ?? "0",
-                    thumbnail: meta?.thumbnail ?? fallbackThumb,
-                },
-            ];
-        }
-        await putLineItems(cart.id, line_items);
-        await refreshCart();
+        await addItem({
+            variantId: variant_id,
+            productId: product.id,
+            title: product.title,
+            description: meta?.title ?? null,
+            unitPrice: meta?.unitPrice ?? "0",
+            thumbnail: meta?.thumbnail ?? fallbackThumb,
+            quantity: 1,
+        });
     }
 </script>
 

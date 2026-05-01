@@ -1,12 +1,10 @@
 <script lang="ts">
-	import { cart } from '$lib/stores/cart';
+	import { addItem, openCartSheet } from '$lib/cart/cart-state.svelte';
 	import ProductVariantSelect from './ProductVariantSelect.svelte';
 	import ProductQuantity from './ProductQuantity.svelte';
 	import ProductAccordions from './ProductAccordions.svelte';
 	import type { VariantItem } from './ProductVariantSelect.svelte';
 	import type { AccordionItem } from './ProductAccordions.svelte';
-	import { ensureCartId, useCart } from '$lib/hooks/use-cart.hook';
-	const { updateCartLineItems } = useCart();
 
 	type ProductDetailsProps = {
 		title: string;
@@ -34,15 +32,12 @@
 	}: ProductDetailsProps = $props();	
 
 	async function addToCart() {
-		const cartId = await ensureCartId();
-		await updateCartLineItems.mutateAsync({
-			id: cartId,
-			lineItems: [{
-				variant_id: selectedVariantId ?? undefined,
-				quantity: 1,
-			} as never]
+		if (!selectedVariantId) return;
+		await addItem({
+			variantId: selectedVariantId,
+			quantity: 1
 		});
-		cart.open();
+		openCartSheet();
 	}
 </script>
 

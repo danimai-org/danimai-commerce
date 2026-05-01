@@ -1,8 +1,15 @@
 <script lang="ts">
-	import type { CartLineItem } from '$lib/stores/cart';
+	type CheckoutCartItem = {
+		key: string;
+		name: string;
+		variant: string;
+		image: string | null;
+		quantity: number;
+		priceValue: number;
+	};
 
 	type Props = {
-		items: CartLineItem[];
+		items: CheckoutCartItem[];
 		subtotalDisplay: string;
 		totalDisplay: string;
 	};

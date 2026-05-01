@@ -8,8 +8,7 @@
 		CheckoutPaymentStep
 	} from '$lib/components/checkout';
 	import { client } from '$lib/api/client.js';
-	import { cart } from '$lib/stores/cart';
-	import type { CartLineItem } from '$lib/stores/cart';
+	import { cartState } from '$lib/cart/cart-state.svelte';
 	type CheckoutStep = 'addresses' | 'delivery' | 'payment' | 'review';
 	const CART_STORAGE_KEY = 'dm_sf_cart_id';
 	const SESSION_STORAGE_KEY = 'dm_sf_session_id';
@@ -36,12 +35,31 @@
 		unit_price?: string | null;
 	};
 
-	let cartItems = $state<CartLineItem[]>([]);
-	$effect(() => {
-		const unsub = cart.subscribe((s) => {
-			cartItems = s.items;
+	type CheckoutCartItem = {
+		key: string;
+		name: string;
+		variant: string;
+		image: string | null;
+		quantity: number;
+		priceValue: number;
+		priceDisplay: string;
+	};
+
+	const cartItems = $derived.by((): CheckoutCartItem[] => {
+		const lineItems = cartState.cart?.line_items ?? [];
+		return lineItems.map((item) => {
+			const amount = Number.parseFloat(String(item.unit_price ?? '0'));
+			const priceValue = Number.isFinite(amount) ? amount : 0;
+			return {
+				key: item.id ?? `${item.variant_id ?? 'variant'}-${item.title ?? 'item'}`,
+				name: item.title ?? 'Item',
+				variant: item.description ?? (item.variant_id ? 'Variant' : '—'),
+				image: item.thumbnail ?? null,
+				quantity: item.quantity ?? 0,
+				priceValue,
+				priceDisplay: `$${priceValue.toFixed(2)}`
+			};
 		});
-		return unsub;
 	});
 
 	$effect(() => {

@@ -3,7 +3,6 @@ import {
   SESSION_COOKIE_KEY,
   SESSION_COOKIE_MAX_AGE_SECONDS,
 } from "$lib/constants/session";
-import { saveInLocalStorage, type Cart } from "$lib/hooks/use-cart.hook";
 import type { LayoutServerLoad } from "./$types";
 
 function treatyErrorMessage(err: unknown): string {
@@ -36,8 +35,6 @@ export const load: LayoutServerLoad = async ({ cookies, request }) => {
   if (cart.error) {
     throw new Error(treatyErrorMessage(cart.error));
   }
-
-  saveInLocalStorage(cart.data as Cart);
 
   const data = res.data as { id: string };
   cookies.set(SESSION_COOKIE_KEY, data.id, {

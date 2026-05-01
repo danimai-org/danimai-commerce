@@ -1,6 +1,5 @@
 <script lang="ts">
-    import { ensureCartId, useCart } from "$lib/hooks/use-cart.hook";
-    import { cart } from "$lib/stores/cart";
+    import { addItem, openCartSheet } from "$lib/cart/cart-state.svelte";
     import { goto } from "$app/navigation";
     import CartImage from "../productCart/CartImage.svelte";
     import AddToCart from "../productCart/AddToCart.svelte";
@@ -14,7 +13,6 @@
         image: string | null;
         variantId?: string | null;
     };
-    const { updateCartLineItems } = useCart();
     let {
         products = [] as ProductGridItem[] | undefined,
         title = "Essential essentials for everyday.",
@@ -77,17 +75,11 @@
         e.preventDefault();
         e.stopPropagation();
         if (!product?.variantId) return;
-        const cartId = await ensureCartId();
-        await updateCartLineItems.mutateAsync({
-            id: cartId,
-            lineItems: [
-                {
-                    variant_id: product.variantId,
-                    quantity: 1,
-                } as never,
-            ],
+        await addItem({
+            variantId: product.variantId,
+            quantity: 1,
         });
-        cart.open();
+        openCartSheet();
     }
 
     function openProduct(href: string) {
