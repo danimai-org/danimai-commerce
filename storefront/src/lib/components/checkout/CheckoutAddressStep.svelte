@@ -1,180 +1,221 @@
 <script lang="ts">
-	import { superForm } from 'sveltekit-superforms/client';
+	import type {
+		SuperFormData,
+		SuperFormErrors,
+	} from 'sveltekit-superforms/client';
+	import type { InputConstraints, ValidationErrors } from 'sveltekit-superforms';
+	import type { Writable } from 'svelte/store';
+	import type { CheckoutFormData } from '$lib/checkout/checkout-form-schema';
 
-	type ShippingAddress = {
-		firstName: string;
-		lastName: string;
-		company: string;
-		address1: string;
-		address2: string;
-		city: string;
-		state: string;
-		postalCode: string;
-		country: string;
-		phone: string;
-	};
+	interface Props {
+		form: SuperFormData<CheckoutFormData>;
+		errors: SuperFormErrors<CheckoutFormData>;
+		constraints: Writable<InputConstraints<CheckoutFormData>>;
+	}
 
-	type Props = {
-		shipping: ShippingAddress;
-		billingSameAsShipping?: boolean;
-		email?: string;
-		onNext: () => void;
-	};
+	let { form, errors, constraints }: Props = $props();
 
-	let {
-		shipping = $bindable(),
-		billingSameAsShipping = $bindable(true),
-		email = $bindable(''),
-		onNext
-	}: Props = $props();
-
-	const initialFormData = $state.snapshot({
-		firstName: shipping.firstName,
-		lastName: shipping.lastName,
-		company: shipping.company,
-		address1: shipping.address1,
-		address2: shipping.address2,
-		city: shipping.city,
-		state: shipping.state,
-		postalCode: shipping.postalCode,
-		country: shipping.country,
-		phone: shipping.phone,
-		billingSameAsShipping,
-		email
+	// Svelte 5: `$errors` from props is not reliably reactive; mirror the store into state.
+	let err = $state<Record<string, unknown>>({});
+	$effect(() => {
+		const es = errors;
+		const unsub = es.subscribe((v: ValidationErrors<CheckoutFormData>) => {
+			err = v as Record<string, unknown>;
+		});
+		return unsub;
 	});
 
-	const { form, errors, enhance } = superForm(initialFormData, {
-		SPA: true,
-		resetForm: false,
-		onSubmit: ({ cancel }) => {
-			$errors.firstName = $form.firstName.trim() ? undefined : ['First name is required'];
-			$errors.lastName = $form.lastName.trim() ? undefined : ['Last name is required'];
-			$errors.address1 = $form.address1.trim() ? undefined : ['Address line 1 is required'];
-			$errors.city = $form.city.trim() ? undefined : ['City is required'];
-			$errors.state = $form.state.trim() ? undefined : ['State / Province is required'];
-			$errors.postalCode = $form.postalCode.trim() ? undefined : ['Postal code is required'];
-			$errors.country = $form.country.trim() ? undefined : ['Country is required'];
-			$errors.email = !$form.email.trim()
-				? ['Email is required']
-				: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($form.email)
-					? undefined
-					: ['Enter a valid email address'];
-
-			const hasErrors = Object.values($errors).some((value) => Boolean(value));
-			if (hasErrors) {
-				cancel();
-				return;
-			}
-
-			shipping = {
-				firstName: $form.firstName,
-				lastName: $form.lastName,
-				company: $form.company,
-				address1: $form.address1,
-				address2: $form.address2,
-				city: $form.city,
-				state: $form.state,
-				postalCode: $form.postalCode,
-				country: $form.country,
-				phone: $form.phone
-			};
-			billingSameAsShipping = $form.billingSameAsShipping;
-			email = $form.email;
-			onNext();
-		}
-	});
+	function fieldErr(v: unknown): string {
+		if (v == null) return '';
+		return Array.isArray(v) ? String(v[0] ?? '') : String(v);
+	}
 </script>
 
-<form class="addresses-form" method="POST" use:enhance>
+<div class="addresses-form">
 	<fieldset class="fieldset-shipping">
 		<legend class="visually-hidden">Shipping address</legend>
 		<div class="form-row form-row-two">
 			<div class="field">
 				<label for="shipping-first-name">First Name</label>
-				<input id="shipping-first-name" type="text" bind:value={$form.firstName} placeholder="First name" />
-				{#if $errors.firstName}
-					<p class="field-error">{$errors.firstName[0]}</p>
+				<input
+					id="shipping-first-name"
+					name="firstName"
+					type="text"
+					bind:value={$form.firstName}
+					placeholder="First name"
+					aria-invalid={err.firstName ? 'true' : undefined}
+					data-invalid={err.firstName ? '' : undefined}
+					{...$constraints.firstName}
+				/>
+				{#if err.firstName}
+					<p class="field-error">{fieldErr(err.firstName)}</p>
 				{/if}
 			</div>
 			<div class="field">
 				<label for="shipping-last-name">Last Name</label>
-				<input id="shipping-last-name" type="text" bind:value={$form.lastName} placeholder="Last name" />
-				{#if $errors.lastName}
-					<p class="field-error">{$errors.lastName[0]}</p>
+				<input
+					id="shipping-last-name"
+					name="lastName"
+					type="text"
+					bind:value={$form.lastName}
+					placeholder="Last name"
+					aria-invalid={err.lastName ? 'true' : undefined}
+					data-invalid={err.lastName ? '' : undefined}
+					{...$constraints.lastName}
+				/>
+				{#if err.lastName}
+					<p class="field-error">{fieldErr(err.lastName)}</p>
 				{/if}
 			</div>
 		</div>
 		<div class="field">
 			<label for="shipping-company">Company</label>
-			<input id="shipping-company" type="text" bind:value={$form.company} placeholder="Company name" />
+			<input
+				id="shipping-company"
+				name="company"
+				type="text"
+				bind:value={$form.company}
+				placeholder="Company name"
+				{...$constraints.company}
+			/>
 		</div>
 		<div class="field">
 			<label for="shipping-address1">Address Line 1</label>
-			<input id="shipping-address1" type="text" bind:value={$form.address1} placeholder="Address line 1" />
-			{#if $errors.address1}
-				<p class="field-error">{$errors.address1[0]}</p>
+			<input
+				id="shipping-address1"
+				name="address1"
+				type="text"
+				bind:value={$form.address1}
+				placeholder="Address line 1"
+				aria-invalid={err.address1 ? 'true' : undefined}
+				data-invalid={err.address1 ? '' : undefined}
+				{...$constraints.address1}
+			/>
+			{#if err.address1}
+				<p class="field-error">{fieldErr(err.address1)}</p>
 			{/if}
 		</div>
 		<div class="field">
 			<label for="shipping-address2">Address Line 2</label>
-			<input id="shipping-address2" type="text" bind:value={$form.address2} placeholder="Address line 2" />
+			<input
+				id="shipping-address2"
+				name="address2"
+				type="text"
+				bind:value={$form.address2}
+				placeholder="Address line 2"
+				{...$constraints.address2}
+			/>
 		</div>
 		<div class="form-row form-row-three">
 			<div class="field">
 				<label for="shipping-city">City</label>
-				<input id="shipping-city" type="text" bind:value={$form.city} placeholder="City" />
-				{#if $errors.city}
-					<p class="field-error">{$errors.city[0]}</p>
+				<input
+					id="shipping-city"
+					name="city"
+					type="text"
+					bind:value={$form.city}
+					placeholder="City"
+					aria-invalid={err.city ? 'true' : undefined}
+					data-invalid={err.city ? '' : undefined}
+					{...$constraints.city}
+				/>
+				{#if err.city}
+					<p class="field-error">{fieldErr(err.city)}</p>
 				{/if}
 			</div>
 			<div class="field">
 				<label for="shipping-state">State / Province</label>
-				<input id="shipping-state" type="text" bind:value={$form.state} placeholder="State / Province" />
-				{#if $errors.state}
-					<p class="field-error">{$errors.state[0]}</p>
+				<input
+					id="shipping-state"
+					name="state"
+					type="text"
+					bind:value={$form.state}
+					placeholder="State / Province"
+					aria-invalid={err.state ? 'true' : undefined}
+					data-invalid={err.state ? '' : undefined}
+					{...$constraints.state}
+				/>
+				{#if err.state}
+					<p class="field-error">{fieldErr(err.state)}</p>
 				{/if}
 			</div>
 			<div class="field">
 				<label for="shipping-postal">Postal Code</label>
-				<input id="shipping-postal" type="text" bind:value={$form.postalCode} placeholder="Postal code" />
-				{#if $errors.postalCode}
-					<p class="field-error">{$errors.postalCode[0]}</p>
+				<input
+					id="shipping-postal"
+					name="postalCode"
+					type="text"
+					bind:value={$form.postalCode}
+					placeholder="Postal code"
+					aria-invalid={err.postalCode ? 'true' : undefined}
+					data-invalid={err.postalCode ? '' : undefined}
+					{...$constraints.postalCode}
+				/>
+				{#if err.postalCode}
+					<p class="field-error">{fieldErr(err.postalCode)}</p>
 				{/if}
 			</div>
 		</div>
 		<div class="field">
 			<label for="shipping-country">Country</label>
-			<select id="shipping-country" bind:value={$form.country}>
+			<select
+				id="shipping-country"
+				name="country"
+				bind:value={$form.country}
+				aria-invalid={err.country ? 'true' : undefined}
+				data-invalid={err.country ? '' : undefined}
+				{...$constraints.country}
+			>
 				<option>United States</option>
 				<option>Canada</option>
 				<option>United Kingdom</option>
 			</select>
-			{#if $errors.country}
-				<p class="field-error">{$errors.country[0]}</p>
+			{#if err.country}
+				<p class="field-error">{fieldErr(err.country)}</p>
 			{/if}
 		</div>
 		<div class="field">
 			<label for="shipping-phone">Phone</label>
-			<input id="shipping-phone" type="tel" bind:value={$form.phone} placeholder="Phone number" />
+			<input
+				id="shipping-phone"
+				name="phone"
+				type="tel"
+				bind:value={$form.phone}
+				placeholder="Phone number"
+				{...$constraints.phone}
+			/>
 		</div>
 	</fieldset>
 
 	<label class="checkbox-row">
-		<input type="checkbox" bind:checked={$form.billingSameAsShipping} />
+		<input
+			type="checkbox"
+			name="billingSameAsShipping"
+			bind:checked={$form.billingSameAsShipping}
+		/>
 		<span>Billing address is the same as shipping address</span>
 	</label>
 
 	<div class="field email-field">
 		<label for="email">Email Address</label>
-		<input id="email" type="email" bind:value={$form.email} placeholder="Email address" />
+		<input
+			id="email"
+			name="email"
+			type="email"
+			bind:value={$form.email}
+			placeholder="Email address"
+			aria-invalid={err.email ? 'true' : undefined}
+			data-invalid={err.email ? '' : undefined}
+			{...$constraints.email}
+		/>
 		<p class="field-hint">You'll receive order updates to this email</p>
-		{#if $errors.email}
-			<p class="field-error">{$errors.email[0]}</p>
+		{#if err.email}
+			<p class="field-error">{fieldErr(err.email)}</p>
 		{/if}
 	</div>
 
 	<button type="submit" class="next-btn full-width">Next</button>
-</form>
+</div>
 
 <style>
 	.visually-hidden {
@@ -237,6 +278,11 @@
 	.field select:focus {
 		outline: none;
 		border-color: #2d2d2d;
+	}
+	.field input[aria-invalid='true'],
+	.field select[aria-invalid='true'] {
+		border-color: #b42318;
+		box-shadow: 0 0 0 1px #b42318;
 	}
 	.field-hint {
 		font-size: 0.8125rem;

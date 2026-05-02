@@ -17,10 +17,7 @@
 	{#if error}
 		<p class="store-error">{error}</p>
 	{/if}
-	<ProductGridSection
-		products={products}
-		
-	/>
+	<ProductGridSection products={products} title="" subtitle="" />
 </main>
 
 <SiteFooter />

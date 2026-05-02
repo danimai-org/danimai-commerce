@@ -1,5 +1,8 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import { get } from "svelte/store";
+    import { superForm } from "sveltekit-superforms/client";
+    import { zod4Client } from "sveltekit-superforms/adapters";
     import { SiteHeader, SiteFooter } from "$lib/components/layout";
     import {
         CheckoutOrderSummary,
@@ -7,6 +10,11 @@
         CheckoutDeliveryStep,
         CheckoutPaymentStep,
     } from "$lib/components/checkout";
+    import {
+        checkoutFormSchema,
+        type CheckoutFormData,
+    } from "$lib/checkout/checkout-form-schema";
+    import type { PageProps } from "./$types";
     import { client } from "$lib/api/client.js";
     import { cartState } from "$lib/cart/cart-state.svelte";
     import {
@@ -15,6 +23,9 @@
         type VariantDisplayRow,
     } from "$lib/cart/variant-display-map";
     import { formatStoreMoney } from "$lib/money";
+
+    let { data }: PageProps = $props();
+
     type CheckoutStep = "addresses" | "delivery" | "payment" | "review";
     const CART_STORAGE_KEY = "dm_sf_cart_id";
     const SESSION_STORAGE_KEY = "dm_sf_session_id";
@@ -85,9 +96,7 @@
                     ? item.description.trim()
                     : "";
             const variantLabel =
-                desc ||
-                variantDisplayLabel(vd) ||
-                (item.variant_id ? "" : "—");
+                desc || variantDisplayLabel(vd) || (item.variant_id ? "" : "—");
             return {
                 key:
                     item.id ??
@@ -123,48 +132,39 @@
     ];
     let currentStep = $state<CheckoutStep>("addresses");
 
-    let shipping = $state({
-        firstName: "",
-        lastName: "",
-        company: "",
-        address1: "",
-        address2: "",
-        city: "",
-        state: "",
-        postalCode: "",
-        country: "United States",
-        phone: "",
-    });
-    let billingSameAsShipping = $state(true);
-    let email = $state("");
-    let shippingMethod = $state("standard-worldwide");
-    let paymentMethod = $state("manual");
     let placeOrderError = $state("");
     let isPlacingOrder = $state(false);
-    const fullName = $derived(
-        `${shipping.firstName} ${shipping.lastName}`.trim() || "—",
-    );
-    const shippingLine1 = $derived(shipping.address1 || "—");
-    const shippingLine2 = $derived(shipping.address2 || "");
-    const shippingLine3 = $derived(
-        [shipping.city, shipping.state, shipping.postalCode]
-            .filter(Boolean)
-            .join(", ") || "—",
-    );
-    const shippingCountry = $derived(shipping.country || "—");
-    const shippingMethodLabel = $derived(
-        shippingMethod === "standard-worldwide"
-            ? "Standard Worldwide Shipping"
-            : shippingMethod,
-    );
-    const paymentMethodLabel = $derived(
-        paymentMethod === "manual" ? "Manual Payment" : paymentMethod,
+
+    // `checkoutForm` comes from a one-shot load; superForm owns client state after init.
+    // svelte-ignore state_referenced_locally
+    const { form, errors, constraints, enhance } = superForm<CheckoutFormData>(
+        data.checkoutForm,
+        {
+            SPA: true,
+            resetForm: false,
+            id: "checkout",
+            validators: zod4Client(checkoutFormSchema),
+            applyAction: false,
+            invalidateAll: false,
+            onUpdated({ form: validated }) {
+                if (!validated.valid || !validated.posted) return;
+                if (currentStep === "addresses") currentStep = "delivery";
+                else if (currentStep === "delivery") currentStep = "payment";
+                else if (currentStep === "payment") currentStep = "review";
+            },
+        },
     );
 
-    function goNext() {
-        if (currentStep === "addresses") currentStep = "delivery";
-        else if (currentStep === "delivery") currentStep = "payment";
-        else if (currentStep === "payment") currentStep = "review";
+    function shippingMethodLabelFrom(
+        method: string,
+    ): "Standard Worldwide Shipping" | string {
+        return method === "standard-worldwide"
+            ? "Standard Worldwide Shipping"
+            : method;
+    }
+
+    function paymentMethodLabelFrom(method: string): "Manual Payment" | string {
+        return method === "manual" ? "Manual Payment" : method;
     }
 
     function goBack() {
@@ -174,13 +174,13 @@
     }
 
     function orderAddressLines(): string[] {
+        const f = get(form);
+        const name = `${f.firstName} ${f.lastName}`.trim() || "—";
         return [
-            fullName,
-            shipping.address1 || shipping.address2 || "—",
-            [shipping.city, shipping.state, shipping.postalCode]
-                .filter(Boolean)
-                .join(", ") || "—",
-            shipping.country || "—",
+            name,
+            f.address1 || f.address2 || "—",
+            [f.city, f.state, f.postalCode].filter(Boolean).join(", ") || "—",
+            f.country || "—",
         ];
     }
 
@@ -296,12 +296,15 @@
 
         isPlacingOrder = true;
         try {
+            const f = get(form);
+            const shipLabel = shippingMethodLabelFrom(f.shippingMethod);
+            const payLabel = paymentMethodLabelFrom(f.paymentMethod);
             const readyCartId = await ensureCheckoutCartReady(cartId);
             const res = await client.admin.orders["from-cart"].post({
                 cart_id: readyCartId,
                 metadata: {
-                    shipping_method: shippingMethodLabel,
-                    payment_method: paymentMethodLabel,
+                    shipping_method: shipLabel,
+                    payment_method: payLabel,
                 },
             });
             if (res.error) throw new Error(treatyErrorMessage(res.error));
@@ -321,7 +324,7 @@
                 number,
                 date: new Date().toISOString(),
                 status: created.status ?? "pending",
-                email: (created.email ?? email ?? "—") as string,
+                email: (created.email ?? f.email ?? "—") as string,
                 items: cartItems.map((item) => ({
                     image: item.image ?? "",
                     imageAlt: item.name,
@@ -331,9 +334,9 @@
                     price: item.priceDisplay,
                 })),
                 shippingAddress: orderAddressLines(),
-                shippingMethod: shippingMethodLabel,
+                shippingMethod: shipLabel,
                 billingAddress: orderAddressLines(),
-                paymentMethod: paymentMethodLabel,
+                paymentMethod: payLabel,
                 totals: orderTotals(),
             };
             sessionStorage.setItem(
@@ -403,57 +406,64 @@
                 {/if}
             </header>
 
-            {#if currentStep === "addresses"}
-                <CheckoutAddressStep
-                    bind:shipping
-                    bind:billingSameAsShipping
-                    bind:email
-                    onNext={goNext}
-                />
-            {:else if currentStep === "delivery"}
-                <CheckoutDeliveryStep
-                    bind:shippingMethod
-                    onBack={goBack}
-                    onNext={goNext}
-                />
-            {:else if currentStep === "payment"}
-                <CheckoutPaymentStep
-                    bind:paymentMethod
-                    onBack={goBack}
-                    onNext={goNext}
-                />
+            {#if currentStep !== "review"}
+                <form class="checkout-flow-form" method="POST" use:enhance>
+                    {#if currentStep === "addresses"}
+                        <CheckoutAddressStep {form} {errors} {constraints} />
+                    {:else if currentStep === "delivery"}
+                        <CheckoutDeliveryStep {form} onBack={goBack} />
+                    {:else if currentStep === "payment"}
+                        <CheckoutPaymentStep {form} onBack={goBack} />
+                    {/if}
+                </form>
             {:else}
                 <div class="review-step">
                     <section class="review-block">
                         <h2 class="review-block-title">Shipping Address</h2>
-                        <p class="review-line">{fullName}</p>
-                        <p class="review-line">{shippingLine1}</p>
-                        {#if shippingLine2}
-                            <p class="review-line">{shippingLine2}</p>
+                        <p class="review-line">
+                            {`${$form.firstName} ${$form.lastName}`.trim() ||
+                                "—"}
+                        </p>
+                        <p class="review-line">{$form.address1 || "—"}</p>
+                        {#if $form.address2}
+                            <p class="review-line">{$form.address2}</p>
                         {/if}
-                        <p class="review-line">{shippingLine3}</p>
-                        <p class="review-line">{shippingCountry}</p>
+                        <p class="review-line">
+                            {[$form.city, $form.state, $form.postalCode]
+                                .filter(Boolean)
+                                .join(", ") || "—"}
+                        </p>
+                        <p class="review-line">{$form.country || "—"}</p>
                     </section>
                     <section class="review-block">
                         <h2 class="review-block-title">Shipping Method</h2>
                         <p class="review-method">
-                            {shippingMethodLabel}
+                            {shippingMethodLabelFrom($form.shippingMethod)}
                             <strong>{formatStoreMoney(0)}</strong>
                         </p>
                     </section>
                     <section class="review-block">
                         <h2 class="review-block-title">Billing Address</h2>
-                        <p class="review-line">{fullName}</p>
-                        <p class="review-line">{shippingLine1}</p>
-                        {#if shippingLine2}
-                            <p class="review-line">{shippingLine2}</p>
+                        <p class="review-line">
+                            {`${$form.firstName} ${$form.lastName}`.trim() ||
+                                "—"}
+                        </p>
+                        <p class="review-line">{$form.address1 || "—"}</p>
+                        {#if $form.address2}
+                            <p class="review-line">{$form.address2}</p>
                         {/if}
-                        <p class="review-line">{shippingLine3}</p>
-                        <p class="review-line">{shippingCountry}</p>
+                        <p class="review-line">
+                            {[$form.city, $form.state, $form.postalCode]
+                                .filter(Boolean)
+                                .join(", ") || "—"}
+                        </p>
+                        <p class="review-line">{$form.country || "—"}</p>
                     </section>
                     <section class="review-block">
                         <h2 class="review-block-title">Payment Method</h2>
-                        <p class="review-method">{paymentMethodLabel}</p>
+                        <p class="review-method">
+                            {paymentMethodLabelFrom($form.paymentMethod)}
+                        </p>
                     </section>
                     <p class="review-note">
                         When you place your order, your payment will be
