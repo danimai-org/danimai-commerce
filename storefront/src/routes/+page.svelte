@@ -8,13 +8,12 @@
         VideoSection,
         QuotesSection,
     } from "$lib/components/sections";
-    import type { ProductGridItem } from "./store/+page.ts";
-    import type { HomeCollectionCard } from "./+page.ts";
+    import type { HomeCollectionCard, HomeProductGridItem } from "./+page.ts";
     import CartLineItems from "$lib/components/cart/cart-line-items.svelte";
 
     let { data } = $props();
     const products = $derived(
-        (data as { products?: ProductGridItem[] })?.products ?? [],
+        (data as { products?: HomeProductGridItem[] })?.products ?? [],
     );
     const collections = $derived(
         (data as { collections?: HomeCollectionCard[] })?.collections ?? [],

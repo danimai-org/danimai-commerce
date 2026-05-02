@@ -1,4 +1,3 @@
-import type { ProductGridItem } from "./store/+page.ts";
 import { API_BASE, rowsFromPaginated } from "../lib/api/storefront-api";
 import { client } from "$lib/api/client.js";
 import type { PageLoad } from "./$types";
@@ -80,13 +79,25 @@ type StorefrontProductRow = {
   title: string;
   handle: string;
   variant: {
+    id: string;
+    title: string;
     thumbnail: string | null;
     price: { amount: string; currency_code: string } | null;
   } | null;
 };
 
+export type HomeProductGridItem = {
+  name: string;
+  price: { amount: number; currency_code: string };
+  href: string;
+  bg: string;
+  image: string | null;
+  variantId: string | null;
+  variantTitle: string | null;
+};
+
 export const load: PageLoad = async ({ fetch }) => {
-  const products: ProductGridItem[] = [];
+  const products: HomeProductGridItem[] = [];
   const collections = await loadAllCollections();
   let error: string | null = null;
 
@@ -110,6 +121,8 @@ export const load: PageLoad = async ({ fetch }) => {
         href: `/products/${p.handle}`,
         bg: pickBg(i),
         image: p.variant?.thumbnail ?? null,
+        variantId: p.variant?.id ?? null,
+        variantTitle: p.variant?.title ?? null,
       });
     }
   } catch (e) {

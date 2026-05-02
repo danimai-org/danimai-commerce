@@ -12,13 +12,14 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
-	import type { ProductGridItem } from '../../store/+page.ts';
 	type CollectionRow = { id: string; title: string; handle?: string; slug?: string };
 	type StorefrontProductRow = {
 		title: string;
 		handle: string;
 		thumbnail: string | null;
 		variant: {
+			id: string;
+			title: string;
 			thumbnail: string | null;
 			price: { amount: string; currency_code: string } | null;
 		} | null;
@@ -115,7 +116,9 @@ function prettyHandle(handle: string): string {
 					},
 					href: `/products/${p.handle}`,
 					bg: pickBg(i),
-					image: p.thumbnail ?? p.variant?.thumbnail ?? null
+					image: p.thumbnail ?? p.variant?.thumbnail ?? null,
+					variantId: p.variant?.id ?? null,
+					variantTitle: p.variant?.title ?? null
 				};
 			});
 			return {

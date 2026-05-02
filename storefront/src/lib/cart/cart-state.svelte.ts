@@ -191,7 +191,7 @@ export async function addItem(input: {
           quantity,
           thumbnail: input.thumbnail ?? null,
           title: input.title ?? null,
-          description: input.description ?? null,
+          description: input.description?.trim() || null,
           product_id: input.productId ?? null,
           unit_price: input.unitPrice ?? null,
         } as Record<string, unknown>,

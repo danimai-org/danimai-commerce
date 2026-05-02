@@ -1,21 +1,23 @@
 <script lang="ts">
+	import { formatStoreMoney } from '$lib/money';
+
 	let {
-		subtotalDisplay,
-		shippingDisplay,
-		discountDisplay,
+		subtotal,
+		shipping = 0,
+		discount = 0,
 		taxDisplay,
-		totalDisplay,
+		total,
 		promoOpen,
 		promoInput = $bindable(''),
 		onOpenPromo,
 		onApplyPromo,
 		onClosePromo
 	}: {
-		subtotalDisplay: string;
-		shippingDisplay: string;
-		discountDisplay: string;
+		subtotal: number;
+		shipping?: number;
+		discount?: number;
 		taxDisplay: string;
-		totalDisplay: string;
+		total: number;
 		promoOpen: boolean;
 		promoInput: string;
 		onOpenPromo: () => void;
@@ -29,15 +31,15 @@
 	<dl class="order-summary-rows">
 		<div class="summary-row">
 			<dt>Subtotal</dt>
-			<dd>{subtotalDisplay}</dd>
+			<dd>{formatStoreMoney(subtotal)}</dd>
 		</div>
 		<div class="summary-row">
 			<dt>Shipping</dt>
-			<dd>{shippingDisplay}</dd>
+			<dd>{formatStoreMoney(shipping)}</dd>
 		</div>
 		<div class="summary-row">
 			<dt>Discount</dt>
-			<dd>{discountDisplay}</dd>
+			<dd>{formatStoreMoney(discount)}</dd>
 		</div>
 		<div class="summary-row">
 			<dt>Tax</dt>
@@ -46,7 +48,7 @@
 	</dl>
 	<div class="summary-total">
 		<span>Total</span>
-		<strong>{totalDisplay}</strong>
+		<strong>{formatStoreMoney(total)}</strong>
 	</div>
 	{#if !promoOpen}
 		<button type="button" class="add-promo" onclick={onOpenPromo}>Add promo code</button>

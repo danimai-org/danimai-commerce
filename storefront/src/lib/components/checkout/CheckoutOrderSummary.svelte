@@ -32,7 +32,9 @@
 				</div>
 				<div class="summary-item-details">
 					<span class="summary-item-name">{item.name}</span>
-					<span class="summary-item-variant">{item.variant}</span>
+					{#if item.variant}
+						<span class="summary-item-variant">{item.variant}</span>
+					{/if}
 					<span class="summary-item-qty">Quantity: {item.quantity}</span>
 				</div>
 				<span class="summary-item-price">{formatStoreMoney(item.priceValue * item.quantity)}</span>

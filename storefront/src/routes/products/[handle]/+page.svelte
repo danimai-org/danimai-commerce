@@ -16,6 +16,26 @@
     let selectedVariantId = $state<string | null>(null);
     let quantity = $state(1);
     let selectedImageUrl = $state<string | null>(null);
+
+    const defaultVariantId = $derived.by(() => {
+        const fromProduct = product?.variant?.id;
+        if (fromProduct && variants.some((v) => v?.id === fromProduct)) {
+            return fromProduct;
+        }
+        return variants[0]?.id ?? null;
+    });
+
+    const resolvedVariantId = $derived(selectedVariantId ?? defaultVariantId);
+
+    $effect(() => {
+        if (variants.length === 0 || !defaultVariantId) return;
+        const ids = new Set(
+            variants.map((v) => v?.id).filter((id): id is string => Boolean(id)),
+        );
+        if (!selectedVariantId || !ids.has(selectedVariantId)) {
+            selectedVariantId = defaultVariantId;
+        }
+    });
     function formatPrice(
         amount: number | string | null | undefined,
         _currencyCode: string | null | undefined,
@@ -46,7 +66,7 @@
     );
     const mainImage = $derived(
         selectedImageUrl ??
-            variants.find((v) => v?.id === selectedVariantId)?.thumbnail ??
+            variants.find((v) => v?.id === resolvedVariantId)?.thumbnail ??
             product?.thumbnail ??
             galleryImages[0] ??
             null,
@@ -100,9 +120,8 @@
                 productHref={`/products/${product?.handle}`}
                 productId={product?.id ?? null}
                 productImage={mainImage}
-                selectedVariantTitle={variants.find(
-                    (v) => v?.id === selectedVariantId,
-                )?.title ?? ""}
+                selectedVariantTitle={variants.find((v) => v?.id === resolvedVariantId)
+                    ?.title ?? ""}
             />
         </div>
 

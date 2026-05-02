@@ -14,8 +14,9 @@
         image: string | null;
         variantId?: string | null;
         variant_id?: string | null;
-        variants?: Array<{ id?: string | null }>;
-        variant?: { id?: string | null } | null;
+        variantTitle?: string | null;
+        variants?: Array<{ id?: string | null; title?: string | null }>;
+        variant?: { id?: string | null; title?: string | null } | null;
     };
     let {
         products = [] as ProductGridItem[] | undefined,
@@ -65,6 +66,21 @@
         return "—";
     }
 
+    function resolveVariantTitle(product: ProductGridItem): string | null {
+        const candidates = [
+            product.variantTitle,
+            product.variant?.title,
+            (product.variants?.[0] as { title?: string | null } | undefined)
+                ?.title,
+        ];
+        for (const c of candidates) {
+            if (typeof c === "string" && c.trim().length > 0) {
+                return c.trim();
+            }
+        }
+        return null;
+    }
+
     async function quickAdd(e: MouseEvent, product: ProductGridItem) {
         e.preventDefault();
         e.stopPropagation();
@@ -80,6 +96,7 @@
             quantity: 1,
             thumbnail: product.image ?? null,
             title: product.name ?? null,
+            description: resolveVariantTitle(product),
             unitPrice,
         });
     }
@@ -139,7 +156,9 @@
         if (e.defaultPrevented) return;
         const target = e.target as HTMLElement | null;
         if (!target) return;
-        if (target.closest("button, input, select, textarea, [role='button']")) {
+        if (
+            target.closest("button, input, select, textarea, [role='button']")
+        ) {
             return;
         }
         openProduct(href);

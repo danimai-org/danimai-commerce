@@ -5,21 +5,54 @@
         changeLineItemQuantity,
         closeCartSheet,
     } from "$lib/cart/cart-state.svelte";
+    import {
+        fetchVariantDisplayMap,
+        variantDisplayLabel,
+        type VariantDisplayRow,
+    } from "$lib/cart/variant-display-map";
     import { formatStoreMoney } from "$lib/money";
+
+    let variantDisplayById = $state(new Map<string, VariantDisplayRow>());
+
+    $effect(() => {
+        const lineItems = cartState.cart?.line_items;
+        if (!lineItems?.length) {
+            variantDisplayById = new Map();
+            return;
+        }
+        let cancelled = false;
+        void (async () => {
+            const next = await fetchVariantDisplayMap(lineItems);
+            if (!cancelled) variantDisplayById = next;
+        })();
+        return () => {
+            cancelled = true;
+        };
+    });
 
     const cartItems = $derived(
         ((cartState.cart?.line_items ?? []) as any[]).map((item) => {
             const amount = Number.parseFloat(String(item.unit_price ?? "0"));
             const priceValue = Number.isFinite(amount) ? amount : 0;
+            const fromMap = item.variant_id
+                ? variantDisplayById.get(item.variant_id)
+                : undefined;
+            const desc =
+                typeof item.description === "string"
+                    ? item.description.trim()
+                    : "";
+            const variant =
+                desc ||
+                variantDisplayLabel(fromMap) ||
+                (item.variant_id ? "" : "—");
             return {
                 ...item,
                 key:
                     item.id ??
                     `${item.variant_id ?? "variant"}-${item.title ?? "item"}`,
                 name: item.title ?? "Item",
-                variant:
-                    item.description ?? (item.variant_id ? "Variant" : "—"),
-                image: item.thumbnail ?? null,
+                variant,
+                image: item.thumbnail ?? fromMap?.thumbnail ?? null,
                 priceValue,
                 priceDisplay: formatStoreMoney(priceValue),
             };
@@ -83,7 +116,9 @@
                             </div>
                             <div class="line-card-body">
                                 <p class="line-card-title">{item.name}</p>
-                                <p class="line-card-meta">{item.variant}</p>
+                                {#if item.variant}
+                                    <p class="line-card-meta">{item.variant}</p>
+                                {/if}
                                 <div class="line-controls-row">
                                     <div class="quantity-controls">
                                         <button

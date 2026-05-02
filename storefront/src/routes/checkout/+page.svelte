@@ -9,6 +9,11 @@
     } from "$lib/components/checkout";
     import { client } from "$lib/api/client.js";
     import { cartState } from "$lib/cart/cart-state.svelte";
+    import {
+        fetchVariantDisplayMap,
+        variantDisplayLabel,
+        type VariantDisplayRow,
+    } from "$lib/cart/variant-display-map";
     import { formatStoreMoney } from "$lib/money";
     type CheckoutStep = "addresses" | "delivery" | "payment" | "review";
     const CART_STORAGE_KEY = "dm_sf_cart_id";
@@ -50,19 +55,46 @@
         priceDisplay: string;
     };
 
+    let variantDisplayById = $state(new Map<string, VariantDisplayRow>());
+
+    $effect(() => {
+        const lineItems = cartState.cart?.line_items;
+        if (!lineItems?.length) {
+            variantDisplayById = new Map();
+            return;
+        }
+        let cancelled = false;
+        void (async () => {
+            const next = await fetchVariantDisplayMap(lineItems);
+            if (!cancelled) variantDisplayById = next;
+        })();
+        return () => {
+            cancelled = true;
+        };
+    });
+
     const cartItems = $derived.by((): CheckoutCartItem[] => {
         const lineItems = cartState.cart?.line_items ?? [];
+        const vmap = variantDisplayById;
         return lineItems.map((item) => {
             const amount = Number.parseFloat(String(item.unit_price ?? "0"));
             const priceValue = Number.isFinite(amount) ? amount : 0;
+            const vd = item.variant_id ? vmap.get(item.variant_id) : undefined;
+            const desc =
+                typeof item.description === "string"
+                    ? item.description.trim()
+                    : "";
+            const variantLabel =
+                desc ||
+                variantDisplayLabel(vd) ||
+                (item.variant_id ? "" : "—");
             return {
                 key:
                     item.id ??
                     `${item.variant_id ?? "variant"}-${item.title ?? "item"}`,
                 name: item.title ?? "Item",
-                variant:
-                    item.description ?? (item.variant_id ? "Variant" : "—"),
-                image: item.thumbnail ?? null,
+                variant: variantLabel,
+                image: item.thumbnail ?? vd?.thumbnail ?? null,
                 quantity: item.quantity ?? 0,
                 priceValue,
                 priceDisplay: formatStoreMoney(priceValue),
@@ -205,19 +237,20 @@
     async function ensureCartHasLineItems(cartId: string) {
         const apiCart = await fetchCartJson(cartId);
         if ((apiCart.line_items?.length ?? 0) > 0) return;
-        if (cartItems.length === 0) return;
+        const raw = cartState.cart?.line_items ?? [];
+        if (raw.length === 0) return;
 
-        const line_items: LineItemPut[] = cartItems
+        const line_items: LineItemPut[] = raw
+            .filter((item) => (item.quantity ?? 0) > 0)
             .map((item) => ({
-                title: item.name,
-                description: null,
-                thumbnail: item.image,
-                variant_id: null,
-                product_id: null,
-                quantity: item.quantity,
-                unit_price: String(item.priceValue),
-            }))
-            .filter((item) => (item.quantity ?? 0) > 0);
+                title: item.title ?? null,
+                description: item.description ?? null,
+                thumbnail: item.thumbnail ?? null,
+                variant_id: item.variant_id ?? null,
+                product_id: item.product_id ?? null,
+                quantity: item.quantity ?? 0,
+                unit_price: item.unit_price ?? null,
+            }));
 
         if (line_items.length === 0) return;
         await putLineItems(cartId, line_items);

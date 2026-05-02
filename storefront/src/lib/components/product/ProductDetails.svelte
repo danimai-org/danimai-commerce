@@ -49,12 +49,14 @@
             unitPrice = Number.isFinite(parsed) ? String(parsed) : null;
         }
 
+        const descRaw =
+            (selectedVariantTitle || selectedVariant?.title || "").trim();
         await addItemAndOpenSheet({
             variantId,
             quantity: Math.max(1, quantity),
             thumbnail: productImage,
             title,
-            description: selectedVariantTitle || null,
+            description: descRaw || null,
             productId,
             unitPrice,
         });

@@ -19,6 +19,11 @@
         firstVariantIdByProductIds,
         rowsFromPaginated,
     } from "$lib/api/storefront-api";
+    import {
+        fetchVariantDisplayMap,
+        variantDisplayLabel,
+        type VariantDisplayRow,
+    } from "$lib/cart/variant-display-map";
 
     type CartRowView = {
         key: string;
@@ -84,12 +89,7 @@
         return m;
     });
 
-    type VariantDetail = {
-        title: string;
-        thumbnail: string | null;
-        unitPrice: number | null;
-    };
-    let variantDetailsById = $state(new Map<string, VariantDetail>());
+    let variantDetailsById = $state(new Map<string, VariantDisplayRow>());
 
     $effect(() => {
         void initCartState();
@@ -101,40 +101,9 @@
             variantDetailsById = new Map();
             return;
         }
-        const ids = [
-            ...new Set(
-                lineItems
-                    .map((li) => li.variant_id)
-                    .filter((id): id is string => Boolean(id)),
-            ),
-        ];
-        if (ids.length === 0) {
-            variantDetailsById = new Map();
-            return;
-        }
         let cancelled = false;
         void (async () => {
-            const next = new Map<string, VariantDetail>();
-            await Promise.all(
-                ids.map(async (id) => {
-                    const res = await client.admin["product-variants"]({
-                        id,
-                    }).get();
-                    if (res.error || !res.data) return;
-                    const d = res.data as {
-                        title: string;
-                        thumbnail?: string | null;
-                        prices?: Array<{ amount?: string | number | null }>;
-                    };
-                    const rawAmount = d.prices?.[0]?.amount;
-                    const unitPrice = parsePrice(rawAmount);
-                    next.set(id, {
-                        title: d.title,
-                        thumbnail: d.thumbnail ?? null,
-                        unitPrice: Number.isFinite(unitPrice) ? unitPrice : null,
-                    });
-                }),
-            );
+            const next = await fetchVariantDisplayMap(lineItems);
             if (!cancelled) variantDetailsById = next;
         })();
         return () => {
@@ -165,7 +134,7 @@
             const variantLabel =
                 (nestedVariant.variant?.title &&
                     String(nestedVariant.variant.title).trim()) ||
-                (vd?.title && vd.title.trim()) ||
+                variantDisplayLabel(vd) ||
                 (li.description && String(li.description).trim()) ||
                 "";
             return {
@@ -178,7 +147,7 @@
                 priceValue: pv,
                 image: li.thumbnail ?? vd?.thumbnail ?? productThumb,
                 quantity: qty,
-                variant: variantLabel || (li.variant_id ? "Variant" : "—"),
+                variant: variantLabel || (li.variant_id ? "" : "—"),
             };
         });
     });
@@ -189,11 +158,7 @@
             0,
         ),
     );
-    const subtotalDisplay = $derived(`$${subtotal.toFixed(2)}`);
-    const shippingDisplay = $derived("$0.00");
-    const discountDisplay = $derived("$0.00");
     const taxDisplay = $derived("—");
-    const totalDisplay = $derived(`$${subtotal.toFixed(2)}`);
 
     let promoOpen = $state(false);
     let promoInput = $state("");
@@ -339,7 +304,7 @@
             variantId: variant_id,
             productId: product.id,
             title: product.title,
-            description: meta?.title ?? null,
+            description: meta?.title?.trim() || null,
             unitPrice: meta?.unitPrice ?? "0",
             thumbnail: meta?.thumbnail ?? fallbackThumb,
             quantity: 1,
@@ -397,11 +362,11 @@
 
         {#if !cartPending && !cartFailed && displayItems.length > 0}
             <CartOrderSummary
-                {subtotalDisplay}
-                {shippingDisplay}
-                {discountDisplay}
+                {subtotal}
+                shipping={0}
+                discount={0}
                 {taxDisplay}
-                {totalDisplay}
+                total={subtotal}
                 {promoOpen}
                 bind:promoInput
                 onOpenPromo={openPromo}
