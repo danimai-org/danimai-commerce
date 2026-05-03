@@ -15,7 +15,7 @@ export const CreateCartSchema = Type.Object({
   customer_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   session_id: Type.String({
     format: "uuid",
-    description: "User session id; required to create a cart",
+    description: "Customer session id; required to create a cart",
   }),
   metadata: Metadata,
 });

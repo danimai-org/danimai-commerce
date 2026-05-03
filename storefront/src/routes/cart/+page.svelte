@@ -102,7 +102,7 @@
 	async function ensureSessionId(): Promise<string> {
 		let sid = localStorage.getItem(SESSION_STORAGE_KEY);
 		if (sid) return sid;
-		const res = await client.admin.auth.sessions.post({});
+		const res = await client.storefront.auth.sessions.post({});
 		if (res.error) throw new Error(treatyErrorMessage(res.error));
 		const j = res.data as { id: string };
 		sid = j.id;

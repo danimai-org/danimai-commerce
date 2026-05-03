@@ -65,7 +65,7 @@ async function ensureSessionId(): Promise<string> {
   }
   const existing = localStorage.getItem(SESSION_STORAGE_KEY);
   if (existing) return existing;
-  const res = await client.admin.auth.sessions.post({});
+  const res = await client.storefront.auth.sessions.post({});
   if (res.error) throw new Error(res.error.value?.message ?? "Unknown error");
   const session = res.data as { id: string };
   localStorage.setItem(SESSION_STORAGE_KEY, session.id);
