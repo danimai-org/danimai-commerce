@@ -1,39 +1,22 @@
 <script lang="ts">
-	import { superForm } from 'sveltekit-superforms/client';
+	import type { SuperFormData } from 'sveltekit-superforms/client';
+	import type { CheckoutFormData } from '$lib/checkout/checkout-form-schema';
 
-	type Props = {
-		shippingMethod?: string;
+	interface Props {
+		form: SuperFormData<CheckoutFormData>;
 		onBack: () => void;
-		onNext: () => void;
-	};
+	}
 
-	let { shippingMethod = $bindable('standard-worldwide'), onBack, onNext }: Props = $props();
-
-	const initialFormData = $state.snapshot({
-		shippingMethod
-	});
-
-	const { form, enhance } = superForm(initialFormData, {
-		SPA: true,
-		resetForm: false,
-		onSubmit: () => {
-			shippingMethod = $form.shippingMethod;
-			onNext();
-		}
-	});
+	let { form, onBack }: Props = $props();
 </script>
 
-<form
-	class="delivery-form"
-	method="POST"
-	use:enhance
->
+<div class="delivery-fields">
 	<fieldset class="fieldset-delivery">
 		<legend class="visually-hidden">Shipping method</legend>
 		<label class="shipping-method">
 			<input
 				type="radio"
-				name="shipping-method"
+				name="shippingMethod"
 				value="standard-worldwide"
 				bind:group={$form.shippingMethod}
 			/>
@@ -41,10 +24,10 @@
 		</label>
 	</fieldset>
 	<div class="delivery-actions">
-		<button type="button" class="back-btn" onclick={onBack}>Back</button>
+		<button type="button" class="back-btn" onclick={() => onBack()}>Back</button>
 		<button type="submit" class="next-btn">Next</button>
 	</div>
-</form>
+</div>
 
 <style>
 	.visually-hidden {
@@ -58,7 +41,7 @@
 		white-space: nowrap;
 		border: 0;
 	}
-	.delivery-form {
+	.delivery-fields {
 		display: flex;
 		flex-direction: column;
 		gap: 1.25rem;

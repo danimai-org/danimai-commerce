@@ -3,6 +3,7 @@
 	import { API_BASE, firstVariantIdByProductIds, rowsFromPaginated } from '../../api/storefront-api';
 	import { client } from '$lib/api/client.js';
 	import { search } from '$lib/stores/search';
+	import { formatStoreMoney } from '$lib/money';
 	type SearchResult = {
 		name: string;
 		price: string;
@@ -104,13 +105,23 @@
 						.catch(() => null)
 				)
 			);
-			results = list.map((p, i) => ({
-				name: p.title,
-				price: prices[i]?.amount ?? '',
-				href: `/products/${p.handle}`,
-				bg: '#f5f0eb',
-				image: p.thumbnail || null
-			}));
+			results = list.map((p, i) => {
+				const raw = prices[i]?.amount;
+				let price = '';
+				if (raw != null && raw !== '') {
+					const cents = parseInt(String(raw), 10);
+					if (Number.isFinite(cents)) {
+						price = formatStoreMoney(cents / 100);
+					}
+				}
+				return {
+					name: p.title,
+					price,
+					href: `/products/${p.handle}`,
+					bg: '#f5f0eb',
+					image: p.thumbnail || null
+				};
+			});
 		} catch {
 			results = [];
 		} finally {

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { SiteHeader, SiteFooter } from '$lib/components/layout';
+	import { formatStoreMoney } from '$lib/money';
 
 	const account = $state({
 		name: 'text',
@@ -10,14 +11,14 @@
 			id: 6,
 			date: 'Feb 23, 2026',
 			status: 'Pending',	payment: 'Authorized',
-			total: '58.00'
+			total: 58
 		},
 		{
 			id: 26,
 			date: 'Apr 13, 2026',
 			status: 'Pending',
 			payment: 'Authorized',
-			total: '$468.00'
+			total: 468
 		}
 	]);
 
@@ -51,7 +52,7 @@
 								<h3>Order #{order.id}</h3>
 								<p>{order.date}</p>
 							</div>
-							<strong>{order.total}</strong>
+							<strong>{formatStoreMoney(order.total)}</strong>
 						</div>
 						<p class="order-meta">Status: {order.status}  Payment: {order.payment}</p>
 					</article>

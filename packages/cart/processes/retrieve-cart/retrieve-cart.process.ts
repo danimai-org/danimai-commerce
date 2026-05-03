@@ -22,6 +22,13 @@ export async function loadCartWithRelations(
   db: Kysely<Database>,
   id: string
 ): Promise<CartWithRelations | undefined> {
+  const toMoney = (value: string | null | undefined): number => {
+    const n = Number.parseFloat(String(value ?? "0"));
+    return Number.isFinite(n) ? n : 0;
+  };
+  const toMoneyString = (value: number): string =>
+    (Math.round((value + Number.EPSILON) * 100) / 100).toFixed(2);
+
   const cart = await db
     .selectFrom("carts")
     .where("id", "=", id)
@@ -47,6 +54,15 @@ export async function loadCartWithRelations(
           .where("deleted_at", "is", null)
           .selectAll()
           .execute();
+  const adjustments =
+    lineIds.length === 0
+      ? []
+      : await db
+          .selectFrom("cart_line_item_adjustments")
+          .where("line_item_id", "in", lineIds)
+          .where("deleted_at", "is", null)
+          .selectAll()
+          .execute();
 
   const taxByLine = new Map<string, typeof taxLines>();
   for (const t of taxLines) {
@@ -55,6 +71,14 @@ export async function loadCartWithRelations(
     const list = taxByLine.get(lid) ?? [];
     list.push(t);
     taxByLine.set(lid, list);
+  }
+  const adjustmentsByLine = new Map<string, typeof adjustments>();
+  for (const adj of adjustments) {
+    const lid = adj.line_item_id;
+    if (!lid) continue;
+    const list = adjustmentsByLine.get(lid) ?? [];
+    list.push(adj);
+    adjustmentsByLine.set(lid, list);
   }
 
   let shipping_address: CartWithRelations["shipping_address"] = null;
@@ -68,13 +92,32 @@ export async function loadCartWithRelations(
     shipping_address = addr ?? null;
   }
 
+  let subtotal = 0;
+  let discountTotal = 0;
+  const cartLineItems = lineItems.map((li) => {
+    const quantity = Number(li.quantity ?? 0);
+    const unitPrice = toMoney(li.unit_price);
+    subtotal += quantity * unitPrice;
+    const lineAdjustments = adjustmentsByLine.get(li.id) ?? [];
+    discountTotal += lineAdjustments.reduce(
+      (sum, adj) => sum + toMoney(adj.amount),
+      0
+    );
+    return {
+      ...li,
+      adjustments: lineAdjustments,
+      tax_lines: taxByLine.get(li.id) ?? [],
+    };
+  });
+  const total = Math.max(0, subtotal - discountTotal);
+
   return {
     ...cart,
     shipping_address,
-    line_items: lineItems.map((li) => ({
-      ...li,
-      tax_lines: taxByLine.get(li.id) ?? [],
-    })),
+    line_items: cartLineItems,
+    subtotal: toMoneyString(subtotal),
+    discount_total: toMoneyString(discountTotal),
+    total: toMoneyString(total),
   } as CartWithRelations;
 }
 

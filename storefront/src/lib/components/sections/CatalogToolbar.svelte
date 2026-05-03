@@ -57,10 +57,10 @@
 		</select>
 		<select class="toolbar-select" onchange={onPrice} value={currentPrice} aria-label="Price">
 			<option value="all">Price</option>
-			<option value="0-50">Under $50</option>
-			<option value="50-100">$50 - $100</option>
-			<option value="100-200">$100 - $200</option>
-			<option value="200-plus">$200+</option>
+			<option value="0-50">Under €50</option>
+			<option value="50-100">€50 - €100</option>
+			<option value="100-200">€100 - €200</option>
+			<option value="200-plus">€200+</option>
 		</select>
 		<select class="toolbar-select" onchange={onColor} value={currentColor} aria-label="Color">
 			<option value="all">Color</option>

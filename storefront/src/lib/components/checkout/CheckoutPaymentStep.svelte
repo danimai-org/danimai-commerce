@@ -1,38 +1,26 @@
 <script lang="ts">
-	import { superForm } from 'sveltekit-superforms/client';
+	import type { SuperFormData } from 'sveltekit-superforms/client';
+	import type { CheckoutFormData } from '$lib/checkout/checkout-form-schema';
 
-	type Props = {
-		paymentMethod?: string;
+	interface Props {
+		form: SuperFormData<CheckoutFormData>;
 		onBack: () => void;
-		onNext: () => void;
-	};
+	}
 
-	let { paymentMethod = $bindable('manual'), onBack, onNext }: Props = $props();
-
-	const initialFormData = $state.snapshot({
-		paymentMethod
-	});
-
-	const { form, enhance } = superForm(initialFormData, {
-		SPA: true,
-		resetForm: false,
-		onSubmit: () => {
-			paymentMethod = $form.paymentMethod;
-			onNext();
-		}
-	});
+	let { form, onBack }: Props = $props();
 </script>
 
-<form
-	class="payment-form"
-	method="POST"
-	use:enhance
->
+<div class="payment-fields">
 	<p class="payment-lead">Select a payment method. You won't be charged until you place your order.</p>
 	<fieldset class="fieldset-payment">
 		<legend class="visually-hidden">Payment method</legend>
 		<label class="payment-method">
-			<input type="radio" name="payment-method" value="manual" bind:group={$form.paymentMethod} />
+			<input
+				type="radio"
+				name="paymentMethod"
+				value="manual"
+				bind:group={$form.paymentMethod}
+			/>
 			<span class="payment-method-label">Manual Payment</span>
 			<span class="payment-method-icon" aria-hidden="true">
 				<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
@@ -43,10 +31,10 @@
 		</label>
 	</fieldset>
 	<div class="payment-actions">
-		<button type="button" class="back-btn" onclick={onBack}>Back</button>
+		<button type="button" class="back-btn" onclick={() => onBack()}>Back</button>
 		<button type="submit" class="next-btn">Next</button>
 	</div>
-</form>
+</div>
 
 <style>
 	.visually-hidden {
@@ -60,7 +48,7 @@
 		white-space: nowrap;
 		border: 0;
 	}
-	.payment-form {
+	.payment-fields {
 		display: flex;
 		flex-direction: column;
 		gap: 1.25rem;

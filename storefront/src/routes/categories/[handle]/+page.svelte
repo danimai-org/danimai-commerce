@@ -23,6 +23,8 @@
 		handle: string;
 		thumbnail: string | null;
 		variant: {
+			id: string;
+			title: string;
 			thumbnail: string | null;
 			price: { amount: string; currency_code: string } | null;
 		} | null;
@@ -35,6 +37,7 @@
 		bg: string;
 		image: string | null;
 		variantId?: string | null;
+		variantTitle?: string | null;
 	};
 
 	type CategoryPageData = {
@@ -234,7 +237,7 @@
 				const pr = p.variant?.price;
 				const amount =
 					pr?.amount != null ? parseInt(pr.amount, 10) / 100 : Number.NaN;
-				const currency_code = pr?.currency_code ?? 'USD';
+				const currency_code = pr?.currency_code ?? 'EUR';
 				return {
 					name: p.title,
 					price: {
@@ -243,7 +246,9 @@
 					},
 					href: `/products/${p.handle}`,
 					bg: pickBg(i),
-					image: p.thumbnail ?? p.variant?.thumbnail ?? null
+					image: p.thumbnail ?? p.variant?.thumbnail ?? null,
+					variantId: p.variant?.id ?? null,
+					variantTitle: p.variant?.title ?? null
 				};
 			});
 			return {

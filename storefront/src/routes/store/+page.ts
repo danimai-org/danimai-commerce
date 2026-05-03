@@ -1,9 +1,5 @@
-import { rowsFromPaginated } from "$lib/api/storefront-api";
-import { client } from "$lib/api/client.js";
-
-export type ProductGridItem = Awaited<
-  ReturnType<(typeof client)["storefront"]["products"]["get"]>
->["data"];
+import { API_BASE, rowsFromPaginated } from "$lib/api/storefront-api";
+import type { PageLoad } from "./$types";
 
 const FALLBACK_BGS = ["#e8e0d5", "#4a4a4a", "#f5f0eb", "#6b7c5c"];
 
@@ -11,86 +7,74 @@ function pickBg(index: number): string {
   return FALLBACK_BGS[index % FALLBACK_BGS.length];
 }
 
-function normalizePrice(
-  value: number | string | null | undefined,
-): number | null {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : null;
-  }
-  if (typeof value === "string") {
-    const parsed = parseFloat(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
-}
+type StorefrontProductRow = {
+  title: string;
+  handle: string;
+  thumbnail: string | null;
+  variant: {
+    id: string;
+    title: string;
+    thumbnail: string | null;
+    price: { amount: string; currency_code: string } | null;
+  } | null;
+};
 
-async function fetchVariantPrice(
-  variantId: string,
-): Promise<{ amount: number; currency_code: string } | null> {
-  try {
-    const res = await client.admin["product-variants"]({ id: variantId }).get();
-    if (res.error) return null;
-    const data = res.data as unknown;
-    const prices =
-      (data as { prices?: Array<{ amount: string; currency_code: string }> })
-        .prices ?? [];
-    if (prices.length === 0) return null;
-    const p = prices[0];
-    const amount = parseInt(p.amount, 10) / 100;
-    return { amount, currency_code: p.currency_code };
-  } catch {
-    return null;
-  }
-}
+export type StoreProductGridItem = {
+  name: string;
+  price: { amount: number; currency_code: string };
+  href: string;
+  bg: string;
+  image: string | null;
+  variantId: string | null;
+  variantTitle: string | null;
+};
 
-export async function load() {
-  const products: ProductGridItem[] | null = null;
-  const error: string | null = null;
+export const load: PageLoad = async ({ fetch }) => {
+  const products: StoreProductGridItem[] = [];
+  let error: string | null = null;
 
   try {
-    const res = await client.storefront["products"].get({
-      query: { limit: "100", page: "1" },
-    });
-    if (res.error) {
-      const error = "Products failed";
-      return { products: null, error };
-    }
-    const data = res.data as unknown;
-    const { rows: list } = rowsFromPaginated<{
-      id: string;
-      title: string;
-      handle: string;
-      thumbnail?: string | null;
-      variants?: Array<{ id: string }>;
-    }>(data);
-    const variantMap = await client.admin["product-variants"].get({
-      query: {
-        filters: { product_id: list.map((p) => p.id).join(",") },
-      },
-    });
-    if (variantMap.error) throw new Error("Failed to load variants");
-    const variantMapData = variantMap.data as unknown;
-    const variantIds =
-      (variantMapData as { rows?: Array<{ id: string }> }).rows?.map(
-        (v: { id: string }) => v.id,
-      ) ?? [];
-    const pricePromises = variantIds.map((id: string) =>
-      fetchVariantPrice(id as string),
-    );
-    const prices = await Promise.all(pricePromises);
-
-    for (let i = 0; i < list.length; i++) {
-      const p = list[i];
-      const firstVariantId =
-        p.variants?.[0]?.id ??
-        (variantMapData as { rows?: Array<{ id: string }> }).rows?.find(
-          (v: { id: string }) => v.id === p.id,
-        )?.id ??
-        null;
+    const root = API_BASE.replace(/\/admin\/?$/, "");
+    let pageNum = 1;
+    const limit = 100;
+    for (;;) {
+      const sp = new URLSearchParams({
+        limit: String(limit),
+        page: String(pageNum),
+        sorting_field: "products.title",
+        sorting_direction: "asc",
+      });
+      const sfRes = await fetch(`${root}/storefront/products?${sp}`, {
+        cache: "no-store",
+      });
+      if (!sfRes.ok) throw new Error("Failed to load products");
+      const sfData = (await sfRes.json()) as unknown;
+      const { rows: list } = rowsFromPaginated<StorefrontProductRow>(sfData);
+      const offset = products.length;
+      for (let i = 0; i < list.length; i++) {
+        const p = list[i];
+        const pr = p.variant?.price;
+        const amount = pr?.amount != null ? parseInt(pr.amount, 10) / 100 : 0;
+        const currency_code = pr?.currency_code ?? "EUR";
+        products.push({
+          name: p.title,
+          price: { amount, currency_code },
+          href: `/products/${p.handle}`,
+          bg: pickBg(offset + i),
+          image: p.thumbnail ?? p.variant?.thumbnail ?? null,
+          variantId: p.variant?.id ?? null,
+          variantTitle: p.variant?.title ?? null,
+        });
+      }
+      const pag = (sfData as { pagination?: { has_next_page?: boolean } })
+        .pagination;
+      if (!pag?.has_next_page || list.length === 0) break;
+      pageNum += 1;
+      if (pageNum > 500) break;
     }
   } catch (e) {
-    const error = e instanceof Error ? e.message : "Failed to load products";
+    error = e instanceof Error ? e.message : "Failed to load products";
   }
 
-  return { products: products ?? [], error };
-}
+  return { products, error };
+};
