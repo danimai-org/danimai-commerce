@@ -10,13 +10,13 @@
         title,
         priceDisplay,
         image,
-        onAddToCart,
+        handleAddToCart,
     }: {
         href: string;
         title: string;
         priceDisplay: string;
         image: string | null;
-        onAddToCart: (e: MouseEvent) => void;
+        handleAddToCart: (e: MouseEvent) => void;
     } = $props();
 </script>
 
@@ -31,7 +31,7 @@
             <CartTitle {title} {priceDisplay} variant="retail" />
         </div>
     </a>
-    <AddToCart {onAddToCart} label="Add to Cart" variant="retail" />
+    <AddToCart {handleAddToCart} label="Add to Cart" variant="retail" />
 </article>
 
 <style>

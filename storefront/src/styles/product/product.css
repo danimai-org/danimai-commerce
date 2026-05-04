@@ -1,0 +1,8 @@
+@layer components {
+    /*Global css*/
+    .product-page {
+        @apply max-w-5xl m-auto;
+    }
+
+    /*Product Component*/
+}

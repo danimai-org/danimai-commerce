@@ -2,11 +2,11 @@
     type AddToCartVariant = "retail" | "feature";
 
     let {
-        onAddToCart,
+        handleAddToCart,
         label = "Add to Cart",
         variant = "retail",
     }: {
-        onAddToCart: (e: MouseEvent) => void | Promise<void>;
+        handleAddToCart: (e: MouseEvent) => void | Promise<void>;
         label?: string;
         variant?: AddToCartVariant;
     } = $props();
@@ -14,7 +14,7 @@
     async function handleClick(e: MouseEvent) {
         e.preventDefault();
         e.stopPropagation();
-        await onAddToCart(e);
+        await handleAddToCart(e);
     }
 </script>
 

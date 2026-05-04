@@ -41,7 +41,7 @@
                 title={product.title}
                 priceDisplay={extra?.priceDisplay ?? "—"}
                 image={imgUrl}
-                onAddToCart={(e) =>
+                handleAddToCart={(e) =>
                     onQuickAdd(e, {
                         id: product.id,
                         title: product.title,

@@ -1,12 +1,12 @@
 <script lang="ts">
     import { SiteHeader, SiteFooter } from "$lib/components/layout";
+    import ProductDetails from "$lib/components/productDetail/ProductDetails.svelte";
+    import ProductError from "$lib/components/productDetail/ProductError.svelte";
+    import ProductGallery from "$lib/components/productDetail/ProductGallery.svelte";
+    import ProductInfoBlocks from "$lib/components/productDetail/ProductInfoBlocks.svelte";
+
     import { ProductGridSection } from "$lib/components/sections";
-    import {
-        ProductGallery,
-        ProductDetails,
-        ProductInfoBlocks,
-        ProductError,
-    } from "$lib/components/product";
+
     import { formatStoreMoney } from "$lib/money";
 
     let { data } = $props();
@@ -15,7 +15,7 @@
     const otherProducts = $derived(data?.otherProducts ?? []);
     let selectedVariantId = $state<string | null>(null);
     let quantity = $state(1);
-    let selectedImageUrl = $state<string | null>(null);
+    let selectedImageIndex = $state<number>(0);
 
     const defaultVariantId = $derived.by(() => {
         const fromProduct = product?.variant?.id;
@@ -30,7 +30,9 @@
     $effect(() => {
         if (variants.length === 0 || !defaultVariantId) return;
         const ids = new Set(
-            variants.map((v) => v?.id).filter((id): id is string => Boolean(id)),
+            variants
+                .map((v) => v?.id)
+                .filter((id): id is string => Boolean(id)),
         );
         if (!selectedVariantId || !ids.has(selectedVariantId)) {
             selectedVariantId = defaultVariantId;
@@ -64,13 +66,6 @@
             ...variants.map((v) => v?.thumbnail ?? null),
         ].filter((url): url is string => !!url),
     );
-    const mainImage = $derived(
-        selectedImageUrl ??
-            variants.find((v) => v?.id === resolvedVariantId)?.thumbnail ??
-            product?.thumbnail ??
-            galleryImages[0] ??
-            null,
-    );
     const variantOptions = $derived(
         variants.map((v) => ({
             id: v?.id ?? ("" as string),
@@ -103,12 +98,7 @@
 {:else}
     <main class="product-page">
         <div class="product-layout">
-            <ProductGallery
-                images={galleryImages}
-                {mainImage}
-                alt={product?.title ?? "Product Image"}
-                bind:selectedImageUrl
-            />
+            <ProductGallery images={galleryImages} bind:selectedImageIndex />
 
             <ProductDetails
                 title={product?.title ?? "Loading..."}
@@ -119,9 +109,9 @@
                 {accordionItems}
                 productHref={`/products/${product?.handle}`}
                 productId={product?.id ?? null}
-                productImage={mainImage}
-                selectedVariantTitle={variants.find((v) => v?.id === resolvedVariantId)
-                    ?.title ?? ""}
+                selectedVariantTitle={variants.find(
+                    (v) => v?.id === resolvedVariantId,
+                )?.title ?? ""}
             />
         </div>
 
@@ -151,11 +141,6 @@
 <SiteFooter />
 
 <style>
-    .product-page {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 2rem 1.5rem 4rem;
-    }
     .product-layout {
         display: grid;
         grid-template-columns: 1fr 1fr;

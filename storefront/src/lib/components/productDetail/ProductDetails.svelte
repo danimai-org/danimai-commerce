@@ -5,6 +5,7 @@
     import ProductAccordions from "./ProductAccordions.svelte";
     import type { VariantItem } from "./ProductVariantSelect.svelte";
     import type { AccordionItem } from "./ProductAccordions.svelte";
+    import AddToCart from "../productCart/AddToCart.svelte";
 
     type ProductDetailsProps = {
         title: string;
@@ -16,7 +17,6 @@
         accordionItems: AccordionItem[];
         productHref?: string;
         productId?: string | null;
-        productImage: string | null;
         selectedVariantTitle: string;
     };
     let {
@@ -29,7 +29,6 @@
         accordionItems = [],
         productHref = "",
         productId = null as string | null,
-        productImage = null as string | null,
         selectedVariantTitle = "",
     }: ProductDetailsProps = $props();
 
@@ -40,7 +39,9 @@
             selectedVariantId = variantId;
         }
 
-        const selectedVariant = variants.find((variant) => variant.id === variantId);
+        const selectedVariant = variants.find(
+            (variant) => variant.id === variantId,
+        );
         let unitPrice: string | null = null;
         if (selectedVariant) {
             const parsed = parseFloat(
@@ -49,12 +50,15 @@
             unitPrice = Number.isFinite(parsed) ? String(parsed) : null;
         }
 
-        const descRaw =
-            (selectedVariantTitle || selectedVariant?.title || "").trim();
+        const descRaw = (
+            selectedVariantTitle ||
+            selectedVariant?.title ||
+            ""
+        ).trim();
         await addItemAndOpenSheet({
             variantId,
             quantity: Math.max(1, quantity),
-            thumbnail: productImage,
+
             title,
             description: descRaw || null,
             productId,
@@ -70,10 +74,7 @@
     <ProductVariantSelect {variants} bind:selectedVariantId />
 
     <ProductQuantity bind:quantity />
-
-    <button type="button" class="add-to-cart" onclick={addToCart}
-        >ADD TO CART</button
-    >
+    <AddToCart handleAddToCart={() => addToCart()} />
 
     {#if tagline}
         <p class="product-tagline">{tagline}</p>
@@ -119,22 +120,7 @@
         color: #1a1a1a;
         margin: 0;
     }
-    .add-to-cart {
-        width: 100%;
-        padding: 1rem 1.5rem;
-        background: #1a1a1a;
-        color: #fff;
-        border: none;
-        font-size: 0.8125rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        font-weight: 500;
-        cursor: pointer;
-        border-radius: 4px;
-    }
-    .add-to-cart:hover {
-        background: #333;
-    }
+
     .product-tagline {
         font-size: 0.9375rem;
         color: #555;
