@@ -5,7 +5,7 @@
     import ProductGallery from "$lib/components/productDetail/ProductGallery.svelte";
     import ProductInfoBlocks from "$lib/components/productDetail/ProductInfoBlocks.svelte";
 
-    import { ProductGridSection } from "$lib/components/sections";
+    import ProductGridSection from "$lib/components/ProductGridSection.svelte";
 
     import { formatStoreMoney } from "$lib/money";
 
@@ -139,26 +139,3 @@
     </main>
 {/if}
 <SiteFooter />
-
-<style>
-    .product-layout {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 3rem;
-        align-items: start;
-    }
-    .also-like {
-        margin-top: 4rem;
-    }
-    .also-like-title {
-        font-size: 1.5rem;
-        font-weight: 700;
-        margin-bottom: 1.5rem;
-        text-align: center;
-    }
-    @media (max-width: 900px) {
-        .product-layout {
-            grid-template-columns: 1fr;
-        }
-    }
-</style>

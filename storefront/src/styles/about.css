@@ -1,0 +1,151 @@
+@layer components {
+    .page-about {
+        @apply block;
+    }
+
+    /*About crafted*/
+    .about-crafted {
+        @apply grid grid-cols-1 md:grid-cols-2 max-w-full;
+    }
+    .about-crafted-image {
+        @apply aspect-[3/4] min-h-[400px];
+        background: linear-gradient(
+            135deg,
+            #6b7c5c 0%,
+            #5a6b4a 50%,
+            #4a5a3a 100%
+        );
+    }
+
+    .about-crafted-content {
+        @apply flex flex-col justify-center bg-[#f8f6f3] p-8 md:p-12 lg:p-16;
+    }
+
+    .about-crafted-title {
+        @apply m-0 mb-4 font-bold text-neutral-900 tracking-tight;
+        font-size: clamp(1.75rem, 3vw, 2.5rem);
+    }
+
+    .about-crafted-text {
+        @apply mb-6 text-neutral-600 leading-relaxed;
+    }
+
+    .about-crafted-cta {
+        @apply self-start text-[13px] font-medium tracking-[0.08em] uppercase text-neutral-900 no-underline hover:underline;
+    }
+
+    /*About crafted responsive*/
+    @media (max-width: 900px) {
+        .about-crafted {
+            grid-template-columns: 1fr;
+        }
+        .about-crafted-content {
+            padding: 2rem 1.5rem;
+        }
+    }
+
+    /*About hero*/
+    .about-hero {
+        @apply relative min-h-[50vh] flex items-center justify-center overflow-hidden;
+    }
+    .about-hero-bg {
+        @apply absolute inset-0 bg-cover bg-center;
+    }
+    .about-hero-overlay {
+        @apply absolute inset-0 bg-[rgba(255,255,255,0.4)];
+    }
+    .about-hero-content {
+        @apply relative z-1 text-center p-2;
+    }
+    .about-hero-title {
+        @apply font-bold text-neutral-900 tracking-tight m-0 mb-4;
+        font-size: clamp(2rem, 5vw, 3.5rem);
+    }
+    .about-hero-subtitle {
+        @apply text-neutral-600 leading-relaxed mb-6;
+        font-size: 1.125rem;
+    }
+
+    /*About hero responsive*/
+    @media (max-width: 600px) {
+        .about-hero-title {
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+        }
+        .about-hero-subtitle {
+            font-size: 1rem;
+        }
+    }
+
+    /*About Partner*/
+    .about-partners {
+        @apply py-8 px-6 border-t border-[#e8e8e8];
+    }
+
+    /* Centered flex wrapper for the list */
+    .about-partners-inner {
+        @apply max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-x-4 gap-y-2;
+    }
+
+    .about-partner-name {
+        @apply text-[13px] text-neutral-400 tracking-wide;
+    }
+
+    .about-partner-sep {
+        @apply text-neutral-300 font-light;
+    }
+
+    /* pzx */
+    .about-principles {
+        @apply bg-neutral-900 text-neutral-200 py-16 px-6 text-center;
+    }
+
+    .about-principles-heading {
+        @apply m-0 mb-4 font-bold text-white tracking-tight;
+        font-size: clamp(1.75rem, 3vw, 2.5rem);
+    }
+
+    .about-principles-sub {
+        @apply max-w-[640px] mx-auto mb-12 text-[15px] leading-relaxed text-neutral-400;
+    }
+
+    .about-principles-grid {
+        @apply grid grid-cols-1 md:grid-cols-2 gap-8 max-w-[1000px] mx-auto text-left;
+    }
+
+    .about-principles-card {
+        @apply p-6 border border-neutral-800 rounded;
+    }
+
+    .about-principles-card-title {
+        @apply m-0 mb-3 text-[12px] font-bold tracking-[0.12em] uppercase text-white;
+    }
+
+    .about-principles-card-text {
+        @apply m-0 text-[15px] leading-relaxed text-neutral-400;
+    }
+
+    /* Purpose section */
+    .about-purpose {
+        @apply max-w-[900px] mx-auto py-16 px-6 text-center;
+    }
+
+    .about-purpose-heading {
+        @apply m-0 mb-6 font-bold text-neutral-900 tracking-tight;
+        font-size: clamp(1.75rem, 3vw, 2.5rem);
+    }
+
+    .about-purpose-para {
+        @apply mb-12 text-base text-neutral-600 leading-[1.7];
+    }
+    .about-purpose-grid {
+        @apply grid grid-cols-1 md:grid-cols-3 gap-8 text-center;
+    }
+
+    .about-purpose-col-title {
+        @apply m-0 mb-3 text-[12px] font-bold tracking-[0.12em] uppercase text-neutral-900;
+    }
+
+    .about-purpose-col-text {
+        @apply m-0 text-[15px] leading-relaxed text-neutral-600;
+    }
+}

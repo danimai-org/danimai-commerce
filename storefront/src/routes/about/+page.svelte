@@ -1,32 +1,28 @@
 <script lang="ts">
-	import { SiteHeader, SiteFooter } from '$lib/components/layout';
-	import {
-		AboutHeroSection,
-		AboutPurposeSection,
-		AboutCraftedSection,
-		AboutPartnersSection,
-		AboutPrinciplesSection
-	} from '$lib/components/sections';
+    import AboutCraftedSection from "$lib/components/about/AboutCraftedSection.svelte";
+    import AboutHeroSection from "$lib/components/about/AboutHeroSection.svelte";
+    import AboutPartnersSection from "$lib/components/about/AboutPartnersSection.svelte";
+    import AboutPrinciplesSection from "$lib/components/about/AboutPrinciplesSection.svelte";
+    import AboutPurposeSection from "$lib/components/about/AboutPurposeSection.svelte";
+
+    import { SiteHeader, SiteFooter } from "$lib/components/layout";
 </script>
 
-<SiteHeader />
+<div class="page-about">
+    <SiteHeader />
 
-<AboutHeroSection />
+    <AboutHeroSection />
 
-<AboutPurposeSection />
+    <AboutPurposeSection />
 
-<AboutCraftedSection ctaHref="/about#principles" ctaLabel="OUR PRINCIPLES →" />
+    <AboutCraftedSection
+        ctaHref="/about#principles"
+        ctaLabel="OUR PRINCIPLES →"
+    />
 
-<AboutPartnersSection />
+    <AboutPartnersSection />
 
-<AboutPrinciplesSection />
+    <AboutPrinciplesSection />
 
-<SiteFooter />
-
-<style>
-	:global(body) {
-		margin: 0;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-		color: #1a1a1a;
-	}
-</style>
+    <SiteFooter />
+</div>

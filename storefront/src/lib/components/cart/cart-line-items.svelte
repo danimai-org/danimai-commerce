@@ -23,7 +23,7 @@
     } = $props();
 </script>
 
-<ul class="line-items">
+<ul class="cart-line-items-ul line-items">
     {#each items as item (item.key)}
         <li class="line-item">
             <a
@@ -88,109 +88,3 @@
         </li>
     {/each}
 </ul>
-
-<style>
-    .line-items {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-    }
-    .line-item {
-        display: grid;
-        grid-template-columns: 96px 1fr auto;
-        gap: 1.25rem;
-        align-items: start;
-        padding: 1.5rem 0;
-        border-bottom: 1px solid #eee;
-    }
-    .line-item:last-child {
-        border-bottom: none;
-    }
-    .line-item-image {
-        aspect-ratio: 1;
-        border-radius: 8px;
-        overflow: hidden;
-        background: #f5f0eb;
-        display: block;
-    }
-    .line-item-image img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-    .line-item-details {
-        min-width: 0;
-    }
-    .line-item-name {
-        font-weight: 600;
-        font-size: 1rem;
-        margin: 0 0 0.25rem;
-        color: #1a1a1a;
-        text-decoration: none;
-        display: block;
-    }
-    .line-item-name:hover {
-        text-decoration: underline;
-    }
-    .line-item-variant {
-        font-size: 0.875rem;
-        color: #666;
-        margin: 0 0 0.75rem;
-    }
-    .line-item-actions {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-    }
-    .quantity-controls {
-        display: flex;
-        align-items: center;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        overflow: hidden;
-    }
-    .qty-btn {
-        width: 32px;
-        height: 32px;
-        background: #fff;
-        border: none;
-        cursor: pointer;
-        font-size: 1rem;
-        line-height: 1;
-        color: #1a1a1a;
-    }
-    .qty-btn:hover {
-        background: #f5f5f5;
-    }
-    .qty-value {
-        min-width: 2rem;
-        text-align: center;
-        font-size: 0.875rem;
-    }
-    .remove-btn {
-        background: none;
-        border: none;
-        padding: 0.25rem;
-        cursor: pointer;
-        color: red;
-    }
-    .remove-btn:hover {
-        color: #1a1a1a;
-    }
-    .line-item-total {
-        font-weight: 600;
-        font-size: 1rem;
-        margin: 0;
-        color: #1a1a1a;
-    }
-    @media (max-width: 640px) {
-        .line-item {
-            grid-template-columns: 72px 1fr;
-            gap: 0.75rem;
-        }
-        .line-item-total {
-            grid-column: 2;
-            text-align: right;
-        }
-    }
-</style>

@@ -1,0 +1,126 @@
+@layer components {
+    .order-confirmation-page {
+        @apply bg-white min-h-screen;
+    }
+
+    .confirmation-container {
+        @apply max-w-[1180px] mx-auto pt-10 px-6 pb-0 text-[#171717];
+    }
+
+    .order-overview h1 {
+        @apply text-[2rem] leading-tight font-medium m-0;
+    }
+
+    .order-number {
+        @apply mt-[0.45rem] mb-[1.65rem] mx-0 text-[0.95rem] text-[#222];
+    }
+
+    .order-details h2 {
+        @apply text-base font-semibold m-0 mb-[0.85rem];
+    }
+
+    .order-details p {
+        @apply m-0 mb-[0.35rem] text-[0.9rem] text-[#333];
+    }
+
+    .order-details p span {
+        @apply font-medium mr-[0.3rem];
+    }
+
+    .order-section {
+        @apply border-t border-[#cfcfcf] py-4 pb-[1.3rem];
+    }
+
+    .order-confirmation-page h3 {
+        @apply m-0 mb-[1.1rem] text-[0.95rem] font-semibold;
+    }
+
+    .items-list {
+        @apply flex flex-col gap-[1.2rem];
+    }
+
+    .item-row {
+        @apply flex justify-between items-start gap-4;
+    }
+
+    .item-main {
+        @apply flex items-start gap-4;
+    }
+
+    .item-main img {
+        @apply w-[52px] h-16 object-cover bg-[#efefef];
+    }
+
+    .item-copy p {
+        @apply m-0 text-[0.88rem] leading-normal;
+    }
+
+    .item-title {
+        @apply font-semibold text-[#111] mb-[0.1rem];
+    }
+
+    .item-variant,
+    .item-qty {
+        @apply text-[#676767];
+    }
+
+    .item-price {
+        @apply m-0 text-[0.92rem] text-[#111] whitespace-nowrap;
+    }
+
+    .info-cols {
+        @apply grid grid-cols-2 gap-8;
+    }
+
+    .order-confirmation-page h4 {
+        @apply m-0 mb-[0.35rem] text-[0.88rem] font-semibold;
+    }
+
+    .info-cols p {
+        @apply m-0 text-[0.86rem] leading-snug text-[#3b3b3b];
+    }
+
+    .summary-rows {
+        @apply max-w-full;
+    }
+
+    .summary-rows p {
+        @apply flex justify-between items-center m-0 mb-[0.45rem] text-[0.9rem] text-[#383838];
+    }
+
+    .summary-rows p strong {
+        @apply font-medium text-[#101010];
+    }
+
+    .summary-total {
+        @apply mt-[0.8rem] pt-[0.7rem] border-t border-[#cfcfcf];
+    }
+
+    .empty-state {
+        @apply m-0 text-[0.9rem] text-[#555];
+    }
+
+    @media (max-width: 900px) {
+        .confirmation-container {
+            @apply pt-[1.8rem];
+        }
+
+        .info-cols {
+            @apply grid-cols-1 gap-[1.2rem];
+        }
+    }
+
+    @media (max-width: 640px) {
+        .order-overview h1 {
+            @apply text-[1.65rem];
+        }
+
+        .item-row {
+            @apply flex-col gap-[0.55rem];
+        }
+
+        .item-price {
+            @apply pl-[68px];
+        }
+    }
+}

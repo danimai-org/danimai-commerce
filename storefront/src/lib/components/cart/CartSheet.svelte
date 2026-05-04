@@ -77,12 +77,13 @@
     }
 
     async function setQuantity(item: any, quantity: number) {
-        const nextQuantity = Math.max(0, quantity);
+        const nextQuantity = Math.max(1, quantity);
         await changeLineItemQuantity(item.id, nextQuantity);
     }
 </script>
 
 {#if cartState.sheetOpen}
+    <div class="cart-sheet-root">
     <div
         class="backdrop"
         onclick={handleClose}
@@ -199,181 +200,5 @@
             </footer>
         {/if}
     </div>
+    </div>
 {/if}
-
-<style>
-    .backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.35);
-        z-index: 1000;
-    }
-    .sheet {
-        position: fixed;
-        top: 0;
-        right: 0;
-        bottom: 0;
-        width: 100%;
-        max-width: 420px;
-        background: #f7f7f7;
-        box-shadow: -4px 0 28px rgba(0, 0, 0, 0.12);
-        z-index: 1001;
-        display: flex;
-        flex-direction: column;
-    }
-    .sheet-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0.875rem 1rem;
-        background: #fff;
-        border-bottom: 1px solid #e4e4e4;
-    }
-    .sheet-title {
-        font-size: 1.3rem;
-        line-height: 1.1;
-        font-weight: 600;
-        margin: 0;
-        color: #111;
-    }
-    .sheet-close {
-        background: none;
-        border: none;
-        font-size: 1.2rem;
-        line-height: 1;
-        cursor: pointer;
-        color: #777;
-        padding: 0.2rem;
-    }
-    .sheet-body {
-        flex: 1;
-        overflow: auto;
-        padding: 0.85rem;
-    }
-    .empty {
-        color: #777;
-        text-align: center;
-        padding: 2rem;
-        margin: 0;
-        font-size: 0.9375rem;
-    }
-    .line-items {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.7rem;
-    }
-    .line-card {
-        display: grid;
-        grid-template-columns: 66px 1fr auto;
-        gap: 0.6rem;
-        border: 1px solid #ececec;
-        background: #fff;
-        padding: 0.45rem;
-        align-items: start;
-    }
-    .line-card-media {
-        width: 66px;
-        height: 66px;
-        background: #f2f2f2;
-        overflow: hidden;
-    }
-    .line-card-media img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-    .line-card-body {
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.18rem;
-    }
-    .line-card-title {
-        margin: 0;
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: #111;
-        line-height: 1.25;
-    }
-    .line-card-meta {
-        margin: 0;
-        font-size: 0.78rem;
-        color: #666;
-    }
-    .line-controls-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-top: 0.25rem;
-    }
-    .line-card-price {
-        font-size: 1.05rem;
-        font-weight: 600;
-        color: #333;
-    }
-    .quantity-controls {
-        display: flex;
-        align-items: center;
-        gap: 0.52rem;
-    }
-    .qty-btn {
-        width: 18px;
-        height: 18px;
-        background: none;
-        border: none;
-        cursor: pointer;
-        font-size: 1.1rem;
-        line-height: 1;
-        color: #555;
-        font-weight: 600;
-        padding: 0;
-    }
-    .qty-value {
-        min-width: 0.9rem;
-        text-align: center;
-        font-size: 0.85rem;
-        font-weight: 500;
-        color: #222;
-    }
-    .remove-btn {
-        background: none;
-        border: none;
-        padding: 0.1rem;
-        cursor: pointer;
-        color: red;
-    }
-    .sheet-footer {
-        padding: 0.85rem 1rem 1rem;
-        background: #fff;
-        border-top: 1px solid #e4e4e4;
-    }
-    .subtotal-row {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 0.75rem;
-        font-size: 1.2rem;
-        line-height: 1;
-        color: #1a1a1a;
-        font-weight: 600;
-    }
-    .subtotal-row strong {
-        font-weight: 700;
-    }
-    .go-to-cart {
-        width: 100%;
-        background: #44444f;
-        color: #fff;
-        border: none;
-        padding: 0.7rem 1rem;
-        font-size: 1.05rem;
-        font-weight: 500;
-        border-radius: 0;
-        cursor: pointer;
-    }
-    .go-to-cart:hover {
-        background: #3a3a44;
-    }
-</style>

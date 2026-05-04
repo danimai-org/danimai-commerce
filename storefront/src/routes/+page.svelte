@@ -1,15 +1,14 @@
 <script lang="ts">
     import { SiteHeader, SiteFooter } from "$lib/components/layout";
-    import {
-        HeroSection,
-        ProductGridSection,
-        StorySection,
-        CollectionsSection,
-        VideoSection,
-        QuotesSection,
-    } from "$lib/components/sections";
+
     import type { HomeCollectionCard, HomeProductGridItem } from "./+page.ts";
     import CartLineItems from "$lib/components/cart/cart-line-items.svelte";
+    import HeroSection from "$lib/components/home/HeroSection.svelte";
+    import ProductGridSection from "$lib/components/ProductGridSection.svelte";
+    import StorySection from "$lib/components/home/StorySection.svelte";
+    import CollectionsSection from "$lib/components/home/CollectionsSection.svelte";
+    import VideoSection from "$lib/components/home/VideoSection.svelte";
+    import QuotesSection from "$lib/components/home/QuotesSection.svelte";
 
     let { data } = $props();
     const products = $derived(
@@ -56,33 +55,3 @@
 
     <SiteFooter />
 </div>
-
-<style>
-    .page-home {
-        --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
-        --font-sans: "DM Sans", system-ui, -apple-system, sans-serif;
-    }
-
-    :global(body) {
-        margin: 0;
-        font-family:
-            "DM Sans",
-            system-ui,
-            -apple-system,
-            sans-serif;
-        color: #1a1a1a;
-        background: #fff;
-    }
-
-    .home-main {
-        display: block;
-    }
-
-    .products-error {
-        max-width: 1200px;
-        margin: 2rem auto;
-        padding: 0 1.5rem;
-        color: #c00;
-        text-align: center;
-    }
-</style>

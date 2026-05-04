@@ -1,5 +1,5 @@
 <script lang="ts">
-    import ProductItem from "../productDetail/ProductItem.svelte";
+    import ProductItem from "./productDetail/ProductItem.svelte";
 
     type ProductGridItem = {
         name: string;
@@ -41,46 +41,3 @@
         {/each}
     </div>
 </section>
-
-<style>
-    .section {
-        max-width: var(--section-max-width, 1200px);
-        margin: 0 auto;
-        padding: var(--section-padding-y, 4rem) var(--section-padding-x, 1.5rem);
-        box-sizing: border-box;
-    }
-    .section-title {
-        font-family: var(--font-serif, Georgia, serif);
-        font-size: clamp(1.5rem, 3vw, 2.125rem);
-        font-weight: 600;
-        text-align: center;
-        margin: 0 0 0.5rem;
-        letter-spacing: -0.02em;
-    }
-    .section-subtitle {
-        text-align: center;
-        margin: 0 0 2.5rem;
-        color: #555;
-        font-size: 0.9375rem;
-        line-height: 1.55;
-        max-width: 36rem;
-        margin-left: auto;
-        margin-right: auto;
-    }
-    .product-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: clamp(1rem, 2vw, 1.75rem);
-    }
-
-    @media (max-width: 1024px) {
-        .product-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
-    }
-    @media (max-width: 640px) {
-        .product-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-</style>

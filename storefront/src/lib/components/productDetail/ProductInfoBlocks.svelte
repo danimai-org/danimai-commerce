@@ -25,31 +25,3 @@
 		</div>
 	{/each}
 </div>
-
-<style>
-	.product-info-blocks {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 2rem;
-		margin-top: 3rem;
-		padding-top: 2rem;
-		border-top: 1px solid #eee;
-	}
-	.info-block h3 {
-		font-size: 1rem;
-		font-weight: 600;
-		margin: 0 0 0.5rem;
-		color: #1a1a1a;
-	}
-	.info-block p {
-		font-size: 0.9375rem;
-		color: #555;
-		line-height: 1.5;
-		margin: 0;
-	}
-	@media (max-width: 900px) {
-		.product-info-blocks {
-			grid-template-columns: 1fr;
-		}
-	}
-</style>
