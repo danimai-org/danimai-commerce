@@ -18,7 +18,7 @@ export const load: LayoutServerLoad = async ({ cookies, request }) => {
   const ipAddress = forwardedFor.split(",")[0]?.trim() ?? "";
   const userAgent = request.headers.get("user-agent") ?? "";
 
-  const res = await client.admin.auth.sessions.post({
+  const res = await client.storefront.auth.sessions.post({
     ip_address: ipAddress,
     user_agent: userAgent,
   });

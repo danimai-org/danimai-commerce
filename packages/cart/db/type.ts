@@ -42,7 +42,7 @@ export interface CartTable {
   region_id: string | null;
   order_id: string | null; // Foreign key to orders.id
   customer_id: string | null;
-  session_id: string; // user sessions.id; required for every cart
+  session_id: string; // customer_sessions.id; required for every cart
   progress: CartProgress[];
   type: string | null; // "default" | "swap" | "draft_order" | "payment_link" | "claim"
   completed_at: string | null; // ISO timestamp
