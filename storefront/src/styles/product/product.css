@@ -52,7 +52,6 @@
             @apply static;
         }
     }
-
     .product-details {
         @apply flex flex-col gap-5;
     }
@@ -116,7 +115,7 @@
     }
 
     .product-options .option-btn {
-        @apply p-2 border border-[#d7d8dd] bg-white text-[1.3rem] cursor-pointer rounded-none text-center text-[#4a4a50] font-light hover:border-[#b9bac2];
+        @apply p-2 border border-[#d7d8dd] bg-white text-[1.3rem] cursor-pointer rounded text-center text-[#4a4a50] font-light hover:border-[#b9bac2];
     }
 
     .product-options .option-btn.selected {
@@ -291,4 +290,3 @@
         @apply w-full h-full bg-[#e8e8e8];
     }
 }
-

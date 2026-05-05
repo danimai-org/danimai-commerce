@@ -77,7 +77,7 @@
     }
 
     async function setQuantity(item: any, quantity: number) {
-        const nextQuantity = Math.max(1, quantity);
+        const nextQuantity = quantity <= 0 ? 0 : Math.max(1, quantity);
         await changeLineItemQuantity(item.id, nextQuantity);
     }
 </script>

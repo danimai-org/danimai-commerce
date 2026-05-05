@@ -30,6 +30,25 @@
             price: { amount: string; currency_code: string } | null;
         } | null;
     };
+    type GridProduct = {
+        name: string;
+        price: { amount: number; currency_code: string };
+        href: string;
+        bg: string;
+        image: string | null;
+        variantId: string | null;
+        variantTitle: string | null;
+    };
+
+    const STOREFRONT_SORT: Record<
+        string,
+        { field: string; dir: "asc" | "desc" }
+    > = {
+        "best-selling": { field: "products.title", dir: "desc" },
+        newest: { field: "products.handle", dir: "desc" },
+        "title-asc": { field: "products.title", dir: "asc" },
+        "title-desc": { field: "products.title", dir: "desc" },
+    };
     const FALLBACK_BGS = ["#e8e0d5", "#4a4a4a", "#f5f0eb", "#6b7c5c"];
     function pickBg(index: number) {
         return FALLBACK_BGS[index % FALLBACK_BGS.length];
@@ -112,11 +131,14 @@
                 pq.limit != null && String(pq.limit) !== ""
                     ? String(pq.limit)
                     : "10";
+            const sortKey = page.url.searchParams.get("sort") ?? "best-selling";
+            const sortCfg =
+                STOREFRONT_SORT[sortKey] ?? STOREFRONT_SORT["best-selling"];
             const sp = new URLSearchParams({
                 page: pageStr,
                 limit: limitStr,
-                sorting_field: "products.title",
-                sorting_direction: "asc",
+                sorting_field: sortCfg.field,
+                sorting_direction: sortCfg.dir,
             });
             sp.set(
                 "filters",
@@ -137,7 +159,7 @@
             const pagination =
                 (raw as { pagination?: PaginationMeta }).pagination ??
                 emptyPagination();
-            const gridProducts = productRows.map((p, i) => {
+            const gridProducts: GridProduct[] = productRows.map((p, i) => {
                 const pr = p.variant?.price;
                 const amount =
                     pr?.amount != null
@@ -174,7 +196,7 @@
 
     const loading = $derived(paginateState.loading);
     const fetchError = $derived(paginateState.error);
-    const rows = $derived(query.data?.rows ?? []);
+    const rows = $derived((query.data?.rows ?? []) as GridProduct[]);
     const pagination = $derived(paginateState.pagination);
     const start = $derived(paginateState.start);
     const end = $derived(paginateState.end);

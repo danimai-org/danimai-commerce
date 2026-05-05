@@ -1,6 +1,5 @@
 <script lang="ts">
     import ProductItem from "./productDetail/ProductItem.svelte";
-
     type ProductGridItem = {
         name: string;
         price: { amount: number; currency_code: string };
@@ -8,14 +7,9 @@
         bg: string;
         image: string | null;
         variantId?: string | null;
-        variant_id?: string | null;
         variantTitle?: string | null;
-        variants?: Array<{ id?: string | null; title?: string | null }>;
-        variant?: { id?: string | null; title?: string | null } | null;
+        variant_id?: string | null;
     };
-    // export type ProductGridItem = Awaited<
-    //   ReturnType<(typeof client)["storefront"]["products"]["get"]>
-    // >["data"];
 
     let {
         products = [] as ProductGridItem[] | undefined,

@@ -38,22 +38,14 @@
         image: string | null;
         variantId?: string | null;
         variantTitle?: string | null;
+        variant_id?: string | null;
     };
-
     type CategoryPageData = {
         rows: ProductGridItem[];
         pagination: PaginationMeta;
         categoryTitle: string;
         categoryNotFound: boolean;
     };
-
-    const sortOptions = [
-        { value: "best-selling", label: "Best selling" },
-        { value: "newest", label: "Newest" },
-        { value: "title-asc", label: "Title A–Z" },
-        { value: "title-desc", label: "Title Z–A" },
-    ];
-
     const STOREFRONT_SORT: Record<
         string,
         { field: string; dir: "asc" | "desc" }
@@ -63,6 +55,18 @@
         "title-asc": { field: "products.title", dir: "asc" },
         "title-desc": { field: "products.title", dir: "desc" },
     };
+    const root = API_BASE.replace(/\/admin\/?$/, "");
+
+    function emptyPagination(): PaginationMeta {
+        return {
+            total: 0,
+            page: 1,
+            limit: 24,
+            total_pages: 0,
+            has_next_page: false,
+            has_previous_page: false,
+        };
+    }
 
     function descendantCategoryIds(
         rootId: string,
@@ -100,17 +104,6 @@
         return FALLBACK_BGS[i % FALLBACK_BGS.length];
     }
 
-    function emptyPagination(): PaginationMeta {
-        return {
-            total: 0,
-            page: 1,
-            limit: 24,
-            total_pages: 0,
-            has_next_page: false,
-            has_previous_page: false,
-        };
-    }
-
     function productsListQuery(url: URL) {
         const p = new URLSearchParams();
         const pg = url.searchParams.get("page");
@@ -128,7 +121,6 @@
         }
         goto(u.pathname + u.search, { replaceState: true });
     }
-
     function applySort(e: Event) {
         gotoWithParams({ sort: (e.currentTarget as HTMLSelectElement).value });
     }
@@ -143,11 +135,10 @@
     function applyColor(e: Event) {
         gotoWithParams({ color: (e.currentTarget as HTMLSelectElement).value });
     }
-
     function goToPage(nextPage: number) {
         const u = new URL(page.url);
         u.searchParams.set("page", String(nextPage));
-        goto(u.toString());
+        goto(u.pathname + u.search, { replaceState: true });
     }
 
     const paginateState = createPagination(
@@ -224,7 +215,6 @@
                 };
             }
 
-            const root = API_BASE.replace(/\/admin\/?$/, "");
             const pq = productsListQuery(page.url) as Record<string, string>;
             const pageStr =
                 pq.page != null && String(pq.page) !== ""
@@ -292,11 +282,10 @@
     );
 
     const { query } = paginateState;
-    const loading = $derived(paginateState.loading);
+
     const fetchError = $derived(paginateState.error);
     const pagination = $derived(paginateState.pagination);
-    const start = $derived(paginateState.start);
-    const end = $derived(paginateState.end);
+
     const pageData = $derived.by((): CategoryPageData | null => {
         const raw = query.data as
             | CategoryPageData
@@ -328,6 +317,14 @@
     const currentPrice = $derived(page.url.searchParams.get("price") ?? "all");
     const currentColor = $derived(page.url.searchParams.get("color") ?? "all");
     const storeName = $derived(page.data?.storeName ?? "Store");
+    const total = $derived(pagination?.total ?? 0);
+    const pageNum = $derived(pagination?.page ?? 1);
+    const limit = $derived(pagination?.limit ?? 24);
+    const totalPages = $derived(pagination?.total_pages ?? 0);
+    const hasNextPage = $derived(pagination?.has_next_page ?? false);
+    const hasPreviousPage = $derived(pagination?.has_previous_page ?? false);
+    const start = $derived(total > 0 ? (pageNum - 1) * limit + 1 : 0);
+    const end = $derived(total > 0 ? Math.min(pageNum * limit, total) : 0);
 </script>
 
 <svelte:head>
@@ -350,26 +347,24 @@
             <h1 class="category-hero-title">{categoryTitle}</h1>
         </section>
         <CatalogToolbar
-            {loading}
-            {start}
-            {end}
-            total={pagination?.total ?? 0}
-            totalPages={pagination?.total_pages ?? 0}
-            page={pagination?.page ?? 1}
-            hasNextPage={pagination?.has_next_page ?? false}
-            hasPreviousPage={pagination?.has_previous_page ?? false}
-            {productCount}
             {currentSort}
             {currentAvailability}
             {currentPrice}
             {currentColor}
-            {sortOptions}
+            {productCount}
+            {total}
+            {start}
+            {end}
+            page={pageNum}
+            {totalPages}
+            {hasNextPage}
+            {hasPreviousPage}
             onSort={applySort}
             onAvailability={applyAvailability}
             onPrice={applyPrice}
             onColor={applyColor}
-            onPrevious={() => goToPage((pagination?.page ?? 1) - 1)}
-            onNext={() => goToPage((pagination?.page ?? 1) + 1)}
+            onPrevious={() => goToPage(pageNum - 1)}
+            onNext={() => goToPage(pageNum + 1)}
         />
         <ProductGridSection products={rows} title="" subtitle="" />
     </main>
