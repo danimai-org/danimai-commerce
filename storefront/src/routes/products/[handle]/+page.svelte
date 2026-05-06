@@ -60,16 +60,15 @@
         ),
     );
 
-    const galleryImages = $derived(
-        [
-            product?.thumbnail,
-            ...variants.map((v) => v?.thumbnail ?? null),
-        ].filter((url): url is string => !!url),
-    );
+    const galleryImages = $derived([
+        product?.thumbnail,
+        ...variants.map((v) => v?.thumbnail ?? null),
+    ]);
     const variantOptions = $derived(
         variants.map((v) => ({
             id: v?.id ?? ("" as string),
             title: v?.title ?? ("" as string),
+            thumbnail: v?.thumbnail ?? product?.thumbnail ?? null,
             priceDisplay: formatPrice(
                 v?.prices?.[0]?.amount ?? product?.variant?.price?.amount,
                 v?.prices?.[0]?.currency_code ??
@@ -109,6 +108,7 @@
                 {accordionItems}
                 productHref={`/products/${product?.handle}`}
                 productId={product?.id ?? null}
+                productThumbnail={product?.thumbnail ?? null}
                 selectedVariantTitle={variants.find(
                     (v) => v?.id === resolvedVariantId,
                 )?.title ?? ""}

@@ -158,8 +158,11 @@
     }
 
     .mobile-drawer {
-        @apply fixed top-0 left-0 bottom-0 z-[190] flex flex-col overflow-auto bg-white;
-        width: min(82vw, 20rem);
+        @apply fixed top-0 left-0 bottom-0 z-[190] flex flex-col overflow-hidden bg-white;
+        width: 300px;
+        height: 100vh;
+        max-height: 100vh;
+
         box-shadow: 4px 0 24px rgba(0, 0, 0, 0.08);
         animation: site-chrome-drawer-in 0.2s ease-out;
     }
@@ -186,7 +189,8 @@
     }
 
     .drawer-nav {
-        @apply py-2 px-5 pb-8 flex flex-col gap-7;
+        @apply py-2 px-5 pb-8 flex-1 flex flex-col gap-7 overflow-y-auto;
+        min-height: 0;
     }
 
     .drawer-section {

@@ -11,13 +11,14 @@
         title: string;
         priceLabel: string;
         tagline?: string;
-        variants: VariantItem[];
+        variants: Array<VariantItem & { thumbnail?: string | null }>;
         selectedVariantId: string | null;
         quantity: number;
         accordionItems: AccordionItem[];
         productHref?: string;
         productId?: string | null;
         selectedVariantTitle: string;
+        productThumbnail?: string | null;
     };
     let {
         title = "",
@@ -30,6 +31,7 @@
         productHref = "",
         productId = null as string | null,
         selectedVariantTitle = "",
+        productThumbnail = null,
     }: ProductDetailsProps = $props();
 
     async function addToCart() {
@@ -58,7 +60,7 @@
         await addItemAndOpenSheet({
             variantId,
             quantity: Math.max(1, quantity),
-
+            thumbnail: selectedVariant?.thumbnail ?? productThumbnail ?? null,
             title,
             description: descRaw || null,
             productId,

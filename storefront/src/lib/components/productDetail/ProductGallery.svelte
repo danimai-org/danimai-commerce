@@ -18,7 +18,7 @@
     </div>
     {#if images.length > 1}
         <div class="product-thumbnails">
-            {#each images.slice(0, 8) as src, i}
+            {#each images as src, i}
                 <button
                     type="button"
                     class="thumb"

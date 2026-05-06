@@ -1,4 +1,5 @@
 /* Retail product grid: global so every route (including /collections/*) gets the same card + cart button UI. */
+
 section.products-section {
     max-width: var(--section-max-width, 1200px);
     margin: 0 auto;
@@ -34,7 +35,7 @@ section.products-section .product-grid {
 
 section.products-section .retail-card {
     display: flex;
-    min-height: 0;
+    min-height: full;
 }
 
 section.products-section .retail-card-surface {
@@ -141,7 +142,6 @@ section.products-section .retail-add-cart {
     border-radius: 8px;
     background: #808050;
     color: #fff;
-    font-family: var(--font-sans, system-ui, sans-serif);
     font-size: 0.9375rem;
     font-weight: 600;
     text-align: center;
