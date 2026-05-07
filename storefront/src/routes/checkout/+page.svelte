@@ -29,7 +29,9 @@
     type CheckoutStep = "addresses" | "delivery" | "payment" | "review";
     const CART_STORAGE_KEY = "dm_sf_cart_id";
     const SESSION_STORAGE_KEY = "dm_sf_session_id";
+    const ACCOUNT_STORAGE_KEY = "dm_sf_account";
     const ORDER_CACHE_KEY_PREFIX = "dm_sf_order_";
+    const ORDERS_STORAGE_KEY_PREFIX = "dm_sf_orders_";
     const DEFAULT_CART_CURRENCY_CODE = "eur";
     type ApiCartLineItem = {
         id: string;
@@ -165,6 +167,25 @@
 
     function paymentMethodLabelFrom(method: string): "Manual Payment" | string {
         return method === "manual" ? "Manual Payment" : method;
+    }
+
+    function ordersStorageKeyForEmail(email: string): string {
+        const normalized = email.trim().toLowerCase();
+        return `${ORDERS_STORAGE_KEY_PREFIX}${normalized || "guest@denimai.com"}`;
+    }
+
+    function currentAccountEmail(): string {
+        try {
+            const parsed = JSON.parse(
+                localStorage.getItem(ACCOUNT_STORAGE_KEY) ?? "{}",
+            ) as { email?: unknown };
+            const email = String(parsed?.email ?? "")
+                .trim()
+                .toLowerCase();
+            return email;
+        } catch {
+            return "";
+        }
     }
 
     function goBack() {
@@ -343,6 +364,41 @@
                 `${ORDER_CACHE_KEY_PREFIX}${orderId}`,
                 JSON.stringify(cachedOrder),
             );
+            let existingOrders: Array<{
+                id?: string;
+                date?: string;
+                total?: string | number;
+                status?: string;
+                payment?: string;
+            }> = [];
+            const ordersStorageKey = ordersStorageKeyForEmail(
+                currentAccountEmail() || String(created.email ?? f.email ?? ""),
+            );
+            try {
+                existingOrders = JSON.parse(
+                    localStorage.getItem(ordersStorageKey) ?? "[]",
+                ) as Array<{
+                    id?: string;
+                    date?: string;
+                    total?: string | number;
+                    status?: string;
+                    payment?: string;
+                }>;
+            } catch {
+                existingOrders = [];
+            }
+            const nextOrders = [
+                {
+                    id: number,
+                    orderId,
+                    date: new Date().toISOString().slice(0, 10),
+                    total: subtotal,
+                    status: created.status ?? "pending",
+                    payment: payLabel,
+                },
+                ...existingOrders.filter((entry) => entry.id !== number),
+            ];
+            localStorage.setItem(ordersStorageKey, JSON.stringify(nextOrders));
             localStorage.removeItem(CART_STORAGE_KEY);
             goto(`/order/confirmation?order=${orderId}`);
         } catch (error) {

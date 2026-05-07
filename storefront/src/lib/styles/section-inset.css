@@ -1,13 +1,26 @@
 /* Shared horizontal alignment with ProductGridSection */
 :root {
-	--section-max-width: 1200px;
-	--section-padding-x: 1.5rem;
-	--section-padding-y: 4rem;
+    --section-max-width: 1200px;
+    --section-padding-x: 1.5rem;
+    --section-padding-y: 4rem;
+    /*--primary-color: red;
+    --secondary-color: green;
+    --bg-color: black;
+    --main-font: sans-serif;*/
 }
 
+/*body {
+    background-color: var(--bg-color);
+    color: var(--primary-color);
+
+    font-family: var(--main-font);
+    margin: 0;
+    padding: 0;
+}*/
+
 @media (max-width: 480px) {
-	:root {
-		--section-padding-x: 1.25rem;
-		--section-padding-y: 3rem;
-	}
+    :root {
+        --section-padding-x: 1.25rem;
+        --section-padding-y: 3rem;
+    }
 }

@@ -177,7 +177,48 @@ export class PaginatedProductsProcess implements ProcessContract<
       ]).groupBy(["products.id", "products.title", "products.status", "products.handle", "product_categories.id"])
       .execute();
 
+    const optionRows = await this.db
+      .selectFrom("product_option_values")
+      .innerJoin(
+        "product_options",
+        "product_options.id",
+        "product_option_values.option_id",
+      )
+      .where("product_option_values.product_id", "in", productIds)
+      .where("product_option_values.deleted_at", "is", null)
+      .select([
+        "product_option_values.product_id as product_id",
+        "product_option_values.id as id",
+        "product_options.title as title",
+        "product_option_values.value as value",
+        "product_option_values.rank as rank",
+      ])
+      .orderBy("product_option_values.product_id", "asc")
+      .orderBy("product_option_values.rank", "asc")
+      .execute();
 
-    return paginationResponse(products, total, input);
+    const optionsByProductId = new Map<string, Array<{
+      id: string;
+      title: string;
+      value: string;
+      rank: number;
+    }>>();
+    for (const row of optionRows) {
+      const existing = optionsByProductId.get(row.product_id) ?? [];
+      existing.push({
+        id: row.id,
+        title: row.title,
+        value: row.value,
+        rank: row.rank,
+      });
+      optionsByProductId.set(row.product_id, existing);
+    }
+
+    const productsWithOptions = products.map((product) => ({
+      ...product,
+      options: optionsByProductId.get(product.id) ?? [],
+    }));
+
+    return paginationResponse(productsWithOptions, total, input);
   }
 }

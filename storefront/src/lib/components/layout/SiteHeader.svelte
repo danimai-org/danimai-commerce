@@ -1,5 +1,7 @@
 <script lang="ts">
     import { afterNavigate } from "$app/navigation";
+    import { goto } from "$app/navigation";
+    import { browser } from "$app/environment";
     import { cartState, openCartSheet } from "$lib/cart/cart-state.svelte";
     import { search } from "$lib/stores/search";
     import SearchSheet from "$lib/components/search/SearchSheet.svelte";
@@ -24,11 +26,15 @@
         handle: string;
     };
 
+    const ACCOUNT_STORAGE_KEY = "dm_sf_account";
+
     let cartCount = $state(0);
     let searchOpen = $state(false);
     let menuOpen = $state(false);
     let accountMenuOpen = $state(false);
     let navWide = $state(false);
+    let isLoggedIn = $state(false);
+    let accountEmail = $state("");
 
     afterNavigate(() => {
         menuOpen = false;
@@ -185,6 +191,41 @@
             document.removeEventListener("keydown", onKey);
         };
     });
+
+    function syncAccountState() {
+        if (!browser) return;
+        const raw = localStorage.getItem(ACCOUNT_STORAGE_KEY);
+        if (!raw) {
+            isLoggedIn = false;
+            accountEmail = "";
+            return;
+        }
+        try {
+            const parsed = JSON.parse(raw) as { email?: string };
+            const email = String(parsed?.email ?? "").trim();
+            isLoggedIn = Boolean(email);
+            accountEmail = email;
+        } catch {
+            isLoggedIn = false;
+            accountEmail = "";
+        }
+    }
+
+    $effect(() => {
+        if (!browser) return;
+        syncAccountState();
+        const onStorage = () => syncAccountState();
+        window.addEventListener("storage", onStorage);
+        return () => window.removeEventListener("storage", onStorage);
+    });
+
+    async function logout() {
+        if (!browser) return;
+        localStorage.removeItem(ACCOUNT_STORAGE_KEY);
+        accountMenuOpen = false;
+        syncAccountState();
+        await goto("/login");
+    }
 </script>
 
 <header class="site-header">
@@ -334,13 +375,39 @@
                             role="menu"
                             aria-label="Account"
                         >
-                            <a
-                                href="/login"
-                                class="account-dropdown-link"
-                                role="menuitem"
-                                onclick={() => (accountMenuOpen = false)}
-                                >Login</a
-                            >
+                            {#if isLoggedIn}
+                                <span class="account-dropdown-link" role="menuitem"
+                                    >{accountEmail}</span
+                                >
+                                <a
+                                    href="/account"
+                                    class="account-dropdown-link"
+                                    role="menuitem"
+                                    onclick={() => (accountMenuOpen = false)}
+                                    >My Account</a
+                                >
+                                <a
+                                    href="/account/orders"
+                                    class="account-dropdown-link"
+                                    role="menuitem"
+                                    onclick={() => (accountMenuOpen = false)}
+                                    >My Orders</a
+                                >
+                                <button
+                                    type="button"
+                                    class="account-dropdown-link"
+                                    role="menuitem"
+                                    onclick={logout}>Logout</button
+                                >
+                            {:else}
+                                <a
+                                    href="/login"
+                                    class="account-dropdown-link"
+                                    role="menuitem"
+                                    onclick={() => (accountMenuOpen = false)}
+                                    >Login</a
+                                >
+                            {/if}
                         </div>
                     {/if}
                 </div>
@@ -491,16 +558,37 @@
             >
             <section class="drawer-section">
                 <h2 class="drawer-cat">Account</h2>
-                <a
-                    href="/login"
-                    class="drawer-link"
-                    onclick={() => (menuOpen = false)}>Login</a
-                >
-                <a
-                    href="/register"
-                    class="drawer-link"
-                    onclick={() => (menuOpen = false)}>Register</a
-                >
+                {#if isLoggedIn}
+                    <a
+                        href="/account"
+                        class="drawer-link"
+                        onclick={() => (menuOpen = false)}>My Account</a
+                    >
+                    <a
+                        href="/account/orders"
+                        class="drawer-link"
+                        onclick={() => (menuOpen = false)}>My Orders</a
+                    >
+                    <button
+                        type="button"
+                        class="drawer-link drawer-link-button"
+                        onclick={() => {
+                            menuOpen = false;
+                            void logout();
+                        }}>Logout</button
+                    >
+                {:else}
+                    <a
+                        href="/login"
+                        class="drawer-link"
+                        onclick={() => (menuOpen = false)}>Login</a
+                    >
+                    <a
+                        href="/register"
+                        class="drawer-link"
+                        onclick={() => (menuOpen = false)}>Register</a
+                    >
+                {/if}
             </section>
         </nav>
     </aside>

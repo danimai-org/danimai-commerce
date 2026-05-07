@@ -27,31 +27,42 @@ export const load: PageServerLoad = async () => {
   const registerForm = await superValidate(zod4(RegisterSchema));
   return { registerForm };
 };
-
 export const actions = {
   register: async ({ request }) => {
     const registerForm = await superValidate(request, zod4(RegisterSchema));
     if (!registerForm.valid) {
       return fail(400, { registerForm });
     }
+
+    const treatyErrorMessage = (err: unknown): string => {
+      const o = err as { value?: { message?: string } };
+      return o?.value?.message ?? "Registration failed";
+    };
+
     try {
-      const user = await client.users.post({
+      const signup = await client.storefront.auth.signup.post({
         first_name: registerForm.data.given_name,
         last_name: registerForm.data.family_name,
         email: registerForm.data.email,
         password: registerForm.data.password,
       });
-      if (!user || user.error) {
+
+      if (signup.error) {
         return message(
           registerForm,
-          user?.error?.value?.message || "Registration failed",
+          treatyErrorMessage(signup.error),
           {
             status: 400,
           },
         );
       }
-      return message(registerForm, "User registered successfully!");
-    } catch (err) {
+
+      const successMessage =
+        (signup.data as { message?: string } | null)?.message ??
+        "User registered successfully!";
+
+      return message(registerForm, successMessage);
+    } catch {
       return message(registerForm, "An unexpected error occurred", {
         status: 500,
       });

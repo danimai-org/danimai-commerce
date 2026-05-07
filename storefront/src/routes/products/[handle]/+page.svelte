@@ -76,6 +76,14 @@
             ),
         })),
     );
+    const productOptions = $derived(
+        (product?.options ?? []).map((option) => ({
+            id: option?.id ?? "",
+            title: option?.title ?? "",
+            value: option?.value ?? "",
+            rank: option?.rank ?? 0,
+        })),
+    );
 
     const accordionItems = [
         {

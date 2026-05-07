@@ -3,7 +3,7 @@
         --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
         --font-sans: "DM Sans", system-ui, -apple-system, sans-serif;
         @apply min-h-screen flex flex-col text-[#1a1a1a] bg-white;
-        font-family: var(--font-sans);
+        font-family: var(--font-serif);
     }
 
     .page-login .auth-main {
@@ -34,7 +34,6 @@
     .page-login .field label {
         @apply text-[0.8125rem] font-medium text-[#2a2a2a];
     }
-
     .page-login .field input {
         @apply font-[inherit] text-[0.9375rem] py-[0.65rem] px-3 border border-[#d4d4d4] rounded-sm bg-white text-[#1a1a1a] placeholder:text-[#9a9a9a] focus:outline-none focus:border-[#1a1a1a];
     }
