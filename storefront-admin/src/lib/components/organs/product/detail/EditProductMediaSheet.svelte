@@ -28,7 +28,7 @@
 	});
 	const thumbnailInMedia = $derived.by(() => {
 		const thumb = thumbnail?.trim?.() ?? '';
-		if (!thumb) return true; // No thumbnail configured, so don't show fallback UI.
+		if (!thumb) return true;
 		return productMedia.some((item) => item.url === thumb);
 	});
 	const apiBaseUrl = 'http://localhost:8000';
@@ -39,14 +39,30 @@
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let primaryMediaId = $state<string | null>(null);
 	let primaryDirty = $state(false);
+	let rankDirty = $state(false);
+	let removingMediaId = $state<string | null>(null);
 	let sortableMedia = $state<Array<{ id: string; url: string; rank: number }>>([]);
+	function normalizeMediaOrder(
+		media: Array<{ id: string; url: string; rank: number }>,
+		primaryId: string | null
+	) {
+		const ordered = [...media].sort((a, b) => a.rank - b.rank);
+		if (primaryId) {
+			const index = ordered.findIndex((item) => item.id === primaryId);
+			if (index > 0) {
+				const [primaryItem] = ordered.splice(index, 1);
+				if (primaryItem) ordered.unshift(primaryItem);
+			}
+		}
+		return ordered.map((item, index) => ({ ...item, rank: index }));
+	}
 
 	$effect(() => {
 		if (open && !prevOpen) {
 			const currentMedia = untrack(() => productMedia);
 			const currentThumbnail = untrack(() => thumbnail);
-			sortableMedia = [...currentMedia];
 			primaryDirty = false;
+			rankDirty = false;
 
 			const thumb = currentThumbnail?.trim?.() ?? '';
 			if (thumb) {
@@ -55,6 +71,7 @@
 			} else {
 				primaryMediaId = currentMedia[0]?.id ?? null;
 			}
+			sortableMedia = normalizeMediaOrder(currentMedia, primaryMediaId);
 			error = null;
 		}
 		prevOpen = open;
@@ -63,10 +80,12 @@
 	$effect(() => {
 		if (!open) return;
 		const currentMedia = productMedia;
-		sortableMedia = [...currentMedia];
-		if (primaryMediaId !== null && !currentMedia.some((item) => item.id === primaryMediaId)) {
-			primaryMediaId = currentMedia[0]?.id ?? null;
-		}
+		const nextPrimary =
+			primaryMediaId !== null && currentMedia.some((item) => item.id === primaryMediaId)
+				? primaryMediaId
+				: (currentMedia[0]?.id ?? null);
+		primaryMediaId = nextPrimary;
+		sortableMedia = normalizeMediaOrder(currentMedia, nextPrimary);
 	});
 
 	function handleDragEnd(event: SortableList.RootEvents['ondragend']) {
@@ -85,23 +104,42 @@
 				rank: index
 			})
 		);
-		sortableMedia = reordered;
-		primaryMediaId = reordered[0]?.id ?? null;
+		const nextPrimary = reordered[0]?.id ?? null;
+		primaryMediaId = nextPrimary;
+		sortableMedia = normalizeMediaOrder(reordered, nextPrimary);
 		primaryDirty = true;
+		rankDirty = true;
 	}
 	function close() {
 		open = false;
 		error = null;
 		primaryDirty = false;
+		rankDirty = false;
+		removingMediaId = null;
 	}
-	async function postImageMutation(body: FormData) {
+	async function postImageMutation(payload: {
+		files?: File[];
+		delete_ids?: string[];
+		type?: string;
+	}) {
+		const body = new FormData();
+		for (const file of payload.files ?? []) body.append('files', file);
+		if (payload.delete_ids && payload.delete_ids.length > 0) {
+			body.append('delete_ids', JSON.stringify(payload.delete_ids));
+		}
+		if (payload.type) body.append('type', payload.type);
+
 		const response = await fetch(`${apiBaseUrl}/admin/products/${productId}/images`, {
 			method: 'POST',
 			body
 		});
 		if (!response.ok) {
-			const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-			throw new Error(payload?.message ?? 'Failed to update product images');
+			const errorPayload = (await response.json().catch(() => null)) as
+				| { message?: string; summary?: string }
+				| null;
+			throw new Error(
+				errorPayload?.message ?? errorPayload?.summary ?? 'Failed to update product images'
+			);
 		}
 	}
 	async function uploadSelectedFiles(files: File[]) {
@@ -109,9 +147,7 @@
 		error = null;
 		submitting = true;
 		try {
-			const body = new FormData();
-			for (const file of files) body.append('files', file);
-			await postImageMutation(body);
+			await postImageMutation({ files });
 			await onSaved();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -125,18 +161,24 @@
 			error = 'Missing product id.';
 			return;
 		}
-		if (!primaryDirty) return;
+		if (!primaryDirty && !rankDirty) return;
 		error = null;
 		submitting = true;
 		try {
+			const normalizedMedia = normalizeMediaOrder(sortableMedia, primaryMediaId);
+			const normalizedPrimaryMediaId = normalizedMedia[0]?.id ?? null;
 			const res = await client.products({ id: productId }).put({
-				thumbnail_media_id: primaryMediaId
+				thumbnail_media_id: normalizedPrimaryMediaId,
+				media_ids: normalizedMedia.map((item) => item.id)
 			});
 			if (res.error) {
 				const err = res.error as { value?: { message?: string } };
 				throw new Error(err?.value?.message ?? String(res.error));
 			}
+			primaryMediaId = normalizedPrimaryMediaId;
+			sortableMedia = normalizedMedia;
 			primaryDirty = false;
+			rankDirty = false;
 			close();
 			await onSaved();
 		} catch (e) {
@@ -150,23 +192,23 @@
 		if (!productId || !mediaId) return;
 		error = null;
 		const wasPrimary = primaryMediaId === mediaId;
+		removingMediaId = mediaId;
 		submitting = true;
 		try {
-			const body = new FormData();
-			body.append('delete_ids', JSON.stringify([mediaId]));
-			await postImageMutation(body);
-
-			// Update local state immediately for a snappy UI; the refetch will also sync.
+			await postImageMutation({ delete_ids: [mediaId] });
 			const remaining = sortableMedia.filter((item) => item.id !== mediaId);
-			sortableMedia = remaining;
+			const nextPrimary = wasPrimary ? (remaining[0]?.id ?? null) : primaryMediaId;
+			sortableMedia = normalizeMediaOrder(remaining, nextPrimary);
+			rankDirty = true;
 			if (wasPrimary) {
-				primaryMediaId = remaining[0]?.id ?? null;
+				primaryMediaId = nextPrimary;
 				primaryDirty = true;
 			}
 			await onSaved();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
+			removingMediaId = null;
 			submitting = false;
 		}
 	}
@@ -190,7 +232,10 @@
 					role="button"
 					tabindex="0"
 					aria-label="Upload images"
-					class="flex min-h-[110px] cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-muted-foreground/25 bg-muted/30 px-4 py-5 text-center text-sm text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:bg-muted/40"
+					class={cn(
+						'flex min-h-[110px] flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-muted-foreground/25 bg-muted/30 px-4 py-5 text-center text-sm text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:bg-muted/40',
+						submitting ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
+					)}
 					ondragover={(event) => event.preventDefault()}
 					ondrop={async (event) => {
 						event.preventDefault();
@@ -207,8 +252,13 @@
 						fileInput?.click();
 					}}
 				>
-					<Upload class="size-7" />
-					<p>Drop images here or click to upload</p>
+					{#if submitting}
+						<div class="size-7 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary"></div>
+						<p>Uploading images...</p>
+					{:else}
+						<Upload class="size-7" />
+						<p>Drop images here or click to upload</p>
+					{/if}
 				</div>
 				<input
 					type="file"
@@ -228,8 +278,10 @@
 				<div class="rounded-md border bg-muted/20 p-3">
 					<div class="mb-2 flex items-center justify-between">
 						<p class="text-sm font-medium">Primary thumbnail</p>
-						<span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
-							>Primary</span>
+						<span
+							class="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
+							>Primary</span
+						>
 					</div>
 					<ProductMediaImage
 						src={thumbnail}
@@ -271,19 +323,24 @@
 										disabled={submitting}
 										onclick={() => removeImage(media.id)}
 									>
-										Remove
+										{#if removingMediaId === media.id}
+											<span
+												class="mr-1 inline-block size-3 animate-spin rounded-full border border-current border-t-transparent"
+											></span>
+											Removing...
+										{:else}
+											Remove
+										{/if}
 									</Button>
 								</div>
 							</SortableList.Item>
 						{/each}
 					</SortableList.Root>
 				</div>
+			{:else if thumbnail && !thumbnailInMedia && primaryMediaId === null}
+				<p class="text-sm text-muted-foreground">No additional media uploaded yet.</p>
 			{:else}
-				{#if thumbnail && !thumbnailInMedia && primaryMediaId === null}
-					<p class="text-sm text-muted-foreground">No additional media uploaded yet.</p>
-				{:else}
-					<p class="text-sm text-muted-foreground">No media uploaded yet.</p>
-				{/if}
+				<p class="text-sm text-muted-foreground">No media uploaded yet.</p>
 			{/if}
 		</div>
 		<div class="flex flex-wrap items-center justify-between gap-2 border-t p-4">
@@ -300,7 +357,9 @@
 			</Button>
 			<div class="flex gap-2">
 				<Button variant="outline" onclick={close} disabled={submitting}>Cancel</Button>
-				<Button onclick={savePrimary} disabled={submitting || !primaryDirty}>Save</Button>
+				<Button onclick={savePrimary} disabled={submitting || (!primaryDirty && !rankDirty)}
+					>Save</Button
+				>
 			</div>
 		</div>
 	</Sheet.Content>

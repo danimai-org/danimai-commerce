@@ -13,8 +13,9 @@
 		(product as { thumbnail?: string | null } | null)?.thumbnail?.trim() || ''
 	);
 	const mediaItems = $derived.by(() => {
-		const current = (product as { media?: Array<{ id?: string; url?: string; rank?: number }> } | null)
-			?.media;
+		const current = (
+			product as { media?: Array<{ id?: string; url?: string; rank?: number }> } | null
+		)?.media;
 		const items = Array.isArray(current)
 			? current
 					.map((item, index) => {
@@ -33,7 +34,9 @@
 		const hasThumbnail = items.some((item) => item.url === thumbnail);
 		if (hasThumbnail) return items;
 		// Ensure the card always shows the primary thumbnail, even if it isn't part of `product.media`.
-		return [{ id: 'thumbnail', url: thumbnail, rank: -1 }, ...items].sort((a, b) => a.rank - b.rank);
+		return [{ id: 'thumbnail', url: thumbnail, rank: -1 }, ...items].sort(
+			(a, b) => a.rank - b.rank
+		);
 	});
 
 	let mediaSheetOpen = $state(false);
@@ -64,8 +67,7 @@
 	{#if mediaItems.length > 0}
 		<button
 			type="button"
-			class="mt-4 block w-full cursor-pointer rounded-md border-0 bg-transparent p-0 text-left transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
-			onclick={openMediaSheet}
+			class="mt-4 block w-full rounded-md border-0 bg-transparent p-0 text-left transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
 			aria-label="Edit media"
 		>
 			<div class="mt-4 flex flex-wrap gap-4">
@@ -82,7 +84,6 @@
 		<button
 			type="button"
 			class="mt-4 flex min-h-[140px] w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-muted-foreground/25 bg-muted/30 py-8 text-center text-sm text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
-			onclick={openMediaSheet}
 			aria-label="Add or edit media"
 		>
 			<Upload class="size-8" />
