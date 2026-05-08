@@ -30,13 +30,7 @@
 					.filter((item): item is { id: string; url: string; rank: number } => item !== null)
 					.sort((a, b) => a.rank - b.rank)
 			: [];
-		if (!thumbnail) return items;
-		const hasThumbnail = items.some((item) => item.url === thumbnail);
-		if (hasThumbnail) return items;
-		// Ensure the card always shows the primary thumbnail, even if it isn't part of `product.media`.
-		return [{ id: 'thumbnail', url: thumbnail, rank: -1 }, ...items].sort(
-			(a, b) => a.rank - b.rank
-		);
+		return items;
 	});
 
 	let mediaSheetOpen = $state(false);
