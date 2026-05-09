@@ -7,7 +7,10 @@ import { ProductAttributeResponseSchema } from "../retrieve-product-attribute/re
 
 // Request/Input schema
 export const PaginatedProductAttributesSchema = createPaginationSchema(
-  Type.Object({}),
+  Type.Object({
+    attribute_group_id: Type.Optional(Type.String({ format: "uuid" })),
+    group_id: Type.Optional(Type.String({ format: "uuid" })),
+  }),
   ["id", "title", "type", "created_at", "updated_at", "deleted_at"],
 );
 

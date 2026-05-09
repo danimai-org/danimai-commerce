@@ -48,27 +48,56 @@ export class PaginatedProductAttributesProcess
       sorting_direction = SortOrder.DESC,
       search,
     } = input;
+    const attribute_group_id =
+      input.filters?.attribute_group_id ?? input.filters?.group_id;
 
     let query = this.db
       .selectFrom("product_attributes")
-      .where("deleted_at", "is", null)
-      
-    if(search && search.trim()) {
-      query = query.where("title", "ilike", `%${search.trim()}%`);
+      .where("product_attributes.deleted_at", "is", null);
+
+    if (attribute_group_id) {
+      query = query.innerJoin(
+        "product_attribute_group_relations",
+        (join) =>
+          join
+            .onRef(
+              "product_attribute_group_relations.product_attribute_id",
+              "=",
+              "product_attributes.id",
+            )
+            .on(
+              "product_attribute_group_relations.attribute_group_id",
+              "=",
+              attribute_group_id,
+            ),
+      );
+    }
+
+    if (search && search.trim()) {
+      query = query.where(
+        "product_attributes.title",
+        "ilike",
+        `%${search.trim()}%`,
+      );
     }
 
     const countResult = await query
-      .select(({ fn }) => fn.count<number>("id").as("count"))
+      .select(({ fn }) =>
+        fn.count<number>("product_attributes.id").as("count"),
+      )
       .executeTakeFirst();
 
     const total = Number(countResult?.count || 0);
 
-    query = query.orderBy(sql.ref(`${sorting_field}`), sorting_direction);
+    query = query.orderBy(
+      sql.ref(`product_attributes.${sorting_field}`),
+      sorting_direction,
+    );
 
     const attributes = await query
       .limit(limit)
       .offset((page - 1) * limit)
-      .selectAll()
+      .selectAll("product_attributes")
       .execute();
 
     return paginationResponse(attributes, total, input);

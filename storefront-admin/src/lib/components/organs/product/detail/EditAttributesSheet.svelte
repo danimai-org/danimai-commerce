@@ -2,6 +2,7 @@
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import { Combobox, MultiSelectCombobox } from '$lib/components/organs/index.js';
 	import { client } from '$lib/client';
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import { onMount } from 'svelte';
@@ -17,17 +18,7 @@
 	};
 
 	type ProductAttributeGroupRow = { id: string; title: string };
-	type ProductAttributeRow = {
-		id: string;
-		title: string;
-		type: string;
-		attribute_group_id?: string | null;
-		product_attribute_group_id?: string | null;
-		attributeGroupId?: string | null;
-		attribute_group?: { id?: string | null } | null;
-		product_attribute_group?: { id?: string | null } | null;
-		group_id?: string | null;
-	};
+	type ProductAttributeRow = { id: string; title: string; type: string; group_id: string };
 
 	interface Props {
 		open?: boolean;
@@ -46,25 +37,15 @@
 	}: Props = $props();
 
 	let loading = $state(false);
-	let loadError = $state<string | null>(null);
+	// let loadError = $state<string | null>(null);
 	let attributeGroups = $state<ProductAttributeGroupRow[]>([]);
-	let allAttributes = $state<ProductAttributeRow[]>([]);
+	let groupAttributes = $state<ProductAttributeRow[]>([]);
+	let groupAttributesLoading = $state(false);
 	let selectedGroupId = $state('');
+	let selectedAttributeIds = $state<string[]>([]);
 
 	function pickLabel(item: { title?: string; value?: string; name?: string }): string {
 		return item.title ?? item.value ?? item.name ?? '';
-	}
-
-	function getAttributeGroupId(item: ProductAttributeRow): string | null {
-		return (
-			item.attribute_group_id ??
-			item.product_attribute_group_id ??
-			item.attributeGroupId ??
-			item.attribute_group?.id ??
-			item.product_attribute_group?.id ??
-			item.group_id ??
-			null
-		);
 	}
 
 	function extractRows<T>(payload: unknown): T[] {
@@ -79,51 +60,15 @@
 
 	onMount(async () => {
 		loading = true;
-		loadError = null;
 		const listQuery = { page: 1, limit: 100, search: '', sorting_field: 'created_at' };
-
-		const [attributesResponse, attributeGroupsResponse] = await Promise.allSettled([
-			client['product-attributes'].get({ query: listQuery }),
-			client['product-attribute-groups'].get({ query: listQuery })
-		]);
-
-		if (attributesResponse.status === 'fulfilled') {
-			const rows = extractRows<{
-				id: string;
-				title?: string;
-				value?: string;
-				name?: string;
-				type?: string;
-				attribute_group_id?: string | null;
-				product_attribute_group_id?: string | null;
-				attributeGroupId?: string | null;
-				attribute_group?: { id?: string | null } | null;
-				product_attribute_group?: { id?: string | null } | null;
-				group_id?: string | null;
-			}>(attributesResponse.value);
-			allAttributes = rows.map((row) => ({
-				id: row.id,
-				title: pickLabel(row),
-				type: row.type ?? 'text',
-				attribute_group_id: row.attribute_group_id,
-				product_attribute_group_id: row.product_attribute_group_id,
-				attributeGroupId: row.attributeGroupId,
-				attribute_group: row.attribute_group,
-				product_attribute_group: row.product_attribute_group,
-				group_id: row.group_id
-			}));
-		}
-
-		if (attributeGroupsResponse.status === 'fulfilled') {
-			const rows = extractRows<{ id: string; title?: string; value?: string; name?: string }>(
-				attributeGroupsResponse.value
-			);
+		try {
+			const res = await client['product-attribute-groups'].get({ query: listQuery });
+			const rows = extractRows<{ id: string; title?: string }>(res);
 			attributeGroups = rows.map((row) => ({ id: row.id, title: pickLabel(row) }));
+		} catch {
+			return 'Failed to load attribute groups';
 		}
 
-		if (attributesResponse.status === 'rejected' || attributeGroupsResponse.status === 'rejected') {
-			loadError = 'Failed to load attributes';
-		}
 		const existingGroupId = productAttributesForm?.data?.attributes?.[0]?.attribute_group_id ?? '';
 		selectedGroupId = existingGroupId || attributeGroups[0]?.id || '';
 		loading = false;
@@ -132,138 +77,161 @@
 	const selectedGroupTitle = $derived(
 		attributeGroups.find((group) => group.id === selectedGroupId)?.title ?? 'Attribute Group'
 	);
-	const groupAttributes = $derived.by(() =>
-		allAttributes.filter((attr) => getAttributeGroupId(attr) === selectedGroupId)
+
+	const attributeGroupOptions = $derived(
+		attributeGroups.map((group) => ({ id: group.id, value: group.title }))
 	);
-	function isSelected(attributeId: string): boolean {
-		return (
-			(productAttributesForm?.data?.attributes ?? []).findIndex(
-				(attr) => attr.attribute_id === attributeId && attr.attribute_group_id === selectedGroupId
-			) >= 0
-		);
-	}
-	function toggleAttribute(attributeId: string, checked: boolean) {
-		const formData = productAttributesForm?.data;
-		if (!formData) return;
-		const current = [...(formData.attributes ?? [])];
-		const existingIndex = current.findIndex(
-			(attr) => attr.attribute_id === attributeId && attr.attribute_group_id === selectedGroupId
-		);
-		if (checked && existingIndex === -1) {
-			current.push({
-				attribute_group_id: selectedGroupId,
-				attribute_group_title: selectedGroupTitle,
-				attribute_id: attributeId,
-				value: ''
-			});
-		}
-		if (!checked && existingIndex !== -1) {
-			current.splice(existingIndex, 1);
-		}
-		formData.attributes = current;
-	}
-	function updateAttributeValue(attributeId: string, value: string) {
-		const formData = productAttributesForm?.data;
-		if (!formData) return;
-		const current = [...(formData.attributes ?? [])];
-		const existingIndex = current.findIndex(
-			(attr) => attr.attribute_id === attributeId && attr.attribute_group_id === selectedGroupId
-		);
-		if (existingIndex === -1) return;
-		current[existingIndex] = {
-			...current[existingIndex],
-			attribute_group_title: selectedGroupTitle,
-			value
+
+	const attributeOptions = $derived(groupAttributes.map((a) => ({ id: a.id, value: a.title })));
+
+	$effect(() => {
+		const groupId = selectedGroupId;
+		if (!groupId) return;
+
+		let cancelled = false;
+		groupAttributesLoading = true;
+		(async () => {
+			try {
+				const res = await client['product-attributes'].get({
+					query: { page: 1, limit: 100 }
+				});
+
+				if (cancelled) return;
+				const rows = extractRows<ProductAttributeRow>(res);
+				groupAttributes = rows.map((row) => ({
+					id: row.id,
+					title: pickLabel(row),
+					type: row.type ?? 'text',
+					group_id: row.group_id ?? groupId
+				}));
+			} finally {
+				if (!cancelled) groupAttributesLoading = false;
+			}
+		})();
+		return () => {
+			cancelled = true;
 		};
-		formData.attributes = current;
+	});
+
+	$effect(() => {
+		if (!open || loading) return;
+		selectedAttributeIds = (productAttributesForm?.data?.attributes ?? [])
+			.filter((a) => a.attribute_group_id === selectedGroupId)
+			.map((a) => a.attribute_id);
+	});
+
+	$effect(() => {
+		const formData = productAttributesForm?.data;
+		const groupId = selectedGroupId;
+		if (!formData || !groupId || loading) return;
+
+		const current = [...(formData.attributes ?? [])];
+		const otherGroups = current.filter((a) => a.attribute_group_id !== groupId);
+
+		const nextForGroup = selectedAttributeIds.map((id) => {
+			const existing = current.find(
+				(a) => a.attribute_id === id && a.attribute_group_id === groupId
+			);
+			return (
+				existing ?? {
+					attribute_group_id: groupId,
+					attribute_id: id,
+					attribute_group_title: selectedGroupTitle,
+					value: ''
+				}
+			);
+		});
+
+		formData.attributes = [...otherGroups, ...nextForGroup];
+	});
+
+	function updateAttributeValue(attributeId: string, value: string) {
+		const attr = productAttributesForm?.data?.attributes?.find(
+			(a) => a.attribute_id === attributeId && a.attribute_group_id === selectedGroupId
+		);
+		if (attr) attr.value = value;
 	}
+
 	function getSelectedValue(attributeId: string): string {
 		return (
-			(productAttributesForm?.data?.attributes ?? []) .find(
-				(attr) => attr.attribute_id === attributeId && attr.attribute_group_id === selectedGroupId
+			productAttributesForm?.data?.attributes?.find(
+				(a) => a.attribute_id === attributeId && a.attribute_group_id === selectedGroupId
 			)?.value ?? ''
 		);
 	}
 </script>
 
 <Sheet.Root bind:open>
-	<Sheet.Content
-		class="flex w-full flex-col sm:max-w-lg"
-		side="right"
-		data-product-id={productAttributesForm?.data?.id}
-	>
-		<Sheet.Header class="flex flex-col items-center gap-1.5 text-center sm:text-center">
+	<Sheet.Content class="flex w-full flex-col sm:max-w-lg" side="right">
+		<Sheet.Header>
 			<Sheet.Title>Edit Attributes</Sheet.Title>
 		</Sheet.Header>
-		<div class="flex flex-1 flex-col gap-4 overflow-auto px-4 pb-4">
+
+		<div class="flex flex-1 flex-col gap-6 overflow-auto px-4 py-4">
 			{#if loading}
-				<p class="text-sm text-muted-foreground">Loading attributes…</p>
+				<p class="text-sm text-muted-foreground">Loading groups…</p>
 			{:else}
 				<div class="space-y-2">
-					<label for="edit-attribute-group" class="text-sm font-medium">Attribute group</label>
-					<select
+					<label for="edit-attribute-group" class="text-sm font-semibold">1. Attribute Group</label>
+					<Combobox
 						id="edit-attribute-group"
-						class="h-9 w-full rounded-md border bg-background px-3 text-sm"
-						value={selectedGroupId}
-						onchange={(e) => (selectedGroupId = (e.currentTarget as HTMLSelectElement).value)}
-					>
-						<option value="" disabled>Select group</option>
-						{#each attributeGroups as group (group.id)}
-							<option value={group.id}>{group.title}</option>
-						{/each}
-					</select>
+						bind:value={selectedGroupId}
+						options={attributeGroupOptions}
+						placeholder="Select group"
+					/>
 				</div>
-				{#if loadError}
-					<p class="text-sm text-destructive">{loadError}</p>
-				{:else if selectedGroupId && groupAttributes.length > 0}
-					<div class="space-y-3">
-						<div class="rounded-md border bg-card p-3">
-							<p class="text-sm font-semibold">{selectedGroupTitle}</p>
-						</div>
-						{#each groupAttributes as attribute (attribute.id)}
-							<div class="rounded-md border p-3">
-								<label class="flex items-center gap-2 text-sm font-medium">
-									<input
-										type="checkbox"
-										checked={isSelected(attribute.id)}
-										onchange={(e) =>
-											toggleAttribute(attribute.id, (e.currentTarget as HTMLInputElement).checked)}
-									/>
-									<span>{attribute.title}</span>
-								</label>
-								{#if isSelected(attribute.id)}
-									<div class="mt-2">
+
+				{#if selectedGroupId}
+					<div class="space-y-2">
+						<label for="edit-product-attributes" class="text-sm font-semibold"
+							>2. Select Attributes</label
+						>
+						<MultiSelectCombobox
+							id="edit-product-attributes"
+							bind:value={selectedAttributeIds}
+							options={attributeOptions}
+							placeholder="Add attributes (Size, Material, etc.)"
+							disabled={groupAttributesLoading}
+						/>
+					</div>
+
+					{#if selectedAttributeIds.length > 0}
+						<div class="space-y-4 border-t pt-2">
+							<div class="grid gap-3">
+								{#each selectedAttributeIds as attributeId (attributeId)}
+									{@const details = groupAttributes.find((a) => a.id === attributeId)}
+									<div class="rounded-lg border bg-card p-3 shadow-sm">
+										<div class="mb-1.5 flex items-center justify-between">
+											<p class="text-sm font-bold tracking-tight uppercase">
+												{details?.title ?? attributeId}
+											</p>
+										</div>
 										<Input
 											class="h-9"
-											placeholder="Enter value"
-											value={getSelectedValue(attribute.id)}
-											oninput={(e) =>
-												updateAttributeValue(
-													attribute.id,
-													(e.currentTarget as HTMLInputElement).value
-												)}
+											placeholder="e.g. S, M, L"
+											value={getSelectedValue(attributeId)}
+											oninput={(e) => updateAttributeValue(attributeId, e.currentTarget.value)}
 										/>
+										<p class="mt-1 text-[10px] text-muted-foreground italic">
+											Separated by commas for tag display.
+										</p>
 									</div>
-								{/if}
+								{/each}
 							</div>
-						{/each}
-					</div>
-				{:else}
-					<p class="text-sm text-muted-foreground">No attributes available for this group</p>
+						</div>
+					{/if}
 				{/if}
 			{/if}
 		</div>
-		<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
+
+		<Sheet.Footer class="border-t p-4">
 			<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
 			<Button
 				onclick={async () => {
-					productAttributesForm.data.attributes = [...(productAttributesForm?.data?.attributes ?? [])];
 					await onSaved();
 					open = false;
-				}}
+				}}>Save Changes</Button
 			>
-				Save
-			</Button>
 		</Sheet.Footer>
 	</Sheet.Content>
 </Sheet.Root>
