@@ -11,6 +11,7 @@
 		placeholder?: string;
 		id?: string;
 		disabled?: boolean;
+		loading?: boolean;
 		emptyMessage?: string;
 		class?: string;
 		triggerClass?: string;
@@ -19,6 +20,7 @@
 		filterFn?: (options: MultiSelectOption[], query: string) => MultiSelectOption[];
 		/** Called when the dropdown is first opened (e.g. for lazy-loading options). */
 		onOpen?: () => void;
+		onSearchChange?: (query: string) => void;
 	};
 
 	let {
@@ -27,6 +29,7 @@
 		placeholder = 'Search…',
 		id: propId,
 		disabled = false,
+		loading = false,
 		emptyMessage = 'No results found.',
 		class: className = '',
 		triggerClass = '',
@@ -34,6 +37,7 @@
 		chipsClass = '',
 		filterFn,
 		onOpen,
+		onSearchChange,
 	}: Props = $props();
 
 	const listboxId = $derived(propId ? `${propId}-listbox` : `multi-select-listbox-${Math.random().toString(36).slice(2, 9)}`);
@@ -110,6 +114,7 @@
 			placeholder={placeholder}
 			bind:value={input}
 			disabled={disabled}
+			oninput={() => onSearchChange?.(input)}
 			onkeydown={(e) => e.key === 'Escape' && (open = false)}
 		/>
 		{#if open}
@@ -121,7 +126,12 @@
 					listboxClass
 				)}
 			>
-				{#if filteredOptions.length === 0}
+				{#if loading}
+					<li class="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground">
+						<span class="inline-block size-3 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary"></span>
+						Searching…
+					</li>
+				{:else if filteredOptions.length === 0}
 					<li class="px-3 py-1.5 text-sm text-muted-foreground">{emptyMessage}</li>
 				{:else}
 					{#each filteredOptions as option (option.id)}

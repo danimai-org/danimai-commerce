@@ -8,9 +8,11 @@
 		options: ComboboxOption[];
 		value?: string;
 		onValueChange?: (value: string) => void;
+		onSearchChange?: (query: string) => void;
 		placeholder?: string;
 		id?: string;
 		disabled?: boolean;
+		loading?: boolean;
 		emptyMessage?: string;
 		class?: string;
 		triggerClass?: string;
@@ -22,9 +24,11 @@
 		options = [],
 		value = $bindable(''),
 		onValueChange,
+		onSearchChange,
 		placeholder = 'Select…',
 		id: propId,
 		disabled = false,
+		loading = false,
 		emptyMessage = 'No results found',
 		class: className = '',
 		triggerClass = '',
@@ -108,6 +112,7 @@
 		oninput={(e) => {
 			open = true;
 			input = (e.currentTarget as HTMLInputElement).value;
+			onSearchChange?.(input);
 		}}
 		onkeydown={(e) => {
 			if (e.key === 'Escape') {
@@ -139,23 +144,30 @@
 				listboxClass
 			)}
 		>
-			{#each filteredOptions as option (option.id)}
-				<li role="option" aria-selected={value === option.id}>
-					<button
-						type="button"
-						class="w-full cursor-pointer px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-						onclick={(e) => {
-							e.stopPropagation();
-							select(option.id);
-						}}
-						onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), select(option.id))}
-					>
-						{option.value}
-					</button>
+			{#if loading}
+				<li class="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground">
+					<span class="inline-block size-3 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary"></span>
+					Searching…
 				</li>
-			{/each}
-			{#if filteredOptions.length === 0}
-				<li class="px-3 py-1.5 text-sm text-muted-foreground">{emptyMessage}</li>
+			{:else}
+				{#each filteredOptions as option (option.id)}
+					<li role="option" aria-selected={value === option.id}>
+						<button
+							type="button"
+							class="w-full cursor-pointer px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+							onclick={(e) => {
+								e.stopPropagation();
+								select(option.id);
+							}}
+							onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), select(option.id))}
+						>
+							{option.value}
+						</button>
+					</li>
+				{/each}
+				{#if filteredOptions.length === 0}
+					<li class="px-3 py-1.5 text-sm text-muted-foreground">{emptyMessage}</li>
+				{/if}
 			{/if}
 		</ul>
 	{/if}
