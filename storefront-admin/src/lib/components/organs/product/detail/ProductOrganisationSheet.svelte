@@ -117,28 +117,30 @@
 	let submitting = $state(false);
 	let saveError = $state<string | null>(null);
 	let prevOpen = $state(false);
+	let orgControlsKey = 0;
 
 	let categorySearch = $state('');
 	let debouncedCategorySearch = $state('');
 	let categoryLoading = $state(false);
+	let categoryFetchGen = 0;
 	let collectionSearch = $state('');
 	let debouncedCollectionSearch = $state('');
 	let collectionLoading = $state(false);
+	let collectionFetchGen = 0;
 	let tagSearch = $state('');
 	let debouncedTagSearch = $state('');
 	let tagLoading = $state(false);
+	let tagFetchGen = 0;
 
 	$effect(() => {
 		const q = categorySearch;
-		categoryLoading = true;
 		const t = setTimeout(() => {
 			debouncedCategorySearch = q;
-		}, 300);
+		}, 200);
 		return () => clearTimeout(t);
 	});
 	$effect(() => {
 		const q = collectionSearch;
-		collectionLoading = true;
 		const t = setTimeout(() => {
 			debouncedCollectionSearch = q;
 		}, 300);
@@ -146,7 +148,6 @@
 	});
 	$effect(() => {
 		const q = tagSearch;
-		tagLoading = true;
 		const t = setTimeout(() => {
 			debouncedTagSearch = q;
 		}, 300);
@@ -154,12 +155,17 @@
 	});
 
 	$effect(() => {
-		if (!open) return;
+		const gen = ++categoryFetchGen;
+		if (!open) {
+			categoryLoading = false;
+			return;
+		}
 		const search = debouncedCategorySearch;
 		categoryLoading = true;
 		void (async () => {
 			try {
 				const res = await client['product-categories'].get({ query: buildQuery(search) });
+				if (gen !== categoryFetchGen) return;
 				fetchedCategories = extractRows<{ id: string; value: string }>(res).map((c) => ({
 					id: c.id,
 					value: c.value
@@ -167,18 +173,23 @@
 			} catch {
 				/* keep existing options */
 			} finally {
-				categoryLoading = false;
+				if (gen === categoryFetchGen) categoryLoading = false;
 			}
 		})();
 	});
 
 	$effect(() => {
-		if (!open) return;
+		const gen = ++collectionFetchGen;
+		if (!open) {
+			collectionLoading = false;
+			return;
+		}
 		const search = debouncedCollectionSearch;
 		collectionLoading = true;
 		void (async () => {
 			try {
 				const res = await client.collections.get({ query: buildQuery(search) });
+				if (gen !== collectionFetchGen) return;
 				fetchedCollections = extractRows<{ id: string; title: string }>(res).map((c) => ({
 					id: c.id,
 					value: c.title
@@ -186,18 +197,23 @@
 			} catch {
 				/* keep existing options */
 			} finally {
-				collectionLoading = false;
+				if (gen === collectionFetchGen) collectionLoading = false;
 			}
 		})();
 	});
 
 	$effect(() => {
-		if (!open) return;
+		const gen = ++tagFetchGen;
+		if (!open) {
+			tagLoading = false;
+			return;
+		}
 		const search = debouncedTagSearch;
 		tagLoading = true;
 		void (async () => {
 			try {
 				const res = await client['product-tags'].get({ query: buildQuery(search) });
+				if (gen !== tagFetchGen) return;
 				fetchedTags = extractRows<{ id: string; value: string }>(res).map((t) => ({
 					id: t.id,
 					value: t.value
@@ -205,13 +221,14 @@
 			} catch {
 				/* keep existing options */
 			} finally {
-				tagLoading = false;
+				if (gen === tagFetchGen) tagLoading = false;
 			}
 		})();
 	});
 
 	$effect(() => {
 		if (open && !prevOpen) {
+			orgControlsKey += 1;
 			selectedCategoryId = productCategoryId;
 			selectedCollectionIds = [...productCollectionIds];
 			selectedTagIds = [...productTagIds];
@@ -272,55 +289,59 @@
 			{#if saveError}
 				<p class="text-sm text-destructive">{saveError}</p>
 			{/if}
-			<div class="flex flex-col gap-2">
-				<label for="org-categories" class="text-sm font-medium">Category</label>
-				<Combobox
-					id="org-categories"
-					bind:value={selectedCategoryId}
-					options={categoriesOptions}
-					placeholder="Search categories…"
-					emptyMessage="No categories found"
-					disabled={submitting}
-					loading={categoryLoading}
-					onSearchChange={(q) => {
-						categorySearch = q;
-					}}
-				/>
-			</div>
-			<div class="flex flex-col gap-3">
-				<h3 class="text-sm font-medium">Collections</h3>
-				<MultiSelectCombobox
-					id="org-collections"
-					bind:value={selectedCollectionIds}
-					options={collectionsOptions}
-					placeholder="Search collections…"
-					emptyMessage="No collections yet."
-					disabled={submitting}
-					loading={collectionLoading}
-					onSearchChange={(q) => {
-						collectionSearch = q;
-					}}
-				/>
-			</div>
-			<div class="flex flex-col gap-2">
-				<div class="flex items-center justify-between gap-2">
-					<label for="org-tags-search" class="text-sm font-medium">
-						Tags <span class="font-normal text-muted-foreground">(Optional)</span>
-					</label>
+			{#key orgControlsKey}
+				<div class="flex flex-col gap-4">
+					<div class="flex flex-col gap-2">
+						<label for="org-categories" class="text-sm font-medium">Category</label>
+						<Combobox
+							id="org-categories"
+							bind:value={selectedCategoryId}
+							options={categoriesOptions}
+							placeholder="Search categories…"
+							emptyMessage="No categories found"
+							disabled={submitting}
+							loading={categoryLoading}
+							onSearchChange={(q) => {
+								categorySearch = q;
+							}}
+						/>
+					</div>
+					<div class="flex flex-col gap-3">
+						<h3 class="text-sm font-medium">Collections</h3>
+						<MultiSelectCombobox
+							id="org-collections"
+							bind:value={selectedCollectionIds}
+							options={collectionsOptions}
+							placeholder="Search collections…"
+							emptyMessage="No collections yet."
+							disabled={submitting}
+							loading={collectionLoading}
+							onSearchChange={(q) => {
+								collectionSearch = q;
+							}}
+						/>
+					</div>
+					<div class="flex flex-col gap-2">
+						<div class="flex items-center justify-between gap-2">
+							<label for="org-tags-search" class="text-sm font-medium">
+								Tags <span class="font-normal text-muted-foreground">(Optional)</span>
+							</label>
+						</div>
+						<MultiSelectCombobox
+							id="org-tags"
+							bind:value={selectedTagIds}
+							options={tagsOptions}
+							placeholder="Type to search…"
+							emptyMessage="No tags found"
+							disabled={submitting}
+							loading={tagLoading}
+							onSearchChange={(q) => {
+								tagSearch = q;
+							}}
+						/>
+					</div>
 				</div>
-				<MultiSelectCombobox
-					id="org-tags"
-					bind:value={selectedTagIds}
-					options={tagsOptions}
-					placeholder="Type to search…"
-					emptyMessage="No tags found"
-					disabled={submitting}
-					loading={tagLoading}
-					onSearchChange={(q) => {
-						tagSearch = q;
-					}}
-				/>
-			</div>
+			{/key}
 		</div>
 		<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
 			<Button variant="outline" onclick={() => (open = false)} disabled={submitting}>Cancel</Button>

@@ -66,10 +66,30 @@
 		value = value.filter((x) => x !== id);
 	}
 
+	function resetSearchQuery() {
+		input = '';
+		onSearchChange?.('');
+	}
+
+	function clearSearchOnly(e: MouseEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		resetSearchQuery();
+	}
+
+	function closeFromEscape() {
+		open = false;
+		resetSearchQuery();
+	}
+
 	function handleFocusout(e: FocusEvent) {
 		if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) {
 			open = false;
 		}
+	}
+
+	function listPointerDown(e: PointerEvent) {
+		e.preventDefault();
 	}
 </script>
 
@@ -95,7 +115,7 @@
 		}}
 		onfocusout={handleFocusout}
 		onkeydown={(e) => {
-			if (e.key === 'Escape') open = false;
+			if (e.key === 'Escape') closeFromEscape();
 			if (e.key === 'Enter' || e.key === ' ') {
 				e.preventDefault();
 				if (e.isTrusted && !hasOpened) {
@@ -115,7 +135,7 @@
 			bind:value={input}
 			disabled={disabled}
 			oninput={() => onSearchChange?.(input)}
-			onkeydown={(e) => e.key === 'Escape' && (open = false)}
+			onkeydown={(e) => e.key === 'Escape' && closeFromEscape()}
 		/>
 		{#if open}
 			<ul
@@ -125,7 +145,27 @@
 					'absolute top-full left-0 z-50 mt-1 max-h-48 w-full min-w-0 overflow-auto rounded-md border border-input bg-popover py-1 text-popover-foreground shadow-md',
 					listboxClass
 				)}
+				onpointerdown={listPointerDown}
 			>
+				{#if input.trim()}
+					<li role="presentation" class="sticky top-0 z-10 border-b border-border bg-muted/40 px-2 py-1.5">
+						<div class="flex items-center justify-end">
+							<button
+								type="button"
+								class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+								aria-label="Clear search"
+								onpointerdown={(e) => {
+									e.preventDefault();
+									e.stopPropagation();
+								}}
+								onclick={clearSearchOnly}
+							>
+								<X class="size-3.5 opacity-70" aria-hidden="true" />
+								Clear
+							</button>
+						</div>
+					</li>
+				{/if}
 				{#if loading}
 					<li class="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground">
 						<span class="inline-block size-3 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary"></span>

@@ -330,7 +330,7 @@ export class UpdateProductProcess
   ) {
     await this.db
       .deleteFrom("product_attribute_values")
-      .where("id", "in", attributes.map((a) => a.attribute_id))
+      .where("product_id", "=", productId)
       .execute();
 
     if (attributes.length === 0) return;
@@ -339,10 +339,9 @@ export class UpdateProductProcess
       id: randomUUID(),
       attribute_group_id: a.attribute_group_id,
       attribute_id: a.attribute_id,
-      product_attribute_id: productId,
+      product_id: productId,
       value: a.value,
       metadata: null,
-      deleted_at: null,
     }));
 
     await this.db

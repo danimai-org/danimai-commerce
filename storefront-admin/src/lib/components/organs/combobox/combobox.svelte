@@ -49,12 +49,22 @@
 
 	const selectedLabel = $derived(value ? options.find((o) => o.id === value)?.value ?? '' : '');
 
-	const displayValue = $derived(open ? input : value ? selectedLabel : input);
+	/** Closed + selection: show label; otherwise keep draft search. Open: always show draft. */
+	const displayValue = $derived(
+		open ? input : value && selectedLabel ? selectedLabel : input
+	);
+
+	let blurSchedule: ReturnType<typeof setTimeout> | undefined;
+
+	function resetSearchQuery() {
+		input = '';
+		onSearchChange?.('');
+	}
 
 	function select(optionId: string) {
 		value = optionId;
 		onValueChange?.(optionId);
-		input = '';
+		resetSearchQuery();
 		open = false;
 	}
 
@@ -62,14 +72,19 @@
 		e.stopPropagation();
 		value = '';
 		onValueChange?.('');
-		input = '';
+		resetSearchQuery();
 		open = false;
+	}
+
+	function clearSearchOnly(e: MouseEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		resetSearchQuery();
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
 			open = false;
-			input = '';
 		}
 		if (e.key === 'Enter' && open) {
 			e.preventDefault();
@@ -78,10 +93,18 @@
 	}
 
 	function handleFocusout(e: FocusEvent) {
-		if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) {
-			open = false;
-			input = '';
-		}
+		const root = e.currentTarget as HTMLElement;
+		if (blurSchedule) clearTimeout(blurSchedule);
+		blurSchedule = setTimeout(() => {
+			blurSchedule = undefined;
+			if (!root.contains(document.activeElement)) {
+				open = false;
+			}
+		}, 0);
+	}
+
+	function listPointerDown(e: PointerEvent) {
+		e.preventDefault();
 	}
 </script>
 
@@ -117,7 +140,6 @@
 		onkeydown={(e) => {
 			if (e.key === 'Escape') {
 				open = false;
-				input = '';
 			}
 			if (e.key === 'Enter' && open) {
 				e.preventDefault();
@@ -143,7 +165,27 @@
 				'absolute top-full left-0 z-50 mt-1 max-h-48 w-full min-w-0 overflow-auto rounded-md border border-input bg-popover py-1 text-popover-foreground shadow-md',
 				listboxClass
 			)}
+			onpointerdown={listPointerDown}
 		>
+			{#if input.trim()}
+				<li role="presentation" class="sticky top-0 z-10 border-b border-border bg-muted/40 px-2 py-1.5">
+					<div class="flex items-center justify-end">
+						<button
+							type="button"
+							class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+							aria-label="Clear search"
+							onpointerdown={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+							}}
+							onclick={clearSearchOnly}
+						>
+							<X class="size-3.5 opacity-70" aria-hidden="true" />
+							Clear
+						</button>
+					</div>
+				</li>
+			{/if}
 			{#if loading}
 				<li class="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground">
 					<span class="inline-block size-3 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary"></span>
