@@ -2,7 +2,7 @@
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import { Combobox, MultiSelectCombobox } from '$lib/components/organs/index.js';
+	import { Combobox } from '$lib/components/organs/index.js';
 	import { client } from '$lib/client';
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import { onMount } from 'svelte';
@@ -22,6 +22,8 @@
 
 	interface Props {
 		open?: boolean;
+		productId: string;
+		attributeGroupId?: string;
 		productAttributesForm: SuperValidated<
 			ProductAttributeGroup,
 			string | unknown,
@@ -32,17 +34,21 @@
 
 	let {
 		open = $bindable(false),
+		productId,
+		attributeGroupId = '',
 		productAttributesForm,
 		onSaved = async () => {}
 	}: Props = $props();
 
 	let loading = $state(false);
-	// let loadError = $state<string | null>(null);
+	let saving = $state(false);
+	let saveError = $state('');
 	let attributeGroups = $state<ProductAttributeGroupRow[]>([]);
 	let groupAttributes = $state<ProductAttributeRow[]>([]);
 	let groupAttributesLoading = $state(false);
+	let groupSearchLoading = $state(false);
 	let selectedGroupId = $state('');
-	let selectedAttributeIds = $state<string[]>([]);
+	let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function pickLabel(item: { title?: string; value?: string; name?: string }): string {
 		return item.title ?? item.value ?? item.name ?? '';
@@ -58,18 +64,31 @@
 		return [];
 	}
 
-	onMount(async () => {
-		loading = true;
-		const listQuery = { page: 1, limit: 100, search: '', sorting_field: 'created_at' };
+	async function searchAttributeGroups(search: string = '') {
+		groupSearchLoading = true;
 		try {
-			const res = await client['product-attribute-groups'].get({ query: listQuery });
+			const res = await client['product-attribute-groups'].get({
+				query: { page: 1, limit: 100, search, sorting_field: 'created_at' }
+			});
 			const rows = extractRows<{ id: string; title?: string }>(res);
 			attributeGroups = rows.map((row) => ({ id: row.id, title: pickLabel(row) }));
 		} catch {
-			return 'Failed to load attribute groups';
+			/* keep existing options on error */
+		} finally {
+			groupSearchLoading = false;
 		}
+	}
 
-		const existingGroupId = productAttributesForm?.data?.attributes?.[0]?.attribute_group_id ?? '';
+	function handleGroupSearch(query: string) {
+		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+		searchDebounceTimer = setTimeout(() => searchAttributeGroups(query), 300);
+	}
+
+	onMount(async () => {
+		loading = true;
+		await searchAttributeGroups('');
+		const existingGroupId =
+			attributeGroupId || productAttributesForm?.data?.attributes?.[0]?.attribute_group_id || '';
 		selectedGroupId = existingGroupId || attributeGroups[0]?.id || '';
 		loading = false;
 	});
@@ -81,8 +100,6 @@
 	const attributeGroupOptions = $derived(
 		attributeGroups.map((group) => ({ id: group.id, value: group.title }))
 	);
-
-	const attributeOptions = $derived(groupAttributes.map((a) => ({ id: a.id, value: a.title })));
 
 	$effect(() => {
 		const groupId = selectedGroupId;
@@ -114,28 +131,21 @@
 	});
 
 	$effect(() => {
-		if (!open || loading) return;
-		selectedAttributeIds = (productAttributesForm?.data?.attributes ?? [])
-			.filter((a) => a.attribute_group_id === selectedGroupId)
-			.map((a) => a.attribute_id);
-	});
-
-	$effect(() => {
 		const formData = productAttributesForm?.data;
 		const groupId = selectedGroupId;
-		if (!formData || !groupId || loading) return;
+		if (!formData || !groupId || loading || groupAttributesLoading) return;
 
 		const current = [...(formData.attributes ?? [])];
 		const otherGroups = current.filter((a) => a.attribute_group_id !== groupId);
 
-		const nextForGroup = selectedAttributeIds.map((id) => {
+		const nextForGroup = groupAttributes.map((attr) => {
 			const existing = current.find(
-				(a) => a.attribute_id === id && a.attribute_group_id === groupId
+				(a) => a.attribute_id === attr.id && a.attribute_group_id === groupId
 			);
 			return (
 				existing ?? {
 					attribute_group_id: groupId,
-					attribute_id: id,
+					attribute_id: attr.id,
 					attribute_group_title: selectedGroupTitle,
 					value: ''
 				}
@@ -172,65 +182,92 @@
 				<p class="text-sm text-muted-foreground">Loading groups…</p>
 			{:else}
 				<div class="space-y-2">
-					<label for="edit-attribute-group" class="text-sm font-semibold">1. Attribute Group</label>
+					<label for="edit-attribute-group" class="text-sm font-semibold"> Attribute Group</label>
 					<Combobox
 						id="edit-attribute-group"
 						bind:value={selectedGroupId}
 						options={attributeGroupOptions}
 						placeholder="Select group"
+						loading={groupSearchLoading}
+						onSearchChange={handleGroupSearch}
 					/>
 				</div>
 
 				{#if selectedGroupId}
-					<div class="space-y-2">
-						<label for="edit-product-attributes" class="text-sm font-semibold"
-							>2. Select Attributes</label
-						>
-						<MultiSelectCombobox
-							id="edit-product-attributes"
-							bind:value={selectedAttributeIds}
-							options={attributeOptions}
-							placeholder="Add attributes (Size, Material, etc.)"
-							disabled={groupAttributesLoading}
-						/>
-					</div>
-
-					{#if selectedAttributeIds.length > 0}
-						<div class="space-y-4 border-t pt-2">
-							<div class="grid gap-3">
-								{#each selectedAttributeIds as attributeId (attributeId)}
-									{@const details = groupAttributes.find((a) => a.id === attributeId)}
-									<div class="rounded-lg border bg-card p-3 shadow-sm">
-										<div class="mb-1.5 flex items-center justify-between">
-											<p class="text-sm font-bold tracking-tight uppercase">
-												{details?.title ?? attributeId}
-											</p>
-										</div>
-										<Input
-											class="h-9"
-											placeholder="e.g. S, M, L"
-											value={getSelectedValue(attributeId)}
-											oninput={(e) => updateAttributeValue(attributeId, e.currentTarget.value)}
-										/>
-										<p class="mt-1 text-[10px] text-muted-foreground italic">
-											Separated by commas for tag display.
-										</p>
-									</div>
-								{/each}
-							</div>
+					{#if groupAttributesLoading}
+						<p class="text-sm text-muted-foreground">Loading attributes…</p>
+					{:else if groupAttributes.length > 0}
+						<div class="space-y-1">
+							<p class="text-sm font-semibold">Attributes</p>
+							<p class="text-xs text-muted-foreground">
+								Set values for each attribute in this group.
+							</p>
 						</div>
+						<div class="rounded-lg border bg-card">
+							{#each groupAttributes as attr, i (attr.id)}
+								<div
+									class="flex items-center gap-4 px-4 py-3{i < groupAttributes.length - 1
+										? ' border-b'
+										: ''}"
+								>
+									<label
+										class="w-28 shrink-0 text-sm font-medium text-foreground capitalize"
+										for="attr-{attr.id}"
+									>
+										{attr.title}
+									</label>
+									<Input
+										id="attr-{attr.id}"
+										class="h-8 flex-1 bg-background"
+										placeholder="Enter {attr.title.toLowerCase()}"
+										value={getSelectedValue(attr.id)}
+										oninput={(e) => updateAttributeValue(attr.id, e.currentTarget.value)}
+									/>
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<p class="text-sm text-muted-foreground">No attributes found in this group.</p>
 					{/if}
 				{/if}
 			{/if}
 		</div>
 
 		<Sheet.Footer class="border-t p-4">
+			{#if saveError}
+				<p class="mr-auto text-sm text-destructive">{saveError}</p>
+			{/if}
 			<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
 			<Button
+				disabled={saving}
 				onclick={async () => {
-					await onSaved();
-					open = false;
-				}}>Save Changes</Button
+					saving = true;
+					saveError = '';
+					try {
+						const attrs = (productAttributesForm?.data?.attributes ?? [])
+							.filter((a) => a.attribute_id && a.value.trim())
+							.map((a) => ({
+								attribute_group_id: a.attribute_group_id,
+								attribute_id: a.attribute_id,
+								value: a.value.trim()
+							}));
+						const res = await client.products({ id: productId }).put({
+							attribute_group_id: selectedGroupId || undefined,
+							attributes: attrs
+						});
+						if (res.error) {
+							const err = res.error as { value?: { message?: string } };
+							saveError = err.value?.message ?? 'Failed to save attributes';
+							return;
+						}
+						await onSaved();
+						open = false;
+					} catch (e) {
+						saveError = e instanceof Error ? e.message : 'Failed to save attributes';
+					} finally {
+						saving = false;
+					}
+				}}>{saving ? 'Saving…' : 'Save'}</Button
 			>
 		</Sheet.Footer>
 	</Sheet.Content>

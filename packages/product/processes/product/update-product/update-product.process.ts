@@ -46,9 +46,6 @@ export class UpdateProductProcess
     if (input.attribute_groups !== undefined) {
       await this.validateAttributeGroupIds(input.attribute_groups.map((g) => g.attribute_group_id));
     }
-    if (input.attributes !== undefined) {
-      await this.validateAttributeValuesForGroups(input.id, input.attributes);
-    }
     if (input.tag_ids !== undefined) {
       await this.validateTagIds(input.tag_ids);
     }

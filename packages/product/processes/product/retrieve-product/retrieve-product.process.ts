@@ -163,6 +163,7 @@ export class RetrieveProductProcess implements ProcessContract<
         "products.discountable",
         "products.is_giftcard",
         "products.thumbnail",
+        "products.attribute_group_id",
         () =>
           sql<Static<(typeof RetrieveProductSchema)["category"]> | null>`
         CASE
@@ -241,6 +242,7 @@ export class RetrieveProductProcess implements ProcessContract<
         "products.discountable",
         "products.is_giftcard",
         "products.thumbnail",
+        "products.attribute_group_id",
       ])
       .executeTakeFirst();
 
