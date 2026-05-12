@@ -110,7 +110,7 @@
 		(async () => {
 			try {
 				const res = await client['product-attributes'].get({
-					query: { page: 1, limit: 100 }
+					query: { page: 1, limit: 100, attribute_group_id: groupId }
 				});
 
 				if (cancelled) return;
@@ -133,7 +133,7 @@
 	$effect(() => {
 		const formData = productAttributesForm?.data;
 		const groupId = selectedGroupId;
-		if (!formData || !groupId || loading || groupAttributesLoading) return;
+		if (!open || !formData || !groupId || loading || groupAttributesLoading) return;
 
 		const current = [...(formData.attributes ?? [])];
 		const otherGroups = current.filter((a) => a.attribute_group_id !== groupId);
@@ -153,6 +153,15 @@
 		});
 
 		formData.attributes = [...otherGroups, ...nextForGroup];
+	});
+
+	/** When closed, strip attribute draft rows so the card uses product/API data instead of stale form rows. */
+	$effect(() => {
+		if (open) return;
+		const formData = productAttributesForm?.data;
+		if ((formData?.attributes?.length ?? 0) > 0) {
+			formData.attributes = [];
+		}
 	});
 
 	function updateAttributeValue(attributeId: string, value: string) {

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
-	import { getProductDetail } from '$lib/hooks/use-product-detail.svelte.js';
 	import EditAttributesSheet from './EditAttributesSheet.svelte';
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import type { Product } from '../type';
@@ -42,7 +41,8 @@
 		>;
 	} = $props();
 
-	const product = $derived(getDetailContext<Product>()?.data ?? null);
+	const detailQuery = getDetailContext<Product>();
+	const product = $derived(detailQuery?.data ?? null);
 
 	let groupTitlesById = $state<Record<string, string>>({});
 	let groupAttributeRows = $state<Array<{ id: string; title: string }>>([]);
@@ -261,5 +261,5 @@
 	productId={product?.id ?? ''}
 	attributeGroupId={productAttributeGroupId ?? ''}
 	{productAttributesForm}
-	onSaved={() => void getProductDetail()?.refetch?.()}
+	onSaved={() => void detailQuery?.refetch?.()}
 />

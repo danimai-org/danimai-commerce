@@ -2,6 +2,9 @@
 	import X from '@lucide/svelte/icons/x';
 	import { cn } from '$lib/utils.js';
 
+	const searchClearBtn =
+		'flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
+
 	export type ComboboxOption = { id: string; value: string };
 
 	type Props = {
@@ -128,7 +131,7 @@
 >
 	<input
 		type="text"
-		class="h-full min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+		class="h-full min-w-0 flex-1 border-0 bg-transparent py-0 pr-1 pl-0 text-sm text-foreground outline-none placeholder:text-muted-foreground"
 		placeholder={open ? 'Type to search…' : value ? '' : placeholder}
 		value={displayValue}
 		disabled={disabled}
@@ -157,6 +160,20 @@
 			<X class="size-4" />
 		</button>
 	{/if}
+	{#if open && input.trim() && !disabled}
+		<button
+			type="button"
+			class={searchClearBtn}
+			aria-label="Clear search"
+			onpointerdown={(e) => {
+				e.preventDefault();
+				e.stopPropagation();
+			}}
+			onclick={clearSearchOnly}
+		>
+			<X class="size-4 opacity-70" aria-hidden="true" />
+		</button>
+	{/if}
 	{#if open}
 		<ul
 			id={listboxId}
@@ -167,25 +184,6 @@
 			)}
 			onpointerdown={listPointerDown}
 		>
-			{#if input.trim()}
-				<li role="presentation" class="sticky top-0 z-10 border-b border-border bg-muted/40 px-2 py-1.5">
-					<div class="flex items-center justify-end">
-						<button
-							type="button"
-							class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-							aria-label="Clear search"
-							onpointerdown={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-							}}
-							onclick={clearSearchOnly}
-						>
-							<X class="size-3.5 opacity-70" aria-hidden="true" />
-							Clear
-						</button>
-					</div>
-				</li>
-			{/if}
 			{#if loading}
 				<li class="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground">
 					<span class="inline-block size-3 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary"></span>

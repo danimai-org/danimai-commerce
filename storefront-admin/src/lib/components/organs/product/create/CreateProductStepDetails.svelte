@@ -69,16 +69,6 @@
 		createMediaItems = createMediaItems.filter((_, i) => i !== index);
 	}
 
-	function setPrimaryMedia(index: number) {
-		if (index <= 0 || index >= createMediaItems.length) return;
-		const next = [...createMediaItems];
-		const [item] = next.splice(index, 1);
-		if (item) {
-			next.unshift(item);
-			createMediaItems = next;
-		}
-	}
-
 	function handleDragEnd(event: SortableList.RootEvents['ondragend']) {
 		const { draggedItemIndex, targetItemIndex, isCanceled } = event;
 		if (
@@ -234,13 +224,13 @@
 												Primary
 											</span>
 										{:else}
-											<button
+											<!-- <button
 												type="button"
 												class="rounded-md border px-2 py-1 text-xs transition-colors hover:bg-muted"
 												onclick={() => setPrimaryMedia(index)}
 											>
 												Set primary
-											</button>
+											</button> -->
 										{/if}
 										<button
 											type="button"
