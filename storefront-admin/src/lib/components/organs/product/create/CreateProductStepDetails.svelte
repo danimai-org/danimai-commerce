@@ -4,7 +4,10 @@
 	import Info from '@lucide/svelte/icons/info';
 	import Image from '@lucide/svelte/icons/image';
 	import X from '@lucide/svelte/icons/x';
+	import { SortableList, sortItems } from '@rodrigodagostino/svelte-sortable-list';
 	import { cn } from '$lib/utils.js';
+
+	export type CreateProductMediaItem = { id: string; file: File; preview: string };
 
 	let {
 		createTitle = $bindable(''),
@@ -16,9 +19,8 @@
 		createHasVariants = $bindable(true),
 		createMediaModalOpen = $bindable(false),
 		createMediaImageUrl = $bindable(''),
-		createMediaChosenFiles = $bindable([] as File[]),
+		createMediaItems = $bindable([] as CreateProductMediaItem[]),
 		createMediaFileInput = $bindable(undefined as HTMLInputElement | undefined),
-		createMediaUrls = $bindable([] as string[]),
 		onEnableVariants = () => {}
 	}: {
 		createTitle: string;
@@ -30,24 +32,12 @@
 		createHasVariants: boolean;
 		createMediaModalOpen: boolean;
 		createMediaImageUrl: string;
-		createMediaChosenFiles: File[];
+		createMediaItems: CreateProductMediaItem[];
 		createMediaFileInput: HTMLInputElement | undefined;
-		createMediaUrls: string[];
 		onEnableVariants?: () => void;
 	} = $props();
 
-	const mediaPreviewSrcs = $derived(createMediaUrls.filter((url) => url.trim().length > 0));
-	const primaryMediaUrl = $derived(mediaPreviewSrcs[0] ?? '');
-	const mediaFileRows = $derived(
-		mediaPreviewSrcs.map((url, index) => ({
-			url,
-			file: createMediaChosenFiles[index],
-			name: createMediaChosenFiles[index]?.name ?? `Image ${index + 1}`,
-			sizeLabel: createMediaChosenFiles[index]
-				? `${(createMediaChosenFiles[index].size / 1024).toFixed(1)} KB`
-				: 'Uploaded image'
-		}))
-	);
+	const primaryMediaUrl = $derived(createMediaItems[0]?.preview.trim() ?? '');
 
 	function readFileAsDataUrl(file: File): Promise<string> {
 		return new Promise((resolve, reject) => {
@@ -61,9 +51,13 @@
 	async function handleSelectedFiles(files: File[]) {
 		if (!files.length) return;
 		try {
-			const fileUrls = await Promise.all(files.map((file) => readFileAsDataUrl(file)));
-			createMediaUrls = [...createMediaUrls, ...fileUrls];
-			createMediaChosenFiles = [...createMediaChosenFiles, ...files];
+			const previews = await Promise.all(files.map((file) => readFileAsDataUrl(file)));
+			const additions = files.map((file, i) => ({
+				id: crypto.randomUUID(),
+				file,
+				preview: previews[i] ?? ''
+			}));
+			createMediaItems = [...createMediaItems, ...additions];
 		} catch {
 			// Ignore malformed files and keep existing images.
 		}
@@ -72,25 +66,34 @@
 	}
 
 	function removeMediaAt(index: number) {
-		createMediaUrls = createMediaUrls.filter((_, i) => i !== index);
-		createMediaChosenFiles = createMediaChosenFiles.filter((_, i) => i !== index);
+		createMediaItems = createMediaItems.filter((_, i) => i !== index);
 	}
 
 	function setPrimaryMedia(index: number) {
-		if (index <= 0 || index >= createMediaUrls.length) return;
-		const nextUrls = [...createMediaUrls];
-		const [primary] = nextUrls.splice(index, 1);
-		nextUrls.unshift(primary);
-		createMediaUrls = nextUrls;
-
-		if (createMediaChosenFiles.length) {
-			const nextFiles = [...createMediaChosenFiles];
-			const [primaryFile] = nextFiles.splice(index, 1);
-			if (primaryFile) {
-				nextFiles.unshift(primaryFile);
-				createMediaChosenFiles = nextFiles;
-			}
+		if (index <= 0 || index >= createMediaItems.length) return;
+		const next = [...createMediaItems];
+		const [item] = next.splice(index, 1);
+		if (item) {
+			next.unshift(item);
+			createMediaItems = next;
 		}
+	}
+
+	function handleDragEnd(event: SortableList.RootEvents['ondragend']) {
+		const { draggedItemIndex, targetItemIndex, isCanceled } = event;
+		if (
+			isCanceled ||
+			typeof targetItemIndex !== 'number' ||
+			draggedItemIndex === targetItemIndex ||
+			draggedItemIndex < 0
+		) {
+			return;
+		}
+		createMediaItems = sortItems(createMediaItems, draggedItemIndex, targetItemIndex);
+	}
+
+	function mediaSizeLabel(file: File): string {
+		return `${(file.size / 1024).toFixed(1)} KB`;
 	}
 </script>
 
@@ -191,10 +194,10 @@
 					if (input) input.value = '';
 				}}
 			/>
-			{#if mediaPreviewSrcs.length > 0}
+			{#if createMediaItems.length > 0}
 				<div class="flex flex-col gap-3 rounded-md border bg-muted/20 p-3">
 					<div class="flex items-center justify-between">
-						<p class="text-xs text-muted-foreground">{mediaPreviewSrcs.length} image(s) selected</p>
+						<p class="text-xs text-muted-foreground">{createMediaItems.length} image(s) selected</p>
 						<p class="text-xs text-muted-foreground">First image is used as thumbnail</p>
 					</div>
 					{#if primaryMediaUrl}
@@ -208,44 +211,49 @@
 						</div>
 					{/if}
 					<div class="flex max-h-56 flex-col gap-2 overflow-auto">
-						{#each mediaFileRows as mediaRow, index (mediaRow.url)}
-							<div class="flex items-center gap-3 rounded-md border bg-background p-2">
-								<img
-									src={mediaRow.url}
-									alt=""
-									class="size-12 rounded-md border object-cover"
-									onerror={(ev) => ((ev.currentTarget as HTMLImageElement).style.display = 'none')}
-								/>
-								<div class="min-w-0 flex-1">
-									<p class="truncate text-sm font-medium">{mediaRow.name}</p>
-									<p class="text-xs text-muted-foreground">{mediaRow.sizeLabel}</p>
-								</div>
-								{#if index === 0}
-									<span
-										class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
-									>
-										<Image class="size-3" />
-										Primary
-									</span>
-								{:else}
-									<button
-										type="button"
-										class="rounded-md border px-2 py-1 text-xs transition-colors hover:bg-muted"
-										onclick={() => setPrimaryMedia(index)}
-									>
-										Set primary
-									</button>
-								{/if}
-								<button
-									type="button"
-									class="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-									onclick={() => removeMediaAt(index)}
-									aria-label={`Remove ${mediaRow.name}`}
-								>
-									<X class="size-4" />
-								</button>
-							</div>
-						{/each}
+						<SortableList.Root ondragend={handleDragEnd}>
+							{#each createMediaItems as mediaRow, index (mediaRow.id)}
+								<SortableList.Item id={mediaRow.id} {index}>
+									<div class="mb-2 flex items-center gap-3 rounded-md border bg-background p-2">
+										<img
+											src={mediaRow.preview}
+											alt=""
+											class="size-12 rounded-md border object-cover"
+											onerror={(ev) =>
+												((ev.currentTarget as HTMLImageElement).style.display = 'none')}
+										/>
+										<div class="min-w-0 flex-1">
+											<p class="truncate text-sm font-medium">{mediaRow.file.name}</p>
+											<p class="text-xs text-muted-foreground">{mediaSizeLabel(mediaRow.file)}</p>
+										</div>
+										{#if index === 0}
+											<span
+												class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
+											>
+												<Image class="size-3" />
+												Primary
+											</span>
+										{:else}
+											<button
+												type="button"
+												class="rounded-md border px-2 py-1 text-xs transition-colors hover:bg-muted"
+												onclick={() => setPrimaryMedia(index)}
+											>
+												Set primary
+											</button>
+										{/if}
+										<button
+											type="button"
+											class="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+											onclick={() => removeMediaAt(index)}
+											aria-label={`Remove ${mediaRow.file.name}`}
+										>
+											<X class="size-4" />
+										</button>
+									</div>
+								</SortableList.Item>
+							{/each}
+						</SortableList.Root>
 					</div>
 				</div>
 			{/if}

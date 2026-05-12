@@ -93,6 +93,7 @@
 				const res = await client['product-attributes'].get({
 					query: { page: 1, limit: 100, attribute_group_id: attrGroupId }
 				});
+				console.log(res);
 				if (cancelled) return;
 				groupAttributeRows = extractRows<{ id: string; title?: string }>(res).map((r) => ({
 					id: r.id,
@@ -158,19 +159,22 @@
 		}
 
 		if (attrGroupId && groupAttributeRows.length > 0) {
-			const valuesById: Record<string, string> = {};
-			for (const a of productAttributes) {
-				if (a?.id) valuesById[a.id] = a.value;
-			}
+			const valuesByTitle: Record<string, string> = {};
 
+			for (const a of productAttributes) {
+				if (a?.title) {
+					valuesByTitle[a.title] = a.value;
+				}
+			}
 			const groupTitle = resolveGroupTitle(attrGroupId);
+
 			for (const [index, ga] of groupAttributeRows.entries()) {
 				upsertRow(
 					attrGroupId,
 					groupTitle,
 					`${attrGroupId}:${ga.id}:${index}`,
 					ga.title,
-					valuesById[ga.id] ?? ''
+					valuesByTitle[ga.title] ?? ''
 				);
 			}
 			return grouped;

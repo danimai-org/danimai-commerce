@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { useQueryClient } from '@tanstack/svelte-query';
 	import { SortableList, sortItems } from '@rodrigodagostino/svelte-sortable-list';
 	import { client } from '$lib/client';
 	import { getDetailContext } from '$lib/hooks';
@@ -18,6 +19,7 @@
 	}
 
 	let { open = $bindable(false), productId, thumbnail, onSaved }: Props = $props();
+	const queryClient = useQueryClient();
 	const detailQuery = getDetailContext<Product>();
 	const product = $derived(detailQuery?.data ?? null);
 	const productMedia = $derived.by(() => {
@@ -32,6 +34,50 @@
 		return productMedia.some((item) => item.url === thumb);
 	});
 	const apiBaseUrl = 'http://localhost:8000';
+
+	type ImageMutationResult = {
+		uploaded: Array<{ id: string; url: string }>;
+		deleted_ids: string[];
+	};
+
+	function applyImageMutationToProductCache(result: ImageMutationResult) {
+		queryClient.setQueryData(
+			['product-detail', productId],
+			(previous: Product | undefined | null) => {
+				if (previous == null) return previous;
+				const p = previous as {
+					media?: Array<{ id: string; url: string; rank: number }>;
+					thumbnail?: string | null;
+				};
+				const deleted = new Set(result.deleted_ids);
+				let media = [...(Array.isArray(p.media) ? p.media : [])].filter((m) => !deleted.has(m.id));
+				const newItems = result.uploaded
+					.map((u) => ({
+						id: u.id,
+						url: typeof u.url === 'string' ? u.url.trim() : ''
+					}))
+					.filter((m) => m.url.length > 0);
+				media = [...media, ...newItems.map((m) => ({ id: m.id, url: m.url, rank: 0 }))];
+				media = media.map((item, index) => ({ ...item, rank: index }));
+				let nextThumb = (typeof p.thumbnail === 'string' ? p.thumbnail.trim() : '') || '';
+				if (newItems.length > 0 && !nextThumb) {
+					nextThumb = newItems[0]!.url;
+				}
+				if (deleted.size > 0 && nextThumb) {
+					const stillHas = media.some((m) => m.url === nextThumb);
+					if (!stillHas) nextThumb = media[0]?.url?.trim?.() ?? '';
+				}
+				if (media.length === 0) {
+					nextThumb = '';
+				}
+				return {
+					...previous,
+					thumbnail: nextThumb || null,
+					media
+				};
+			}
+		);
+	}
 
 	let error = $state<string | null>(null);
 	let submitting = $state(false);
@@ -121,7 +167,7 @@
 		files?: File[];
 		delete_ids?: string[];
 		type?: string;
-	}) {
+	}): Promise<ImageMutationResult> {
 		const body = new FormData();
 		for (const file of payload.files ?? []) body.append('files', file);
 		if (payload.delete_ids && payload.delete_ids.length > 0) {
@@ -134,20 +180,35 @@
 			body
 		});
 		if (!response.ok) {
-			const errorPayload = (await response.json().catch(() => null)) as
-				| { message?: string; summary?: string }
-				| null;
+			const errorPayload = (await response.json().catch(() => null)) as {
+				message?: string;
+				summary?: string;
+			} | null;
 			throw new Error(
 				errorPayload?.message ?? errorPayload?.summary ?? 'Failed to update product images'
 			);
 		}
+		const parsed = (await response.json().catch(() => null)) as Partial<ImageMutationResult> | null;
+		return {
+			uploaded: Array.isArray(parsed?.uploaded)
+				? parsed.uploaded.map((u) => ({
+						id: String((u as { id?: string }).id ?? ''),
+						url: String((u as { url?: string }).url ?? '')
+					}))
+				: [],
+			deleted_ids: Array.isArray(parsed?.deleted_ids)
+				? parsed.deleted_ids.map((id) => String(id))
+				: []
+		};
 	}
 	async function uploadSelectedFiles(files: File[]) {
 		if (!files.length || !productId) return;
 		error = null;
 		submitting = true;
 		try {
-			await postImageMutation({ files });
+			const result = await postImageMutation({ files });
+			applyImageMutationToProductCache(result);
+			await queryClient.invalidateQueries({ queryKey: ['products'] });
 			await onSaved();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -175,6 +236,23 @@
 				const err = res.error as { value?: { message?: string } };
 				throw new Error(err?.value?.message ?? String(res.error));
 			}
+			const nextThumbnail = normalizedMedia[0]?.url?.trim?.() ?? '';
+			queryClient.setQueryData(
+				['product-detail', productId],
+				(previous: Product | undefined | null) => {
+					if (previous == null) return previous;
+					const prevThumb = (previous as { thumbnail?: string | null }).thumbnail?.trim?.();
+					return {
+						...previous,
+						thumbnail: nextThumbnail || prevThumb || null,
+						media: normalizedMedia.map((item, index) => ({
+							id: item.id,
+							url: item.url,
+							rank: index
+						}))
+					};
+				}
+			);
 			primaryMediaId = normalizedPrimaryMediaId;
 			sortableMedia = normalizedMedia;
 			primaryDirty = false;
@@ -195,7 +273,9 @@
 		removingMediaId = mediaId;
 		submitting = true;
 		try {
-			await postImageMutation({ delete_ids: [mediaId] });
+			const result = await postImageMutation({ delete_ids: [mediaId] });
+			applyImageMutationToProductCache(result);
+			await queryClient.invalidateQueries({ queryKey: ['products'] });
 			const remaining = sortableMedia.filter((item) => item.id !== mediaId);
 			const nextPrimary = wasPrimary ? (remaining[0]?.id ?? null) : primaryMediaId;
 			sortableMedia = normalizeMediaOrder(remaining, nextPrimary);
@@ -253,7 +333,9 @@
 					}}
 				>
 					{#if submitting}
-						<div class="size-7 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary"></div>
+						<div
+							class="size-7 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary"
+						></div>
 						<p>Uploading images...</p>
 					{:else}
 						<Upload class="size-7" />
@@ -343,24 +425,9 @@
 				<p class="text-sm text-muted-foreground">No media uploaded yet.</p>
 			{/if}
 		</div>
-		<div class="flex flex-wrap items-center justify-between gap-2 border-t p-4">
-			<Button
-				variant="ghost"
-				class="text-destructive hover:bg-destructive/10"
-				onclick={() => {
-					primaryMediaId = null;
-					primaryDirty = true;
-				}}
-				disabled={submitting}
-			>
-				Clear primary
-			</Button>
-			<div class="flex gap-2">
-				<Button variant="outline" onclick={close} disabled={submitting}>Cancel</Button>
-				<Button onclick={savePrimary} disabled={submitting || (!primaryDirty && !rankDirty)}
-					>Save</Button
-				>
-			</div>
-		</div>
+		<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
+			<Button variant="outline" onclick={close} disabled={submitting}>Cancel</Button>
+			<Button onclick={savePrimary} disabled={submitting || (!primaryDirty && !rankDirty)}>Save</Button>
+		</Sheet.Footer>
 	</Sheet.Content>
 </Sheet.Root>

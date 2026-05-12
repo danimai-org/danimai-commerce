@@ -485,6 +485,37 @@ export class UpdateProductProcess
         .execute();
     }
 
+    // Persist gallery order for retrieve-product (metadata.rank + sort).
+    if (mediaIds !== undefined && mediaIds.length > 0) {
+      const mediaRows = (await mediaDb
+        .selectFrom("media_files")
+        .where("id", "in", mediaIds)
+        .where("owner_type", "=", "product")
+        .where("owner_id", "=", productId)
+        .where("deleted_at", "is", null)
+        .select(["id", "metadata"])
+        .execute()) as Array<{ id: string; metadata: unknown | null }>;
+      const byId = new Map(mediaRows.map((row) => [row.id, row]));
+      for (let i = 0; i < mediaIds.length; i++) {
+        const mid = mediaIds[i]!;
+        const row = byId.get(mid);
+        if (!row) continue;
+        const prev =
+          row.metadata !== null &&
+          typeof row.metadata === "object" &&
+          !Array.isArray(row.metadata)
+            ? (row.metadata as Record<string, unknown>)
+            : {};
+        const metadata = { ...prev, rank: i };
+        await mediaDb
+          .updateTable("media_files")
+          .set({ metadata })
+          .where("id", "=", mid)
+          .where("deleted_at", "is", null)
+          .execute();
+      }
+    }
+
     if (thumbnailMediaId) {
       const thumbnailMedia = await mediaDb
         .selectFrom("media_files")

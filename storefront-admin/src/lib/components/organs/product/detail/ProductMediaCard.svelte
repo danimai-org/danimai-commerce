@@ -33,6 +33,13 @@
 		return items;
 	});
 
+	const displayItems = $derived.by(() => {
+		if (mediaItems.length > 0) return mediaItems;
+		const t = thumbnail;
+		if (t) return [{ id: '__thumbnail-fallback__', url: t, rank: 0 }];
+		return [];
+	});
+
 	let mediaSheetOpen = $state(false);
 
 	async function refetch() {
@@ -58,14 +65,14 @@
 			<Pencil class="size-4" />
 		</Button>
 	</div>
-	{#if mediaItems.length > 0}
+	{#if displayItems.length > 0}
 		<button
 			type="button"
 			class="mt-4 block w-full rounded-md border-0 bg-transparent p-0 text-left transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
 			aria-label="Edit media"
 		>
 			<div class="mt-4 flex flex-wrap gap-4">
-				{#each mediaItems as mediaItem (mediaItem.id)}
+				{#each displayItems as mediaItem (mediaItem.id)}
 					<ProductMediaImage
 						src={mediaItem.url}
 						alt=""
