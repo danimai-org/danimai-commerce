@@ -90,7 +90,7 @@
 		(async () => {
 			try {
 				const res = await client['product-attributes'].get({
-					query: { page: 1, limit: 100, attribute_group_id: attrGroupId }
+					query: { page: 1, limit: 100, filters: { attribute_group_id: attrGroupId } }
 				});
 				if (cancelled) return;
 				groupAttributeRows = extractRows<{ id: string; title?: string }>(res).map((r) => ({

@@ -73,7 +73,7 @@
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<AttributeGroupHeroCard />
 
-			<div class="flex flex-col gap-8 p-6">
+			<div class="flex flex-col gap-4 p-6">
 				<AttributeGroupAttributesCard />
 				<ProductListingCard
 					title="Products with this attribute group"

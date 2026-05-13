@@ -110,7 +110,7 @@
 		(async () => {
 			try {
 				const res = await client['product-attributes'].get({
-					query: { page: 1, limit: 100, attribute_group_id: groupId }
+					query: { page: 1, limit: 100, filters: { attribute_group_id: groupId } }
 				});
 
 				if (cancelled) return;

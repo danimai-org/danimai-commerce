@@ -21,6 +21,8 @@
 		listboxClass?: string;
 		chipsClass?: string;
 		filterFn?: (options: MultiSelectOption[], query: string) => MultiSelectOption[];
+		/** When false, hides the preview table below the combobox (e.g. when selection is shown elsewhere). */
+		showSelectedTable?: boolean;
 		/** Called when the dropdown is first opened (e.g. for lazy-loading options). */
 		onOpen?: () => void;
 		onSearchChange?: (query: string) => void;
@@ -39,6 +41,7 @@
 		listboxClass = '',
 		chipsClass = '',
 		filterFn,
+		showSelectedTable = true,
 		onOpen,
 		onSearchChange,
 	}: Props = $props();
@@ -201,7 +204,7 @@
 			</ul>
 		{/if}
 	</div>
-	{#if selectedOptions.length > 0}
+	{#if showSelectedTable && selectedOptions.length > 0}
 		<div class={cn('w-full overflow-hidden rounded-md border', chipsClass)}>
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">

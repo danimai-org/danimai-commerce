@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { DropdownMenu } from 'bits-ui';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -160,30 +161,46 @@
 						</td>
 					{:else if isActionsColumn(column)}
 						<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
-							<DropdownMenu.Root>
-								<DropdownMenu.Trigger
-									class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
-								>
-									<MoreHorizontal class="size-4" />
-									<span class="sr-only">Actions</span>
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Portal>
-									<DropdownMenu.Content
-										class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-										sideOffset={4}
+							{#if column.actionsDisplay === 'inline'}
+								<div class="flex flex-wrap items-center gap-2">
+									{#each column.actions as action (action.key)}
+										<Button
+											type="button"
+											variant={action.key === 'delete' ? 'destructive' : 'outline'}
+											size="sm"
+											class="h-8 rounded-md"
+											onclick={() => action.onClick(row)}
+										>
+											{action.label}
+										</Button>
+									{/each}
+								</div>
+							{:else}
+								<DropdownMenu.Root>
+									<DropdownMenu.Trigger
+										class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
 									>
-										{#each column.actions as action (action.key)}
-											<DropdownMenu.Item
-												textValue={action.label}
-												class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 {action.key === 'delete' ? 'text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive' : ''}"
-												onclick={() => action.onClick(row)}
-											>
-												{action.label}
-											</DropdownMenu.Item>
-										{/each}
-									</DropdownMenu.Content>
-								</DropdownMenu.Portal>
-							</DropdownMenu.Root>
+										<MoreHorizontal class="size-4" />
+										<span class="sr-only">Actions</span>
+									</DropdownMenu.Trigger>
+									<DropdownMenu.Portal>
+										<DropdownMenu.Content
+											class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+											sideOffset={4}
+										>
+											{#each column.actions as action (action.key)}
+												<DropdownMenu.Item
+													textValue={action.label}
+													class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 {action.key === 'delete' ? 'text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive' : ''}"
+													onclick={() => action.onClick(row)}
+												>
+													{action.label}
+												</DropdownMenu.Item>
+											{/each}
+										</DropdownMenu.Content>
+									</DropdownMenu.Portal>
+								</DropdownMenu.Root>
+							{/if}
 						</td>
 					{:else if hasLegacyActions(column)}
 						<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
