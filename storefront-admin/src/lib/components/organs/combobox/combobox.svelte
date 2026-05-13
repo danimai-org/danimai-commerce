@@ -12,6 +12,8 @@
 		value?: string;
 		onValueChange?: (value: string) => void;
 		onSearchChange?: (query: string) => void;
+		/** Lazy-load hooks: first open (click / type) per mounted instance */
+		onOpen?: () => void;
 		placeholder?: string;
 		id?: string;
 		disabled?: boolean;
@@ -28,6 +30,7 @@
 		value = $bindable(''),
 		onValueChange,
 		onSearchChange,
+		onOpen,
 		placeholder = 'Select…',
 		id: propId,
 		disabled = false,
@@ -44,6 +47,14 @@
 
 	let open = $state(false);
 	let input = $state('');
+	let hasOpened = $state(false);
+
+	function notifyFirstOpen() {
+		if (!hasOpened) {
+			hasOpened = true;
+			onOpen?.();
+		}
+	}
 
 	const defaultFilter = (opts: ComboboxOption[], query: string) =>
 		opts.filter((o) => !query.trim() || o.value.toLowerCase().includes(query.trim().toLowerCase()));
@@ -125,7 +136,11 @@
 	id={comboboxId}
 	aria-disabled={disabled}
 	tabindex={disabled ? -1 : 0}
-	onclick={() => !disabled && (open = true)}
+	onclick={() => {
+		if (disabled) return;
+		notifyFirstOpen();
+		open = true;
+	}}
 	onfocusout={handleFocusout}
 	onkeydown={handleKeydown}
 >
@@ -136,6 +151,7 @@
 		value={displayValue}
 		disabled={disabled}
 		oninput={(e) => {
+			notifyFirstOpen();
 			open = true;
 			input = (e.currentTarget as HTMLInputElement).value;
 			onSearchChange?.(input);

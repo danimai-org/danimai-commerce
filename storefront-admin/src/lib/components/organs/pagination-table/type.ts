@@ -8,8 +8,8 @@ export type TableColumnAction<T = Record<string, unknown>> = {
 export type TableColumn<IRow = Record<string, unknown>> = {
 	label: string;
 	key: string;
-	/** How to render the cell: 'text' (default), 'date', 'boolean', 'actions', 'link' */
-	type?: 'text' | 'date' | 'boolean' | 'actions' | 'link';
+	/** How to render the cell: 'text' (default), 'date', 'boolean', 'statusBadge', 'actions', 'link' */
+	type?: 'text' | 'date' | 'boolean' | 'statusBadge' | 'actions' | 'link';
 	/** For type 'actions': list of dropdown items with onClick. When set, openEdit/openDeleteConfirm are ignored for this column. */
 	actions?: TableColumnAction<IRow>[];
 	/** For type 'actions': 'dropdown' (default) or visible inline buttons. */

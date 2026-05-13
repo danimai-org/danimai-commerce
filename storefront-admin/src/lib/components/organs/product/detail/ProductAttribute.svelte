@@ -212,17 +212,17 @@
 		</Button>
 	</div>
 
-	<dl class="space-y-4">
+	<dl class="space-y-6">
 		{#if attributesGroup.length > 0}
 			{#each attributesGroup as group (group.id)}
-				<div class="rounded-lg border bg-muted/30 p-4 shadow-xs">
-					<dt class="mb-3 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+				<div>
+					<dt class="mb-2.5 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
 						{group.title}
 					</dt>
-					<div class="space-y-3">
+					<div class="space-y-0 divide-y divide-border/60">
 						{#each group.rows as attr (attr.id)}
 							<dd
-								class="grid grid-cols-[1fr_auto] items-start gap-4 border-b border-gray-200/50 pb-2 last:border-0 last:pb-0"
+								class="grid grid-cols-[1fr_auto] items-start gap-4 py-3 first:pt-0 last:pb-0"
 							>
 								<span class="text-sm font-medium text-muted-foreground">{attr.title}</span>
 

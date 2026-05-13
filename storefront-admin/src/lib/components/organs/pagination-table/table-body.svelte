@@ -110,6 +110,22 @@
 		if (value == null || value === '') return '—';
 		return String(value);
 	}
+
+	function statusBadgeClasses(status: unknown): string {
+		const s = String(status ?? '').toLowerCase();
+		switch (s) {
+			case 'published':
+				return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400';
+			case 'draft':
+				return 'bg-slate-500/15 text-slate-700 dark:text-slate-300';
+			case 'proposed':
+				return 'bg-amber-500/15 text-amber-700 dark:text-amber-400';
+			case 'rejected':
+				return 'bg-destructive/15 text-destructive';
+			default:
+				return 'bg-violet-500/15 text-violet-700 dark:text-violet-400';
+		}
+	}
 </script>
 
 <tbody>
@@ -244,7 +260,16 @@
 						<td
 							class="px-4 py-3 {colIndex === 0 ? 'font-medium' : 'text-muted-foreground'}"
 						>
-							{#if column.type === 'boolean' || (cellValue(column, row) != null && isBooleanKey(column.key))}
+							{#if column.type === 'statusBadge'}
+								{@const raw = cellValue(column, row)}
+								{#if raw == null || raw === ''}
+									<span class="text-muted-foreground">—</span>
+								{:else}
+									<span
+										class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize {statusBadgeClasses(raw)}"
+									>{String(raw)}</span>
+								{/if}
+							{:else if column.type === 'boolean' || (cellValue(column, row) != null && isBooleanKey(column.key))}
 								{@const val = cellValue(column, row)}
 								{#if val === true}
 									<span

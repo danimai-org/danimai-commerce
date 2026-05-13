@@ -39,8 +39,21 @@
 	let attributesLoading = $state(false);
 	let submitting = $state(false);
 
-	let loadRequestId = 0;
-	let sheetWasOpen = $state(false);
+	let attributeSearch = $state('');
+	let debouncedAttributeSearch = $state('');
+	let attributeFetchGen = 0;
+	let prevSheetOpen = $state(false);
+	let attributesControlKey = $state(0);
+	/** Only fetch after the user opens the attribute combobox (not when the sheet mounts). */
+	let attributesFetchEnabled = $state(false);
+
+	$effect(() => {
+		const q = attributeSearch;
+		const t = setTimeout(() => {
+			debouncedAttributeSearch = q;
+		}, 300);
+		return () => clearTimeout(t);
+	});
 
 	const attributeOptions = $derived(
 		searchRows.map((a) => ({
@@ -137,6 +150,18 @@
 		return out;
 	}
 
+	async function fetchAttributesPage(search: string): Promise<CatalogRow[]> {
+		const res = await client['product-attributes'].get({
+			query: {
+				search: search.trim(),
+				page: 1,
+				limit: 100,
+				sorting_field: 'title'
+			}
+		});
+		return normalizeRows((res.data?.rows ?? []) as unknown[]);
+	}
+
 	async function fetchAllCatalogPages(): Promise<CatalogRow[]> {
 		const limit = 100;
 		const maxPages = 100;
@@ -164,55 +189,67 @@
 		}
 	}
 
-	async function loadFullCatalog() {
-		const id = ++loadRequestId;
-		attributesLoading = true;
-		try {
-			const rows = await fetchAllCatalogPages();
-			if (id !== loadRequestId) return;
-			searchRows = rows;
-			mergeRowsIntoAttributesById(attributesById, rows);
-		} catch {
-			if (id !== loadRequestId) return;
-			searchRows = [];
-		} finally {
-			if (id === loadRequestId) attributesLoading = false;
-		}
-	}
-
-	function onComboboxOpen() {
-		if (!attributesLoading && searchRows.length === 0) void loadFullCatalog();
+	function onAttributeComboboxOpen() {
+		attributesFetchEnabled = true;
 	}
 
 	$effect(() => {
+		if (open && !prevSheetOpen) {
+			attributesControlKey += 1;
+			attributeSearch = '';
+			debouncedAttributeSearch = '';
+
+			const groupRows = [...currentGroupAttributes];
+			const ids = [...currentAttributeIds];
+
+			selectedToAdd = ids;
+			attributesById.clear();
+			mergeRowsIntoAttributesById(attributesById, groupRows);
+
+			requiredByAttributeId = Object.fromEntries(
+				ids.map((id) => [id, currentAttributeRequiredById[id] ?? false])
+			);
+
+			searchRows = [];
+			attributesFetchEnabled = false;
+		}
 		if (!open) {
-			sheetWasOpen = false;
 			selectedToAdd = [];
 			requiredByAttributeId = {};
 			searchRows = [];
 			attributesById.clear();
 			attributesLoading = false;
-			loadRequestId++;
+			attributesFetchEnabled = false;
+			attributeFetchGen++;
+			attributeSearch = '';
+			debouncedAttributeSearch = '';
+		}
+		prevSheetOpen = open;
+	});
+
+	$effect(() => {
+		if (!open || !attributesFetchEnabled) {
+			if (!open) attributesLoading = false;
 			return;
 		}
-
-		const justOpened = !sheetWasOpen;
-		sheetWasOpen = true;
-		if (!justOpened) return;
-
-		const groupRows = [...currentGroupAttributes];
-		const ids = [...currentAttributeIds];
-
-		selectedToAdd = ids;
-		attributesById.clear();
-		mergeRowsIntoAttributesById(attributesById, groupRows);
-
-		requiredByAttributeId = Object.fromEntries(
-			ids.map((id) => [id, currentAttributeRequiredById[id] ?? false])
-		);
-
-		searchRows = [];
-		void loadFullCatalog();
+		const search = debouncedAttributeSearch;
+		const gen = ++attributeFetchGen;
+		attributesLoading = true;
+		void (async () => {
+			try {
+				const rows = search.trim()
+					? await fetchAttributesPage(search)
+					: await fetchAllCatalogPages();
+				if (gen !== attributeFetchGen) return;
+				searchRows = rows;
+				mergeRowsIntoAttributesById(attributesById, rows);
+			} catch {
+				if (gen !== attributeFetchGen) return;
+				searchRows = [];
+			} finally {
+				if (gen === attributeFetchGen) attributesLoading = false;
+			}
+		})();
 	});
 
 	$effect(() => {
@@ -296,17 +333,22 @@
 				<div class="mt-6 flex flex-col gap-4">
 					<div class="flex flex-col gap-2">
 						<label for="add-to-group-attributes" class="text-sm font-medium">Attributes</label>
-						<MultiSelectCombobox
-							id="add-to-group-attributes"
-							options={comboboxOptions}
-							bind:value={selectedToAdd}
-							onOpen={onComboboxOpen}
-							loading={attributesLoading}
-							showSelectedTable={false}
-							placeholder="Search attributes…"
-							emptyMessage="No attributes found."
-							class="mt-1"
-						/>
+						{#key attributesControlKey}
+							<MultiSelectCombobox
+								id="add-to-group-attributes"
+								options={comboboxOptions}
+								bind:value={selectedToAdd}
+								onOpen={onAttributeComboboxOpen}
+								loading={attributesLoading}
+								showSelectedTable={false}
+								placeholder="Search attributes…"
+								emptyMessage="No attributes found."
+								onSearchChange={(q) => {
+									attributeSearch = q;
+								}}
+								class="mt-1"
+							/>
+						{/key}
 					</div>
 
 					<section class="overflow-hidden rounded-lg border border-border bg-card shadow-sm">

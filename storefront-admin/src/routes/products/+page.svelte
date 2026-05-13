@@ -93,7 +93,7 @@
 		},
 		{ label: 'Sales Channels', key: 'sales_channels_display', type: 'text' },
 		{ label: 'Variants', key: 'variants_count', type: 'text' },
-		{ label: 'Status', key: 'status', type: 'text' },
+		{ label: 'Status', key: 'status', type: 'statusBadge' },
 		{
 			label: 'Actions',
 			key: 'actions',
