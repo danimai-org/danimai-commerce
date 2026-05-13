@@ -121,7 +121,7 @@ export const productAttributeRoutes = new Elysia({ prefix: "/product-attributes"
     "/",
     async ({ body: input, set }) => {
       const process = getService<DeleteProductAttributesProcess>(DELETE_PRODUCT_ATTRIBUTES_PROCESS);
-      await process.runOperations({ input });
+      await process.runOperations({ input: input as StaticDecode<typeof DeleteProductAttributesSchema> });
       set.status = 204;
       return undefined;
     },

@@ -15,6 +15,7 @@
 	import CreateProductStepVariants from './CreateProductStepVariants.svelte';
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import { get } from 'svelte/store';
+	import { previewUrl, type MediaUploadLocalItem } from '$lib/components/shared/media-upload.types.js';
 
 	interface Props {
 		open: boolean;
@@ -128,7 +129,7 @@
 					if (createdProductId && createMediaItems.length > 0) {
 						const uploaded = await uploadProductImages(
 							createdProductId,
-							createMediaItems.map((m) => m.file)
+							createMediaItems.map((m: MediaUploadLocalItem) => m.file)
 						);
 						if (uploaded.length > 0) {
 							const res = await client.products({ id: createdProductId }).put({
@@ -157,11 +158,7 @@
 	let createHandle = $state('');
 	let createDescription = $state('');
 	let createHasVariants = $state(true);
-	let createMediaModalOpen = $state(false);
-	let createMediaImageUrl = $state('');
-	type CreateProductMediaItem = { id: string; file: File; preview: string };
-	let createMediaItems = $state<CreateProductMediaItem[]>([]);
-	let createMediaFileInput = $state<HTMLInputElement | undefined>();
+	let createMediaItems = $state<MediaUploadLocalItem[]>([]);
 
 	let createDiscountable = $state(true);
 	let createCollectionIds = $state<string[]>([]);
@@ -366,7 +363,6 @@
 		createAttributeGroupId = '';
 		createAttributeEntries = [];
 		createMediaItems = [];
-		createMediaImageUrl = '';
 		createError = null;
 		submitPending = false;
 		createdProductId = null;
@@ -785,10 +781,7 @@
 					{createError}
 					{titleError}
 					bind:createHasVariants
-					bind:createMediaModalOpen
-					bind:createMediaImageUrl
 					bind:createMediaItems
-					bind:createMediaFileInput
 					onEnableVariants={syncVariantsFromOptions}
 				/>
 			{/if}
@@ -863,7 +856,7 @@
 			<input
 				type="hidden"
 				name="thumbnail"
-				value={createMediaItems[0]?.preview.trim() ?? ''}
+				value={previewUrl(createMediaItems[0]).trim()}
 			/>
 
 			<div class="flex shrink-0 flex-wrap justify-end gap-2 border-t p-4">

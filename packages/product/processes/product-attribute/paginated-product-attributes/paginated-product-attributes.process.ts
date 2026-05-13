@@ -48,9 +48,8 @@ export class PaginatedProductAttributesProcess
       sorting_direction = SortOrder.DESC,
       search,
     } = input;
-    const attribute_group_id =
-      input.filters?.attribute_group_id ?? input.filters?.group_id;
-
+    const { attribute_group_id } = input.filters ?? {};
+    console.log("attribute_group_id", input)
     let query = this.db
       .selectFrom("product_attributes")
       .where("product_attributes.deleted_at", "is", null);

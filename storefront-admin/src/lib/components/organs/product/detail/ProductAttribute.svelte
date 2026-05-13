@@ -72,7 +72,6 @@
 			groupTitlesById = {};
 		}
 	});
-
 	const productAttributeGroupId = $derived.by(() => {
 		const direct = (product as { attribute_group_id?: string | null } | null)?.attribute_group_id;
 		if (direct) return direct;
@@ -93,7 +92,6 @@
 				const res = await client['product-attributes'].get({
 					query: { page: 1, limit: 100, attribute_group_id: attrGroupId }
 				});
-				console.log(res);
 				if (cancelled) return;
 				groupAttributeRows = extractRows<{ id: string; title?: string }>(res).map((r) => ({
 					id: r.id,
@@ -107,7 +105,6 @@
 			cancelled = true;
 		};
 	});
-
 	const attributesGroup = $derived.by<AttributeDisplayGroup[]>(() => {
 		const productAttributes =
 			(product as { attributes?: ProductAttributeRow[] } | null)?.attributes ?? [];
