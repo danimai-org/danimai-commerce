@@ -20,7 +20,7 @@ import type { Database } from "../../../db/type";
  */
 function normalizeAttributesColumn(
   raw: unknown
-): Array<{ id: string; title: string; type: string }> {
+): Array<{ id: string; title: string; type: string; required: boolean }> {
   if (raw == null) return [];
   let parsed: unknown = raw;
   if (typeof parsed === "string") {
@@ -31,7 +31,7 @@ function normalizeAttributesColumn(
     }
   }
   if (!Array.isArray(parsed)) return [];
-  const out: Array<{ id: string; title: string; type: string }> = [];
+  const out: Array<{ id: string; title: string; type: string; required: boolean }> = [];
   for (const item of parsed) {
     if (item == null) continue;
     if (typeof item === "string") {
@@ -42,7 +42,12 @@ function normalizeAttributesColumn(
           typeof o.title === "string" &&
           typeof o.type === "string"
         ) {
-          out.push({ id: o.id, title: o.title, type: o.type });
+          out.push({
+            id: o.id,
+            title: o.title,
+            type: o.type,
+            required: typeof o.required === "boolean" ? o.required : false,
+          });
         }
       } catch {
         /* skip */
@@ -56,7 +61,12 @@ function normalizeAttributesColumn(
         typeof o.title === "string" &&
         typeof o.type === "string"
       ) {
-        out.push({ id: o.id, title: o.title, type: o.type });
+        out.push({
+          id: o.id,
+          title: o.title,
+          type: o.type,
+          required: typeof o.required === "boolean" ? o.required : false,
+        });
       }
     }
   }
@@ -106,7 +116,8 @@ export class RetrieveProductAttributeGroupProcess
                 json_build_object(
                   'id', pa.id,
                   'title', pa.title,
-                  'type', pa.type
+                  'type', pa.type,
+                  'required', COALESCE(pagr.required, false)
                 )
                 ORDER BY pa.title
               )

@@ -4,7 +4,7 @@ export type AttributeGroup =
 	| Awaited<ReturnType<ReturnType<(typeof client)['product-attribute-groups']>['get']>>['data']
 	| null;
 
-export type AttributeGroupAttribute = { id: string; title: string; type: string };
+export type AttributeGroupAttribute = { id: string; title: string; type: string; required: boolean };
 
 export type AttributeGroupDetail = {
 	id: string;
@@ -36,7 +36,9 @@ function normalizeAttributeGroupItem(item: unknown): AttributeGroupAttribute | n
 	const title = typeof nested.title === 'string' ? nested.title : String(nested.title ?? '');
 	const typeRaw = nested.type ?? nested.Type;
 	const type = typeof typeRaw === 'string' ? typeRaw : typeRaw != null ? String(typeRaw) : '';
-	return { id, title, type };
+	const reqRaw = nested.required;
+	const required = typeof reqRaw === 'boolean' ? reqRaw : false;
+	return { id, title, type, required };
 }
 
 export function parseAttributeGroupPayload(raw: unknown): AttributeGroupDetail | null {

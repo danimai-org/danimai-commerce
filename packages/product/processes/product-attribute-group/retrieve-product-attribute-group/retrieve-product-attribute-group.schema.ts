@@ -20,6 +20,7 @@ const RetrieveProductAttributeGroupAttributeSchema = Type.Object({
   id: Type.String(),
   title: Type.String(),
   type: Type.String(),
+  required: Type.Boolean(),
 });
 
 export const RetrieveProductAttributeGroupResponseSchema = Type.Object({

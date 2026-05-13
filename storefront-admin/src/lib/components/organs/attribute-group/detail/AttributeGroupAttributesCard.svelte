@@ -21,7 +21,6 @@
 	} from '$lib/components/organs/attribute-group/type.js';
 	import { client } from '$lib/client.js';
 	import { toast } from 'svelte-sonner';
-	import EditAttributeSheet from '$lib/components/organs/attribute-group/detail/EditAttributeSheet.svelte';
 	import AddAttributeToGroupSheet from '$lib/components/organs/attribute-group/detail/AddAttributeToGroupSheet.svelte';
 
 	const detailQuery = getDetailContext<AttributeGroupDetail | null>();
@@ -49,8 +48,6 @@
 	let typeFilter = $state<Set<string>>(new Set());
 	let filterPanelOpen = $state(false);
 
-	let editSheetOpen = $state(false);
-	let editingAttribute = $state<AttributeGroupAttribute | null>(null);
 	let addSheetOpen = $state(false);
 
 	let removeConfirmOpen = $state(false);
@@ -145,11 +142,6 @@
 
 	type AttributeRow = AttributeGroupAttribute;
 
-	function openEditSheet(row: AttributeRow) {
-		editingAttribute = row;
-		editSheetOpen = true;
-	}
-
 	function requestRemove(row: AttributeRow) {
 		attributeToRemove = row;
 		removeError = null;
@@ -163,17 +155,12 @@
 			type: 'text'
 		},
 		{ label: 'Type', key: 'type', type: 'text' },
+		{ label: 'Required', key: 'required', type: 'boolean' },
 		{
 			label: 'Actions',
 			key: 'actions',
 			type: 'actions',
 			actions: [
-				{
-					label: 'Edit',
-					key: 'edit',
-					type: 'button',
-					onClick: (item) => openEditSheet(item as AttributeRow)
-				},
 				{
 					label: 'Delete',
 					key: 'delete',
@@ -192,11 +179,15 @@
 		removeError = null;
 		try {
 			const nextIds = selectedAttributeIds.filter((id) => id !== row.id);
+			const byId = new Map(groupAttributes.map((a) => [a.id, a]));
 			const res = await client['product-attribute-groups']({ id: group.id }).put({
 				id: group.id,
 				title: group.title.trim(),
 				metadata: metadataForPut(group.metadata),
-				attributes: nextIds.map((attribute_id) => ({ attribute_id }))
+				attributes: nextIds.map((attribute_id) => ({
+					attribute_id,
+					required: byId.get(attribute_id)?.required ?? false
+				}))
 			});
 			if (res == null || (typeof res === 'object' && 'error' in res && res.error)) {
 				removeError = 'Could not update this group';
@@ -329,18 +320,20 @@
 	</div>
 </section>
 
-<EditAttributeSheet
-	bind:open={editSheetOpen}
-	attribute={editingAttribute}
-	onSuccess={refetchGroup}
-/>
-
 <AddAttributeToGroupSheet
 	bind:open={addSheetOpen}
 	groupId={detailQuery?.data?.id ?? ''}
 	groupTitle={detailQuery?.data?.title ?? ''}
 	groupMetadata={detailQuery?.data?.metadata ?? null}
 	currentAttributeIds={selectedAttributeIds}
+	currentAttributeRequiredById={Object.fromEntries(
+		groupAttributes.map((a) => [a.id, a.required ?? false])
+	)}
+	currentGroupAttributes={groupAttributes.map((a) => ({
+		id: a.id,
+		title: a.title,
+		type: a.type
+	}))}
 	onSuccess={refetchGroup}
 />
 
