@@ -4,8 +4,9 @@
 	import Search from '@lucide/svelte/icons/search';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 
+	import { cn } from '$lib/utils.js';
 	import { client } from '$lib/client.js';
-	import type { CurrenciesListResponse } from '$lib/currencies/types.js';
+
 	import AddCurrenciesSheet from '$lib/components/organs/store/add-currencies-sheet.svelte';
 	import { createPagination } from '$lib/api/pagination.svelte.js';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -14,7 +15,6 @@
 	let limit = $state(10);
 	let search = $state('');
 	let debouncedSearch = $state('');
-
 	$effect(() => {
 		const q = search;
 		if (debouncedSearch === q) return;
@@ -40,10 +40,11 @@
 		{ keySuffix: () => [pageNum, limit, debouncedSearch] }
 	);
 
-	const listPayload = $derived(
-		(paginateState.query.data?.data ?? null) as CurrenciesListResponse | null
-	);
+	const listPayload = $derived(paginateState.query.data?.data ?? null);
 	const rows = $derived(listPayload?.rows ?? []);
+	const searchStale = $derived(search.trim() !== debouncedSearch.trim());
+	const displayRows = $derived(searchStale ? [] : rows);
+
 	const paginationMeta = $derived(listPayload?.pagination ?? null);
 	const count = $derived(paginationMeta?.total ?? 0);
 	const currentPage = $derived(paginationMeta?.page ?? pageNum);
@@ -52,19 +53,25 @@
 		paginationMeta ? (paginationMeta.page - 1) * paginationMeta.limit + 1 : 0
 	);
 	const rangeEnd = $derived(
-		paginationMeta
-			? Math.min(paginationMeta.page * paginationMeta.limit, paginationMeta.total)
-			: 0
+		paginationMeta ? Math.min(paginationMeta.page * paginationMeta.limit, paginationMeta.total) : 0
 	);
-	const loading = $derived(paginateState.loading);
+	const tableFetching = $derived(
+		searchStale || paginateState.query.isPending || paginateState.query.isFetching
+	);
 	const error = $derived(paginateState.error);
+
+	const searchingNoResults = $derived(
+		debouncedSearch.trim().length > 0 && !tableFetching && displayRows.length === 0 && !error
+	);
 
 	function goToPage(next: number) {
 		pageNum = Math.max(1, Math.min(next, totalPages));
 	}
 
 	let selectedIds = new SvelteSet<string>();
-	const allVisibleSelected = $derived(rows.length > 0 && rows.every((r) => selectedIds.has(r.id)));
+	const allVisibleSelected = $derived(
+		displayRows.length > 0 && displayRows.every((r) => selectedIds.has(r.id))
+	);
 
 	async function removeSelected() {
 		if (selectedIds.size === 0) return;
@@ -80,9 +87,9 @@
 
 	function toggleSelectAll() {
 		if (allVisibleSelected) {
-			rows.forEach((r) => selectedIds.delete(r.id));
+			displayRows.forEach((r) => selectedIds.delete(r.id));
 		} else {
-			rows.forEach((r) => selectedIds.add(r.id));
+			displayRows.forEach((r) => selectedIds.add(r.id));
 		}
 	}
 
@@ -139,26 +146,27 @@
 					<th class="px-4 py-3 font-medium">Code</th>
 					<th class="px-4 py-3 font-medium">Name</th>
 					<th class="px-4 py-3 font-medium">Tax Inclusive</th>
-					<th class="px-4 py-3 text-right font-medium">Actions</th>
 				</tr>
 			</thead>
 			<tbody>
-				{#if loading && rows.length === 0}
+				{#if error}
 					<tr>
-						<td colspan={5} class="px-4 py-8 text-center text-muted-foreground">Loading…</td>
+						<td colspan={4} class="px-4 py-8 text-center text-destructive">{error}</td>
 					</tr>
-				{:else if error}
+				{:else if tableFetching && displayRows.length === 0}
 					<tr>
-						<td colspan={5} class="px-4 py-8 text-center text-destructive">{error}</td>
+						<td colspan={4} class="px-4 py-8 text-center text-muted-foreground">Loading…</td>
 					</tr>
-				{:else if rows.length === 0}
-					<tr>
-						<td colspan={5} class="px-4 py-8 text-center text-muted-foreground">
-							No currencies found.
-						</td>
-					</tr>
+				{:else if displayRows.length === 0}
+					{#if !searchingNoResults}
+						<tr>
+							<td colspan={4} class="px-4 py-8 text-center text-muted-foreground">
+								No currencies found.
+							</td>
+						</tr>
+					{/if}
 				{:else}
-					{#each rows as row (row.id)}
+					{#each displayRows as row (row.id)}
 						<tr class="border-b last:border-b-0 hover:bg-muted/30">
 							<td class="px-4 py-3">
 								<input
@@ -171,8 +179,18 @@
 							</td>
 							<td class="px-4 py-3 font-medium">{row.code}</td>
 							<td class="px-4 py-3 text-muted-foreground">{row.name}</td>
-							<td class="px-4 py-3">{row.tax_inclusive_pricing ? 'Yes' : 'No'}</td>
-							<td class="px-4 py-3 text-right"> </td>
+							<td class="px-4 py-3">
+								<span
+									class={cn(
+										'inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-tight',
+										row.tax_inclusive_pricing
+											? 'bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+											: 'bg-red-500/15 text-red-700 dark:bg-red-500/20 dark:text-red-300'
+									)}
+								>
+									{row.tax_inclusive_pricing ? 'Yes' : 'No'}
+								</span>
+							</td>
 						</tr>
 					{/each}
 				{/if}
@@ -180,7 +198,7 @@
 		</table>
 	</div>
 
-	{#if count > 0}
+	{#if count > 0 && !searchStale}
 		<div class="flex items-center justify-between gap-4 border-t px-4 py-3">
 			<p class="text-sm text-muted-foreground">{rangeStart} - {rangeEnd} of {count} results</p>
 			<div class="flex items-center gap-2">
@@ -188,7 +206,7 @@
 					size="sm"
 					variant="outline"
 					onclick={() => goToPage(currentPage - 1)}
-					disabled={currentPage <= 1 || loading}
+					disabled={currentPage <= 1 || tableFetching}
 				>
 					Prev
 				</Button>
@@ -197,7 +215,7 @@
 					size="sm"
 					variant="outline"
 					onclick={() => goToPage(currentPage + 1)}
-					disabled={currentPage >= totalPages || loading}
+					disabled={currentPage >= totalPages || tableFetching}
 				>
 					Next
 				</Button>
