@@ -73,24 +73,31 @@
 			</div>
 		</div>
 		<div class="mb-6 flex flex-col gap-4">
-			<div class="flex flex-wrap items-center justify-between gap-2">
-				<Button variant="outline" size="sm" class="rounded-md">
-					<SlidersHorizontal class="mr-1.5 size-4" />
-					Add filter
+			<div class="flex min-w-0 flex-wrap items-center gap-2 sm:justify-between">
+				<Button
+					variant="outline"
+					size="sm"
+					class="h-9 shrink-0 rounded-md max-sm:w-9 max-sm:justify-center max-sm:gap-0 max-sm:px-0 sm:min-h-9"
+					aria-label="Add filter"
+					title="Add filter"
+				>
+					<SlidersHorizontal class="size-4 shrink-0 sm:mr-1.5" />
+					<span class="hidden sm:inline">Add filter</span>
 				</Button>
-				<div class="flex items-center gap-2">
-					<div class="relative w-64">
+				<div class="flex min-w-0 flex-1 items-center gap-2 sm:w-auto sm:flex-none">
+					<div class="relative min-w-0 w-full flex-1 sm:w-64 sm:flex-none">
 						<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 						<Input
 							type="search"
 							placeholder="Search"
 							bind:value={searchQuery}
-							class="h-9 rounded-md pl-9"
+							class="h-9 w-full min-w-0 rounded-md pl-9"
 						/>
 					</div>
 					<button
 						type="button"
-						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+						class="flex size-9 shrink-0 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+						aria-label="Sort"
 					>
 						<ArrowUpDown class="size-4" />
 						<span class="sr-only">Sort</span>

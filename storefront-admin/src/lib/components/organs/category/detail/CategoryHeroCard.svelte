@@ -30,7 +30,7 @@
 	const categoryDescription = $derived(getDescription());
 </script>
 
-<div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
+<div class="w-full min-w-0 lg:min-h-0 lg:flex-1">
 	<div class="flex flex-col gap-6">
 		<div class="rounded-lg border bg-card p-8 shadow-sm">
 			<div class="flex items-start justify-between gap-4">

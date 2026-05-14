@@ -20,44 +20,40 @@
 		showToolbar?: boolean;
 		children?: import('svelte').Snippet;
 	} = $props();
-
-	function debounce(func: (...args: string[]) => void, delay = 300) {
-		let timer: NodeJS.Timeout;
-		return (...args: string[]) => {
-			clearTimeout(timer);
-			timer = setTimeout(() => func.apply(undefined, args), delay);
-		};
-	}
-	const debouncedSearch = debounce((search: string) => {
-		searchQuery = search;
-	}, 300);
 </script>
 
 {#if showToolbar}
-	<div class="mb-6 flex flex-col gap-4">
-		<div class="flex flex-wrap items-center justify-between gap-2">
+	<div class="mb-6 flex min-w-0 w-full flex-col gap-4">
+		<div class="flex min-w-0 flex-wrap items-center gap-2 sm:justify-between">
 			{#if showFilter}
-				<Button variant="outline" size="sm" class="rounded-md">
-					<SlidersHorizontal class="mr-1.5 size-4" />
-					Add filter
+				<Button
+					variant="outline"
+					size="sm"
+					class="h-9 shrink-0 rounded-md max-sm:w-9 max-sm:justify-center max-sm:gap-0 max-sm:px-0 sm:min-h-9"
+					aria-label="Add filter"
+					title="Add filter"
+				>
+					<SlidersHorizontal class="size-4 shrink-0 sm:mr-1.5" />
+					<span class="hidden sm:inline">Add filter</span>
 				</Button>
 			{:else}
-				<div></div>
+				<div class="hidden sm:block"></div>
 			{/if}
-			<div class="flex items-center gap-2">
-				<div class="relative w-64">
+			<div class="flex min-w-0 flex-1 items-center gap-2 sm:w-auto sm:flex-none">
+				<div class="relative min-w-0 w-full flex-1 sm:w-64 sm:flex-none">
 					<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 					<Input
 						type="search"
 						placeholder={searchPlaceholder}
-						class="h-9 rounded-md pl-9"
+						class="h-9 w-full min-w-0 rounded-md pl-9"
 						bind:value={searchQuery}
 					/>
 				</div>
 				{#if showSort}
 					<button
 						type="button"
-						class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+						class="flex size-9 shrink-0 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+						aria-label="Sort"
 					>
 						<ArrowUpDown class="size-4" />
 						<span class="sr-only">Sort</span>

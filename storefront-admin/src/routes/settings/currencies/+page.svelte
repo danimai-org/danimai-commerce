@@ -293,9 +293,15 @@
 						Remove selected ({selectedIds.size})
 					</Button>
 				{:else}
-					<Button variant="outline" size="sm" class="rounded-md">
-						<SlidersHorizontal class="mr-1.5 size-4" />
-						Add filter
+					<Button
+						variant="outline"
+						size="sm"
+						class="h-9 shrink-0 rounded-md max-sm:w-9 max-sm:justify-center max-sm:gap-0 max-sm:px-0 sm:min-h-9"
+						aria-label="Add filter"
+						title="Add filter"
+					>
+						<SlidersHorizontal class="size-4 shrink-0 sm:mr-1.5" />
+						<span class="hidden sm:inline">Add filter</span>
 					</Button>
 				{/if}
 			</div>
