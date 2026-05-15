@@ -2,9 +2,9 @@
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import * as Select from '$lib/components/ui/select/index.js';
+	import Combobox from '$lib/components/organs/combobox/combobox.svelte';
+	import type { ComboboxOption } from '$lib/components/organs/combobox/combobox.svelte';
 	import { cn } from '$lib/utils.js';
-	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import Search from '@lucide/svelte/icons/search';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { Country } from 'country-state-city';
@@ -20,9 +20,11 @@
 	type RegionCreateFormData = {
 		name: string;
 		currency_code: string;
+		country_ids: string[];
 	};
 
 	const listQuery = { page: 1, limit: 100 } as const;
+	const DEBOUNCE_MS = 400;
 
 	let {
 		open = $bindable(false),
@@ -33,6 +35,30 @@
 		regionCreateForm: SuperValidated<RegionCreateFormData>;
 		onSuccess?: () => void;
 	}>();
+
+	let currencySearch = $state('');
+	let debouncedCurrencySearch = $state('');
+	let currencyOpenAwaitFetch = $state(false);
+	let currencyOpenSeq = 0;
+	let currencyOpenRafId = 0;
+
+	function debouncedLane(
+		live: () => string,
+		debounced: () => string,
+		setDebounced: (v: string) => void
+	) {
+		const q = live();
+		if (debounced() === q) return;
+		const t = setTimeout(() => setDebounced(q), DEBOUNCE_MS);
+		return () => clearTimeout(t);
+	}
+
+	$effect(() =>
+		debouncedLane(() => currencySearch, () => debouncedCurrencySearch, (v) => (debouncedCurrencySearch = v))
+	);
+
+	const currencyStale = $derived(currencySearch.trim() !== debouncedCurrencySearch.trim());
+	const currencyDebouncedTrim = $derived(debouncedCurrencySearch.trim());
 
 	// svelte-ignore state_referenced_locally
 	const { form, errors, enhance, delayed } = superForm(regionCreateForm, {
@@ -57,15 +83,71 @@
 	});
 
 	const currenciesQuery = createQuery(() => ({
-		queryKey: ['create-region', 'currencies', listQuery.page, listQuery.limit],
-		queryFn: () => client['currencies'].get({ query: listQuery }),
-		enabled: open
+		queryKey: ['create-region', 'currencies', 'v2', open, currencyDebouncedTrim, listQuery.page, listQuery.limit],
+		queryFn: ({ signal }) =>
+			client['currencies'].get({
+				query: {
+					page: listQuery.page,
+					limit: listQuery.limit,
+					...(currencyDebouncedTrim ? { search: currencyDebouncedTrim } : {})
+				},
+				...(signal ? { fetch: { signal } } : {})
+			}),
+		enabled: open,
+		refetchOnWindowFocus: false
 	}));
 
 	const currenciesData = $derived(currenciesQuery.data?.data);
-	const currencies = $derived(
-		(currenciesData as { rows?: Array<{ code: string; name: string; symbol: string }> } | undefined)
-			?.rows ?? []
+	const currencies = $derived(currenciesData?.rows ?? []);
+
+	function cancelCurrencyCombRaf() {
+		if (currencyOpenRafId) cancelAnimationFrame(currencyOpenRafId);
+		currencyOpenRafId = 0;
+	}
+
+	function onCurrencyOpenChange(opened: boolean) {
+		if (opened) {
+			cancelCurrencyCombRaf();
+			currencyOpenAwaitFetch = true;
+			const id = ++currencyOpenSeq;
+			currencyOpenRafId = requestAnimationFrame(() => {
+				currencyOpenRafId = 0;
+				void currenciesQuery.refetch().finally(() => {
+					if (id === currencyOpenSeq) currencyOpenAwaitFetch = false;
+				});
+			});
+		} else {
+			currencyOpenSeq++;
+			cancelCurrencyCombRaf();
+			currencyOpenAwaitFetch = false;
+		}
+	}
+
+	const currencyComboboxLoading = $derived(
+		currencyStale || currenciesQuery.isFetching || currencyOpenAwaitFetch
+	);
+
+	function currencyParenContent(c: { code: string; symbol: string }) {
+		if (!c.symbol || c.symbol === c.code) return c.code;
+		return `${c.code} ${c.symbol}`;
+	}
+
+	function withSelectedFallback(mapped: ComboboxOption[], selectedId: string): ComboboxOption[] {
+		const id = selectedId.trim();
+		if (!id || mapped.some((o) => o.id === id)) return mapped;
+		return [{ id, value: `${id}` }, ...mapped];
+	}
+
+	const passthroughOpts = (opts: ComboboxOption[]): ComboboxOption[] => opts;
+
+	const currencyOptions = $derived.by((): ComboboxOption[] =>
+		withSelectedFallback(
+			currencies.map((row) => ({
+				id: String(row.code),
+				value: `${String(row.name)} (${currencyParenContent({ code: String(row.code), symbol: String(row.symbol) })})`
+			})),
+			String($form.currency_code ?? '')
+		)
 	);
 
 	let automaticTaxes = $state(true);
@@ -103,6 +185,11 @@
 		if (!open) {
 			pickedCountryIds = [];
 			countriesPreviewSearch = '';
+			currencySearch = '';
+			debouncedCurrencySearch = '';
+			currencyOpenSeq++;
+			cancelCurrencyCombRaf();
+			currencyOpenAwaitFetch = false;
 		}
 	});
 </script>
@@ -137,40 +224,19 @@
 					</div>
 					<div class="flex flex-col gap-2">
 						<label for="create-currency" class="text-sm font-medium">Currency</label>
-						<Select.Root
-							type="single"
-							value={$form.currency_code || undefined}
-							onValueChange={(v) => ($form.currency_code = v ?? '')}
-						>
-							<Select.Trigger
-								id="create-currency"
-								class={cn(
-									'flex h-9 w-full items-center gap-2',
-									$errors.currency_code && 'border-destructive'
-								)}
-							>
-								{@const selected = currencies.find(
-									(c: { code: string }) => c.code === $form.currency_code
-								)}
-								<span class="min-w-0 flex-1 truncate text-left">
-									{selected ? `${selected.name} (${selected.code})` : 'Select currency'}
-								</span>
-								<ChevronDown class="size-4 shrink-0 opacity-50" />
-							</Select.Trigger>
-							<Select.Content>
-								<Select.Viewport class="max-h-[min(60vh,20rem)]">
-									{#each currencies as currency (currency.code)}
-										<Select.Item
-											value={currency.code}
-											label={`${currency.name} (${currency.code})`}
-										>
-											{currency.name} ({currency.code}
-											{currency.symbol})
-										</Select.Item>
-									{/each}
-								</Select.Viewport>
-							</Select.Content>
-						</Select.Root>
+						<Combobox
+							id="create-currency"
+							options={currencyOptions}
+							bind:value={$form.currency_code}
+							placeholder="Select currency"
+							loading={currencyComboboxLoading}
+							emptyMessage="No currencies match your search."
+							filterFn={passthroughOpts}
+							class={cn($errors.currency_code && 'border-destructive')}
+							listboxClass="max-h-[min(60vh,20rem)]"
+							onSearchChange={(v) => (currencySearch = v)}
+							onOpenChange={onCurrencyOpenChange}
+						/>
 						<input type="hidden" name="currency_code" value={String($form.currency_code)} />
 						{#if $errors.currency_code}
 							<span class="text-xs text-destructive">{$errors.currency_code}</span>

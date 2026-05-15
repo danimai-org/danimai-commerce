@@ -216,14 +216,14 @@
 		{#if attributesGroup.length > 0}
 			{#each attributesGroup as group (group.id)}
 				<div>
-					<dt class="mb-2.5 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+					<dt
+						class="mb-2.5 border-b p-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase"
+					>
 						{group.title}
 					</dt>
 					<div class="space-y-0 divide-y divide-border/60">
 						{#each group.rows as attr (attr.id)}
-							<dd
-								class="grid grid-cols-[1fr_auto] items-start gap-4 py-3 first:pt-0 last:pb-0"
-							>
+							<dd class="grid grid-cols-[1fr_auto] items-start gap-4 py-3 first:pt-0 last:pb-0">
 								<span class="text-sm font-medium text-muted-foreground">{attr.title}</span>
 
 								<div class="flex max-w-[250px] flex-wrap justify-end gap-1.5">

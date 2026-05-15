@@ -8,7 +8,7 @@ import {
   paginationResponse,
   SortOrder,
 } from "@danimai/core";
-import { Kysely, sql } from "kysely";
+import { Kysely, sql, type SqlBool } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   type PaginatedStockLocationsProcessOutput,
@@ -61,6 +61,14 @@ export class PaginatedStockLocationsProcess
     let query = this.db
       .selectFrom("stock_locations")
       .where("stock_locations.deleted_at", "is", null);
+
+    const search = input.search?.trim();
+    if (search) {
+      const term = `%${search}%`;
+      query = query.where(
+        sql<SqlBool>`(stock_locations.name ilike ${term} or cast(stock_locations.id as text) ilike ${term})`,
+      );
+    }
 
     const countResult = await query
       .select(({ fn }) => fn.count<number>("id").as("count"))

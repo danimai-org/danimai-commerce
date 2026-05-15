@@ -22,8 +22,10 @@
 	import { client } from '$lib/client.js';
 	import { toast } from 'svelte-sonner';
 	import AddAttributeToGroupSheet from '$lib/components/organs/attribute-group/detail/AddAttributeToGroupSheet.svelte';
+	import { createQuery } from '@tanstack/svelte-query';
 
 	const detailQuery = getDetailContext<AttributeGroupDetail | null>();
+	const groupId = $derived(detailQuery?.data?.id ?? '');
 	const groupAttributes = $derived(detailQuery?.data?.attributes ?? []);
 
 	const selectedAttributeIds = $derived(groupAttributes.map((a) => a.id));
@@ -43,7 +45,10 @@
 		return out;
 	});
 
+	const SEARCH_DEBOUNCE_MS = 300;
+
 	let searchInput = $state('');
+	let debouncedSearch = $state('');
 	let sortDir = $state<'asc' | 'desc'>('asc');
 	let typeFilter = $state<Set<string>>(new Set());
 	let filterPanelOpen = $state(false);
@@ -66,13 +71,62 @@
 		return Array.from(types).sort((a, b) => a.localeCompare(b));
 	});
 
+	$effect(() => {
+		void detailQuery?.data?.id;
+		searchInput = '';
+		debouncedSearch = '';
+	});
+
+	$effect(() => {
+		const s = searchInput;
+		const tid = setTimeout(() => {
+			debouncedSearch = s.trim();
+		}, SEARCH_DEBOUNCE_MS);
+		return () => clearTimeout(tid);
+	});
+
+	const attributeSearchQuery = createQuery(() => ({
+		queryKey: ['attribute-group-attributes-search', groupId, debouncedSearch],
+		queryFn: async () => {
+			const res = await client['product-attributes'].get({
+				query: {
+					page: 1,
+					limit: 500,
+					search: debouncedSearch,
+					sorting_field: 'title',
+					filters: { attribute_group_id: groupId }
+				}
+			});
+			if (res.error) {
+				const err = res.error as { value?: { message?: string } };
+				throw new Error(err.value?.message ?? 'Failed to search attributes');
+			}
+			const rows = (res.data?.rows ?? []) as { id?: string }[];
+			return rows.map((r) => String(r.id ?? '')).filter(Boolean);
+		},
+		enabled: () => Boolean(groupId && debouncedSearch.length > 0),
+		refetchOnWindowFocus: false
+	}));
+
+	const apiMatchedIds = $derived(
+		debouncedSearch.length > 0 && attributeSearchQuery.data
+			? new SvelteSet(attributeSearchQuery.data)
+			: null
+	);
+
 	const displayRows = $derived.by(() => {
-		let rows = [...filteredAttributes];
-		const q = searchInput.trim().toLowerCase();
-		if (q) {
-			rows = rows.filter(
-				(r) => r.title.toLowerCase().includes(q) || r.type.toLowerCase().includes(q)
-			);
+		let rows: AttributeGroupAttribute[];
+		const q = debouncedSearch;
+		const qlower = q.toLowerCase();
+		if (!q) {
+			rows = [...filteredAttributes];
+		} else {
+			rows = filteredAttributes.filter((r) => {
+				if (apiMatchedIds?.has(r.id)) return true;
+				if (r.title.toLowerCase().includes(qlower)) return true;
+				if (r.type.toLowerCase().includes(qlower)) return true;
+				return false;
+			});
 		}
 		if (typeFilter.size > 0) {
 			rows = rows.filter((r) => typeFilter.has(r.type));
@@ -103,12 +157,12 @@
 	const attributeStart = $derived(attributeTotal > 0 ? (attributePage - 1) * PAGE_SIZE + 1 : 0);
 	const attributeEnd = $derived(Math.min(attributePage * PAGE_SIZE, attributeTotal));
 
-	// $effect(() => {
-	// 	searchInput;
-	// 	sortDir;
-	// 	typeFilter;
-	// 	attributePage = 1;
-	// });
+	$effect(() => {
+		void debouncedSearch;
+		void sortDir;
+		void typeFilter;
+		attributePage = 1;
+	});
 	$effect(() => {
 		if (attributePage > attributeTotalPages) attributePage = attributeTotalPages;
 		if (attributePage < 1) attributePage = 1;
@@ -288,6 +342,15 @@
 	</div>
 	<div class="p-4 sm:p-6">
 		<PaginationTable showToolbar={false}>
+			{#if attributeSearchQuery.isError && debouncedSearch}
+				<div
+					class="mb-3 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+				>
+					{attributeSearchQuery.error instanceof Error
+						? attributeSearchQuery.error.message
+						: String(attributeSearchQuery.error)}
+				</div>
+			{/if}
 			{#if filteredAttributes.length === 0}
 				<div
 					class="flex min-h-[12rem] items-center justify-center rounded-lg border border-dashed bg-muted/20 px-4 py-8"

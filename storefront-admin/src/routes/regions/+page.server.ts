@@ -5,24 +5,24 @@ import { zod4 } from 'sveltekit-superforms/adapters';
 import { superValidate, message } from 'sveltekit-superforms';
 import { client } from '$lib/client';
 
+function parseCountryIdsField(raw: string | undefined): string[] {
+	const s = (raw ?? '').trim();
+	if (!s) return [];
+	try {
+		const parsed = JSON.parse(s) as unknown;
+		return Array.isArray(parsed) ? parsed.map(String) : [];
+	} catch {
+		return [];
+	}
+}
+
 const RegionCreateSchema = z.object({
 	name: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name is too long'),
 	currency_code: z
 		.string()
 		.min(3, 'Currency code must be 3 characters (e.g. USD)')
 		.max(3, 'Currency code must be 3 characters (e.g. USD)'),
-	country_ids: z.preprocess(
-		(val) => (val === undefined || val === null ? '' : String(val)),
-		z.string().transform((s) => {
-			if (!s.trim()) return [] as string[];
-			try {
-				const parsed = JSON.parse(s) as unknown;
-				return Array.isArray(parsed) ? parsed.map(String) : [];
-			} catch {
-				return [];
-			}
-		})
-	)
+	country_ids: z.string().optional().transform(parseCountryIdsField)
 });
 
 const RegionUpdateSchema = RegionCreateSchema.extend({
@@ -33,7 +33,8 @@ export const load: PageServerLoad = async () => {
 	const regionCreateForm = await superValidate(
 		{
 			name: '',
-			currency_code: ''
+			currency_code: '',
+			country_ids: ''
 		},
 		zod4(RegionCreateSchema),
 		{ errors: false }
@@ -43,7 +44,8 @@ export const load: PageServerLoad = async () => {
 		{
 			id: '',
 			name: '',
-			currency_code: ''
+			currency_code: '',
+			country_ids: ''
 		},
 		zod4(RegionUpdateSchema),
 		{ errors: false }

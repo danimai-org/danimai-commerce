@@ -1,6 +1,10 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button/index.js';
+	import { DropdownMenu } from 'bits-ui';
+	import Pencil from '@lucide/svelte/icons/pencil';
+	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import EditTax from '$lib/components/organs/tax-region/update/EditTax.svelte';
+
+	import { Toaster } from 'svelte-sonner';
 
 	interface Props {
 		taxRegion?: Record<string, unknown> | null;
@@ -30,7 +34,29 @@
 			<p class="mt-1 text-sm text-muted-foreground">Tax region details</p>
 		</div>
 		<div class="flex items-center gap-2">
-			<Button size="sm" variant="outline" onclick={() => (editSheetOpen = true)}>Edit</Button>
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger
+					class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
+					aria-label="Actions"
+				>
+					<MoreHorizontal class="size-4" />
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Portal>
+					<DropdownMenu.Content
+						class="z-50 min-w-32 rounded-xl border bg-popover p-1 text-popover-foreground shadow-md"
+						sideOffset={4}
+					>
+						<DropdownMenu.Item
+							textValue="Edit"
+							class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
+							onSelect={() => (editSheetOpen = true)}
+						>
+							<Pencil class="size-4" />
+							Edit
+						</DropdownMenu.Item>
+					</DropdownMenu.Content>
+				</DropdownMenu.Portal>
+			</DropdownMenu.Root>
 		</div>
 	</div>
 
@@ -45,15 +71,25 @@
 		</div>
 		<div>
 			<dt class="text-muted-foreground">Created</dt>
-			<dd class="mt-1 font-medium">{formatDate(taxRegion?.created_at as unknown as string | Date)}</dd>
+			<dd class="mt-1 font-medium">
+				{formatDate(taxRegion?.created_at as unknown as string | Date)}
+			</dd>
 		</div>
 		<div>
 			<dt class="text-muted-foreground">Updated</dt>
-			<dd class="mt-1 font-medium">{formatDate(taxRegion?.updated_at as unknown as string | Date)}</dd>
+			<dd class="mt-1 font-medium">
+				{formatDate(taxRegion?.updated_at as unknown as string | Date)}
+			</dd>
 		</div>
 	</dl>
 </div>
 
 {#key taxRegion?.id}
-	<EditTax bind:open={editSheetOpen} region={taxRegion as Record<string, unknown> | null} onSuccess={onUpdated} />
+	<EditTax
+		bind:open={editSheetOpen}
+		region={taxRegion as Record<string, unknown> | null}
+		onSuccess={onUpdated}
+	/>
 {/key}
+
+<Toaster position="top-center" richColors={true} />

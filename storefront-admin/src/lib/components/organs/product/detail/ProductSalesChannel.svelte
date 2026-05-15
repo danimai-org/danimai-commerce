@@ -16,35 +16,21 @@
 		(product as { sales_channels?: Array<{ id: string; name: string }> } | null)?.sales_channels ??
 			[]
 	);
-	const salesChannelsQuery = createQuery(() => ({
-		queryKey: ['sales-channels', 'product-detail-sheet'],
-		queryFn: async () =>
-			client['sales-channels'].get({
+	const salesChannelsTotalQuery = createQuery(() => ({
+		queryKey: ['sales-channels', 'product-detail-total'],
+		queryFn: async () => {
+			const res = await client['sales-channels'].get({
 				query: {
 					page: '1',
-					limit: '100',
-					sorting_field: 'created_at'
+					limit: '1',
+					sorting_field: 'sales_channels.created_at'
 				}
-			}),
+			});
+			const payload = res?.data as { pagination?: { total?: number } } | undefined;
+			return payload?.pagination?.total ?? 0;
+		},
 		refetchOnWindowFocus: false
 	}));
-	const allSalesChannels = $derived.by(() => {
-		const payload = salesChannelsQuery.data?.data as
-			| { rows?: unknown[]; data?: unknown[] }
-			| undefined;
-		const rows = (payload?.rows ?? payload?.data ?? []) as {
-			id: string;
-			name?: string;
-			title?: string;
-			is_default?: boolean;
-		}[];
-		return rows.map((channel) => ({
-			id: channel.id,
-			name: channel.name ?? '',
-			title: channel.title,
-			is_default: channel.is_default
-		}));
-	});
 	let selectedIds = new SvelteSet<string>();
 	let sheetOpen = $state(false);
 	let submitting = $state(false);
@@ -120,7 +106,7 @@
 		{/if}
 	</div>
 	<p class="mt-1 text-xs text-muted-foreground">
-		Available in {salesChannels.length} of {allSalesChannels.length || salesChannels.length} sales channels
+		Available in {salesChannels.length} of {salesChannelsTotalQuery.data ?? salesChannels.length} sales channels
 	</p>
 	{#if saveError}
 		<p class="mt-2 text-xs text-destructive">{saveError}</p>
@@ -129,7 +115,6 @@
 
 <ProductSalesChannelsSheet
 	bind:open={sheetOpen}
-	channels={allSalesChannels.length ? allSalesChannels : salesChannels}
 	{selectedIds}
 	onSelectedIdsChange={(set) => {
 		selectedIds.clear();

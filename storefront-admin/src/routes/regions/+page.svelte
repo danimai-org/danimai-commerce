@@ -14,10 +14,18 @@
 	import { client } from '$lib/client.js';
 	import { createPaginationState } from '$lib/api/pagination.svelte.js';
 	import type { PageProps } from './$types';
+	import type { SuperValidated } from 'sveltekit-superforms';
 	import { resolve } from '$app/paths';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { goto, invalidateAll } from '$app/navigation';
-	// import CreateRegion from '$lib/components/organs/region/create/create-region.svelte';
+	import CreateRegion from '$lib/components/organs/region/create/create-region.svelte';
+
+	type RegionCreateFormData = {
+		name: string;
+		currency_code: string;
+		country_ids: string[];
+	};
+
 	const { data }: PageProps = $props();
 
 	async function refetch() {
@@ -51,15 +59,14 @@
 	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
 	const confirmDelete = $derived(paginateState.confirmDelete);
 
-	// let createSheetOpen = $state(false);
+	let createSheetOpen = $state(false);
 
 	function openCreateSheet() {
-		// createSheetOpen = true;
+		createSheetOpen = true;
 	}
-	// async function handleFormSaved() {
-	// 	paginateState.closeForm();
-	// 	refetch();
-	// }
+	async function handleFormSaved() {
+		await refetch();
+	}
 	const tableColumns: TableColumn[] = [
 		{ label: 'Name', key: 'name', type: 'text' },
 		{ label: 'Currency', key: 'currency_code', type: 'text' },
@@ -120,7 +127,11 @@
 	</div>
 </div>
 
-<!-- <CreateRegion open={createSheetOpen} onSuccess={handleFormSaved} /> -->
+<CreateRegion
+	bind:open={createSheetOpen}
+	regionCreateForm={data.regionCreateForm as SuperValidated<RegionCreateFormData>}
+	onSuccess={handleFormSaved}
+/>
 
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}

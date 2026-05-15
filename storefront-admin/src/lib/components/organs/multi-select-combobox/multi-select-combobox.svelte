@@ -25,6 +25,8 @@
 		showSelectedTable?: boolean;
 		/** Called when the dropdown is first opened (e.g. for lazy-loading options). */
 		onOpen?: () => void;
+		/** Fires whenever the dropdown opens or closes */
+		onOpenChange?: (open: boolean) => void;
 		onSearchChange?: (query: string) => void;
 	};
 
@@ -43,6 +45,7 @@
 		filterFn,
 		showSelectedTable = true,
 		onOpen,
+		onOpenChange,
 		onSearchChange,
 	}: Props = $props();
 
@@ -83,14 +86,20 @@
 		resetSearchQuery();
 	}
 
+	function setDropdownOpen(next: boolean) {
+		if (open === next) return;
+		open = next;
+		onOpenChange?.(next);
+	}
+
 	function closeFromEscape() {
-		open = false;
+		setDropdownOpen(false);
 		resetSearchQuery();
 	}
 
 	function handleFocusout(e: FocusEvent) {
 		if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) {
-			open = false;
+			setDropdownOpen(false);
 		}
 	}
 
@@ -117,7 +126,7 @@
 				hasOpened = true;
 				onOpen?.();
 			}
-			open = true;
+			setDropdownOpen(true);
 		}}
 		onfocusout={handleFocusout}
 		onkeydown={(e) => {
@@ -128,7 +137,7 @@
 					hasOpened = true;
 					onOpen?.();
 				}
-				open = true;
+				setDropdownOpen(true);
 			}
 		}}
 	>

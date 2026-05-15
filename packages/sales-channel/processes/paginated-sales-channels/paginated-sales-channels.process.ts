@@ -61,6 +61,12 @@ export class PaginatedSalesChannelsProcess
       query = query.where("is_default", "=", input.filters.is_default);
     }
 
+    const search = input.search?.trim();
+    if (search) {
+      const term = `%${search}%`;
+      query = query.where("name", "ilike", term);
+    }
+
     const countResult = await query
       .select(({ fn }) => fn.count<number>("id").as("count"))
       .executeTakeFirst();

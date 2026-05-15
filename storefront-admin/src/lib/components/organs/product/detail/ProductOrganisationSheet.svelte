@@ -154,17 +154,16 @@
 		return () => clearTimeout(t);
 	});
 
-	$effect(() => {
+	function fetchCategories(sheetOpen: boolean, searchDebounce: string) {
 		const gen = ++categoryFetchGen;
-		if (!open) {
+		if (!sheetOpen) {
 			categoryLoading = false;
 			return;
 		}
-		const search = debouncedCategorySearch;
 		categoryLoading = true;
 		void (async () => {
 			try {
-				const res = await client['product-categories'].get({ query: buildQuery(search) });
+				const res = await client['product-categories'].get({ query: buildQuery(searchDebounce) });
 				if (gen !== categoryFetchGen) return;
 				fetchedCategories = extractRows<{ id: string; value: string }>(res).map((c) => ({
 					id: c.id,
@@ -176,19 +175,18 @@
 				if (gen === categoryFetchGen) categoryLoading = false;
 			}
 		})();
-	});
+	}
 
-	$effect(() => {
+	function fetchCollections(sheetOpen: boolean, searchDebounce: string) {
 		const gen = ++collectionFetchGen;
-		if (!open) {
+		if (!sheetOpen) {
 			collectionLoading = false;
 			return;
 		}
-		const search = debouncedCollectionSearch;
 		collectionLoading = true;
 		void (async () => {
 			try {
-				const res = await client.collections.get({ query: buildQuery(search) });
+				const res = await client.collections.get({ query: buildQuery(searchDebounce) });
 				if (gen !== collectionFetchGen) return;
 				fetchedCollections = extractRows<{ id: string; title: string }>(res).map((c) => ({
 					id: c.id,
@@ -200,19 +198,18 @@
 				if (gen === collectionFetchGen) collectionLoading = false;
 			}
 		})();
-	});
+	}
 
-	$effect(() => {
+	function fetchTags(sheetOpen: boolean, searchDebounce: string) {
 		const gen = ++tagFetchGen;
-		if (!open) {
+		if (!sheetOpen) {
 			tagLoading = false;
 			return;
 		}
-		const search = debouncedTagSearch;
 		tagLoading = true;
 		void (async () => {
 			try {
-				const res = await client['product-tags'].get({ query: buildQuery(search) });
+				const res = await client['product-tags'].get({ query: buildQuery(searchDebounce) });
 				if (gen !== tagFetchGen) return;
 				fetchedTags = extractRows<{ id: string; value: string }>(res).map((t) => ({
 					id: t.id,
@@ -224,6 +221,18 @@
 				if (gen === tagFetchGen) tagLoading = false;
 			}
 		})();
+	}
+
+	$effect(() => {
+		fetchCategories(open, debouncedCategorySearch);
+	});
+
+	$effect(() => {
+		fetchCollections(open, debouncedCollectionSearch);
+	});
+
+	$effect(() => {
+		fetchTags(open, debouncedTagSearch);
 	});
 
 	$effect(() => {
@@ -304,6 +313,9 @@
 							onSearchChange={(q) => {
 								categorySearch = q;
 							}}
+							onOpenChange={(panelOpen) => {
+								if (panelOpen && open) fetchCategories(open, debouncedCategorySearch);
+							}}
 						/>
 					</div>
 					<div class="flex flex-col gap-3">
@@ -318,6 +330,9 @@
 							loading={collectionLoading}
 							onSearchChange={(q) => {
 								collectionSearch = q;
+							}}
+							onOpenChange={(panelOpen) => {
+								if (panelOpen && open) fetchCollections(open, debouncedCollectionSearch);
 							}}
 						/>
 					</div>
@@ -337,6 +352,9 @@
 							loading={tagLoading}
 							onSearchChange={(q) => {
 								tagSearch = q;
+							}}
+							onOpenChange={(panelOpen) => {
+								if (panelOpen && open) fetchTags(open, debouncedTagSearch);
 							}}
 						/>
 					</div>

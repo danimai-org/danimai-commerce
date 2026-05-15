@@ -14,6 +14,8 @@
 		onSearchChange?: (query: string) => void;
 		/** Lazy-load hooks: first open (click / type) per mounted instance */
 		onOpen?: () => void;
+		/** Fires whenever the dropdown opens or closes */
+		onOpenChange?: (open: boolean) => void;
 		placeholder?: string;
 		id?: string;
 		disabled?: boolean;
@@ -31,6 +33,7 @@
 		onValueChange,
 		onSearchChange,
 		onOpen,
+		onOpenChange,
 		placeholder = 'Select…',
 		id: propId,
 		disabled = false,
@@ -48,6 +51,12 @@
 	let open = $state(false);
 	let input = $state('');
 	let hasOpened = $state(false);
+
+	function setDropdownOpen(next: boolean) {
+		if (open === next) return;
+		open = next;
+		onOpenChange?.(next);
+	}
 
 	function notifyFirstOpen() {
 		if (!hasOpened) {
@@ -79,7 +88,7 @@
 		value = optionId;
 		onValueChange?.(optionId);
 		resetSearchQuery();
-		open = false;
+		setDropdownOpen(false);
 	}
 
 	function clear(e: MouseEvent) {
@@ -87,7 +96,7 @@
 		value = '';
 		onValueChange?.('');
 		resetSearchQuery();
-		open = false;
+		setDropdownOpen(false);
 	}
 
 	function clearSearchOnly(e: MouseEvent) {
@@ -98,7 +107,7 @@
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
-			open = false;
+			setDropdownOpen(false);
 		}
 		if (e.key === 'Enter' && open) {
 			e.preventDefault();
@@ -112,7 +121,7 @@
 		blurSchedule = setTimeout(() => {
 			blurSchedule = undefined;
 			if (!root.contains(document.activeElement)) {
-				open = false;
+				setDropdownOpen(false);
 			}
 		}, 0);
 	}
@@ -139,7 +148,7 @@
 	onclick={() => {
 		if (disabled) return;
 		notifyFirstOpen();
-		open = true;
+		setDropdownOpen(true);
 	}}
 	onfocusout={handleFocusout}
 	onkeydown={handleKeydown}
@@ -150,15 +159,20 @@
 		placeholder={open ? 'Type to search…' : value ? '' : placeholder}
 		value={displayValue}
 		disabled={disabled}
+		onfocus={() => {
+			if (disabled) return;
+			notifyFirstOpen();
+			setDropdownOpen(true);
+		}}
 		oninput={(e) => {
 			notifyFirstOpen();
-			open = true;
+			setDropdownOpen(true);
 			input = (e.currentTarget as HTMLInputElement).value;
 			onSearchChange?.(input);
 		}}
 		onkeydown={(e) => {
 			if (e.key === 'Escape') {
-				open = false;
+				setDropdownOpen(false);
 			}
 			if (e.key === 'Enter' && open) {
 				e.preventDefault();
