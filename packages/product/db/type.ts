@@ -16,9 +16,7 @@ export interface Database {
   product_collections: ProductCollectionTable;
   product_collection_relations: ProductCollectionRelationTable;
 
-  product_attribute_groups: ProductAttributeGroupTable;
   product_attributes: ProductAttributeTable;
-  product_attribute_group_relations: ProductAttributeGroupRelationTable;
   product_attribute_values: ProductAttributeValueTable;
 
   product_options: ProductOptionTable;
@@ -54,25 +52,10 @@ export interface ProductTable {
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
   deleted_at: Date | null;
-  attribute_group_id: string | null;
 }
 export type Product = Selectable<ProductTable>;
 export type NewProduct = Insertable<ProductTable>;
 export type ProductUpdate = Updateable<ProductTable>;
-
-// table product_attribute_groups
-export interface ProductAttributeGroupTable {
-  id: Generated<string>;
-  title: string;
-  metadata: unknown | null;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
-  deleted_at: Date | null;
-}
-
-export type ProductAttributeGroup = Selectable<ProductAttributeGroupTable>;
-export type NewProductAttributeGroup = Insertable<ProductAttributeGroupTable>;
-export type ProductAttributeGroupUpdate = Updateable<ProductAttributeGroupTable>;
 
 // table product_attributes
 export interface ProductAttributeTable {
@@ -94,9 +77,8 @@ export type ProductAttributeUpdate = Updateable<ProductAttributeTable>;
 export interface ProductAttributeValueTable {
   id: Generated<string>;
   value: string;
-  attribute_group_id: string | null;
-  attribute_id: string | null;
-  product_id: string | null;
+  attribute_id: string;
+  product_id: string;
   metadata: unknown | null;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
@@ -106,20 +88,6 @@ export type ProductAttributeValue = Selectable<ProductAttributeValueTable>;
 export type NewProductAttributeValue = Insertable<ProductAttributeValueTable>;
 export type ProductAttributeValueUpdate =
   Updateable<ProductAttributeValueTable>;
-
-// table product_attribute_group_relations
-export interface ProductAttributeGroupRelationTable {
-  id: Generated<string>;
-  product_attribute_id: string;
-  attribute_group_id: string;
-  required: boolean;
-  rank: number;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
-}
-export type ProductAttributeGroupRelation = Selectable<ProductAttributeGroupRelationTable>;
-export type NewProductAttributeGroupRelation = Insertable<ProductAttributeGroupRelationTable>;
-export type ProductAttributeGroupRelationUpdate = Updateable<ProductAttributeGroupRelationTable>;
 
 // table product_variants
 export interface ProductVariantTable {

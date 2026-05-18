@@ -4,7 +4,6 @@ import { collectionRoutes } from "./collections";
 import { productCategoryRoutes } from "./product-categories";
 import { productTagRoutes } from "./product-tags";
 import { productAttributeRoutes } from "./product-attributes";
-import { productAttributeGroupRoutes } from "./product-attribute-groups";
 import { productVariantRoutes } from "./product-variants";
 import { salesChannelRoutes } from "./sales-channels";
 import { currencyRoutes } from "./currencies";
@@ -35,7 +34,6 @@ export const routes = new Elysia()
             .use(productCategoryRoutes)
             .use(productTagRoutes)
             .use(productAttributeRoutes)
-            .use(productAttributeGroupRoutes)
             .use(productVariantRoutes)
             .use(salesChannelRoutes)
             .use(currencyRoutes)

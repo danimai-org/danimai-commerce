@@ -34,9 +34,7 @@ const ProductVariantSchema = Type.Object({
 });
 
 
-// Attribute value (scoped to group + attribute)
 const AttributeValueSchema = Type.Object({
-  attribute_group_id: Type.String({ format: "uuid" }),
   attribute_id: Type.String({ format: "uuid" }),
   value: Type.Any(),
 });
@@ -53,7 +51,6 @@ export const CreateProductSchema = Type.Object({
   media_ids: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
   external_id: Type.Optional(Type.String()),
   category_id: Type.Optional(Type.String({ format: "uuid" })),
-  attribute_group_id: Type.Optional(Type.String({ format: "uuid" })),
   options: Type.Optional(Type.Array(ProductOptionSchema)),
   variants: Type.Optional(Type.Array(ProductVariantSchema)),
   sales_channel_ids: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
