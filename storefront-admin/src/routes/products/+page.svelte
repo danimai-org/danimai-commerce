@@ -27,7 +27,14 @@
 	const paginateState = createPagination(
 		async ({ queryKey }) => {
 			const qs = String(queryKey[2] ?? '');
-			return client.products.get({ query: createPaginationQuery(new URLSearchParams(qs)) });
+			const res = await client.products.get({
+				query: createPaginationQuery(new URLSearchParams(qs))
+			});
+			if (res.error) {
+				const err = res.error as { value?: { message?: string } };
+				throw new Error(err.value?.message ?? 'Failed to load products');
+			}
+			return res;
 		},
 		['products'],
 		undefined,
@@ -40,12 +47,7 @@
 		await client.products.delete({ product_ids: ids });
 	}
 
-	const queryData = $derived(
-		paginateState.query.data as
-			| { data: { rows: Product[]; pagination: PaginationMeta } }
-			| undefined
-	);
-	const rawRows = $derived(queryData?.data?.rows ?? []);
+	const rawRows = $derived(paginateState.query.data?.data?.rows ?? []);
 	const rows = $derived(
 		rawRows.map((p: Product) => ({
 			...p,
@@ -54,7 +56,9 @@
 			variants_count: p.variant_count ?? p.variants?.length ?? 0
 		}))
 	) as Record<string, unknown>[];
-	const pagination = $derived((queryData?.data?.pagination ?? null) as PaginationMeta | null);
+	const pagination = $derived(
+		(paginateState.query.data?.data?.pagination ?? null) as PaginationMeta | null
+	);
 	const start = $derived(
 		pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0
 	);

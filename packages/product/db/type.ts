@@ -60,8 +60,6 @@ export type Product = Selectable<ProductTable>;
 export type NewProduct = Insertable<ProductTable>;
 export type ProductUpdate = Updateable<ProductTable>;
 
-<<<<<<< HEAD
-=======
 // table product_attribute_groups
 export interface ProductAttributeGroupTable {
   id: Generated<string>;
@@ -77,7 +75,7 @@ export type NewProductAttributeGroup = Insertable<ProductAttributeGroupTable>;
 export type ProductAttributeGroupUpdate =
   Updateable<ProductAttributeGroupTable>;
 
->>>>>>> 182ff3c92e5c9fc7fd38777be56211efb9c0f479
+
 // table product_attributes
 export interface ProductAttributeTable {
   id: Generated<string>;
@@ -108,8 +106,7 @@ export type NewProductAttributeValue = Insertable<ProductAttributeValueTable>;
 export type ProductAttributeValueUpdate =
   Updateable<ProductAttributeValueTable>;
 
-<<<<<<< HEAD
-=======
+
 // table product_attribute_group_relations
 export interface ProductAttributeGroupRelationTable {
   id: Generated<string>;
@@ -127,7 +124,6 @@ export type NewProductAttributeGroupRelation =
 export type ProductAttributeGroupRelationUpdate =
   Updateable<ProductAttributeGroupRelationTable>;
 
->>>>>>> 182ff3c92e5c9fc7fd38777be56211efb9c0f479
 // table product_variants
 export interface ProductVariantTable {
   id: Generated<string>;

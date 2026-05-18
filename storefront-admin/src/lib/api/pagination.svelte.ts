@@ -67,7 +67,7 @@ export const createPagination = <T>(
 	const pagination = $derived(
 		(query.data as unknown as { pagination?: PaginationMeta })?.pagination ?? null
 	);
-	const loading = $derived(query.isPending);
+	const loading = $derived(query.isLoading);
 	const error = $derived(
 		query.error != null
 			? query.error instanceof Error

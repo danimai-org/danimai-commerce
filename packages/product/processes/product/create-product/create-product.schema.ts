@@ -41,11 +41,7 @@ const ProductVariantSchema = Type.Object({
   ),
 });
 
-<<<<<<< HEAD
-
-=======
 // Attribute value (scoped to group + attribute)
->>>>>>> 182ff3c92e5c9fc7fd38777be56211efb9c0f479
 const AttributeValueSchema = Type.Object({
   attribute_id: Type.String({ format: "uuid" }),
   value: Type.Any(),
