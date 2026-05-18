@@ -11,8 +11,22 @@ import {
 } from "@danimai/core";
 import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type CreateProductProcessInput, type CreateProductProcessOutput, CreateProductSchema, ProductVariantPriceSchema } from "./create-product.schema";
-import type { Database, Product, ProductCategory, ProductOption } from "../../../db/type";
+import {
+  type CreateProductProcessInput,
+  type CreateProductProcessOutput,
+  CreateProductSchema,
+  ProductVariantPriceSchema,
+} from "./create-product.schema";
+import type {
+  Database,
+  NewProductVariantOptionRelation,
+  Product,
+  ProductCategory,
+  ProductOption,
+  ProductOptionValue,
+  ProductVariant,
+  ProductVariantOptionRelation,
+} from "../../../db/type";
 import { randomUUID } from "crypto";
 import type { Price, PriceSet } from "@danimai/pricing";
 import type { Static } from "@sinclair/typebox";
@@ -30,24 +44,28 @@ export const CREATE_PRODUCT_PROCESS = Symbol("CreateProduct");
  * Output: created product row persisted with related records.
  */
 @Process(CREATE_PRODUCT_PROCESS)
-export class CreateProductProcess
-  implements ProcessContract<typeof CreateProductSchema, CreateProductProcessOutput> {
-
+export class CreateProductProcess implements ProcessContract<
+  typeof CreateProductSchema,
+  CreateProductProcessOutput
+> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
     @InjectLogger()
-    private readonly logger: Logger
-  ) { }
+    private readonly logger: Logger,
+  ) {}
 
   /**
    * Executes the process business logic.
    * Input: validated process context and request payload.
    * Output: operation result object or entity payload.
    */
-  async runOperations(@ProcessContext({
-    schema: CreateProductSchema,
-  }) context: ProcessContextType<typeof CreateProductSchema>) {
+  async runOperations(
+    @ProcessContext({
+      schema: CreateProductSchema,
+    })
+    context: ProcessContextType<typeof CreateProductSchema>,
+  ) {
     const { input } = context;
     let createdProductId = "";
 
@@ -56,63 +74,82 @@ export class CreateProductProcess
     await sql`begin`.execute(trx);
 
     try {
-
       // ── Validate category ──────────────────────────────────────────────
       // Ensure the referenced category exists before attaching it to the product
 
       if (input.category_id) {
-        const category = await trx.selectFrom("product_categories")
+        const category = await trx
+          .selectFrom("product_categories")
           .where("id", "=", input.category_id)
           .where("deleted_at", "is", null)
           .selectAll()
           .executeTakeFirst();
 
         if (!category) {
-          throw new ValidationError("Category not found", [{
-            type: "not_found",
-            message: "Category not found",
-            path: "category_id",
-          }]);
+          throw new ValidationError("Category not found", [
+            {
+              type: "not_found",
+              message: "Category not found",
+              path: "category_id",
+            },
+          ]);
         }
       }
 
       if (input.attribute_group_id) {
-        const attributeGroup = await trx.selectFrom("product_attribute_groups")
+        const attributeGroup = await trx
+          .selectFrom("product_attribute_groups")
           .where("id", "=", input.attribute_group_id)
           .where("deleted_at", "is", null)
           .selectAll()
           .executeTakeFirst();
 
         if (!attributeGroup) {
-          throw new ValidationError("Attribute group not found", [{
-            type: "not_found",
-            message: "Attribute group not found",
-            path: "attribute_group_id",
-          }]);
+          throw new ValidationError("Attribute group not found", [
+            {
+              type: "not_found",
+              message: "Attribute group not found",
+              path: "attribute_group_id",
+            },
+          ]);
         }
 
-
         if (input.attributes && input.attributes.length > 0) {
-          const attributes = await trx.selectFrom("product_attributes")
-            .innerJoin("product_attribute_group_relations",
-              (join) => join.onRef("product_attribute_group_relations.product_attribute_id", "=", "product_attributes.id")
-                .on("product_attribute_group_relations.attribute_group_id", "=", attributeGroup.id)
+          const attributes = await trx
+            .selectFrom("product_attributes")
+            .innerJoin("product_attribute_group_relations", (join) =>
+              join
+                .onRef(
+                  "product_attribute_group_relations.product_attribute_id",
+                  "=",
+                  "product_attributes.id",
+                )
+                .on(
+                  "product_attribute_group_relations.attribute_group_id",
+                  "=",
+                  attributeGroup.id,
+                ),
             )
-            .where("product_attribute_group_relations.product_attribute_id", "in", input.attributes.map((a) => a.attribute_id))
+            .where(
+              "product_attribute_group_relations.product_attribute_id",
+              "in",
+              input.attributes.map((a) => a.attribute_id),
+            )
             .where("deleted_at", "is", null)
             .selectAll()
             .execute();
 
           if (attributes.length !== input.attributes.length) {
-            throw new ValidationError("One or more attributes not found", [{
-              type: "not_found",
-              message: "One or more attributes not found",
-              path: "attributes",
-            }]);
+            throw new ValidationError("One or more attributes not found", [
+              {
+                type: "not_found",
+                message: "One or more attributes not found",
+                path: "attributes",
+              },
+            ]);
           }
         }
       }
-
 
       let handle: string;
 
@@ -125,11 +162,13 @@ export class CreateProductProcess
           .executeTakeFirst();
 
         if (existing) {
-          throw new ValidationError("Product handle already exists", [{
-            type: "not_unique",
-            message: "Product handle already exists",
-            path: "handle",
-          }]);
+          throw new ValidationError("Product handle already exists", [
+            {
+              type: "not_unique",
+              message: "Product handle already exists",
+              path: "handle",
+            },
+          ]);
         }
         handle = input.handle;
       } else {
@@ -193,39 +232,58 @@ export class CreateProductProcess
       // Option values are scoped to (option + product).
       // Returns a map of option_title -> { option_id, values: { value -> option_value_id } }
 
+      let options: ProductOption[] = [];
+      let optionValues: ProductOptionValue[] = [];
+
       if (input.options && input.options.length > 0) {
-        let options: ProductOption[] = [];
         const existingOptions = await trx
           .selectFrom("product_options")
-          .where(sql`lower(title)`, "in", input.options.map((o) => sql`lower(${o.title})`))
+          .where(
+            sql`lower(title)`,
+            "in",
+            input.options.map((o) => sql`lower(${o.title})`),
+          )
           .where("deleted_at", "is", null)
           .selectAll()
           .execute();
-        const optionsToCreate = input.options.filter((o) => !existingOptions.some((eo) => eo.title === o.title));
+        const optionsToCreate = input.options.filter(
+          (o) => !existingOptions.some((eo) => eo.title === o.title),
+        );
         if (optionsToCreate.length > 0) {
           options = await trx
             .insertInto("product_options")
-            .values(optionsToCreate.map((o) => ({ id: randomUUID(), title: o.title, metadata: null })))
+            .values(
+              optionsToCreate.map((o) => ({
+                id: randomUUID(),
+                title: o.title,
+                metadata: null,
+              })),
+            )
             .returningAll()
             .execute();
         }
         options = [...existingOptions, ...options];
 
         if (input.options && input.options.length > 0) {
-          await trx
+          optionValues = await trx
             .insertInto("product_option_values")
-            .values(input.options.map((o, rank) => ({
-              id: randomUUID(),
-              value: o.title,
-              option_id: options.find((option) => option.title === o.title)?.id ?? "",
-              product_id: product.id,
-              rank: rank,
-            })).filter((o) => o.option_id !== ""))
+            .values(
+              input.options
+                .map((o, rank) => ({
+                  id: randomUUID(),
+                  value: o.title,
+                  option_id:
+                    options.find((option) => option.title === o.title)?.id ??
+                    "",
+                  product_id: product.id,
+                  rank: rank,
+                }))
+                .filter((o) => o.option_id !== ""),
+            )
+            .returningAll()
             .execute();
         }
       }
-
-
 
       // ── Create product variants with option relations and prices ───────
       if (input.variants && input.variants.length > 0) {
@@ -250,8 +308,30 @@ export class CreateProductProcess
           .returningAll()
           .execute();
 
+        const variantOptionsRelations: NewProductVariantOptionRelation[] =
+          input.variants.flatMap((variant, index) =>
+            variant.option_values.map((option, index) => ({
+              variant_id: createdVariants[index]?.id!,
+              option_value_id: optionValues.find(
+                (ov) =>
+                  ov.value === option.value &&
+                  ov.option_id ===
+                    options.find((o) => o.title === option.title)?.id,
+              )?.id!,
+            })),
+          );
+
+        if (variantOptionsRelations.length > 0) {
+          await trx
+            .insertInto("product_variant_option_relations")
+            .values(variantOptionsRelations)
+            .execute();
+        }
+
         for (const variantInput of input.variants) {
-          const createdVariant = createdVariants.find((v) => v.title === variantInput.title);
+          const createdVariant = createdVariants.find(
+            (v) => v.title === variantInput.title,
+          );
           if (!createdVariant) {
             continue;
           }
@@ -264,35 +344,51 @@ export class CreateProductProcess
           });
         }
 
-        const variantMap = new Map<string, typeof createdVariants[0]>();
+        const variantMap = new Map<string, (typeof createdVariants)[0]>();
         for (const variant of createdVariants) {
           variantMap.set(variant.title, variant);
         }
+
         const priceSets = await trx
           .insertInto("price_sets")
-          .values(createdVariants.map((v) => ({ id: randomUUID(), variant_id: v.id, metadata: null })))
+          .values(
+            createdVariants.map((v) => ({
+              id: randomUUID(),
+              variant_id: v.id,
+              metadata: null,
+            })),
+          )
           .returningAll()
           .execute();
 
-        const priceSetsMap = new Map<string, PriceSet>(priceSets.map((ps) => [ps.variant_id, ps]));
+        const priceSetsMap = new Map<string, PriceSet>(
+          priceSets.map((ps) => [ps.variant_id, ps]),
+        );
 
-        const inputPriceMap = new Map<string, Static<typeof ProductVariantPriceSchema>[]>(input.variants.map((v) => [
-          createdVariants.find((cv) => cv.title === v.title)?.id ?? "",
-          v.prices ?? []
-        ]));
+        const inputPriceMap = new Map<
+          string,
+          Static<typeof ProductVariantPriceSchema>[]
+        >(
+          input.variants.map((v) => [
+            createdVariants.find((cv) => cv.title === v.title)?.id ?? "",
+            v.prices ?? [],
+          ]),
+        );
         const pricesToCreate = createdVariants
-          .flatMap((variant) => inputPriceMap
-            .get(variant.id)?.map((price) => ({
-              id: randomUUID(),
-              price_set_id: priceSetsMap.get(variant.id)?.id ?? "",
-              amount: price.amount.toString(),
-              currency_code: price.currency_code,
-              min_quantity: price.min_quantity ?? null,
-              max_quantity: price.max_quantity ?? null,
-              price_list_id: price.price_list_id ?? null,
-              metadata: null,
-            })) ?? [])
-          .filter(price => Boolean(price));
+          .flatMap(
+            (variant) =>
+              inputPriceMap.get(variant.id)?.map((price) => ({
+                id: randomUUID(),
+                price_set_id: priceSetsMap.get(variant.id)?.id ?? "",
+                amount: price.amount.toString(),
+                currency_code: price.currency_code,
+                min_quantity: price.min_quantity ?? null,
+                max_quantity: price.max_quantity ?? null,
+                price_list_id: price.price_list_id ?? null,
+                metadata: null,
+              })) ?? [],
+          )
+          .filter((price) => Boolean(price));
 
         if (pricesToCreate.length > 0) {
           await trx
@@ -327,7 +423,8 @@ export class CreateProductProcess
           .executeTakeFirst();
 
         if (currentProduct) {
-          const metadata = (currentProduct.metadata as Record<string, unknown>) || {};
+          const metadata =
+            (currentProduct.metadata as Record<string, unknown>) || {};
           metadata.shipping_profile_id = input.shipping_profile_id;
 
           await trx
@@ -346,7 +443,7 @@ export class CreateProductProcess
             input.tag_ids.map((product_tag_id) => ({
               product_id: product.id,
               product_tag_id,
-            }))
+            })),
           )
           .onConflict((oc) => oc.doNothing())
           .execute();
@@ -360,7 +457,7 @@ export class CreateProductProcess
             input.collection_ids.map((product_collection_id) => ({
               product_id: product.id,
               product_collection_id,
-            }))
+            })),
           )
           .onConflict((oc) => oc.doNothing())
           .execute();
@@ -368,14 +465,16 @@ export class CreateProductProcess
       if (input.attributes && input.attributes.length > 0) {
         await trx
           .insertInto("product_attribute_values")
-          .values(input.attributes.map((attribute) => ({
-            id: randomUUID(),
-            value: attribute.value,
-            attribute_group_id: attribute.attribute_group_id,
-            attribute_id: attribute.attribute_id,
-            product_id: product.id,
-            metadata: null,
-          })))
+          .values(
+            input.attributes.map((attribute) => ({
+              id: randomUUID(),
+              value: attribute.value,
+              attribute_group_id: attribute.attribute_group_id,
+              attribute_id: attribute.attribute_id,
+              product_id: product.id,
+              metadata: null,
+            })),
+          )
           .onConflict((oc) => oc.doNothing())
           .execute();
       }
@@ -401,7 +500,7 @@ export class CreateProductProcess
       mediaIds?: string[];
       thumbnailMediaId?: string;
       updateThumbnailTable?: "products" | "product_variants";
-    }
+    },
   ) {
     const mediaTable = trx as any;
     const ids = new Set<string>(options.mediaIds ?? []);

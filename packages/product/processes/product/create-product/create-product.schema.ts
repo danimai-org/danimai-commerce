@@ -5,7 +5,7 @@ import { ProductStatusEnum } from "../../../db/type";
 const ProductOptionSchema = Type.Object({
   title: Type.String(),
   values: Type.Array(Type.String()),
-});
+}); // Size -> S, M, L | Color -> Red, Green
 
 // Product Variant Price Schema
 export const ProductVariantPriceSchema = Type.Object({
@@ -18,6 +18,12 @@ export const ProductVariantPriceSchema = Type.Object({
 
 // Product Variant Schema
 const ProductVariantSchema = Type.Object({
+  option_values: Type.Array(
+    Type.Object({
+      title: Type.String(),
+      value: Type.String(),
+    }),
+  ), // (Color -> Red, Size -> M), (Color -> Red, Size -> L)
   title: Type.String(),
   sku: Type.Optional(Type.String()),
   barcode: Type.Optional(Type.String()),
@@ -30,10 +36,16 @@ const ProductVariantSchema = Type.Object({
   thumbnail_media_id: Type.Optional(Type.String({ format: "uuid" })),
   media_ids: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
   prices: Type.Optional(Type.Array(ProductVariantPriceSchema)),
-  metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
+  metadata: Type.Optional(
+    Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()])),
+  ),
 });
 
+<<<<<<< HEAD
 
+=======
+// Attribute value (scoped to group + attribute)
+>>>>>>> 182ff3c92e5c9fc7fd38777be56211efb9c0f479
 const AttributeValueSchema = Type.Object({
   attribute_id: Type.String({ format: "uuid" }),
   value: Type.Any(),
@@ -57,13 +69,15 @@ export const CreateProductSchema = Type.Object({
   tag_ids: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
   collection_ids: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
   shipping_profile_id: Type.Optional(Type.String({ format: "uuid" })),
-  metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
-  attributes: Type.Optional(Type.Array(AttributeValueSchema, { uniqueItems: true })),
+  metadata: Type.Optional(
+    Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()])),
+  ),
+  attributes: Type.Optional(
+    Type.Array(AttributeValueSchema, { uniqueItems: true }),
+  ),
 });
 
-export type CreateProductProcessInput = Static<
-  typeof CreateProductSchema
->;
+export type CreateProductProcessInput = Static<typeof CreateProductSchema>;
 
 export const CreateProductResponseSchema = Type.Object({
   id: Type.String(),

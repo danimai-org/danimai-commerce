@@ -1,5 +1,8 @@
 import type { Generated, Selectable, Insertable, Updateable } from "kysely";
-import type { ProductSalesChannelTable, SalesChannelTable } from "@danimai/sales-channel/db";
+import type {
+  ProductSalesChannelTable,
+  SalesChannelTable,
+} from "@danimai/sales-channel/db";
 import type { PriceSetTable, PriceTable } from "@danimai/pricing";
 
 export enum ProductStatusEnum {
@@ -57,6 +60,24 @@ export type Product = Selectable<ProductTable>;
 export type NewProduct = Insertable<ProductTable>;
 export type ProductUpdate = Updateable<ProductTable>;
 
+<<<<<<< HEAD
+=======
+// table product_attribute_groups
+export interface ProductAttributeGroupTable {
+  id: Generated<string>;
+  title: string;
+  metadata: unknown | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  deleted_at: Date | null;
+}
+
+export type ProductAttributeGroup = Selectable<ProductAttributeGroupTable>;
+export type NewProductAttributeGroup = Insertable<ProductAttributeGroupTable>;
+export type ProductAttributeGroupUpdate =
+  Updateable<ProductAttributeGroupTable>;
+
+>>>>>>> 182ff3c92e5c9fc7fd38777be56211efb9c0f479
 // table product_attributes
 export interface ProductAttributeTable {
   id: Generated<string>;
@@ -70,8 +91,6 @@ export interface ProductAttributeTable {
 export type ProductAttribute = Selectable<ProductAttributeTable>;
 export type NewProductAttribute = Insertable<ProductAttributeTable>;
 export type ProductAttributeUpdate = Updateable<ProductAttributeTable>;
-
-
 
 // table product_attribute_values
 export interface ProductAttributeValueTable {
@@ -89,6 +108,26 @@ export type NewProductAttributeValue = Insertable<ProductAttributeValueTable>;
 export type ProductAttributeValueUpdate =
   Updateable<ProductAttributeValueTable>;
 
+<<<<<<< HEAD
+=======
+// table product_attribute_group_relations
+export interface ProductAttributeGroupRelationTable {
+  id: Generated<string>;
+  product_attribute_id: string;
+  attribute_group_id: string;
+  required: boolean;
+  rank: number;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+export type ProductAttributeGroupRelation =
+  Selectable<ProductAttributeGroupRelationTable>;
+export type NewProductAttributeGroupRelation =
+  Insertable<ProductAttributeGroupRelationTable>;
+export type ProductAttributeGroupRelationUpdate =
+  Updateable<ProductAttributeGroupRelationTable>;
+
+>>>>>>> 182ff3c92e5c9fc7fd38777be56211efb9c0f479
 // table product_variants
 export interface ProductVariantTable {
   id: Generated<string>;

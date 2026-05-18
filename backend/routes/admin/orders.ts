@@ -10,9 +10,6 @@ import {
   CreateOrdersProcess,
   CreateOrdersSchema,
   CreateOrdersResponseSchema,
-  CREATE_ORDER_FROM_CART_PROCESS,
-  CreateOrderFromCartProcess,
-  CreateOrderFromCartSchema,
   UPDATE_ORDERS_PROCESS,
   UpdateOrdersProcess,
   UpdateOrderSchema,
@@ -71,29 +68,6 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
         tags: ["Orders"],
         summary: "Create orders",
         description: "Creates one or more orders",
-      },
-    }
-  )
-  .post(
-    "/from-cart",
-    async ({ body }: { body: StaticDecode<typeof CreateOrderFromCartSchema> }) => {
-      const process = getService<CreateOrderFromCartProcess>(
-        CREATE_ORDER_FROM_CART_PROCESS
-      );
-      return process.runOperations({ input: body });
-    },
-    {
-      body: CreateOrderFromCartSchema,
-      response: {
-        200: OrderResponseSchema,
-        400: ValidationErrorResponseSchema,
-        500: InternalErrorResponseSchema,
-      },
-      detail: {
-        tags: ["Orders"],
-        summary: "Create order from cart",
-        description:
-          "Builds an order from a cart (line items, tax lines, shipping snapshot), marks the cart completed",
       },
     }
   )

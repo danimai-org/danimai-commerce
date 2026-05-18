@@ -5,9 +5,11 @@ import {
   UPDATE_PRODUCT_VARIANTS_PROCESS,
   DELETE_PRODUCT_VARIANTS_PROCESS,
   PAGINATED_PRODUCT_VARIANTS_PROCESS,
+  CREATE_PRODUCT_VARIANTS_PROCESS,
   UpdateProductVariantsProcess,
   DeleteProductVariantsProcess,
   PaginatedProductVariantsProcess,
+  CreateProductVariantsProcess,
   PaginatedProductVariantsSchema,
   PaginatedProductVariantsResponseSchema,
   RETRIEVE_PRODUCT_VARIANT_PROCESS,
@@ -18,6 +20,8 @@ import {
   UpdateProductVariantSchema,
   UpdateProductVariantsResponseSchema,
   DeleteProductVariantsSchema,
+  CreateProductVariantsSchema,
+  CreateProductVariantsResponseSchema,
 } from "@danimai/product";
 import { handleProcessError } from "../../utils/error-handler";
 import {
@@ -42,6 +46,27 @@ const UpdateProductVariantBodySchema = Type.Object({
 
 export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })
   .onError(({ error, set }) => handleProcessError(error, set))
+  .post(
+    "/",
+    async ({ body }: { body: StaticDecode<typeof CreateProductVariantsSchema> }) => {
+      const process = getService<CreateProductVariantsProcess>(CREATE_PRODUCT_VARIANTS_PROCESS);
+      return process.runOperations({ input: body });
+    },
+    {
+      body: CreateProductVariantsSchema,
+      response: {
+        200: CreateProductVariantsResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Product Variants"],
+        summary: "Replace product variants",
+        description:
+          "Deletes all existing variants for the given product and recreates them with the supplied options and variant set.",
+      },
+    }
+  )
   .get(
     "/",
     async ({ query }) => {
