@@ -4,7 +4,6 @@
 	import { Combobox, MultiSelectCombobox } from '$lib/components/organs/index.js';
 	import Info from '@lucide/svelte/icons/info';
 	import { client } from '$lib/client.js';
-	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
 
 	import { SvelteMap } from 'svelte/reactivity';
 	import { superForm } from 'sveltekit-superforms/client';
@@ -30,6 +29,12 @@
 	};
 
 	type Option = { id: string; value: string };
+	type ListQuery = {
+		search?: string;
+		page?: string | number;
+		limit?: string | number;
+		sorting_field?: string;
+	};
 
 	function extractRows<T>(response: unknown): T[] {
 		const payload = (response as { data?: { rows?: T[]; data?: T[] } | T[] } | null)?.data;
@@ -44,17 +49,11 @@
 		return Array.from(map.values());
 	}
 
-	const listQuery = createPaginationQuery({
-		page: 1,
-		limit: 100,
-		search: '',
-		sorting_field: 'created_at'
-	}) as {
-		search?: string;
-		page?: string | number;
-		limit?: string | number;
-		sorting_field?: string;
-	};
+	function buildQuery(search: string): ListQuery {
+		return { page: 1, limit: 100, sorting_field: 'created_at', search: search.trim() || undefined };
+	}
+
+	// const passthrough = (opts: Option[]) => opts;
 
 	const product = $derived(getDetailContext<Product>()?.data ?? null);
 
@@ -112,58 +111,145 @@
 		invalidateAll: false
 	});
 
-	let optionsLoaded = $state(false);
 	let selectedCategoryId = $state('');
 	let selectedCollectionIds = $state<string[]>([]);
 	let selectedTagIds = $state<string[]>([]);
 	let submitting = $state(false);
 	let saveError = $state<string | null>(null);
+	let prevOpen = $state(false);
+	let orgControlsKey = 0;
 
-	async function loadOptions() {
-		if (optionsLoaded) return;
-		optionsLoaded = true;
+	let categorySearch = $state('');
+	let debouncedCategorySearch = $state('');
+	let categoryLoading = $state(false);
+	let categoryFetchGen = 0;
+	let collectionSearch = $state('');
+	let debouncedCollectionSearch = $state('');
+	let collectionLoading = $state(false);
+	let collectionFetchGen = 0;
+	let tagSearch = $state('');
+	let debouncedTagSearch = $state('');
+	let tagLoading = $state(false);
+	let tagFetchGen = 0;
 
-		const [collectionsResponse, categoriesResponse, tagsResponse] = await Promise.allSettled([
-			client.collections.get({ query: listQuery }),
-			client['product-categories'].get({ query: listQuery }),
-			client['product-tags'].get({ query: listQuery })
-		]);
+	$effect(() => {
+		const q = categorySearch;
+		const t = setTimeout(() => {
+			debouncedCategorySearch = q;
+		}, 200);
+		return () => clearTimeout(t);
+	});
+	$effect(() => {
+		const q = collectionSearch;
+		const t = setTimeout(() => {
+			debouncedCollectionSearch = q;
+		}, 300);
+		return () => clearTimeout(t);
+	});
+	$effect(() => {
+		const q = tagSearch;
+		const t = setTimeout(() => {
+			debouncedTagSearch = q;
+		}, 300);
+		return () => clearTimeout(t);
+	});
 
-		fetchedCollections =
-			collectionsResponse.status === 'fulfilled'
-				? extractRows<{ id: string; title: string }>(collectionsResponse.value).map((c) => ({
-						id: c.id,
-						value: c.title
-					}))
-				: [];
+	function fetchCategories(sheetOpen: boolean, searchDebounce: string) {
+		const gen = ++categoryFetchGen;
+		if (!sheetOpen) {
+			categoryLoading = false;
+			return;
+		}
+		categoryLoading = true;
+		void (async () => {
+			try {
+				const res = await client['product-categories'].get({ query: buildQuery(searchDebounce) });
+				if (gen !== categoryFetchGen) return;
+				fetchedCategories = extractRows<{ id: string; value: string }>(res).map((c) => ({
+					id: c.id,
+					value: c.value
+				}));
+			} catch {
+				/* keep existing options */
+			} finally {
+				if (gen === categoryFetchGen) categoryLoading = false;
+			}
+		})();
+	}
 
-		fetchedCategories =
-			categoriesResponse.status === 'fulfilled'
-				? extractRows<{ id: string; value: string }>(categoriesResponse.value).map((c) => ({
-						id: c.id,
-						value: c.value
-					}))
-				: [];
+	function fetchCollections(sheetOpen: boolean, searchDebounce: string) {
+		const gen = ++collectionFetchGen;
+		if (!sheetOpen) {
+			collectionLoading = false;
+			return;
+		}
+		collectionLoading = true;
+		void (async () => {
+			try {
+				const res = await client.collections.get({ query: buildQuery(searchDebounce) });
+				if (gen !== collectionFetchGen) return;
+				fetchedCollections = extractRows<{ id: string; title: string }>(res).map((c) => ({
+					id: c.id,
+					value: c.title
+				}));
+			} catch {
+				/* keep existing options */
+			} finally {
+				if (gen === collectionFetchGen) collectionLoading = false;
+			}
+		})();
+	}
 
-		fetchedTags =
-			tagsResponse.status === 'fulfilled'
-				? extractRows<{ id: string; value: string }>(tagsResponse.value).map((t) => ({
-						id: t.id,
-						value: t.value
-					}))
-				: [];
+	function fetchTags(sheetOpen: boolean, searchDebounce: string) {
+		const gen = ++tagFetchGen;
+		if (!sheetOpen) {
+			tagLoading = false;
+			return;
+		}
+		tagLoading = true;
+		void (async () => {
+			try {
+				const res = await client['product-tags'].get({ query: buildQuery(searchDebounce) });
+				if (gen !== tagFetchGen) return;
+				fetchedTags = extractRows<{ id: string; value: string }>(res).map((t) => ({
+					id: t.id,
+					value: t.value
+				}));
+			} catch {
+				/* keep existing options */
+			} finally {
+				if (gen === tagFetchGen) tagLoading = false;
+			}
+		})();
 	}
 
 	$effect(() => {
-		if (open) loadOptions();
+		fetchCategories(open, debouncedCategorySearch);
 	});
 
 	$effect(() => {
-		if (!open) return;
-		selectedCategoryId = productCategoryId;
-		selectedCollectionIds = [...productCollectionIds];
-		selectedTagIds = [...productTagIds];
-		saveError = null;
+		fetchCollections(open, debouncedCollectionSearch);
+	});
+
+	$effect(() => {
+		fetchTags(open, debouncedTagSearch);
+	});
+
+	$effect(() => {
+		if (open && !prevOpen) {
+			orgControlsKey += 1;
+			selectedCategoryId = productCategoryId;
+			selectedCollectionIds = [...productCollectionIds];
+			selectedTagIds = [...productTagIds];
+			saveError = null;
+			categorySearch = '';
+			debouncedCategorySearch = '';
+			collectionSearch = '';
+			debouncedCollectionSearch = '';
+			tagSearch = '';
+			debouncedTagSearch = '';
+		}
+		prevOpen = open;
 	});
 
 	async function saveOrganisation() {
@@ -171,11 +257,12 @@
 		submitting = true;
 		saveError = null;
 		try {
-			const response = await client.products({ id: productId }).put({
-				category_id: selectedCategoryId || undefined,
+			const payload = {
+				...(selectedCategoryId ? { category_id: selectedCategoryId } : {}),
 				collection_ids: selectedCollectionIds,
 				tag_ids: selectedTagIds
-			});
+			};
+			const response = await client.products({ id: productId }).put(payload);
 
 			if (response.error) {
 				const err = response.error as { value?: { message?: string } };
@@ -211,54 +298,68 @@
 			{#if saveError}
 				<p class="text-sm text-destructive">{saveError}</p>
 			{/if}
-			<div class="flex flex-col gap-2">
-				<label for="org-categories" class="text-sm font-medium">Category</label>
-				<Combobox
-					id="org-categories"
-					bind:value={selectedCategoryId}
-					options={categoriesOptions}
-					placeholder="Search categories…"
-					emptyMessage="No categories found"
-					disabled={submitting}
-				/>
-			</div>
-			<div class="flex flex-col gap-3">
-				<h3 class="text-sm font-medium">Collections</h3>
-				<MultiSelectCombobox
-					id="org-collections"
-					bind:value={selectedCollectionIds}
-					options={collectionsOptions}
-					placeholder="Search collections…"
-					emptyMessage="No collections yet."
-					disabled={submitting}
-				/>
-			</div>
-			<div class="flex flex-col gap-2">
-				<div class="flex items-center justify-between gap-2">
-					<label for="org-tags-search" class="text-sm font-medium">
-						Tags <span class="font-normal text-muted-foreground">(Optional)</span>
-					</label>
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						onclick={async () => {
-							// const name = window.prompt('New tag name');
-							// if (name) await createAndSelectOrgTag(name);
-						}}
-					>
-						Create tag
-					</Button>
+			{#key orgControlsKey}
+				<div class="flex flex-col gap-4">
+					<div class="flex flex-col gap-2">
+						<label for="org-categories" class="text-sm font-medium">Category</label>
+						<Combobox
+							id="org-categories"
+							bind:value={selectedCategoryId}
+							options={categoriesOptions}
+							placeholder="Search categories…"
+							emptyMessage="No categories found"
+							disabled={submitting}
+							loading={categoryLoading}
+							onSearchChange={(q) => {
+								categorySearch = q;
+							}}
+							onOpenChange={(panelOpen) => {
+								if (panelOpen && open) fetchCategories(open, debouncedCategorySearch);
+							}}
+						/>
+					</div>
+					<div class="flex flex-col gap-3">
+						<h3 class="text-sm font-medium">Collections</h3>
+						<MultiSelectCombobox
+							id="org-collections"
+							bind:value={selectedCollectionIds}
+							options={collectionsOptions}
+							placeholder="Search collections…"
+							emptyMessage="No collections yet."
+							disabled={submitting}
+							loading={collectionLoading}
+							onSearchChange={(q) => {
+								collectionSearch = q;
+							}}
+							onOpenChange={(panelOpen) => {
+								if (panelOpen && open) fetchCollections(open, debouncedCollectionSearch);
+							}}
+						/>
+					</div>
+					<div class="flex flex-col gap-2">
+						<div class="flex items-center justify-between gap-2">
+							<label for="org-tags-search" class="text-sm font-medium">
+								Tags <span class="font-normal text-muted-foreground">(Optional)</span>
+							</label>
+						</div>
+						<MultiSelectCombobox
+							id="org-tags"
+							bind:value={selectedTagIds}
+							options={tagsOptions}
+							placeholder="Type to search…"
+							emptyMessage="No tags found"
+							disabled={submitting}
+							loading={tagLoading}
+							onSearchChange={(q) => {
+								tagSearch = q;
+							}}
+							onOpenChange={(panelOpen) => {
+								if (panelOpen && open) fetchTags(open, debouncedTagSearch);
+							}}
+						/>
+					</div>
 				</div>
-				<MultiSelectCombobox
-					id="org-tags"
-					bind:value={selectedTagIds}
-					options={tagsOptions}
-					placeholder="Type to search…"
-					emptyMessage="No tags found"
-					disabled={submitting}
-				/>
-			</div>
+			{/key}
 		</div>
 		<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
 			<Button variant="outline" onclick={() => (open = false)} disabled={submitting}>Cancel</Button>

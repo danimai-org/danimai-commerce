@@ -5,7 +5,6 @@ import {
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  type PaginationResponseType,
   paginationResponse,
   SortOrder,
 } from "@danimai/core";
@@ -59,7 +58,14 @@ export class PaginatedCurrenciesProcess
     if (input.filters?.code) {
       query = query.where("code", "=", input.filters.code.trim());
     }
-    
+
+    const search = input.search?.trim();
+    if (search) {
+      const term = `%${search}%`;
+      query = query.where((eb) =>
+        eb.or([eb("code", "ilike", term), eb("name", "ilike", term)]),
+      );
+    }
 
     const countResult = await query
       .select(({ fn }) => fn.count<number>("id").as("count"))

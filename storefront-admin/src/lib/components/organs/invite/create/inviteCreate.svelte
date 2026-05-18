@@ -1,4 +1,4 @@
-<script lang="ts">
+<!-- <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
@@ -153,4 +153,4 @@
 		</form>
 	</Sheet.Content>
 </Sheet.Root>
-<Toaster richColors position="top-center" />
+<Toaster richColors position="top-center" /> -->

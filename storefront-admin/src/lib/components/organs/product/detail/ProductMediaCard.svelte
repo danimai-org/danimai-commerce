@@ -4,6 +4,9 @@
 	import Upload from '@lucide/svelte/icons/upload-cloud';
 	import EditProductMediaSheet from './EditProductMediaSheet.svelte';
 	import ProductMediaImage from './ProductMediaImage.svelte';
+	import ImageGalleryModal, {
+		type GalleryImage
+	} from '$lib/components/shared/image-gallery-modal.svelte';
 	import { getDetailContext } from '$lib/hooks';
 	import type { Product } from '../type';
 	let { productId }: { productId: string } = $props();
@@ -13,8 +16,9 @@
 		(product as { thumbnail?: string | null } | null)?.thumbnail?.trim() || ''
 	);
 	const mediaItems = $derived.by(() => {
-		const current = (product as { media?: Array<{ id?: string; url?: string; rank?: number }> } | null)
-			?.media;
+		const current = (
+			product as { media?: Array<{ id?: string; url?: string; rank?: number }> } | null
+		)?.media;
 		const items = Array.isArray(current)
 			? current
 					.map((item, index) => {
@@ -29,14 +33,23 @@
 					.filter((item): item is { id: string; url: string; rank: number } => item !== null)
 					.sort((a, b) => a.rank - b.rank)
 			: [];
-		if (!thumbnail) return items;
-		const hasThumbnail = items.some((item) => item.url === thumbnail);
-		if (hasThumbnail) return items;
-		// Ensure the card always shows the primary thumbnail, even if it isn't part of `product.media`.
-		return [{ id: 'thumbnail', url: thumbnail, rank: -1 }, ...items].sort((a, b) => a.rank - b.rank);
+		return items;
 	});
 
+	const displayItems = $derived.by(() => {
+		if (mediaItems.length > 0) return mediaItems;
+		const t = thumbnail;
+		if (t) return [{ id: '__thumbnail-fallback__', url: t, rank: 0 }];
+		return [];
+	});
+
+	const galleryImages = $derived<GalleryImage[]>(
+		displayItems.map((m) => ({ id: m.id, src: m.url }))
+	);
+
 	let mediaSheetOpen = $state(false);
+	let galleryOpen = $state(false);
+	let galleryInitialIndex = $state(0);
 
 	async function refetch() {
 		await detailQuery?.refetch?.();
@@ -45,6 +58,12 @@
 	function openMediaSheet() {
 		if (!productId) return;
 		mediaSheetOpen = true;
+	}
+
+	function openGallery(index: number) {
+		if (galleryImages.length === 0) return;
+		galleryInitialIndex = Math.min(Math.max(0, index), galleryImages.length - 1);
+		galleryOpen = true;
 	}
 </script>
 
@@ -61,29 +80,29 @@
 			<Pencil class="size-4" />
 		</Button>
 	</div>
-	{#if mediaItems.length > 0}
-		<button
-			type="button"
-			class="mt-4 block w-full cursor-pointer rounded-md border-0 bg-transparent p-0 text-left transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
-			onclick={openMediaSheet}
-			aria-label="Edit media"
-		>
-			<div class="mt-4 flex flex-wrap gap-4">
-				{#each mediaItems as mediaItem (mediaItem.id)}
+	{#if displayItems.length > 0}
+		<div class="mt-4 flex flex-wrap gap-4">
+			{#each displayItems as mediaItem, i (mediaItem.id)}
+				<button
+					type="button"
+					class="rounded-xl border-0 bg-transparent p-0 transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+					aria-label="View image {i + 1} in gallery"
+					onclick={() => openGallery(i)}
+				>
 					<ProductMediaImage
 						src={mediaItem.url}
 						alt=""
 						class="size-36 rounded-xl border bg-muted object-cover"
 					/>
-				{/each}
-			</div>
-		</button>
+				</button>
+			{/each}
+		</div>
 	{:else}
 		<button
 			type="button"
 			class="mt-4 flex min-h-[140px] w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-muted-foreground/25 bg-muted/30 py-8 text-center text-sm text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
-			onclick={openMediaSheet}
 			aria-label="Add or edit media"
+			onclick={openMediaSheet}
 		>
 			<Upload class="size-8" />
 			<p>No media yet</p>
@@ -91,6 +110,12 @@
 		</button>
 	{/if}
 </div>
+
+<ImageGalleryModal
+	bind:open={galleryOpen}
+	images={galleryImages}
+	initialIndex={galleryInitialIndex}
+/>
 
 {#if productId}
 	<EditProductMediaSheet bind:open={mediaSheetOpen} {productId} {thumbnail} onSaved={refetch} />

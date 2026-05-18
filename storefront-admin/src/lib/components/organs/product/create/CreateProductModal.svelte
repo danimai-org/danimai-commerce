@@ -15,6 +15,7 @@
 	import CreateProductStepVariants from './CreateProductStepVariants.svelte';
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import { get } from 'svelte/store';
+	import { previewUrl, type MediaUploadLocalItem } from '$lib/components/shared/media-upload.types.js';
 
 	interface Props {
 		open: boolean;
@@ -122,11 +123,14 @@
 			submitPending = false;
 			if (form.valid) {
 				try {
-					if (!createdProductId && createMediaChosenFiles.length > 0) {
+					if (!createdProductId && createMediaItems.length > 0) {
 						throw new Error('Product created but media upload could not start (missing product id).');
 					}
-					if (createdProductId && createMediaChosenFiles.length > 0) {
-						const uploaded = await uploadProductImages(createdProductId, createMediaChosenFiles);
+					if (createdProductId && createMediaItems.length > 0) {
+						const uploaded = await uploadProductImages(
+							createdProductId,
+							createMediaItems.map((m: MediaUploadLocalItem) => m.file)
+						);
 						if (uploaded.length > 0) {
 							const res = await client.products({ id: createdProductId }).put({
 								thumbnail_media_id: uploaded[0]?.id
@@ -154,11 +158,7 @@
 	let createHandle = $state('');
 	let createDescription = $state('');
 	let createHasVariants = $state(true);
-	let createMediaModalOpen = $state(false);
-	let createMediaImageUrl = $state('');
-	let createMediaChosenFiles = $state<File[]>([]);
-	let createMediaFileInput = $state<HTMLInputElement | undefined>();
-	let createMediaUrls = $state<string[]>([]);
+	let createMediaItems = $state<MediaUploadLocalItem[]>([]);
 
 	let createDiscountable = $state(true);
 	let createCollectionIds = $state<string[]>([]);
@@ -362,9 +362,7 @@
 		createOptions = [];
 		createAttributeGroupId = '';
 		createAttributeEntries = [];
-		createMediaUrls = [];
-		createMediaImageUrl = '';
-		createMediaChosenFiles = [];
+		createMediaItems = [];
 		createError = null;
 		submitPending = false;
 		createdProductId = null;
@@ -783,11 +781,7 @@
 					{createError}
 					{titleError}
 					bind:createHasVariants
-					bind:createMediaModalOpen
-					bind:createMediaImageUrl
-					bind:createMediaChosenFiles
-					bind:createMediaFileInput
-					bind:createMediaUrls
+					bind:createMediaItems
 					onEnableVariants={syncVariantsFromOptions}
 				/>
 			{/if}
@@ -862,7 +856,7 @@
 			<input
 				type="hidden"
 				name="thumbnail"
-				value={createMediaUrls.find((url) => url.trim().length > 0)?.trim() ?? ''}
+				value={previewUrl(createMediaItems[0]).trim()}
 			/>
 
 			<div class="flex shrink-0 flex-wrap justify-end gap-2 border-t p-4">

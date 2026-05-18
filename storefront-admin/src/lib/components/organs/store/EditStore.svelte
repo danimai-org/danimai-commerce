@@ -26,59 +26,123 @@
 	} = $props();
 
 	const listQuery = { page: 1, limit: 100 } as const;
+	const DEBOUNCE_MS = 400;
 
-	const regionsQuery = createQuery(() => ({
-		queryKey: ['edit-store', 'regions', listQuery.page, listQuery.limit],
-		queryFn: () => client['regions'].get({ query: listQuery }),
-		enabled: open
-	}));
-	const salesChannelsQuery = createQuery(() => ({
-		queryKey: ['edit-store', 'sales-channels', listQuery.page, listQuery.limit],
-		queryFn: () => client['sales-channels'].get({ query: listQuery }),
-		enabled: open
-	}));
-	const stockLocationsQuery = createQuery(() => ({
-		queryKey: ['edit-store', 'stock-locations', listQuery.page, listQuery.limit],
-		queryFn: () => client['stock-locations'].get({ query: listQuery }),
-		enabled: open
-	}));
-	const currenciesQuery = createQuery(() => ({
-		queryKey: ['edit-store', 'currencies', listQuery.page, listQuery.limit],
-		queryFn: () => client['currencies'].get({ query: listQuery }),
-		enabled: open
-	}));
+	let currencySearch = $state('');
+	let debouncedCurrencySearch = $state('');
+	let regionSearch = $state('');
+	let debouncedRegionSearch = $state('');
+	let salesChannelSearch = $state('');
+	let debouncedSalesChannelSearch = $state('');
+	let stockLocationSearch = $state('');
+	let debouncedStockLocationSearch = $state('');
 
-	const regionOptions = $derived<ComboboxOption[]>(
-		(regionsQuery.data?.data?.rows ?? []).map((r) => ({
-			id: r.id,
-			value: r.name
-		}))
+	function debouncedLane(
+		live: () => string,
+		debounced: () => string,
+		setDebounced: (v: string) => void
+	) {
+		const q = live();
+		if (debounced() === q) return;
+		const t = setTimeout(() => setDebounced(q), DEBOUNCE_MS);
+		return () => clearTimeout(t);
+	}
+
+	$effect(() =>
+		debouncedLane(() => currencySearch, () => debouncedCurrencySearch, (v) => (debouncedCurrencySearch = v))
 	);
-	const salesChannelOptions = $derived<ComboboxOption[]>(
-		(salesChannelsQuery.data?.data?.rows ?? []).map((r) => ({
-			id: r.id,
-			value: r.name
-		}))
+	$effect(() =>
+		debouncedLane(() => regionSearch, () => debouncedRegionSearch, (v) => (debouncedRegionSearch = v))
 	);
-	const locationOptions = $derived<ComboboxOption[]>(
-		(stockLocationsQuery.data?.data?.rows ?? []).map((r) => ({
-			id: r.id,
-			value: r.name ?? r.id
-		}))
+	$effect(() =>
+		debouncedLane(
+			() => salesChannelSearch,
+			() => debouncedSalesChannelSearch,
+			(v) => (debouncedSalesChannelSearch = v)
+		)
 	);
-	const currencyOptions = $derived<ComboboxOption[]>(
-		(currenciesQuery.data?.data?.rows ?? []).map((r) => ({
-			id: r.code,
-			value: `${r.code} — ${r.name}`
-		}))
+	$effect(() =>
+		debouncedLane(
+			() => stockLocationSearch,
+			() => debouncedStockLocationSearch,
+			(v) => (debouncedStockLocationSearch = v)
+		)
 	);
 
-	const optionsLoading = $derived(
-		regionsQuery.isPending ||
-			salesChannelsQuery.isPending ||
-			stockLocationsQuery.isPending ||
-			currenciesQuery.isPending
+	const currencyStale = $derived(currencySearch.trim() !== debouncedCurrencySearch.trim());
+	const regionStale = $derived(regionSearch.trim() !== debouncedRegionSearch.trim());
+	const salesChannelStale = $derived(
+		salesChannelSearch.trim() !== debouncedSalesChannelSearch.trim()
 	);
+	const stockLocationStale = $derived(
+		stockLocationSearch.trim() !== debouncedStockLocationSearch.trim()
+	);
+
+	const currencyDebouncedTrim = $derived(debouncedCurrencySearch.trim());
+	const regionDebouncedTrim = $derived(debouncedRegionSearch.trim());
+	const salesChannelDebouncedTrim = $derived(debouncedSalesChannelSearch.trim());
+	const stockLocationDebouncedTrim = $derived(debouncedStockLocationSearch.trim());
+
+	let currencyOpenAwaitFetch = $state(false);
+	let regionOpenAwaitFetch = $state(false);
+	let salesChannelOpenAwaitFetch = $state(false);
+	let stockLocationOpenAwaitFetch = $state(false);
+
+	let currencyOpenSeq = 0;
+	let regionOpenSeq = 0;
+	let salesChannelOpenSeq = 0;
+	let stockLocationOpenSeq = 0;
+
+	let currencyOpenRafId = 0;
+	let regionOpenRafId = 0;
+	let salesChannelOpenRafId = 0;
+	let stockLocationOpenRafId = 0;
+
+	function cancelCurrencyCombRaf() {
+		if (currencyOpenRafId) cancelAnimationFrame(currencyOpenRafId);
+		currencyOpenRafId = 0;
+	}
+	function cancelRegionCombRaf() {
+		if (regionOpenRafId) cancelAnimationFrame(regionOpenRafId);
+		regionOpenRafId = 0;
+	}
+	function cancelSalesChannelCombRaf() {
+		if (salesChannelOpenRafId) cancelAnimationFrame(salesChannelOpenRafId);
+		salesChannelOpenRafId = 0;
+	}
+	function cancelStockLocationCombRaf() {
+		if (stockLocationOpenRafId) cancelAnimationFrame(stockLocationOpenRafId);
+		stockLocationOpenRafId = 0;
+	}
+
+	function resetComboboxOpenFetchers() {
+		currencyOpenSeq++;
+		regionOpenSeq++;
+		salesChannelOpenSeq++;
+		stockLocationOpenSeq++;
+		cancelCurrencyCombRaf();
+		cancelRegionCombRaf();
+		cancelSalesChannelCombRaf();
+		cancelStockLocationCombRaf();
+		currencyOpenAwaitFetch = false;
+		regionOpenAwaitFetch = false;
+		salesChannelOpenAwaitFetch = false;
+		stockLocationOpenAwaitFetch = false;
+	}
+
+	$effect(() => {
+		if (!open) {
+			currencySearch = '';
+			debouncedCurrencySearch = '';
+			regionSearch = '';
+			debouncedRegionSearch = '';
+			salesChannelSearch = '';
+			debouncedSalesChannelSearch = '';
+			stockLocationSearch = '';
+			debouncedStockLocationSearch = '';
+			resetComboboxOpenFetchers();
+		}
+	});
 
 	// svelte-ignore state_referenced_locally
 	const { form, errors, enhance, delayed, reset, message } = superForm(storeUpdateForm, {
@@ -97,6 +161,207 @@
 			}
 		}
 	});
+
+	const regionsQuery = createQuery(() => ({
+		queryKey: ['edit-store', 'regions', 'v2', open, regionDebouncedTrim, listQuery.page, listQuery.limit],
+		queryFn: ({ signal }) =>
+			client['regions'].get({
+				query: {
+					page: listQuery.page,
+					limit: listQuery.limit,
+					...(regionDebouncedTrim ? { search: regionDebouncedTrim } : {})
+				},
+				...(signal ? { fetch: { signal } } : {})
+			}),
+		enabled: open,
+		refetchOnWindowFocus: false
+	}));
+	const salesChannelsQuery = createQuery(() => ({
+		queryKey: [
+			'edit-store',
+			'sales-channels',
+			'v2',
+			open,
+			salesChannelDebouncedTrim,
+			listQuery.page,
+			listQuery.limit
+		],
+		queryFn: ({ signal }) =>
+			client['sales-channels'].get({
+				query: {
+					page: listQuery.page,
+					limit: listQuery.limit,
+					...(salesChannelDebouncedTrim ? { search: salesChannelDebouncedTrim } : {})
+				},
+				...(signal ? { fetch: { signal } } : {})
+			}),
+		enabled: open,
+		refetchOnWindowFocus: false
+	}));
+	const stockLocationsQuery = createQuery(() => ({
+		queryKey: [
+			'edit-store',
+			'stock-locations',
+			'v2',
+			open,
+			stockLocationDebouncedTrim,
+			listQuery.page,
+			listQuery.limit
+		],
+		queryFn: ({ signal }) =>
+			client['stock-locations'].get({
+				query: {
+					page: listQuery.page,
+					limit: listQuery.limit,
+					...(stockLocationDebouncedTrim ? { search: stockLocationDebouncedTrim } : {})
+				},
+				...(signal ? { fetch: { signal } } : {})
+			}),
+		enabled: open,
+		refetchOnWindowFocus: false
+	}));
+	const currenciesQuery = createQuery(() => ({
+		queryKey: ['edit-store', 'currencies', 'v2', open, currencyDebouncedTrim, listQuery.page, listQuery.limit],
+		queryFn: ({ signal }) =>
+			client['currencies'].get({
+				query: {
+					page: listQuery.page,
+					limit: listQuery.limit,
+					...(currencyDebouncedTrim ? { search: currencyDebouncedTrim } : {})
+				},
+				...(signal ? { fetch: { signal } } : {})
+			}),
+		enabled: open,
+		refetchOnWindowFocus: false
+	}));
+
+	function withSelectedFallback(mapped: ComboboxOption[], selectedId: string): ComboboxOption[] {
+		const id = selectedId.trim();
+		if (!id || mapped.some((o) => o.id === id)) return mapped;
+		return [{ id, value: id }, ...mapped];
+	}
+
+	const passthroughOpts = (opts: ComboboxOption[]): ComboboxOption[] => opts;
+
+	const regionOptions = $derived.by((): ComboboxOption[] =>
+		withSelectedFallback(
+			(regionsQuery.data?.data?.rows ?? []).map((r) => ({
+				id: r.id,
+				value: r.name || r.id
+			})),
+			$form.default_region_id ?? ''
+		)
+	);
+	const salesChannelOptions = $derived.by((): ComboboxOption[] =>
+		withSelectedFallback(
+			(salesChannelsQuery.data?.data?.rows ?? []).map((r) => ({
+				id: r.id,
+				value: r.name
+			})),
+			$form.default_sales_channel_id ?? ''
+		)
+	);
+	const locationOptions = $derived.by((): ComboboxOption[] =>
+		withSelectedFallback(
+			(stockLocationsQuery.data?.data?.rows ?? []).map((r) => ({
+				id: r.id,
+				value: r.name ?? r.id
+			})),
+			$form.default_location_id ?? ''
+		)
+	);
+	const currencyOptions = $derived.by((): ComboboxOption[] =>
+		withSelectedFallback(
+			(currenciesQuery.data?.data?.rows ?? []).map((r) => ({
+				id: r.code,
+				value: `${r.code} — ${r.name}`
+			})),
+			$form.default_currency_code ?? ''
+		)
+	);
+
+	const currencyComboboxLoading = $derived(
+		currencyStale || currenciesQuery.isFetching || currencyOpenAwaitFetch
+	);
+	const regionComboboxLoading = $derived(regionStale || regionsQuery.isFetching || regionOpenAwaitFetch);
+	const salesChannelComboboxLoading = $derived(
+		salesChannelStale || salesChannelsQuery.isFetching || salesChannelOpenAwaitFetch
+	);
+	const stockLocationComboboxLoading = $derived(
+		stockLocationStale || stockLocationsQuery.isFetching || stockLocationOpenAwaitFetch
+	);
+
+	function onCurrencyOpenChange(opened: boolean) {
+		if (opened) {
+			cancelCurrencyCombRaf();
+			currencyOpenAwaitFetch = true;
+			const id = ++currencyOpenSeq;
+			currencyOpenRafId = requestAnimationFrame(() => {
+				currencyOpenRafId = 0;
+				void currenciesQuery.refetch().finally(() => {
+					if (id === currencyOpenSeq) currencyOpenAwaitFetch = false;
+				});
+			});
+		} else {
+			currencyOpenSeq++;
+			cancelCurrencyCombRaf();
+			currencyOpenAwaitFetch = false;
+		}
+	}
+
+	function onRegionOpenChange(opened: boolean) {
+		if (opened) {
+			cancelRegionCombRaf();
+			regionOpenAwaitFetch = true;
+			const id = ++regionOpenSeq;
+			regionOpenRafId = requestAnimationFrame(() => {
+				regionOpenRafId = 0;
+				void regionsQuery.refetch().finally(() => {
+					if (id === regionOpenSeq) regionOpenAwaitFetch = false;
+				});
+			});
+		} else {
+			regionOpenSeq++;
+			cancelRegionCombRaf();
+			regionOpenAwaitFetch = false;
+		}
+	}
+
+	function onSalesChannelOpenChange(opened: boolean) {
+		if (opened) {
+			cancelSalesChannelCombRaf();
+			salesChannelOpenAwaitFetch = true;
+			const id = ++salesChannelOpenSeq;
+			salesChannelOpenRafId = requestAnimationFrame(() => {
+				salesChannelOpenRafId = 0;
+				void salesChannelsQuery.refetch().finally(() => {
+					if (id === salesChannelOpenSeq) salesChannelOpenAwaitFetch = false;
+				});
+			});
+		} else {
+			salesChannelOpenSeq++;
+			cancelSalesChannelCombRaf();
+			salesChannelOpenAwaitFetch = false;
+		}
+	}
+
+	function onStockLocationOpenChange(opened: boolean) {
+		if (opened) {
+			cancelStockLocationCombRaf();
+			stockLocationOpenAwaitFetch = true;
+			const id = ++stockLocationOpenSeq;
+			stockLocationOpenRafId = requestAnimationFrame(() => {
+				stockLocationOpenRafId = 0;
+				void stockLocationsQuery.refetch().finally(() => {
+					if (id === stockLocationOpenSeq) stockLocationOpenAwaitFetch = false;
+				});
+			});
+		} else {
+			stockLocationOpenSeq++;
+			cancelStockLocationCombRaf();
+			stockLocationOpenAwaitFetch = false;
+		}
+	}
 
 	$effect(() => {
 		if (!open) return;
@@ -176,7 +441,11 @@
 								options={currencyOptions}
 								bind:value={$form.default_currency_code}
 								placeholder="Select currency"
-								disabled={optionsLoading}
+								loading={currencyComboboxLoading}
+								emptyMessage="No currencies match your search."
+								filterFn={passthroughOpts}
+								onSearchChange={(v) => (currencySearch = v)}
+								onOpenChange={onCurrencyOpenChange}
 							/>
 						</div>
 						<div class="flex flex-col gap-2">
@@ -186,7 +455,11 @@
 								options={regionOptions}
 								bind:value={$form.default_region_id}
 								placeholder="Select region"
-								disabled={optionsLoading}
+								loading={regionComboboxLoading}
+								emptyMessage="No regions match your search."
+								filterFn={passthroughOpts}
+								onSearchChange={(v) => (regionSearch = v)}
+								onOpenChange={onRegionOpenChange}
 							/>
 						</div>
 						<div class="flex flex-col gap-2">
@@ -198,7 +471,11 @@
 								options={salesChannelOptions}
 								bind:value={$form.default_sales_channel_id}
 								placeholder="Select sales channel"
-								disabled={optionsLoading}
+								loading={salesChannelComboboxLoading}
+								emptyMessage="No sales channels match your search."
+								filterFn={passthroughOpts}
+								onSearchChange={(v) => (salesChannelSearch = v)}
+								onOpenChange={onSalesChannelOpenChange}
 							/>
 						</div>
 						<div class="flex flex-col gap-2">
@@ -208,14 +485,18 @@
 								options={locationOptions}
 								bind:value={$form.default_location_id}
 								placeholder="Select location"
-								disabled={optionsLoading}
+								loading={stockLocationComboboxLoading}
+								emptyMessage="No locations match your search."
+								filterFn={passthroughOpts}
+								onSearchChange={(v) => (stockLocationSearch = v)}
+								onOpenChange={onStockLocationOpenChange}
 							/>
 						</div>
 					</div>
 				</div>
 				<div class="flex justify-end gap-2 border-t p-4">
 					<Button type="button" variant="outline" onclick={close} disabled={$delayed}>Cancel</Button>
-					<Button type="submit" disabled={$delayed || optionsLoading}>
+					<Button type="submit" disabled={$delayed}>
 						{$delayed ? 'Saving…' : 'Save'}
 					</Button>
 				</div>

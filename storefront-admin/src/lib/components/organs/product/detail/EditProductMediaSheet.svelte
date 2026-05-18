@@ -1,14 +1,20 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { SortableList, sortItems } from '@rodrigodagostino/svelte-sortable-list';
+	import { useQueryClient } from '@tanstack/svelte-query';
 	import { client } from '$lib/client';
 	import { getDetailContext } from '$lib/hooks';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { cn } from '$lib/utils.js';
-	import Upload from '@lucide/svelte/icons/upload-cloud';
+	import MediaUpload from '$lib/components/shared/MediaUpload.svelte';
+	import { previewUrl, type MediaUploadItem } from '$lib/components/shared/media-upload.types.js';
 	import type { Product } from '../type';
 	import ProductMediaImage from './ProductMediaImage.svelte';
+
+	function mapProductMediaToItems(
+		media: Array<{ id: string; url: string; rank: number }>
+	): MediaUploadItem[] {
+		return media.map((m) => ({ kind: 'remote' as const, id: m.id, url: m.url }));
+	}
 
 	interface Props {
 		open: boolean;
@@ -18,100 +24,172 @@
 	}
 
 	let { open = $bindable(false), productId, thumbnail, onSaved }: Props = $props();
+	const queryClient = useQueryClient();
 	const detailQuery = getDetailContext<Product>();
-	const product = $derived(detailQuery?.data ?? null);
 	const productMedia = $derived.by(() => {
-		const list = (product as { media?: Array<{ id: string; url: string; rank: number }> } | null)
-			?.media;
+		const list = (
+			detailQuery?.data as {
+				media?: Array<{ id: string; url: string; rank: number }>;
+			} | null
+		)?.media;
 		if (!Array.isArray(list)) return [];
 		return [...list].sort((a, b) => a.rank - b.rank);
 	});
 	const thumbnailInMedia = $derived.by(() => {
 		const thumb = thumbnail?.trim?.() ?? '';
-		if (!thumb) return true; // No thumbnail configured, so don't show fallback UI.
+		if (!thumb) return true;
 		return productMedia.some((item) => item.url === thumb);
 	});
 	const apiBaseUrl = 'http://localhost:8000';
 
+	type ImageMutationResult = {
+		uploaded: Array<{ id: string; url: string }>;
+		deleted_ids: string[];
+	};
+
+	function applyImageMutationToProductCache(result: ImageMutationResult) {
+		queryClient.setQueryData(
+			['product-detail', productId],
+			(previous: Product | undefined | null) => {
+				if (previous == null) return previous;
+				const p = previous as {
+					media?: Array<{ id: string; url: string; rank: number }>;
+					thumbnail?: string | null;
+				};
+				const deletedIds = result.deleted_ids.map((id) => String(id));
+				let media = [...(Array.isArray(p.media) ? p.media : [])].filter(
+					(m) => !deletedIds.includes(m.id)
+				);
+				const newItems = result.uploaded
+					.map((u) => ({
+						id: u.id,
+						url: typeof u.url === 'string' ? u.url.trim() : ''
+					}))
+					.filter((m) => m.url.length > 0);
+				media = [...media, ...newItems.map((m) => ({ id: m.id, url: m.url, rank: 0 }))];
+				media = media.map((item, index) => ({ ...item, rank: index }));
+				let nextThumb = (typeof p.thumbnail === 'string' ? p.thumbnail.trim() : '') || '';
+				if (newItems.length > 0 && !nextThumb) {
+					nextThumb = newItems[0]!.url;
+				}
+				if (deletedIds.length > 0 && nextThumb) {
+					const stillHas = media.some((m) => m.url === nextThumb);
+					if (!stillHas) nextThumb = media[0]?.url?.trim?.() ?? '';
+				}
+				if (media.length === 0) {
+					nextThumb = '';
+				}
+				return {
+					...previous,
+					thumbnail: nextThumb || null,
+					media
+				};
+			}
+		);
+	}
 	let error = $state<string | null>(null);
 	let submitting = $state(false);
 	let prevOpen = $state(false);
-	let fileInput = $state<HTMLInputElement | null>(null);
 	let primaryMediaId = $state<string | null>(null);
 	let primaryDirty = $state(false);
-	let sortableMedia = $state<Array<{ id: string; url: string; rank: number }>>([]);
+	let rankDirty = $state(false);
+	let removingMediaId = $state<string | null>(null);
+	let sortableMedia = $state<MediaUploadItem[]>([]);
+	function normalizeMediaOrder(
+		media: MediaUploadItem[],
+		primaryId: string | null
+	): MediaUploadItem[] {
+		const ordered = [...media];
+		if (primaryId) {
+			const index = ordered.findIndex((item) => item.id === primaryId);
+			if (index > 0) {
+				const [primaryItem] = ordered.splice(index, 1);
+				if (primaryItem) ordered.unshift(primaryItem);
+			}
+		}
+		return ordered;
+	}
 
 	$effect(() => {
 		if (open && !prevOpen) {
 			const currentMedia = untrack(() => productMedia);
-			const currentThumbnail = untrack(() => thumbnail);
-			sortableMedia = [...currentMedia];
 			primaryDirty = false;
+			rankDirty = false;
 
-			const thumb = currentThumbnail?.trim?.() ?? '';
+			const thumb = untrack(() => thumbnail)?.trim?.() ?? '';
 			if (thumb) {
 				const matched = currentMedia.find((item) => item.url === thumb);
 				primaryMediaId = matched?.id ?? null;
 			} else {
 				primaryMediaId = currentMedia[0]?.id ?? null;
 			}
+			sortableMedia = normalizeMediaOrder(mapProductMediaToItems(currentMedia), primaryMediaId);
 			error = null;
 		}
 		prevOpen = open;
 	});
-
 	$effect(() => {
 		if (!open) return;
 		const currentMedia = productMedia;
-		sortableMedia = [...currentMedia];
-		if (primaryMediaId !== null && !currentMedia.some((item) => item.id === primaryMediaId)) {
-			primaryMediaId = currentMedia[0]?.id ?? null;
-		}
+		const nextPrimary =
+			primaryMediaId !== null && currentMedia.some((item) => item.id === primaryMediaId)
+				? primaryMediaId
+				: (currentMedia[0]?.id ?? null);
+		primaryMediaId = nextPrimary;
+		sortableMedia = normalizeMediaOrder(mapProductMediaToItems(currentMedia), nextPrimary);
 	});
 
-	function handleDragEnd(event: SortableList.RootEvents['ondragend']) {
-		const { draggedItemIndex, targetItemIndex, isCanceled } = event;
-		if (
-			isCanceled ||
-			typeof targetItemIndex !== 'number' ||
-			draggedItemIndex === targetItemIndex ||
-			draggedItemIndex < 0
-		) {
-			return;
-		}
-		const reordered = sortItems(sortableMedia, draggedItemIndex, targetItemIndex).map(
-			(item, index) => ({
-				...item,
-				rank: index
-			})
-		);
-		sortableMedia = reordered;
-		primaryMediaId = reordered[0]?.id ?? null;
-		primaryDirty = true;
-	}
 	function close() {
 		open = false;
 		error = null;
 		primaryDirty = false;
+		rankDirty = false;
+		removingMediaId = null;
 	}
-	async function postImageMutation(body: FormData) {
+	async function postImageMutation(payload: {
+		files?: File[];
+		delete_ids?: string[];
+	}): Promise<ImageMutationResult> {
+		const body = new FormData();
+		for (const file of payload.files ?? []) body.append('files', file);
+		if (payload.delete_ids && payload.delete_ids.length > 0) {
+			body.append('delete_ids', JSON.stringify(payload.delete_ids));
+		}
+
 		const response = await fetch(`${apiBaseUrl}/admin/products/${productId}/images`, {
 			method: 'POST',
 			body
 		});
 		if (!response.ok) {
-			const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-			throw new Error(payload?.message ?? 'Failed to update product images');
+			const errorPayload = (await response.json().catch(() => null)) as {
+				message?: string;
+				summary?: string;
+			} | null;
+			throw new Error(
+				errorPayload?.message ?? errorPayload?.summary ?? 'Failed to update product images'
+			);
 		}
+		const parsed = (await response.json().catch(() => null)) as Partial<ImageMutationResult> | null;
+		return {
+			uploaded: Array.isArray(parsed?.uploaded)
+				? parsed.uploaded.map((u) => ({
+						id: String((u as { id?: string }).id ?? ''),
+						url: String((u as { url?: string }).url ?? '')
+					}))
+				: [],
+			deleted_ids: Array.isArray(parsed?.deleted_ids)
+				? parsed.deleted_ids.map((id) => String(id))
+				: []
+		};
 	}
 	async function uploadSelectedFiles(files: File[]) {
 		if (!files.length || !productId) return;
 		error = null;
 		submitting = true;
 		try {
-			const body = new FormData();
-			for (const file of files) body.append('files', file);
-			await postImageMutation(body);
+			const result = await postImageMutation({ files });
+			applyImageMutationToProductCache(result);
+			await queryClient.invalidateQueries({ queryKey: ['products'] });
 			await onSaved();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -125,18 +203,41 @@
 			error = 'Missing product id.';
 			return;
 		}
-		if (!primaryDirty) return;
+		if (!primaryDirty && !rankDirty) return;
 		error = null;
 		submitting = true;
 		try {
+			const normalizedMedia = normalizeMediaOrder(sortableMedia, primaryMediaId);
+			const normalizedPrimaryMediaId = normalizedMedia[0]?.id ?? null;
 			const res = await client.products({ id: productId }).put({
-				thumbnail_media_id: primaryMediaId
+				thumbnail_media_id: normalizedPrimaryMediaId,
+				media_ids: normalizedMedia.map((item) => item.id)
 			});
 			if (res.error) {
 				const err = res.error as { value?: { message?: string } };
 				throw new Error(err?.value?.message ?? String(res.error));
 			}
+			const nextThumbnail = previewUrl(normalizedMedia[0]).trim();
+			queryClient.setQueryData(
+				['product-detail', productId],
+				(previous: Product | undefined | null) => {
+					if (previous == null) return previous;
+					const prevThumb = (previous as { thumbnail?: string | null }).thumbnail?.trim?.();
+					return {
+						...previous,
+						thumbnail: nextThumbnail || prevThumb || null,
+						media: normalizedMedia.map((item, index) => ({
+							id: item.id,
+							url: previewUrl(item),
+							rank: index
+						}))
+					};
+				}
+			);
+			primaryMediaId = normalizedPrimaryMediaId;
+			sortableMedia = normalizedMedia;
 			primaryDirty = false;
+			rankDirty = false;
 			close();
 			await onSaved();
 		} catch (e) {
@@ -150,23 +251,25 @@
 		if (!productId || !mediaId) return;
 		error = null;
 		const wasPrimary = primaryMediaId === mediaId;
+		removingMediaId = mediaId;
 		submitting = true;
 		try {
-			const body = new FormData();
-			body.append('delete_ids', JSON.stringify([mediaId]));
-			await postImageMutation(body);
-
-			// Update local state immediately for a snappy UI; the refetch will also sync.
+			const result = await postImageMutation({ delete_ids: [mediaId] });
+			applyImageMutationToProductCache(result);
+			await queryClient.invalidateQueries({ queryKey: ['products'] });
 			const remaining = sortableMedia.filter((item) => item.id !== mediaId);
-			sortableMedia = remaining;
+			const nextPrimary = wasPrimary ? (remaining[0]?.id ?? null) : primaryMediaId;
+			sortableMedia = normalizeMediaOrder(remaining, nextPrimary);
+			rankDirty = true;
 			if (wasPrimary) {
-				primaryMediaId = remaining[0]?.id ?? null;
+				primaryMediaId = nextPrimary;
 				primaryDirty = true;
 			}
 			await onSaved();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
+			removingMediaId = null;
 			submitting = false;
 		}
 	}
@@ -186,41 +289,17 @@
 			{/if}
 			<div class="flex flex-col gap-2">
 				<p class="text-sm font-medium">Upload images</p>
-				<div
-					role="button"
-					tabindex="0"
-					aria-label="Upload images"
-					class="flex min-h-[110px] cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-muted-foreground/25 bg-muted/30 px-4 py-5 text-center text-sm text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:bg-muted/40"
-					ondragover={(event) => event.preventDefault()}
-					ondrop={async (event) => {
-						event.preventDefault();
-						if (submitting) return;
-						const files = Array.from(event.dataTransfer?.files ?? []).filter((file) =>
-							file.type.startsWith('image/')
-						);
-						await uploadSelectedFiles(files);
-					}}
-					onclick={() => fileInput?.click()}
-					onkeydown={(event) => {
-						if (event.key !== 'Enter' && event.key !== ' ') return;
-						event.preventDefault();
-						fileInput?.click();
-					}}
-				>
-					<Upload class="size-7" />
-					<p>Drop images here or click to upload</p>
-				</div>
-				<input
-					type="file"
-					accept="image/*"
-					multiple
-					class="hidden"
-					bind:this={fileInput}
-					onchange={async (event) => {
-						const input = event.currentTarget as HTMLInputElement | null;
-						const files = Array.from(input?.files ?? []);
-						await uploadSelectedFiles(files);
-						if (input) input.value = '';
+				<MediaUpload
+					bind:value={sortableMedia}
+					disabled={submitting}
+					showHeroPreview={false}
+					pendingRemoveId={removingMediaId}
+					onPickFiles={uploadSelectedFiles}
+					onRemoveRemote={removeImage}
+					onChange={(next) => {
+						primaryMediaId = next[0]?.id ?? null;
+						rankDirty = true;
+						primaryDirty = true;
 					}}
 				/>
 			</div>
@@ -228,8 +307,10 @@
 				<div class="rounded-md border bg-muted/20 p-3">
 					<div class="mb-2 flex items-center justify-between">
 						<p class="text-sm font-medium">Primary thumbnail</p>
-						<span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
-							>Primary</span>
+						<span
+							class="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
+							>Primary</span
+						>
 					</div>
 					<ProductMediaImage
 						src={thumbnail}
@@ -238,47 +319,7 @@
 					/>
 				</div>
 			{/if}
-			{#if sortableMedia.length > 0}
-				<div class="max-h-72 overflow-auto rounded-md border bg-muted/20 p-3">
-					<SortableList.Root ondragend={handleDragEnd}>
-						{#each sortableMedia as media, index (media.id)}
-							<SortableList.Item id={media.id} {index}>
-								<div
-									class={cn(
-										'mb-2 grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-md border bg-muted/20 p-2',
-										primaryMediaId === media.id && 'border-primary bg-primary/5'
-									)}
-								>
-									<ProductMediaImage
-										src={media.url}
-										alt=""
-										class="size-14 rounded-md border object-cover"
-									/>
-									<div class="flex items-center">
-										{#if primaryMediaId === media.id}
-											<span
-												class="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
-											>
-												Primary
-											</span>
-										{/if}
-									</div>
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										class="justify-self-end whitespace-nowrap text-destructive hover:bg-destructive/10"
-										disabled={submitting}
-										onclick={() => removeImage(media.id)}
-									>
-										Remove
-									</Button>
-								</div>
-							</SortableList.Item>
-						{/each}
-					</SortableList.Root>
-				</div>
-			{:else}
+			{#if sortableMedia.length === 0}
 				{#if thumbnail && !thumbnailInMedia && primaryMediaId === null}
 					<p class="text-sm text-muted-foreground">No additional media uploaded yet.</p>
 				{:else}
@@ -286,22 +327,11 @@
 				{/if}
 			{/if}
 		</div>
-		<div class="flex flex-wrap items-center justify-between gap-2 border-t p-4">
-			<Button
-				variant="ghost"
-				class="text-destructive hover:bg-destructive/10"
-				onclick={() => {
-					primaryMediaId = null;
-					primaryDirty = true;
-				}}
-				disabled={submitting}
+		<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
+			<Button variant="outline" onclick={close} disabled={submitting}>Cancel</Button>
+			<Button onclick={savePrimary} disabled={submitting || (!primaryDirty && !rankDirty)}
+				>Save</Button
 			>
-				Clear primary
-			</Button>
-			<div class="flex gap-2">
-				<Button variant="outline" onclick={close} disabled={submitting}>Cancel</Button>
-				<Button onclick={savePrimary} disabled={submitting || !primaryDirty}>Save</Button>
-			</div>
-		</div>
+		</Sheet.Footer>
 	</Sheet.Content>
 </Sheet.Root>

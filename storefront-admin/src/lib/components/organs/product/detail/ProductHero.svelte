@@ -38,8 +38,8 @@
 
 <div class="min-w-0 self-start rounded-lg border bg-card p-6 shadow-sm">
 	<section class="flex flex-col gap-6 pb-4">
-		<div class="flex items-center justify-between gap-4">
-			<h1 class="text-2xl font-semibold tracking-tight">
+		<div class="flex items-start justify-between gap-4 sm:items-center">
+			<h1 class="min-w-0 flex-1 text-xl font-semibold tracking-tight sm:text-2xl">
 				{(product as { title?: string } | null)?.title ?? '—'}
 			</h1>
 			<Button
@@ -55,19 +55,25 @@
 	</section>
 	<div class="rounded-lg bg-card pt-6 pr-6 pb-6 pl-0">
 		<dl class="mt-0 grid gap-3 text-sm">
-			<div class="flex justify-between gap-4">
+			<div
+				class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+			>
 				<dt class="shrink-0 font-medium text-muted-foreground">Description</dt>
-				<dd class="text-right">
+				<dd class="min-w-0 break-words text-left sm:text-right">
 					{(product as { description?: string } | null)?.description ?? '—'}
 				</dd>
 			</div>
-			<div class="flex justify-between gap-4">
+			<div
+				class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+			>
 				<dt class="shrink-0 font-medium text-muted-foreground">Handle</dt>
-				<dd class="text-right">{handleDisplay}</dd>
+				<dd class="min-w-0 break-words text-left sm:text-right">{handleDisplay}</dd>
 			</div>
-			<div class="flex justify-between gap-4">
+			<div
+				class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+			>
 				<dt class="shrink-0 font-medium text-muted-foreground">Discountable</dt>
-				<dd class="text-right">
+				<dd class="min-w-0 break-words text-left sm:text-right">
 					{(product as { discountable?: boolean } | null)?.discountable === true
 						? 'True'
 						: (product as { discountable?: boolean } | null)?.discountable === false

@@ -5,7 +5,7 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { cn } from '$lib/utils.js';
 	import Info from '@lucide/svelte/icons/info';
-	import { Combobox } from '$lib/components/organs/index.js';
+	import { Combobox, type ComboboxOption } from '$lib/components/organs/index.js';
 	import { Toaster } from 'svelte-sonner';
 	import { toast } from 'svelte-sonner';
 	import { client } from '$lib/client.js';
@@ -19,11 +19,36 @@
 		onSuccess?: () => void;
 	} = $props();
 
+	let countrySearch = $state('');
+	let debouncedCountrySearch = $state('');
+
+	const DEBOUNCE_MS = 400;
+
+	$effect(() => {
+		const q = countrySearch;
+		if (debouncedCountrySearch === q) return;
+		const t = setTimeout(() => {
+			debouncedCountrySearch = q;
+		}, DEBOUNCE_MS);
+		return () => clearTimeout(t);
+	});
+
+	const countrySearchStale = $derived(countrySearch.trim() !== debouncedCountrySearch.trim());
+	const debouncedCountryTrim = $derived(debouncedCountrySearch.trim());
+
 	const listQuery = { page: 1, limit: 100 } as const;
 	const countriesQuery = createQuery(() => ({
-		queryKey: ['tax-region', 'countries', listQuery.page, listQuery.limit],
-		queryFn: () => client['regions'].countries.get({ query: listQuery }),
-		enabled: open
+		queryKey: ['tax-region', 'countries', listQuery.page, listQuery.limit, debouncedCountryTrim],
+		queryFn: () =>
+			client['regions'].countries.get({
+				query: {
+					page: listQuery.page,
+					limit: listQuery.limit,
+					...(debouncedCountryTrim ? { search: debouncedCountryTrim } : {})
+				}
+			}),
+		enabled: open,
+		refetchOnWindowFocus: false
 	}));
 
 	type CountryRow = { id: string; name: string; code: string };
@@ -34,6 +59,21 @@
 			code: String(row.iso_2).toUpperCase()
 		}))
 	);
+
+	const countryComboboxOptions = $derived.by((): ComboboxOption[] => {
+		const base = countries.map((c) => ({ id: c.name, value: c.name }));
+		const selected = $form.name.trim();
+		if (!selected || base.some((o) => o.id === selected)) return base;
+		return [{ id: selected, value: selected }, ...base];
+	});
+
+	const countryComboboxLoading = $derived(
+		countrySearchStale || countriesQuery.isFetching || countriesQuery.isPending
+	);
+
+	const passthroughComboboxFilter: (opts: ComboboxOption[], query: string) => ComboboxOption[] = (
+		opts
+	) => opts;
 
 	const { form, errors, enhance, delayed } = superForm(
 		{
@@ -61,6 +101,8 @@
 	$effect(() => {
 		if (!open) {
 			initialized = false;
+			countrySearch = '';
+			debouncedCountrySearch = '';
 			return;
 		}
 
@@ -70,6 +112,8 @@
 		defaultRateName = '';
 		defaultRateValue = '';
 		defaultRateCode = '';
+		countrySearch = '';
+		debouncedCountrySearch = '';
 	});
 
 	function close() {
@@ -96,14 +140,16 @@
 						<Combobox
 							id="tr-country"
 							bind:value={$form.name}
+							onSearchChange={(q) => {
+								countrySearch = q;
+							}}
+							loading={countryComboboxLoading}
+							filterFn={passthroughComboboxFilter}
 							class={cn(
 								'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
 								$errors.name && 'border-destructive'
 							)}
-							options={countries.map((c) => ({
-								id: c.name,
-								value: c.name
-							}))}
+							options={countryComboboxOptions}
 						/>
 						{#if $errors.name}
 							<span class="text-xs text-destructive">{$errors.name}</span>

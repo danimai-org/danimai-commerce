@@ -588,15 +588,17 @@
 <Dialog.Root bind:open>
 	<Dialog.Content class="h-full w-full">
 		<div class="flex h-full flex-col bg-muted/30">
-			<div class="flex shrink-0 items-center gap-2 border-b bg-background px-6 py-4">
+			<div class="flex shrink-0 items-center gap-2 border-b bg-background px-4 py-3 sm:px-6 sm:py-4">
 				<div class="flex items-center gap-2 text-sm text-muted-foreground">
 					<FileText class="size-4" />
 					<span>></span>
 					<span class="text-foreground">Create order</span>
 				</div>
 			</div>
-			<div class="flex min-h-0 flex-1 gap-6 overflow-auto p-6">
-				<div class="flex min-w-0 flex-1 flex-col gap-6">
+			<div
+				class="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4 sm:gap-6 sm:p-6 lg:flex-row lg:items-start"
+			>
+				<div class="flex min-h-0 min-w-0 flex-1 flex-col gap-4 sm:gap-6 lg:min-h-0">
 					<CardSection title="Products">
 						{#snippet headerAction()}
 							<button
@@ -617,25 +619,29 @@
 										class="h-9 rounded-md pl-9"
 									/>
 								</div>
-								<div class="flex gap-2">
-									<Button variant="outline" size="sm" class="flex-1" onclick={openProductBrowser}>
+								<div class="flex flex-col gap-2 min-[420px]:flex-row">
+									<Button variant="outline" size="sm" class="min-[420px]:flex-1" onclick={openProductBrowser}>
 										Browse
 									</Button>
-									<Button variant="outline" size="sm" class="flex-1">
+									<Button variant="outline" size="sm" class="min-[420px]:flex-1">
 										Add custom item
 									</Button>
 								</div>
 								{#if orderItems.length > 0}
 									<div class="mt-4 border-t pt-4">
-										<div class="mb-2 grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground">
+										<div
+											class="mb-2 hidden grid-cols-12 gap-4 text-xs font-medium text-muted-foreground sm:grid"
+										>
 											<div class="col-span-6">Product</div>
 											<div class="col-span-3 text-center">Quantity</div>
 											<div class="col-span-3 text-right">Total</div>
 										</div>
 										<div class="flex flex-col gap-2">
 											{#each orderItems as item, i (item.id + '-' + i)}
-												<div class="grid grid-cols-12 items-center gap-4 rounded-md border p-2">
-													<div class="col-span-6">
+												<div
+													class="grid grid-cols-1 items-center gap-3 rounded-md border p-3 sm:grid-cols-12 sm:gap-4 sm:p-2"
+												>
+													<div class="sm:col-span-6">
 														<div class="flex items-center gap-3">
 															{#if item.thumbnail}
 																<img src={item.thumbnail} alt="" class="size-10 shrink-0 rounded-md object-cover" />
@@ -650,20 +656,26 @@
 															</div>
 														</div>
 													</div>
-													<div class="col-span-3">
+													<div
+														class="flex items-center justify-between gap-2 sm:col-span-3 sm:block"
+													>
+														<span class="text-xs font-medium text-muted-foreground sm:hidden">Quantity</span>
 														<Input
 															type="number"
 															min="1"
 															value={item.quantity}
 															oninput={(e) =>
 																updateItemQuantity(item.id, Number((e.target as HTMLInputElement).value))}
-															class="h-8 text-center"
+															class="h-8 w-24 text-center sm:w-full"
 														/>
 													</div>
-													<div class="col-span-2 text-right text-sm font-medium">
-														{formatCurrency(item.price * item.quantity)}
+													<div
+														class="flex items-center justify-between sm:col-span-2 sm:block sm:text-right"
+													>
+														<span class="text-xs font-medium text-muted-foreground sm:hidden">Total</span>
+														<span class="text-sm font-medium">{formatCurrency(item.price * item.quantity)}</span>
 													</div>
-													<div class="col-span-1">
+													<div class="flex justify-end sm:col-span-1">
 														<button
 															type="button"
 															onclick={() => removeOrderItem(item.id)}
@@ -733,7 +745,7 @@
 										<input type="checkbox" bind:checked={paymentDueLater} class="rounded border-input" />
 										<span>Payment due later</span>
 									</label>
-									<div class="flex gap-2">
+									<div class="flex flex-col gap-2 sm:flex-row">
 										<Button variant="outline" size="sm" class="flex-1">Send invoice</Button>
 										<DropdownMenu.Root>
 											<DropdownMenu.Trigger
@@ -765,7 +777,7 @@
 					</CardSection>
 				</div>
 
-				<div class="flex w-80 flex-col gap-6">
+				<div class="flex w-full shrink-0 flex-col gap-4 sm:gap-6 lg:w-80">
 					<CardSection title="Notes">
 						{#snippet headerAction()}
 							<button
@@ -976,18 +988,36 @@
 			<Dialog.Header class="flex flex-row items-center justify-between border-b px-6 py-4">
 				<Dialog.Title class="text-base font-semibold">Browse Products</Dialog.Title>
 			</Dialog.Header>
-			<div class="flex flex-wrap items-center justify-between gap-4 border-b px-6 py-4">
-				<Button variant="outline" size="sm" class="rounded-md">
-					<SlidersHorizontal class="mr-1.5 size-4" />
-					Add filter
+			<div
+				class="flex min-w-0 flex-wrap items-center gap-2 border-b px-6 py-4 sm:justify-between"
+			>
+				<Button
+					variant="outline"
+					size="sm"
+					class="h-9 shrink-0 rounded-md max-sm:w-9 max-sm:justify-center max-sm:gap-0 max-sm:px-0 sm:min-h-9"
+					aria-label="Add filter"
+					title="Add filter"
+				>
+					<SlidersHorizontal class="size-4 shrink-0 sm:mr-1.5" />
+					<span class="hidden sm:inline">Add filter</span>
 				</Button>
-				<div class="flex items-center gap-2 ml-auto">
-					<div class="relative w-64">
+				<div class="flex min-w-0 flex-1 items-center gap-2 sm:w-auto sm:flex-none">
+					<div class="relative min-w-0 w-full flex-1 sm:w-64 sm:flex-none">
 						<Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-						<Input type="search" placeholder="Search products" bind:value={productBrowserSearch} class="h-9 rounded-md pl-9" />
+						<Input
+							type="search"
+							placeholder="Search products"
+							bind:value={productBrowserSearch}
+							class="h-9 w-full min-w-0 rounded-md pl-9"
+						/>
 					</div>
-					<button type="button" class="flex size-9 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Sort">
+					<button
+						type="button"
+						class="flex size-9 shrink-0 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+						aria-label="Sort"
+					>
 						<ArrowUpDown class="size-4" />
+						<span class="sr-only">Sort</span>
 					</button>
 				</div>
 			</div>

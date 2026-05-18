@@ -9,6 +9,7 @@ export const load: PageLoad = async ({ url, data }) => {
 
 	if (!regions || !regions.data) {
 		return {
+			...data,
 			regions: null
 		};
 	}

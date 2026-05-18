@@ -60,6 +60,14 @@ export class PaginatedRegionsProcess
       query = query.where("currency_code", "=", input.filters.currency_code);
     }
 
+    const search = input.search?.trim();
+    if (search) {
+      const term = `%${search}%`;
+      query = query.where((eb) =>
+        eb.or([eb("name", "ilike", term), eb("currency_code", "ilike", term)]),
+      );
+    }
+
     const countResult = await query
       .select(({ fn }) => fn.count<number>("id").as("count"))
       .executeTakeFirst();

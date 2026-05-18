@@ -42,7 +42,7 @@
 	}
 </script>
 
-<div class="h-full w-72 self-start rounded-lg border bg-card p-6 shadow-sm">
+<div class="w-full rounded-lg border bg-card p-6 shadow-sm lg:w-72 lg:shrink-0 lg:self-start">
 	<h2 class="mb-4 font-semibold">Status</h2>
 	<Select.Root
 		type="single"

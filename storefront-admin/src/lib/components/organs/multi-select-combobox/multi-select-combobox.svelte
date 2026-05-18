@@ -3,6 +3,9 @@
 	import X from '@lucide/svelte/icons/x';
 	import { cn } from '$lib/utils.js';
 
+	const searchClearBtn =
+		'absolute top-1/2 right-2 z-10 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
+
 	export type MultiSelectOption = { id: string; value: string };
 
 	type Props = {
@@ -11,14 +14,20 @@
 		placeholder?: string;
 		id?: string;
 		disabled?: boolean;
+		loading?: boolean;
 		emptyMessage?: string;
 		class?: string;
 		triggerClass?: string;
 		listboxClass?: string;
 		chipsClass?: string;
 		filterFn?: (options: MultiSelectOption[], query: string) => MultiSelectOption[];
+		/** When false, hides the preview table below the combobox (e.g. when selection is shown elsewhere). */
+		showSelectedTable?: boolean;
 		/** Called when the dropdown is first opened (e.g. for lazy-loading options). */
 		onOpen?: () => void;
+		/** Fires whenever the dropdown opens or closes */
+		onOpenChange?: (open: boolean) => void;
+		onSearchChange?: (query: string) => void;
 	};
 
 	let {
@@ -27,13 +36,17 @@
 		placeholder = 'Search…',
 		id: propId,
 		disabled = false,
+		loading = false,
 		emptyMessage = 'No results found.',
 		class: className = '',
 		triggerClass = '',
 		listboxClass = '',
 		chipsClass = '',
 		filterFn,
+		showSelectedTable = true,
 		onOpen,
+		onOpenChange,
+		onSearchChange,
 	}: Props = $props();
 
 	const listboxId = $derived(propId ? `${propId}-listbox` : `multi-select-listbox-${Math.random().toString(36).slice(2, 9)}`);
@@ -62,10 +75,36 @@
 		value = value.filter((x) => x !== id);
 	}
 
+	function resetSearchQuery() {
+		input = '';
+		onSearchChange?.('');
+	}
+
+	function clearSearchOnly(e: MouseEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		resetSearchQuery();
+	}
+
+	function setDropdownOpen(next: boolean) {
+		if (open === next) return;
+		open = next;
+		onOpenChange?.(next);
+	}
+
+	function closeFromEscape() {
+		setDropdownOpen(false);
+		resetSearchQuery();
+	}
+
 	function handleFocusout(e: FocusEvent) {
 		if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) {
-			open = false;
+			setDropdownOpen(false);
 		}
+	}
+
+	function listPointerDown(e: PointerEvent) {
+		e.preventDefault();
 	}
 </script>
 
@@ -87,18 +126,18 @@
 				hasOpened = true;
 				onOpen?.();
 			}
-			open = true;
+			setDropdownOpen(true);
 		}}
 		onfocusout={handleFocusout}
 		onkeydown={(e) => {
-			if (e.key === 'Escape') open = false;
+			if (e.key === 'Escape') closeFromEscape();
 			if (e.key === 'Enter' || e.key === ' ') {
 				e.preventDefault();
 				if (e.isTrusted && !hasOpened) {
 					hasOpened = true;
 					onOpen?.();
 				}
-				open = true;
+				setDropdownOpen(true);
 			}
 		}}
 	>
@@ -106,12 +145,30 @@
 		<input
 			type="text"
 			id={inputId}
-			class="h-full min-w-0 flex-1 border-0 bg-transparent py-1 pl-9 pr-3 outline-none placeholder:text-muted-foreground"
+			class={cn(
+				'h-full min-w-0 flex-1 border-0 bg-transparent py-1 pl-9 outline-none placeholder:text-muted-foreground',
+				input.trim() ? 'pr-10' : 'pr-3'
+			)}
 			placeholder={placeholder}
 			bind:value={input}
 			disabled={disabled}
-			onkeydown={(e) => e.key === 'Escape' && (open = false)}
+			oninput={() => onSearchChange?.(input)}
+			onkeydown={(e) => e.key === 'Escape' && closeFromEscape()}
 		/>
+		{#if input.trim() && !disabled}
+			<button
+				type="button"
+				class={searchClearBtn}
+				aria-label="Clear search"
+				onpointerdown={(e) => {
+					e.preventDefault();
+					e.stopPropagation();
+				}}
+				onclick={clearSearchOnly}
+			>
+				<X class="size-4 opacity-70" aria-hidden="true" />
+			</button>
+		{/if}
 		{#if open}
 			<ul
 				id={listboxId}
@@ -120,8 +177,14 @@
 					'absolute top-full left-0 z-50 mt-1 max-h-48 w-full min-w-0 overflow-auto rounded-md border border-input bg-popover py-1 text-popover-foreground shadow-md',
 					listboxClass
 				)}
+				onpointerdown={listPointerDown}
 			>
-				{#if filteredOptions.length === 0}
+				{#if loading}
+					<li class="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground">
+						<span class="inline-block size-3 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary"></span>
+						Searching…
+					</li>
+				{:else if filteredOptions.length === 0}
 					<li class="px-3 py-1.5 text-sm text-muted-foreground">{emptyMessage}</li>
 				{:else}
 					{#each filteredOptions as option (option.id)}
@@ -150,7 +213,7 @@
 			</ul>
 		{/if}
 	</div>
-	{#if selectedOptions.length > 0}
+	{#if showSelectedTable && selectedOptions.length > 0}
 		<div class={cn('w-full overflow-hidden rounded-md border', chipsClass)}>
 			<table class="w-full text-sm">
 				<thead class="border-b bg-muted/50">

@@ -57,11 +57,10 @@ export class UpdateProductProcess implements ProcessContract<
         input.attribute_groups.map((g) => g.attribute_group_id),
       );
     }
-
     if (!!input.attributes?.length) {
       await this.validateAttributeValuesForGroups(input.id, input.attributes);
     }
-    if (!!input.tag_ids?.length) {
+    if (input.tag_ids !== undefined) {
       await this.validateTagIds(input.tag_ids);
     }
     if (!!input.collection_ids?.length) {
@@ -364,11 +363,7 @@ export class UpdateProductProcess implements ProcessContract<
   ) {
     await this.db
       .deleteFrom("product_attribute_values")
-      .where(
-        "id",
-        "in",
-        attributes.map((a) => a.attribute_id),
-      )
+      .where("product_id", "=", productId)
       .execute();
 
     if (attributes.length === 0) return;
@@ -377,10 +372,9 @@ export class UpdateProductProcess implements ProcessContract<
       id: randomUUID(),
       attribute_group_id: a.attribute_group_id,
       attribute_id: a.attribute_id,
-      product_attribute_id: productId,
+      product_id: productId,
       value: a.value,
       metadata: null,
-      deleted_at: null,
     }));
 
     await this.db
@@ -534,6 +528,37 @@ export class UpdateProductProcess implements ProcessContract<
         .where("id", "in", [...ids])
         .where("deleted_at", "is", null)
         .execute();
+    }
+
+    // Persist gallery order for retrieve-product (metadata.rank + sort).
+    if (mediaIds !== undefined && mediaIds.length > 0) {
+      const mediaRows = (await mediaDb
+        .selectFrom("media_files")
+        .where("id", "in", mediaIds)
+        .where("owner_type", "=", "product")
+        .where("owner_id", "=", productId)
+        .where("deleted_at", "is", null)
+        .select(["id", "metadata"])
+        .execute()) as Array<{ id: string; metadata: unknown | null }>;
+      const byId = new Map(mediaRows.map((row) => [row.id, row]));
+      for (let i = 0; i < mediaIds.length; i++) {
+        const mid = mediaIds[i]!;
+        const row = byId.get(mid);
+        if (!row) continue;
+        const prev =
+          row.metadata !== null &&
+          typeof row.metadata === "object" &&
+          !Array.isArray(row.metadata)
+            ? (row.metadata as Record<string, unknown>)
+            : {};
+        const metadata = { ...prev, rank: i };
+        await mediaDb
+          .updateTable("media_files")
+          .set({ metadata })
+          .where("id", "=", mid)
+          .where("deleted_at", "is", null)
+          .execute();
+      }
     }
 
     if (thumbnailMediaId) {

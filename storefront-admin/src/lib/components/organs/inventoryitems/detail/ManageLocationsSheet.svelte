@@ -28,6 +28,7 @@
 		detail,
 		displayName,
 		stockLocationsRows,
+		stockLocationNameById,
 		stockLocationsPagination,
 		stockLocationsStart,
 		stockLocationsEnd,
@@ -39,6 +40,7 @@
 		detail: ManageLocationsDetail | null;
 		displayName: string;
 		stockLocationsRows: { id: string; name: string | null }[];
+		stockLocationNameById?: ReadonlyMap<string, string>;
 		stockLocationsPagination: PaginationMeta | null;
 		stockLocationsStart: number;
 		stockLocationsEnd: number;
@@ -46,6 +48,17 @@
 		onStockLocationsPageChange: (pageNum: number) => void;
 		onDetailRefetch: () => Promise<void>;
 	} = $props();
+
+	function locationDisplayName(level: InventoryLevelWithLocation): string {
+		const embedded = level.location?.name?.trim();
+		if (embedded) return embedded;
+		const fromMap = stockLocationNameById?.get(level.location_id)?.trim();
+		if (fromMap) return fromMap;
+		const row = stockLocationsRows.find((r) => r.id === level.location_id);
+		const fromRow = row?.name?.trim();
+		if (fromRow) return fromRow;
+		return level.location_id;
+	}
 
 	let addLocationId = $state('');
 	let addStockedQty = $state('0');
@@ -69,7 +82,8 @@
 		const currentLevel = levelToDelete;
 		if (!currentLevel) return '';
 		const level = detail?.levels.find((l) => l.id === currentLevel.id);
-		return level?.location?.name ?? currentLevel.location_id;
+		if (level) return locationDisplayName(level);
+		return locationDisplayName(currentLevel);
 	});
 
 	const stockLocationsColumns: TableColumn[] = [
@@ -226,9 +240,7 @@
 									<tbody>
 										{#each detail.levels as level (level.id)}
 											<tr class="border-b last:border-0">
-												<td class="px-3 py-2 text-xs"
-													>{level.location?.name ?? level.location_id}</td
-												>
+												<td class="px-3 py-2 text-xs">{locationDisplayName(level)}</td>
 												<td class="px-3 py-2">
 													<Input
 														type="number"

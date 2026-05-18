@@ -51,28 +51,29 @@
 			>
 		</div>
 	{:else}
-		<div class="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
-			<nav class="flex items-center gap-[5px] pl-[10px] text-sm">
+		<div class="flex shrink-0 items-center justify-between gap-4 border-b px-4 py-3 sm:px-6">
+			<nav class="flex min-w-0 flex-wrap items-center gap-1 gap-y-1 pl-0 text-sm sm:gap-[5px] sm:pl-[10px]">
 				<button
 					type="button"
-					class="text-muted-foreground hover:text-foreground"
+					class="shrink-0 text-muted-foreground hover:text-foreground"
 					onclick={() => goto(resolve('/products', {}))}
 				>
 					Products
 				</button>
-				<span class="text-muted-foreground">/</span>
-				<span class="font-medium">{product?.title ?? productId ?? '…'}</span>
+				<span class="shrink-0 text-muted-foreground">/</span>
+				<span class="min-w-0 truncate font-medium">{product?.title ?? productId ?? '…'}</span>
 			</nav>
 		</div>
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
-			<div class="p-6">
+			<div class="p-4 sm:p-6">
 				<div
-					class="grid gap-6"
-					style="grid-template-columns: 1fr 24rem; grid-auto-rows: minmax(0, auto); align-items: start;"
+					class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start"
 				>
 					<ProductHero productUpdateForm={data.productUpdateForm} />
 
-					<div class="row-span-2 flex w-80 flex-col gap-6 self-start">
+					<div
+						class="flex w-full min-w-0 flex-col gap-6 self-start lg:row-span-2 lg:w-auto"
+					>
 						<ProductStatus />
 						<ProductOrganisation productOrganisationForm={data.productUpdateForm} />
 						<ProductSalesChannel />
@@ -85,7 +86,9 @@
 						<ProductVariant />
 					</div>
 
-					<div class="col-span-2 grid w-full min-w-0 gap-4 sm:grid-cols-2">
+					<div
+						class="col-span-1 grid w-full min-w-0 gap-4 sm:grid-cols-2 lg:col-span-2"
+					>
 						<MetadataComponent
 							productId={product?.id}
 							metadata={product?.metadata ?? {}}

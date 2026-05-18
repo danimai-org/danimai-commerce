@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { DropdownMenu } from 'bits-ui';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -109,6 +110,22 @@
 		if (value == null || value === '') return '—';
 		return String(value);
 	}
+
+	function statusBadgeClasses(status: unknown): string {
+		const s = String(status ?? '').toLowerCase();
+		switch (s) {
+			case 'published':
+				return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400';
+			case 'draft':
+				return 'bg-slate-500/15 text-slate-700 dark:text-slate-300';
+			case 'proposed':
+				return 'bg-amber-500/15 text-amber-700 dark:text-amber-400';
+			case 'rejected':
+				return 'bg-destructive/15 text-destructive';
+			default:
+				return 'bg-violet-500/15 text-violet-700 dark:text-violet-400';
+		}
+	}
 </script>
 
 <tbody>
@@ -160,30 +177,46 @@
 						</td>
 					{:else if isActionsColumn(column)}
 						<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
-							<DropdownMenu.Root>
-								<DropdownMenu.Trigger
-									class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
-								>
-									<MoreHorizontal class="size-4" />
-									<span class="sr-only">Actions</span>
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Portal>
-									<DropdownMenu.Content
-										class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-										sideOffset={4}
+							{#if column.actionsDisplay === 'inline'}
+								<div class="flex flex-wrap items-center gap-2">
+									{#each column.actions as action (action.key)}
+										<Button
+											type="button"
+											variant={action.key === 'delete' ? 'destructive' : 'outline'}
+											size="sm"
+											class="h-8 rounded-md"
+											onclick={() => action.onClick(row)}
+										>
+											{action.label}
+										</Button>
+									{/each}
+								</div>
+							{:else}
+								<DropdownMenu.Root>
+									<DropdownMenu.Trigger
+										class="flex size-8 items-center justify-center rounded-md hover:bg-muted"
 									>
-										{#each column.actions as action (action.key)}
-											<DropdownMenu.Item
-												textValue={action.label}
-												class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 {action.key === 'delete' ? 'text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive' : ''}"
-												onclick={() => action.onClick(row)}
-											>
-												{action.label}
-											</DropdownMenu.Item>
-										{/each}
-									</DropdownMenu.Content>
-								</DropdownMenu.Portal>
-							</DropdownMenu.Root>
+										<MoreHorizontal class="size-4" />
+										<span class="sr-only">Actions</span>
+									</DropdownMenu.Trigger>
+									<DropdownMenu.Portal>
+										<DropdownMenu.Content
+											class="z-50 min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+											sideOffset={4}
+										>
+											{#each column.actions as action (action.key)}
+												<DropdownMenu.Item
+													textValue={action.label}
+													class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 {action.key === 'delete' ? 'text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive' : ''}"
+													onclick={() => action.onClick(row)}
+												>
+													{action.label}
+												</DropdownMenu.Item>
+											{/each}
+										</DropdownMenu.Content>
+									</DropdownMenu.Portal>
+								</DropdownMenu.Root>
+							{/if}
 						</td>
 					{:else if hasLegacyActions(column)}
 						<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
@@ -227,7 +260,16 @@
 						<td
 							class="px-4 py-3 {colIndex === 0 ? 'font-medium' : 'text-muted-foreground'}"
 						>
-							{#if column.type === 'boolean' || (cellValue(column, row) != null && isBooleanKey(column.key))}
+							{#if column.type === 'statusBadge'}
+								{@const raw = cellValue(column, row)}
+								{#if raw == null || raw === ''}
+									<span class="text-muted-foreground">—</span>
+								{:else}
+									<span
+										class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize {statusBadgeClasses(raw)}"
+									>{String(raw)}</span>
+								{/if}
+							{:else if column.type === 'boolean' || (cellValue(column, row) != null && isBooleanKey(column.key))}
 								{@const val = cellValue(column, row)}
 								{#if val === true}
 									<span

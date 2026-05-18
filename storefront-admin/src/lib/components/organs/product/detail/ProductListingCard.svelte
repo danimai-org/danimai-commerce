@@ -46,11 +46,14 @@
 	let removeSubmitting = $state(false);
 	let removeError = $state<string | null>(null);
 
+	const SEARCH_DEBOUNCE_MS = 300;
+
 	let rows = $state<Product[]>([]);
 	let pagination = $state<PaginationMeta | null>(null);
 	let pageNum = $state(1);
 	let limit = $state(10);
 	let search = $state('');
+	let debouncedSearch = $state('');
 	let loading = $state(false);
 	let error = $state<string | null>(null);
 
@@ -104,14 +107,24 @@
 	);
 
 	$effect(() => {
+		const s = search;
+		const tid = setTimeout(() => {
+			debouncedSearch = s.trim();
+		}, SEARCH_DEBOUNCE_MS);
+		return () => clearTimeout(tid);
+	});
+
+	$effect(() => {
 		void filterKey;
+		void debouncedSearch;
 		pageNum = 1;
 	});
 
 	$effect(() => {
 		void filterKey;
 		void limit;
-		void search;
+		void pageNum;
+		void debouncedSearch;
 		void loadProducts();
 	});
 
@@ -124,7 +137,7 @@
 					...queryFilter,
 					page: pageNum,
 					limit,
-					search: search.trim() || undefined,
+					search: debouncedSearch.trim() || undefined,
 					sorting_field: 'created_at',
 					filters: filter ?? undefined
 				}

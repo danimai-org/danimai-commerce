@@ -6,6 +6,7 @@
 		LocationListCard,
 		ReservationsCard
 	} from '$lib/components/organs/inventoryitems/detail/index.js';
+	import { DeleteConfirmationModal } from '$lib/components/organs/index.js';
 	import type {
 		InventoryItemDetailData,
 		InventoryItemEntity,
@@ -188,6 +189,45 @@
 		manageLocationsSheetOpen = true;
 	}
 
+	let levelDeleteOpen = $state(false);
+	let levelToDelete = $state<Record<string, unknown> | null>(null);
+	let levelDeleteSubmitting = $state(false);
+	let levelDeleteError = $state<string | null>(null);
+
+	const levelDeleteTitle = $derived(
+		String(levelToDelete?.location_name ?? levelToDelete?.location_id ?? levelToDelete?.id ?? '')
+	);
+
+	function requestDeleteLevel(row: Record<string, unknown>) {
+		levelToDelete = row;
+		levelDeleteError = null;
+		levelDeleteOpen = true;
+	}
+
+	async function confirmDeleteLevel() {
+		const row = levelToDelete;
+		const rawId = row?.id;
+		const id = typeof rawId === 'string' ? rawId : rawId != null ? String(rawId) : '';
+		if (!id) return;
+		levelDeleteSubmitting = true;
+		levelDeleteError = null;
+		try {
+			const res = await client.inventory.levels({ id }).delete();
+			if (res?.error) {
+				const err = res.error as { value?: { message?: string } };
+				levelDeleteError = String(err.value?.message ?? 'Failed to delete inventory level');
+				return;
+			}
+			levelDeleteOpen = false;
+			levelToDelete = null;
+			await detailQuery.refetch();
+		} catch (e) {
+			levelDeleteError = e instanceof Error ? e.message : String(e);
+		} finally {
+			levelDeleteSubmitting = false;
+		}
+	}
+
 	const stockLocationsPaginateState = createPagination(
 		async () =>
 			client['stock-locations'].get({
@@ -265,6 +305,12 @@
 					key: 'edit',
 					type: 'button',
 					onClick: openManageLocationsSheet
+				},
+				{
+					label: 'Delete',
+					key: 'delete',
+					type: 'button',
+					onClick: (item) => requestDeleteLevel(item as Record<string, unknown>)
 				}
 			]
 		}
@@ -344,12 +390,14 @@
 					onDetailRefetch={async () => {
 						await detailQuery.refetch();
 					}}
+					stockLocationNameById={locationNameById}
 				/>
 
 				<ReservationsCard
 					inventoryItemId={data.item.id}
 					inventoryItemLabel={data.item.sku ?? data.item.id.slice(0, 8)}
 					levels={data.levels}
+					stockLocationNameById={locationNameById}
 					variantTitle={data.associated_variants?.[0]?.title ?? null}
 					variantSku={data.associated_variants?.[0]?.sku ?? null}
 					itemSku={data.item.sku}
@@ -362,3 +410,17 @@
 		</div>
 	{/if}
 </div>
+
+<DeleteConfirmationModal
+	bind:open={levelDeleteOpen}
+	entityName="inventory level"
+	entityTitle={levelDeleteTitle}
+	customMessage="Remove this inventory level? Stock at this location will no longer be tracked for this item."
+	onConfirm={confirmDeleteLevel}
+	onCancel={() => {
+		levelToDelete = null;
+		levelDeleteError = null;
+	}}
+	submitting={levelDeleteSubmitting}
+	error={levelDeleteError}
+/>

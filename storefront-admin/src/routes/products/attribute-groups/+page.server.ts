@@ -9,7 +9,7 @@ const AttributeGroupCreateSchema = z.object({
 	title: z.string().min(3, 'Title must be at least 3 characters').max(50, 'Title is too long'),
 	type: z.enum(['string', 'number', 'boolean', 'date']),
 	attribute_ids: z.array(z.string()).default([]),
-	required: z.boolean().default(false),
+	attributes_required_json: z.string().default('{}'),
 	rank: z.number().default(0)
 });
 
@@ -25,10 +25,24 @@ export const actions = {
 		if (!attributeGroupCreateForm.valid) {
 			return fail(400, { attributeGroupCreateForm });
 		}
+		let requiredById: Record<string, boolean> = {};
+		try {
+			const parsed = JSON.parse(
+				attributeGroupCreateForm.data.attributes_required_json || '{}'
+			) as unknown;
+			if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+				for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+					if (typeof v === 'boolean') requiredById[k] = v;
+				}
+			}
+		} catch {
+			requiredById = {};
+		}
 		const res = await client['product-attribute-groups'].post({
 			title: attributeGroupCreateForm.data.title.trim(),
 			attributes: attributeGroupCreateForm.data.attribute_ids.map((attribute_id) => ({
-				attribute_id
+				attribute_id,
+				required: requiredById[attribute_id] ?? false
 			})),
 			metadata: {
 				rank: attributeGroupCreateForm.data.rank

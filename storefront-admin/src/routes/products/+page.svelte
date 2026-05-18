@@ -22,14 +22,15 @@
 	let { data }: { data: PageData } = $props();
 	let createOpen = $state(false);
 
-	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+	const SEARCH_DEBOUNCE_MS = 300;
 
 	const paginateState = createPagination(
-		async () => {
-			return client.products.get({ query: paginationQuery });
+		async ({ queryKey }) => {
+			const qs = String(queryKey[2] ?? '');
+			return client.products.get({ query: createPaginationQuery(new URLSearchParams(qs)) });
 		},
 		['products'],
-		paginationQuery,
+		undefined,
 		{
 			keySuffix: () => [page.url.searchParams.toString()]
 		}
@@ -74,6 +75,25 @@
 		goto(`?${searchParams.toString()}`, { replaceState: true, keepFocus: true });
 	}
 
+	$effect(() => {
+		paginateState.searchText = page.url.searchParams.get('search') ?? '';
+	});
+
+	$effect(() => {
+		const s = paginateState.searchText;
+		const tid = setTimeout(() => {
+			const wanted = s ?? '';
+			const currentSearch = untrack(() => page.url.searchParams.get('search') ?? '');
+			if (wanted === currentSearch) return;
+			const searchParams = untrack(() => new SvelteURLSearchParams(page.url.searchParams));
+			searchParams.set('search', wanted);
+			searchParams.set('page', '1');
+			// eslint-disable-next-line svelte/no-navigation-without-resolve
+			goto(`?${searchParams.toString()}`, { replaceState: true, keepFocus: true });
+		}, SEARCH_DEBOUNCE_MS);
+		return () => clearTimeout(tid);
+	});
+
 	const tableColumns: TableColumn[] = [
 		{
 			label: 'Product',
@@ -93,7 +113,7 @@
 		},
 		{ label: 'Sales Channels', key: 'sales_channels_display', type: 'text' },
 		{ label: 'Variants', key: 'variants_count', type: 'text' },
-		{ label: 'Status', key: 'status', type: 'text' },
+		{ label: 'Status', key: 'status', type: 'statusBadge' },
 		{
 			label: 'Actions',
 			key: 'actions',
@@ -115,15 +135,6 @@
 			]
 		}
 	];
-
-	function handleSearchChange(search: string) {
-		paginateState.searchText = search;
-		goWithParams({ search });
-	}
-
-	$effect(() => {
-		handleSearchChange(paginateState.searchText);
-	});
 </script>
 
 <svelte:head>
@@ -178,7 +189,6 @@
 	productCreateForm={data.productCreateForm}
 	onSuccess={() => paginateState.query.refetch()}
 />
-
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="product"

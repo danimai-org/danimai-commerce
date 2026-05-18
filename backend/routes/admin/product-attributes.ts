@@ -54,6 +54,33 @@ export const productAttributeRoutes = new Elysia({ prefix: "/product-attributes"
     }
   )
   .get(
+    "/types",
+    ({ query }) => {
+      const ATTRIBUTE_TYPE_VALUES = ["string", "number", "boolean", "date"] as const;
+      const q = (query.search ?? "").trim().toLowerCase();
+      const types = q
+        ? ATTRIBUTE_TYPE_VALUES.filter((t) => t.includes(q))
+        : [...ATTRIBUTE_TYPE_VALUES];
+      return { types };
+    },
+    {
+      query: Type.Object({
+        search: Type.Optional(Type.String()),
+      }),
+      response: {
+        200: Type.Object({
+          types: Type.Array(Type.String()),
+        }),
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Product Attributes"],
+        summary: "List product attribute value types",
+        description: "Returns allowed attribute type strings, optionally filtered by search",
+      },
+    }
+  )
+  .get(
     "/:id",
     async ({ params }) => {
       const process = getService<RetrieveProductAttributeProcess>(RETRIEVE_PRODUCT_ATTRIBUTE_PROCESS);
@@ -121,7 +148,7 @@ export const productAttributeRoutes = new Elysia({ prefix: "/product-attributes"
     "/",
     async ({ body: input, set }) => {
       const process = getService<DeleteProductAttributesProcess>(DELETE_PRODUCT_ATTRIBUTES_PROCESS);
-      await process.runOperations({ input });
+      await process.runOperations({ input: input as StaticDecode<typeof DeleteProductAttributesSchema> });
       set.status = 204;
       return undefined;
     },

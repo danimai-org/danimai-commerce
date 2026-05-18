@@ -23,19 +23,35 @@
 	}>();
 
 	let search = $state('');
+	let debouncedSearch = $state('');
+
+	const DEBOUNCE_MS = 400;
+
+	$effect(() => {
+		const q = search;
+		if (debouncedSearch === q) return;
+		const t = setTimeout(() => {
+			debouncedSearch = q;
+		}, DEBOUNCE_MS);
+		return () => clearTimeout(t);
+	});
+
+	const searchStale = $derived(search.trim() !== debouncedSearch.trim());
+	const debouncedTrim = $derived(debouncedSearch.trim());
 
 	const listQuery = { page: 1, limit: 100 } as const;
 	const countriesQuery = createQuery(() => ({
-		queryKey: ['add-region-countries', listQuery.page, listQuery.limit, search.trim()],
+		queryKey: ['add-region-countries', listQuery.page, listQuery.limit, debouncedTrim],
 		queryFn: () =>
 			client['regions'].countries.get({
 				query: {
 					page: listQuery.page,
 					limit: listQuery.limit,
-					search: search.trim()
+					...(debouncedTrim ? { search: debouncedTrim } : {})
 				}
 			}),
-		enabled: open
+		enabled: open,
+		refetchOnWindowFocus: false
 	}));
 
 	type CountryRow = { id: string; name: string; code: string };
@@ -59,19 +75,25 @@
 		return apiRows.filter((r) => !excluded.has(r.code));
 	});
 
-	const loading = $derived(countriesQuery.isPending);
+	const displayRows = $derived(searchStale ? [] : rows);
+
+	const loading = $derived(searchStale || countriesQuery.isFetching || countriesQuery.isPending);
 
 	let selectedIds = new SvelteSet<string>();
 
-	const allRowsSelected = $derived(rows.length > 0 && rows.every((c) => selectedIds.has(c.code)));
+	const allRowsSelected = $derived(
+		displayRows.length > 0 && displayRows.every((c) => selectedIds.has(c.code))
+	);
 
 	$effect(() => {
 		if (!open) {
 			search = '';
+			debouncedSearch = '';
 			selectedIds.clear();
 			return;
 		}
 		search = '';
+		debouncedSearch = '';
 		selectedIds.clear();
 		for (const id of preselectedIds) {
 			selectedIds.add(String(id).toUpperCase());
@@ -103,9 +125,13 @@
 				<div class="flex min-h-[12rem] items-center justify-center px-6 py-12">
 					<p class="text-center text-sm text-muted-foreground">Loading countries…</p>
 				</div>
-			{:else if rows.length === 0}
+			{:else if displayRows.length === 0}
 				<div class="flex min-h-[12rem] items-center justify-center px-6 py-12">
-					<p class="text-center text-sm text-muted-foreground">No countries match your search.</p>
+					<p class="text-center text-sm text-muted-foreground">
+						{debouncedTrim
+							? 'No countries match your search.'
+							: 'No unassigned countries are available.'}
+					</p>
 				</div>
 			{:else}
 				<table class="w-full text-sm">
@@ -121,7 +147,7 @@
 										if (allRowsSelected) {
 											selectedIds.clear();
 										} else {
-											for (const c of rows) {
+											for (const c of displayRows) {
 												selectedIds.add(c.code);
 											}
 										}
@@ -134,7 +160,7 @@
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-border">
-						{#each rows as c (c.code)}
+						{#each displayRows as c (c.code)}
 							<tr class={cn('transition-colors hover:bg-muted/30')}>
 								<td class="py-3.5 pr-2 pl-6 align-middle">
 									<input

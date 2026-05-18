@@ -67,6 +67,28 @@ export class UpdateProductImagesProcess {
     const deleted_ids = await this.deleteMedia(mediaDb, input.id, deleteIds, "product");
     const uploaded = await this.uploadMedia(input, files);
 
+    if (uploaded.length > 0) {
+      const productRow = await this.db
+        .selectFrom("products")
+        .where("id", "=", input.id)
+        .where("deleted_at", "is", null)
+        .select(["thumbnail"])
+        .executeTakeFirst();
+      const existingThumb =
+        typeof productRow?.thumbnail === "string" ? productRow.thumbnail.trim() : "";
+      if (!existingThumb) {
+        const firstUrl = uploaded[0]?.url?.trim?.() ?? "";
+        if (firstUrl) {
+          await this.db
+            .updateTable("products")
+            .set({ thumbnail: firstUrl })
+            .where("id", "=", input.id)
+            .where("deleted_at", "is", null)
+            .execute();
+        }
+      }
+    }
+
     return { uploaded, deleted_ids };
   }
 

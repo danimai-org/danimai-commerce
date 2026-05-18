@@ -5,11 +5,12 @@
 	import Search from '@lucide/svelte/icons/search';
 	import { cn } from '$lib/utils.js';
 	import { SvelteSet } from 'svelte/reactivity';
+	import { client } from '$lib/client.js';
+	import { createQuery } from '@tanstack/svelte-query';
 
 	export type SalesChannel = { id: string; name: string; title?: string; is_default?: boolean };
 	type Props = {
 		open: boolean;
-		channels?: SalesChannel[];
 		selectedIds?: SvelteSet<string>;
 		onSelectedIdsChange: (set: SvelteSet<string>) => void;
 		onSave: () => void;
@@ -19,7 +20,6 @@
 
 	let {
 		open = $bindable(false),
-		channels = [],
 		selectedIds = new SvelteSet<string>(),
 		onSelectedIdsChange,
 		onSave,
@@ -27,12 +27,61 @@
 		submitting = false
 	}: Props = $props();
 
-	let searchQuery = $state('');
+	const SEARCH_DEBOUNCE_MS = 300;
 
-	const filteredChannels = $derived(
-		searchQuery.trim()
-			? channels.filter((ch) => ch.name.toLowerCase().includes(searchQuery.toLowerCase()))
-			: channels
+	let searchQuery = $state('');
+	let debouncedSearch = $state('');
+
+	$effect(() => {
+		if (!open) return;
+		searchQuery = '';
+		debouncedSearch = '';
+	});
+
+	$effect(() => {
+		const s = searchQuery;
+		const tid = setTimeout(() => {
+			debouncedSearch = s.trim();
+		}, SEARCH_DEBOUNCE_MS);
+		return () => clearTimeout(tid);
+	});
+
+	const channelsQuery = createQuery(() => ({
+		queryKey: ['sales-channels', 'product-sales-sheet', debouncedSearch],
+		queryFn: () =>
+			client['sales-channels'].get({
+				query: {
+					page: '1',
+					limit: '100',
+					sorting_field: 'sales_channels.name',
+
+					...(debouncedSearch ? { search: debouncedSearch } : {})
+				}
+			}),
+		enabled: () => open,
+		refetchOnWindowFocus: false
+	}));
+
+	const filteredChannels = $derived.by((): SalesChannel[] => {
+		const res = channelsQuery.data;
+		const payload = res?.data as
+			| { rows?: Array<{ id: string; name?: string; is_default?: boolean }> }
+			| undefined;
+		const rows = payload?.rows ?? [];
+		return rows.map((ch) => ({
+			id: ch.id,
+			name: ch.name ?? '',
+			is_default: ch.is_default
+		}));
+	});
+
+	const listLoading = $derived(open && (channelsQuery.isPending || channelsQuery.isFetching));
+	const listError = $derived(
+		channelsQuery.error != null
+			? channelsQuery.error instanceof Error
+				? channelsQuery.error.message
+				: String(channelsQuery.error)
+			: null
 	);
 
 	function toggle(channel: SalesChannel) {
@@ -66,7 +115,11 @@
 						/>
 					</div>
 					<div class="flex flex-col gap-2">
-						{#if filteredChannels.length === 0}
+						{#if listError}
+							<p class="py-8 text-center text-sm text-destructive">{listError}</p>
+						{:else if listLoading}
+							<p class="py-8 text-center text-sm text-muted-foreground">Loading…</p>
+						{:else if filteredChannels.length === 0}
 							<p class="py-8 text-center text-sm text-muted-foreground">No sales channels found.</p>
 						{:else}
 							{#each filteredChannels as channel (channel.id)}

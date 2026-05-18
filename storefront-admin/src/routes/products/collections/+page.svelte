@@ -12,7 +12,6 @@
 		CollectionFormSheet
 	} from '$lib/components/organs/index.js';
 	import FileText from '@lucide/svelte/icons/file-text';
-	import GripVertical from '@lucide/svelte/icons/grip-vertical';
 	import { client } from '$lib/client.js';
 
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
@@ -105,13 +104,7 @@
 				<FileText class="size-4" />
 				<span class="font-semibold">Collections</span>
 			</div>
-			<div class="flex items-center gap-2">
-				<Button variant="outline" size="sm">
-					<GripVertical class="mr-1.5 size-4" />
-					Edit ranking
-				</Button>
-				<Button size="sm" onclick={openCreateSheet}>Create</Button>
-			</div>
+			<Button size="sm" onclick={openCreateSheet}>Create</Button>
 		</div>
 		<PaginationTable>
 			<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">

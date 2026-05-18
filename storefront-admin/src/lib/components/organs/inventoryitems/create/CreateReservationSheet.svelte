@@ -12,6 +12,7 @@
 		open = $bindable(false),
 		inventoryItems,
 		levels,
+		stockLocationNameById,
 		variantTitle = null,
 		variantSku = null,
 		itemSku = null,
@@ -20,6 +21,7 @@
 		open?: boolean;
 		inventoryItems: { id: string; label: string }[];
 		levels: InventoryLevelWithLocation[];
+		stockLocationNameById?: ReadonlyMap<string, string>;
 		variantTitle?: string | null;
 		variantSku?: string | null;
 		itemSku?: string | null;
@@ -35,7 +37,11 @@
 	let wasOpen = $state(false);
 
 	function locationLabel(level: InventoryLevelWithLocation): string {
-		return level.location?.name?.trim() || level.location_id;
+		const embedded = level.location?.name?.trim();
+		if (embedded) return embedded;
+		const fromMap = stockLocationNameById?.get(level.location_id)?.trim();
+		if (fromMap) return fromMap;
+		return level.location_id;
 	}
 
 	const selectedLevel = $derived(

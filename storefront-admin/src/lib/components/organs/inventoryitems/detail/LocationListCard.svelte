@@ -32,6 +32,7 @@
 		manageLocationsDetail = null,
 		displayName = '',
 		stockLocationsRows = [],
+		stockLocationNameById,
 		stockLocationsPagination = null,
 		stockLocationsStart = 0,
 		stockLocationsEnd = 0,
@@ -54,6 +55,7 @@
 		manageLocationsDetail?: ManageLocationsDetail | null;
 		displayName?: string;
 		stockLocationsRows?: { id: string; name: string | null }[];
+		stockLocationNameById?: ReadonlyMap<string, string>;
 		stockLocationsPagination?: PaginationMeta | null;
 		stockLocationsStart?: number;
 		stockLocationsEnd?: number;
@@ -89,6 +91,7 @@
 		detail={manageLocationsDetail}
 		{displayName}
 		{stockLocationsRows}
+		stockLocationNameById={stockLocationNameById}
 		stockLocationsPagination={stockLocationsPagination}
 		stockLocationsStart={stockLocationsStart}
 		stockLocationsEnd={stockLocationsEnd}
