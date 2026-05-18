@@ -7,6 +7,7 @@
 		inventoryItemId,
 		inventoryItemLabel,
 		levels,
+		stockLocationNameById,
 		variantTitle = null,
 		variantSku = null,
 		itemSku = null,
@@ -16,6 +17,7 @@
 		inventoryItemId: string;
 		inventoryItemLabel: string;
 		levels: InventoryLevelWithLocation[];
+		stockLocationNameById?: ReadonlyMap<string, string>;
 		variantTitle?: string | null;
 		variantSku?: string | null;
 		itemSku?: string | null;
@@ -26,6 +28,8 @@
 	let createOpen = $state(false);
 
 	function locationNameForId(locationId: string): string {
+		const fromMap = stockLocationNameById?.get(locationId)?.trim();
+		if (fromMap) return fromMap;
 		const level = levels.find((l) => l.location_id === locationId);
 		return level?.location?.name?.trim() || locationId;
 	}
@@ -69,6 +73,7 @@
 	bind:open={createOpen}
 	inventoryItems={[{ id: inventoryItemId, label: inventoryItemLabel }]}
 	{levels}
+	{stockLocationNameById}
 	{variantTitle}
 	{variantSku}
 	{itemSku}

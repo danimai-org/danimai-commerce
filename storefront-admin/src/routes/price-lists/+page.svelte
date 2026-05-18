@@ -40,7 +40,7 @@
 	// 	const id = (item as { id?: string }).id;
 	// 	if (!id) return;
 	// 	goto(resolve(`/price-lists/${id}?edit=true`, {}));
-	// }
+	// }okp;≥æ/p₹
 
 	const rows = $derived(data?.priceLists?.rows ?? []);
 	const pagination = $derived(data?.priceLists?.pagination ?? null);
