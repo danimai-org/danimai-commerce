@@ -141,13 +141,35 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
           .onRef("sales_channels.id", "=", "product_sales_channels.sales_channel_id")
           .on("sales_channels.deleted_at", "is", null),
       )
+      .leftJoin("product_option_values", (join) =>
+        join
+          .onRef("product_option_values.product_id", "=", "products.id")
+          .on("product_option_values.deleted_at", "is", null),
+      )
+      .leftJoin("product_options", (join) =>
+        join
+          .onRef("product_options.id", "=", "product_option_values.option_id")
+          .on("product_options.deleted_at", "is", null),
+      )
+      .leftJoin("product_images as product_level_images", (join) =>
+        join
+          .onRef("product_level_images.product_id", "=", "products.id")
+          .on("product_level_images.deleted_at", "is", null)
+          .on("product_level_images.variant_id", "is", null),
+      )
       .select([
         "products.id as id",
         "products.title as title",
         "products.status as status",
         "products.handle as handle",
         "products.thumbnail as product_thumbnail",
-        (eb) => sql<number>`count(product_variants.id)::int`.as("variant_count"),
+        (eb) => sql<string | null>`
+          (
+            array_agg(product_level_images.url order by product_level_images.rank asc)
+            FILTER (WHERE product_level_images.url IS NOT NULL)
+          )[1]
+        `.as("product_level_thumbnail"),
+        (eb) => sql<number>`count(distinct product_variants.id)::int`.as("variant_count"),
         (eb) => sql<{
           id: string;
           name: string;
@@ -171,6 +193,30 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
             )
           END
         `.as('category'),
+        (eb) => sql<{
+          id: string;
+          value: string;
+          rank: number;
+          option: {
+            id: string;
+            title: string;
+          };
+        }[]>`
+          CASE
+            WHEN count(product_option_values.id) = 0 THEN ARRAY[]::json[]
+            ELSE array_agg(
+              DISTINCT jsonb_build_object(
+                'id', product_option_values.id,
+                'value', product_option_values.value,
+                'rank', product_option_values.rank,
+                'option', jsonb_build_object(
+                  'id', product_options.id,
+                  'title', product_options.title
+                )
+              )
+            )::json[]
+          END
+        `.as("option_values"),
       ]).groupBy([
         "products.id",
         "products.title",
@@ -183,6 +229,17 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
 
     const variants = await this.db
       .selectFrom("product_variants")
+      .leftJoin("product_images as variant_images", (join) =>
+        join
+          .onRef("variant_images.variant_id", "=", "product_variants.id")
+          .on("variant_images.deleted_at", "is", null),
+      )
+      .leftJoin("price_sets", "price_sets.variant_id", "product_variants.id")
+      .leftJoin("prices", (join) =>
+        join
+          .onRef("prices.price_set_id", "=", "price_sets.id")
+          .on("prices.deleted_at", "is", null),
+      )
       .distinctOn(["product_variants.product_id"])
       .where("product_variants.product_id", "in", productIds)
       .where("product_variants.deleted_at", "is", null)
@@ -193,111 +250,18 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
         "product_variants.sku as sku",
         "product_variants.thumbnail as thumbnail",
         "product_variants.variant_rank as variant_rank",
-      ])
-      .orderBy("product_variants.product_id", "asc")
-      .orderBy(sql`product_variants.variant_rank asc nulls last`)
-      .execute();
-
-    const variantIds = variants.map((variant) => variant.id);
-
-    const imageRows = await this.db
-      .selectFrom("product_images")
-      .where("product_id", "in", productIds)
-      .where("deleted_at", "is", null)
-      .select(["product_id", "variant_id", "url", "rank"])
-      .orderBy("product_id", "asc")
-      .orderBy("rank", "asc")
-      .execute();
-
-    const firstImageByVariantId = new Map<string, string>();
-    const firstProductLevelImageByProductId = new Map<string, string>();
-    for (const img of imageRows) {
-      const pid = img.product_id;
-      if (!pid) continue;
-      if (img.variant_id) {
-        if (!firstImageByVariantId.has(img.variant_id)) {
-          firstImageByVariantId.set(img.variant_id, img.url);
-        }
-      } else if (!firstProductLevelImageByProductId.has(pid)) {
-        firstProductLevelImageByProductId.set(pid, img.url);
-      }
-    }
-
-    const variantPrices = await this.db
-      .selectFrom("price_sets")
-      .innerJoin("prices", (join) =>
-        join
-          .onRef("prices.price_set_id", "=", "price_sets.id")
-          .on("prices.deleted_at", "is", null),
-      )
-      .where("price_sets.variant_id", "in", variantIds)
-      .select([
-        "price_sets.variant_id as variant_id",
+        "variant_images.url as variant_image_url",
         "prices.amount as amount",
         "prices.currency_code as currency_code",
         "prices.min_quantity as min_quantity",
         "prices.max_quantity as max_quantity",
         "prices.price_list_id as price_list_id",
       ])
-      .orderBy("price_sets.variant_id", "asc")
+      .orderBy("product_variants.product_id", "asc")
+      .orderBy(sql`product_variants.variant_rank asc nulls last`)
       .orderBy("prices.id", "asc")
+      .orderBy(sql`variant_images.rank asc nulls last`)
       .execute();
-
-    const priceByVariant = new Map<string, {
-      amount: string;
-      currency_code: string;
-      min_quantity: number | null;
-      max_quantity: number | null;
-      price_list_id: string | null;
-    }>();
-    for (const row of variantPrices) {
-      if (!priceByVariant.has(row.variant_id) && row.amount !== null && row.currency_code !== null) {
-        priceByVariant.set(row.variant_id, {
-          amount: row.amount,
-          currency_code: row.currency_code,
-          min_quantity: row.min_quantity,
-          max_quantity: row.max_quantity,
-          price_list_id: row.price_list_id,
-        });
-      }
-    }
-
-    const optionRows = await this.db
-      .selectFrom("product_option_values")
-      .innerJoin(
-        "product_options",
-        "product_options.id",
-        "product_option_values.option_id",
-      )
-      .where("product_option_values.product_id", "in", productIds)
-      .where("product_option_values.deleted_at", "is", null)
-      .select([
-        "product_option_values.product_id as product_id",
-        "product_option_values.id as id",
-        "product_options.title as title",
-        "product_option_values.value as value",
-        "product_option_values.rank as rank",
-      ])
-      .orderBy("product_option_values.product_id", "asc")
-      .orderBy("product_option_values.rank", "asc")
-      .execute();
-
-    const optionsByProductId = new Map<string, Array<{
-      id: string;
-      title: string;
-      value: string;
-      rank: number;
-    }>>();
-    for (const row of optionRows) {
-      const existing = optionsByProductId.get(row.product_id) ?? [];
-      existing.push({
-        id: row.id,
-        title: row.title,
-        value: row.value,
-        rank: row.rank,
-      });
-      optionsByProductId.set(row.product_id, existing);
-    }
 
     const variantsByProduct = new Map<string, StorefrontPaginatedProductsProcessOutput["rows"][number]["variant"]>();
     for (const row of variants) {
@@ -305,37 +269,44 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
         id: row.id,
         title: row.title,
         sku: row.sku,
-        thumbnail: row.thumbnail,
+        thumbnail: row.thumbnail ?? row.variant_image_url,
         variant_rank: row.variant_rank,
-        price: priceByVariant.get(row.id) ?? null,
+        price: row.amount !== null && row.currency_code !== null
+          ? {
+            amount: row.amount,
+            currency_code: row.currency_code,
+            min_quantity: row.min_quantity,
+            max_quantity: row.max_quantity,
+            price_list_id: row.price_list_id,
+          }
+          : null,
       });
     }
 
     type ProductAggRow = (typeof products)[number] & {
       product_thumbnail: string | null;
+      product_level_thumbnail: string | null;
+      option_values: StorefrontPaginatedProductsProcessOutput["rows"][number]["option_values"];
     };
 
     const productsWithVariants = products.map((row) => {
-      const { product_thumbnail, ...productBase } = row as ProductAggRow;
+      const { product_thumbnail, product_level_thumbnail, ...productBase } = row as ProductAggRow;
       const variant = variantsByProduct.get(row.id) ?? null;
-      const variantThumb =
-        variant?.thumbnail ??
-        (variant ? firstImageByVariantId.get(variant.id) ?? null : null);
       const productThumb =
         product_thumbnail ??
-        firstProductLevelImageByProductId.get(row.id) ??
+        product_level_thumbnail ??
         null;
-      const thumbnail = variantThumb ?? productThumb ?? null;
+      const thumbnail = (variant?.thumbnail ?? null) ?? productThumb ?? null;
       const variantOut = variant
         ? {
             ...variant,
-            thumbnail: variantThumb ?? productThumb,
+            thumbnail: variant.thumbnail ?? productThumb,
           }
         : null;
       return {
         ...productBase,
         thumbnail,
-        options: optionsByProductId.get(row.id) ?? [],
+        option_values: productBase.option_values,
         variant: variantOut,
       };
     });

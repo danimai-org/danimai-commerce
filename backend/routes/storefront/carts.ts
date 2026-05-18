@@ -34,7 +34,7 @@ const UpdateCartAddressesBodySchema = Type.Omit(UpdateCartAddressesSchema, ["id"
 const UpdateCartTaxLinesBodySchema = Type.Omit(UpdateCartTaxLinesSchema, ["id"]);
 const ApplyCartPromoCodeBodySchema = Type.Omit(ApplyCartPromoCodeSchema, ["id"]);
 
-export const cartRoutes = new Elysia({ prefix: "/carts" })
+export const storefrontCartRoutes = new Elysia({ prefix: "/carts" })
   .onError(({ error, set }) => handleProcessError(error, set))
   .post(
     "/",
@@ -50,7 +50,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         500: InternalErrorResponseSchema,
       },
       detail: {
-        tags: ["Carts"],
+        tags: ["Storefront Carts"],
         summary: "Create cart",
         description: "Creates a new cart",
       },
@@ -70,7 +70,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         500: InternalErrorResponseSchema,
       },
       detail: {
-        tags: ["Carts"],
+        tags: ["Storefront Carts"],
         summary: "Get cart by id",
         description: "Returns a cart with line items, tax lines, and shipping address",
       },
@@ -98,7 +98,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         500: InternalErrorResponseSchema,
       },
       detail: {
-        tags: ["Carts"],
+        tags: ["Storefront Carts"],
         summary: "Update cart line items",
         description: "Syncs line items for a cart",
       },
@@ -126,7 +126,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         500: InternalErrorResponseSchema,
       },
       detail: {
-        tags: ["Carts"],
+        tags: ["Storefront Carts"],
         summary: "Apply promo code",
         description: "Validates and applies a promo code to cart line items",
       },
@@ -154,7 +154,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         500: InternalErrorResponseSchema,
       },
       detail: {
-        tags: ["Carts"],
+        tags: ["Storefront Carts"],
         summary: "Update cart shipping address",
         description: "Creates or updates the shipping address for a cart",
       },
@@ -182,7 +182,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         500: InternalErrorResponseSchema,
       },
       detail: {
-        tags: ["Carts"],
+        tags: ["Storefront Carts"],
         summary: "Update cart tax lines",
         description: "Syncs tax lines per line item for a cart",
       },

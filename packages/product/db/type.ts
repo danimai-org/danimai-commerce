@@ -1,5 +1,8 @@
 import type { Generated, Selectable, Insertable, Updateable } from "kysely";
-import type { ProductSalesChannelTable, SalesChannelTable } from "@danimai/sales-channel/db";
+import type {
+  ProductSalesChannelTable,
+  SalesChannelTable,
+} from "@danimai/sales-channel/db";
 import type { PriceSetTable, PriceTable } from "@danimai/pricing";
 
 export enum ProductStatusEnum {
@@ -72,7 +75,8 @@ export interface ProductAttributeGroupTable {
 
 export type ProductAttributeGroup = Selectable<ProductAttributeGroupTable>;
 export type NewProductAttributeGroup = Insertable<ProductAttributeGroupTable>;
-export type ProductAttributeGroupUpdate = Updateable<ProductAttributeGroupTable>;
+export type ProductAttributeGroupUpdate =
+  Updateable<ProductAttributeGroupTable>;
 
 // table product_attributes
 export interface ProductAttributeTable {
@@ -87,8 +91,6 @@ export interface ProductAttributeTable {
 export type ProductAttribute = Selectable<ProductAttributeTable>;
 export type NewProductAttribute = Insertable<ProductAttributeTable>;
 export type ProductAttributeUpdate = Updateable<ProductAttributeTable>;
-
-
 
 // table product_attribute_values
 export interface ProductAttributeValueTable {
@@ -117,9 +119,12 @@ export interface ProductAttributeGroupRelationTable {
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }
-export type ProductAttributeGroupRelation = Selectable<ProductAttributeGroupRelationTable>;
-export type NewProductAttributeGroupRelation = Insertable<ProductAttributeGroupRelationTable>;
-export type ProductAttributeGroupRelationUpdate = Updateable<ProductAttributeGroupRelationTable>;
+export type ProductAttributeGroupRelation =
+  Selectable<ProductAttributeGroupRelationTable>;
+export type NewProductAttributeGroupRelation =
+  Insertable<ProductAttributeGroupRelationTable>;
+export type ProductAttributeGroupRelationUpdate =
+  Updateable<ProductAttributeGroupRelationTable>;
 
 // table product_variants
 export interface ProductVariantTable {

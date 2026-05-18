@@ -32,6 +32,32 @@ export const ProductVariantResponseSchema = Type.Object({
       }),
     ),
   ),
+  options: Type.Optional(
+    Type.Array(
+      Type.Object({
+        id: Type.String(),
+        title: Type.String(),
+        value: Type.String(),
+        rank: Type.Number(),
+      }),
+    ),
+  ),
+  price_sets: Type.Optional(
+    Type.Array(
+      Type.Object({
+        id: Type.String(),
+        prices: Type.Array(
+          Type.Object({
+            id: Type.String(),
+            amount: Type.String(),
+            currency_code: Type.String(),
+            min_quantity: Type.Union([Type.Number(), Type.Null()]),
+            max_quantity: Type.Union([Type.Number(), Type.Null()]),
+          }),
+        ),
+      }),
+    ),
+  ),
 });
 
 export const RetrieveProductVariantResponseSchema = Type.Union([

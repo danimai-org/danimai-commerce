@@ -7,50 +7,56 @@ import {
   type ProcessContract,
   ValidationError,
 } from "@danimai/core";
-import { Kysely, sql } from "kysely";
+import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
-import { type UpdateProductVariantProcessInput, UpdateProductVariantSchema } from "./update-product-variants.schema";
-import type { Database, ProductVariant, Product } from "../../../db/type";
-import { randomUUID } from "crypto";
+import {
+  type UpdateProductVariantProcessInput,
+  UpdateProductVariantSchema,
+  type UpdateProductVariantsProcessOutput,
+} from "./update-product-variants.schema";
+import type { Database, Product } from "../../../db/type";
 
 /**
  * Handles the update product variants process.
  * Input: validated process context input for this operation.
- * Output: process-specific result data for downstream callers.
+ * Output: undefined; the variant row is updated in place.
  */
 export const UPDATE_PRODUCT_VARIANTS_PROCESS = Symbol("UpdateProductVariants");
 
 @Process(UPDATE_PRODUCT_VARIANTS_PROCESS)
 export class UpdateProductVariantsProcess
-  implements ProcessContract<typeof UpdateProductVariantSchema, UpdateProductVariantProcessOutput> {
+  implements
+    ProcessContract<
+      typeof UpdateProductVariantSchema,
+      UpdateProductVariantsProcessOutput
+    >
+{
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
     @InjectLogger()
-    private readonly logger: Logger
-  ) { }
+    private readonly logger: Logger,
+  ) {}
 
   /**
    * Executes the process business logic.
-   * Input: validated process context and request payload.
-   * Output: operation result object or entity payload.
+   * Updates only product_variants fields; does not touch prices, media, or
+   * option-value relations.
    */
-  async runOperations(@ProcessContext({
-    schema: UpdateProductVariantSchema,
-  }) context: ProcessContextType<typeof UpdateProductVariantSchema>) {
+  async runOperations(
+    @ProcessContext({
+      schema: UpdateProductVariantSchema,
+    })
+    context: ProcessContextType<typeof UpdateProductVariantSchema>,
+  ) {
     const { input } = context;
 
     await this.validateVariant(input);
     const product = await this.validateProduct(input);
 
-    return this.db.transaction().execute(async (trx) => {
-      const variant = await this.updateProductVariant(trx, input, product);
-      if (input.prices !== undefined) {
-        await this.syncVariantPrices(trx, input.id, input.prices);
-      }
-      await this.syncVariantMedia(trx, input.id, input.media_ids, input.thumbnail_media_id);
-      return variant;
-    });
+    await this.updateProductVariant(this.db, input, product);
+
+    return undefined;
   }
 
   async validateVariant(input: UpdateProductVariantProcessInput) {
@@ -62,17 +68,21 @@ export class UpdateProductVariantsProcess
       .executeTakeFirst();
 
     if (!variant) {
-      throw new ValidationError("Product variant not found", [{
-        type: "not_found",
-        message: "Product variant not found",
-        path: "id",
-      }]);
+      throw new ValidationError("Product variant not found", [
+        {
+          type: "not_found",
+          message: "Product variant not found",
+          path: "id",
+        },
+      ]);
     }
 
     return variant;
   }
 
-  async validateProduct(input: UpdateProductVariantProcessInput): Promise<Product | null> {
+  async validateProduct(
+    input: UpdateProductVariantProcessInput,
+  ): Promise<Product | null> {
     if (!input.product_id) {
       return null;
     }
@@ -85,11 +95,13 @@ export class UpdateProductVariantsProcess
       .executeTakeFirst();
 
     if (!product) {
-      throw new ValidationError("Product not found", [{
-        type: "not_found",
-        message: "Product not found",
-        path: "product_id",
-      }]);
+      throw new ValidationError("Product not found", [
+        {
+          type: "not_found",
+          message: "Product not found",
+          path: "product_id",
+        },
+      ]);
     }
 
     return product;
@@ -98,21 +110,21 @@ export class UpdateProductVariantsProcess
   async updateProductVariant(
     trx: Kysely<Database>,
     input: UpdateProductVariantProcessInput,
-    product: Product | null
+    product: Product | null,
   ) {
     this.logger.info("Updating product variant", { input });
 
     const updateData: {
       title?: string;
-      product_id?: string | null;
+      product_id?: string;
       sku?: string | null;
       barcode?: string | null;
       ean?: string | null;
       upc?: string | null;
       allow_backorder?: boolean;
       manage_inventory?: boolean;
-      variant_rank?: number | null;
-      thumbnail?: string | null;
+      variant_rank?: number;
+      thumbnail?: string;
       metadata?: unknown;
     } = {};
 
@@ -120,24 +132,24 @@ export class UpdateProductVariantsProcess
       updateData.title = input.title;
     }
 
-    if (input.product_id !== undefined) {
-      updateData.product_id = product?.id ?? null;
+    if (input.product_id !== undefined && product) {
+      updateData.product_id = product.id;
     }
 
     if (input.sku !== undefined) {
-      updateData.sku = input.sku ?? null;
+      updateData.sku = input.sku;
     }
 
     if (input.barcode !== undefined) {
-      updateData.barcode = input.barcode ?? null;
+      updateData.barcode = input.barcode;
     }
 
     if (input.ean !== undefined) {
-      updateData.ean = input.ean ?? null;
+      updateData.ean = input.ean;
     }
 
     if (input.upc !== undefined) {
-      updateData.upc = input.upc ?? null;
+      updateData.upc = input.upc;
     }
 
     if (input.allow_backorder !== undefined) {
@@ -149,140 +161,26 @@ export class UpdateProductVariantsProcess
     }
 
     if (input.variant_rank !== undefined) {
-      updateData.variant_rank = input.variant_rank ?? null;
+      updateData.variant_rank = input.variant_rank;
     }
 
     if (input.thumbnail !== undefined) {
-      updateData.thumbnail = input.thumbnail ?? null;
-    }
-    if (input.thumbnail_media_id === null) {
-      updateData.thumbnail = null;
+      updateData.thumbnail = input.thumbnail;
     }
 
     if (input.metadata !== undefined) {
       updateData.metadata = input.metadata;
     }
 
-    const updated = await trx
+    if (Object.keys(updateData).length === 0) {
+      return;
+    }
+
+    await trx
       .updateTable("product_variants")
       .set(updateData)
       .where("id", "=", input.id)
       .where("deleted_at", "is", null)
-      .returningAll()
-      .executeTakeFirst();
-
-    return updated;
-  }
-
-  async syncVariantPrices(
-    trx: Kysely<Database>,
-    variantId: string,
-    prices: Array<{
-      amount: number;
-      currency_code: string;
-      min_quantity?: number;
-      max_quantity?: number;
-      price_list_id?: string;
-    }>
-  ) {
-    // Using type assertion to access pricing tables
-    const pricingDb = trx as any;
-
-    // Find existing price_set for this variant
-    const existingPriceSet = await pricingDb
-      .selectFrom("price_sets")
-      .where(sql`metadata->>'variant_id'`, "=", variantId)
-      .where("deleted_at", "is", null)
-      .selectAll()
-      .executeTakeFirst();
-
-    let priceSetId: string;
-
-    if (existingPriceSet) {
-      priceSetId = existingPriceSet.id;
-      // Delete all existing prices for this price_set
-      await pricingDb
-        .deleteFrom("prices")
-        .where("price_set_id", "=", priceSetId)
-        .where("deleted_at", "is", null)
-        .execute();
-    } else {
-      // Create new price_set
-      const newPriceSet = await pricingDb
-        .insertInto("price_sets")
-        .values({
-          id: randomUUID(),
-          metadata: { variant_id: variantId },
-        })
-        .returningAll()
-        .executeTakeFirst();
-
-      if (!newPriceSet) {
-        throw new Error("Failed to create price_set");
-      }
-      priceSetId = newPriceSet.id;
-    }
-
-    // Insert new prices
-    if (prices.length > 0) {
-      await pricingDb
-        .insertInto("prices")
-        .values(
-          prices.map((priceInput) => ({
-            id: randomUUID(),
-            price_set_id: priceSetId,
-            amount: priceInput.amount.toString(),
-            currency_code: priceInput.currency_code,
-            min_quantity: priceInput.min_quantity ?? null,
-            max_quantity: priceInput.max_quantity ?? null,
-            price_list_id: priceInput.price_list_id ?? null,
-            metadata: null,
-          }))
-        )
-        .execute();
-    }
-  }
-
-  async syncVariantMedia(
-    trx: Kysely<Database>,
-    variantId: string,
-    mediaIds?: string[],
-    thumbnailMediaId?: string | null
-  ) {
-    const mediaDb = trx as any;
-    const ids = new Set<string>(mediaIds ?? []);
-    if (thumbnailMediaId) {
-      ids.add(thumbnailMediaId);
-    }
-
-    if (ids.size > 0) {
-      await mediaDb
-        .updateTable("media_files")
-        .set({
-          owner_type: "product_variant",
-          owner_id: variantId,
-        })
-        .where("id", "in", [...ids])
-        .where("deleted_at", "is", null)
-        .execute();
-    }
-
-    if (thumbnailMediaId) {
-      const thumbnailMedia = await mediaDb
-        .selectFrom("media_files")
-        .where("id", "=", thumbnailMediaId)
-        .where("deleted_at", "is", null)
-        .select(["url"])
-        .executeTakeFirst();
-
-      if (thumbnailMedia?.url) {
-        await mediaDb
-          .updateTable("product_variants")
-          .set({ thumbnail: thumbnailMedia.url })
-          .where("id", "=", variantId)
-          .where("deleted_at", "is", null)
-          .execute();
-      }
-    }
+      .execute();
   }
 }

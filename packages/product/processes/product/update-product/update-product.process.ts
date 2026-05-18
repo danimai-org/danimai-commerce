@@ -10,7 +10,10 @@ import {
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import { randomUUID } from "crypto";
-import { type UpdateProductProcessInput, UpdateProductSchema } from "./update-product.schema";
+import {
+  type UpdateProductProcessInput,
+  UpdateProductSchema,
+} from "./update-product.schema";
 import type { Database, Product, ProductStatusEnum } from "../../../db/type";
 
 /**
@@ -21,62 +24,86 @@ import type { Database, Product, ProductStatusEnum } from "../../../db/type";
 export const UPDATE_PRODUCT_PROCESS = Symbol("UpdateProduct");
 
 @Process(UPDATE_PRODUCT_PROCESS)
-export class UpdateProductProcess
-  implements ProcessContract<typeof UpdateProductSchema, Product | undefined> {
+export class UpdateProductProcess implements ProcessContract<
+  typeof UpdateProductSchema,
+  Product | undefined
+> {
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
     @InjectLogger()
-    private readonly logger: Logger
-  ) { }
+    private readonly logger: Logger,
+  ) {}
 
   /**
    * Executes the process business logic.
    * Input: validated process context and request payload.
    * Output: operation result object or entity payload.
    */
-  async runOperations(@ProcessContext({
-    schema: UpdateProductSchema,
-  }) context: ProcessContextType<typeof UpdateProductSchema>) {
+  async runOperations(
+    @ProcessContext({
+      schema: UpdateProductSchema,
+    })
+    context: ProcessContextType<typeof UpdateProductSchema>,
+  ) {
     const { input } = context;
 
     await this.validateProduct(input);
     const category = await this.validateCategory(input);
     const handle = await this.validateHandle(input);
+
     if (input.attribute_groups !== undefined) {
-      await this.validateAttributeGroupIds(input.attribute_groups.map((g) => g.attribute_group_id));
+      await this.validateAttributeGroupIds(
+        input.attribute_groups.map((g) => g.attribute_group_id),
+      );
     }
-    if (input.attributes !== undefined) {
+
+    if (!!input.attributes?.length) {
       await this.validateAttributeValuesForGroups(input.id, input.attributes);
     }
-    if (input.tag_ids !== undefined) {
+    if (!!input.tag_ids?.length) {
       await this.validateTagIds(input.tag_ids);
     }
-    if (input.collection_ids !== undefined) {
+    if (!!input.collection_ids?.length) {
       await this.validateCollectionIds(input.collection_ids);
     }
-    if (input.sales_channel_ids !== undefined) {
+    if (!!input.sales_channel_ids?.length) {
       await this.validateSalesChannelIds(input.sales_channel_ids);
     }
 
     const updated = await this.updateProduct(input, category, handle);
-    if (input.attribute_groups !== undefined) {
+    if (!!input.attribute_groups?.length) {
       await this.syncAttributeGroupRelations(input.id, input.attribute_groups);
     }
-    if (input.attributes !== undefined) {
+    if (!!input.attributes?.length) {
       await this.syncAttributeValues(input.id, input.attributes);
     }
-    if (input.tag_ids !== undefined) {
+    if (!!input.tag_ids?.length) {
       await this.syncProductTags(input.id, input.tag_ids);
     }
-    if (input.collection_ids !== undefined) {
+    if (!!input.collection_ids?.length) {
       await this.syncProductCollections(input.id, input.collection_ids);
     }
-    if (input.sales_channel_ids !== undefined) {
+
+    if (!!input.sales_channel_ids?.length) {
       await this.syncProductSalesChannels(input.id, input.sales_channel_ids);
     }
-    await this.syncProductMedia(input.id, input.media_ids, input.thumbnail_media_id);
-    return updated ?? (await this.db.selectFrom("products").where("id", "=", input.id).where("deleted_at", "is", null).selectAll().executeTakeFirst());
+
+    await this.syncProductMedia(
+      input.id,
+      input.media_ids,
+      input.thumbnail_media_id,
+    );
+
+    return (
+      updated ??
+      (await this.db
+        .selectFrom("products")
+        .where("id", "=", input.id)
+        .where("deleted_at", "is", null)
+        .selectAll()
+        .executeTakeFirst())
+    );
   }
 
   async validateProduct(input: UpdateProductProcessInput) {
@@ -88,11 +115,13 @@ export class UpdateProductProcess
       .executeTakeFirst();
 
     if (!product) {
-      throw new ValidationError("Product not found", [{
-        type: "not_found",
-        message: "Product not found",
-        path: "id",
-      }]);
+      throw new ValidationError("Product not found", [
+        {
+          type: "not_found",
+          message: "Product not found",
+          path: "id",
+        },
+      ]);
     }
 
     return product;
@@ -111,17 +140,21 @@ export class UpdateProductProcess
       .executeTakeFirst();
 
     if (!category) {
-      throw new ValidationError("Category not found", [{
-        type: "not_found",
-        message: "Category not found",
-        path: "category_id",
-      }]);
+      throw new ValidationError("Category not found", [
+        {
+          type: "not_found",
+          message: "Category not found",
+          path: "category_id",
+        },
+      ]);
     }
 
     return category;
   }
 
-  async validateHandle(input: UpdateProductProcessInput): Promise<string | undefined> {
+  async validateHandle(
+    input: UpdateProductProcessInput,
+  ): Promise<string | undefined> {
     if (!input.handle) {
       return undefined;
     }
@@ -135,11 +168,13 @@ export class UpdateProductProcess
       .executeTakeFirst();
 
     if (existing) {
-      throw new ValidationError("Product handle already exists", [{
-        type: "not_unique",
-        message: "Product handle already exists",
-        path: "handle",
-      }]);
+      throw new ValidationError("Product handle already exists", [
+        {
+          type: "not_unique",
+          message: "Product handle already exists",
+          path: "handle",
+        },
+      ]);
     }
 
     return input.handle;
@@ -148,7 +183,7 @@ export class UpdateProductProcess
   async updateProduct(
     input: UpdateProductProcessInput,
     category: { id: string } | null,
-    handle: string | undefined
+    handle: string | undefined,
   ) {
     this.logger.info("Updating product", { input });
 
@@ -165,43 +200,15 @@ export class UpdateProductProcess
       category_id?: string | null;
       attribute_group_id?: string | null;
       metadata?: unknown;
-    } = {};
-
-    if (input.title !== undefined) {
-      updateData.title = input.title;
-    }
-
-    if (handle !== undefined) {
-      updateData.handle = handle;
-    }
-
-
-    if (input.description !== undefined) {
-      updateData.description = input.description ?? null;
-    }
-
-    if (input.is_giftcard !== undefined) {
-      updateData.is_giftcard = input.is_giftcard;
-    }
-
-    if (input.discountable !== undefined) {
-      updateData.discountable = input.discountable;
-    }
-
-    if (input.status !== undefined) {
-      updateData.status = input.status as ProductStatusEnum;
-    }
-
-    if (input.thumbnail !== undefined) {
-      updateData.thumbnail = input.thumbnail ?? null;
-    }
-    if (input.thumbnail_media_id === null) {
-      updateData.thumbnail = null;
-    }
-
-    if (input.external_id !== undefined) {
-      updateData.external_id = input.external_id ?? null;
-    }
+    } = {
+      title: input.title,
+      handle: input.handle,
+      description: input.description,
+      is_giftcard: input.is_giftcard,
+      discountable: input.discountable,
+      status: input.status as ProductStatusEnum,
+      external_id: input.external_id,
+    };
 
     if (input.category_id !== undefined) {
       updateData.category_id = category?.id ?? null;
@@ -242,17 +249,23 @@ export class UpdateProductProcess
     const found = new Set(existing.map((r) => r.id));
     const missing = groupIds.filter((id) => !found.has(id));
     if (missing.length > 0) {
-      throw new ValidationError("One or more attribute groups not found", [{
-        type: "not_found",
-        message: `Attribute groups not found: ${missing.join(", ")}`,
-        path: "attribute_groups",
-      }]);
+      throw new ValidationError("One or more attribute groups not found", [
+        {
+          type: "not_found",
+          message: `Attribute groups not found: ${missing.join(", ")}`,
+          path: "attribute_groups",
+        },
+      ]);
     }
   }
 
   async validateAttributeValuesForGroups(
     productId: string,
-    attributes: Array<{ attribute_group_id: string; attribute_id: string; value: string }>
+    attributes: Array<{
+      attribute_group_id: string;
+      attribute_id: string;
+      value: string;
+    }>,
   ) {
     if (attributes.length === 0) return;
     const attrIds = [...new Set(attributes.map((a) => a.attribute_id))];
@@ -265,24 +278,32 @@ export class UpdateProductProcess
     const foundAttrs = new Set(existingAttrs.map((r) => r.id));
     const missingAttrs = attrIds.filter((id) => !foundAttrs.has(id));
     if (missingAttrs.length > 0) {
-      throw new ValidationError("One or more attributes not found", [{
-        type: "not_found",
-        message: `Attributes not found: ${missingAttrs.join(", ")}`,
-        path: "attributes",
-      }]);
+      throw new ValidationError("One or more attributes not found", [
+        {
+          type: "not_found",
+          message: `Attributes not found: ${missingAttrs.join(", ")}`,
+          path: "attributes",
+        },
+      ]);
     }
     const groupAttrPairs = await this.db
       .selectFrom("product_attribute_group_relations")
       .select(["attribute_group_id", "product_attribute_id"])
       .execute();
-    const validPairs = new Set(groupAttrPairs.map((r) => `${r.attribute_group_id}:${r.product_attribute_id}`));
+    const validPairs = new Set(
+      groupAttrPairs.map(
+        (r) => `${r.attribute_group_id}:${r.product_attribute_id}`,
+      ),
+    );
     for (const a of attributes) {
       if (!validPairs.has(`${a.attribute_group_id}:${a.attribute_id}`)) {
-        throw new ValidationError("Attribute not assigned to group", [{
-          type: "invalid",
-          message: `Attribute ${a.attribute_id} is not assigned to group ${a.attribute_group_id}`,
-          path: "attributes",
-        }]);
+        throw new ValidationError("Attribute not assigned to group", [
+          {
+            type: "invalid",
+            message: `Attribute ${a.attribute_id} is not assigned to group ${a.attribute_group_id}`,
+            path: "attributes",
+          },
+        ]);
       }
     }
     const productGroupIds = await this.db
@@ -293,18 +314,24 @@ export class UpdateProductProcess
       .then((rows) => new Set(rows.map((r) => r.attribute_group_id)));
     for (const a of attributes) {
       if (!productGroupIds.has(a.attribute_group_id)) {
-        throw new ValidationError("Product must be linked to attribute group", [{
-          type: "invalid",
-          message: `Product is not linked to group ${a.attribute_group_id}. Set attribute_groups first.`,
-          path: "attributes",
-        }]);
+        throw new ValidationError("Product must be linked to attribute group", [
+          {
+            type: "invalid",
+            message: `Product is not linked to group ${a.attribute_group_id}. Set attribute_groups first.`,
+            path: "attributes",
+          },
+        ]);
       }
     }
   }
 
   async syncAttributeGroupRelations(
     productId: string,
-    groups: Array<{ attribute_group_id: string; required?: boolean; rank?: number }>
+    groups: Array<{
+      attribute_group_id: string;
+      required?: boolean;
+      rank?: number;
+    }>,
   ) {
     await this.db
       .deleteFrom("product_attribute_group_relations")
@@ -322,18 +349,26 @@ export class UpdateProductProcess
           attribute_group_id: g.attribute_group_id,
           required: g.required ?? false,
           rank: g.rank ?? i,
-        }))
+        })),
       )
       .execute();
   }
 
   async syncAttributeValues(
     productId: string,
-    attributes: Array<{ attribute_group_id: string; attribute_id: string; value: string }>
+    attributes: Array<{
+      attribute_group_id: string;
+      attribute_id: string;
+      value: string;
+    }>,
   ) {
     await this.db
       .deleteFrom("product_attribute_values")
-      .where("id", "in", attributes.map((a) => a.attribute_id))
+      .where(
+        "id",
+        "in",
+        attributes.map((a) => a.attribute_id),
+      )
       .execute();
 
     if (attributes.length === 0) return;
@@ -365,11 +400,13 @@ export class UpdateProductProcess
     const found = new Set(existing.map((r) => r.id));
     const missing = tagIds.filter((id) => !found.has(id));
     if (missing.length > 0) {
-      throw new ValidationError("One or more tags not found", [{
-        type: "not_found",
-        message: `Tags not found: ${missing.join(", ")}`,
-        path: "tag_ids",
-      }]);
+      throw new ValidationError("One or more tags not found", [
+        {
+          type: "not_found",
+          message: `Tags not found: ${missing.join(", ")}`,
+          path: "tag_ids",
+        },
+      ]);
     }
   }
 
@@ -403,11 +440,13 @@ export class UpdateProductProcess
     const found = new Set(existing.map((r) => r.id));
     const missing = collectionIds.filter((id) => !found.has(id));
     if (missing.length > 0) {
-      throw new ValidationError("One or more collections not found", [{
-        type: "not_found",
-        message: `Collections not found: ${missing.join(", ")}`,
-        path: "collection_ids",
-      }]);
+      throw new ValidationError("One or more collections not found", [
+        {
+          type: "not_found",
+          message: `Collections not found: ${missing.join(", ")}`,
+          path: "collection_ids",
+        },
+      ]);
     }
   }
 
@@ -426,7 +465,9 @@ export class UpdateProductProcess
     await this.db
       .insertInto("product_collection_relations")
       .values(relations)
-      .onConflict((oc) => oc.columns(["product_id", "product_collection_id"]).doNothing())
+      .onConflict((oc) =>
+        oc.columns(["product_id", "product_collection_id"]).doNothing(),
+      )
       .execute();
   }
 
@@ -441,11 +482,13 @@ export class UpdateProductProcess
     const found = new Set(existing.map((r) => r.id));
     const missing = salesChannelIds.filter((id) => !found.has(id));
     if (missing.length > 0) {
-      throw new ValidationError("One or more sales channels not found", [{
-        type: "not_found",
-        message: `Sales channels not found: ${missing.join(", ")}`,
-        path: "sales_channel_ids",
-      }]);
+      throw new ValidationError("One or more sales channels not found", [
+        {
+          type: "not_found",
+          message: `Sales channels not found: ${missing.join(", ")}`,
+          path: "sales_channel_ids",
+        },
+      ]);
     }
   }
 
@@ -464,13 +507,17 @@ export class UpdateProductProcess
           id: randomUUID(),
           product_id: productId,
           sales_channel_id,
-        }))
+        })),
       )
       .onConflict((oc) => oc.doNothing())
       .execute();
   }
 
-  async syncProductMedia(productId: string, mediaIds?: string[], thumbnailMediaId?: string | null) {
+  async syncProductMedia(
+    productId: string,
+    mediaIds?: string[],
+    thumbnailMediaId?: string | null,
+  ) {
     const mediaDb = this.db as any;
     const ids = new Set<string>(mediaIds ?? []);
     if (thumbnailMediaId) {
