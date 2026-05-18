@@ -59,8 +59,8 @@
 			.get({ query: { limit: 100 } as Record<string, unknown> })
 			.then((res) => {
 				if (res.error) return;
-				const rows = ((res.data as { data?: { rows?: Role[] } } | null)?.data?.rows ??
-					[]) as Role[];
+				const payload = res.data as { rows?: Role[]; data?: { rows?: Role[] } } | null;
+				const rows = (payload?.rows ?? payload?.data?.rows ?? []) as Role[];
 				if (rows.length > 0) roles = rows;
 			})
 			.catch(() => {});

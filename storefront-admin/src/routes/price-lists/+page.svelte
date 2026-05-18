@@ -40,7 +40,7 @@
 	// 	const id = (item as { id?: string }).id;
 	// 	if (!id) return;
 	// 	goto(resolve(`/price-lists/${id}?edit=true`, {}));
-	// }okp;≥æ/p₹
+	// }
 
 	const rows = $derived(data?.priceLists?.rows ?? []);
 	const pagination = $derived(data?.priceLists?.pagination ?? null);
@@ -52,7 +52,12 @@
 	const deleteError = $derived(paginateState.deleteError);
 	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
 	const tableColumns: TableColumn[] = [
-		{ label: 'Name', key: 'name', type: 'text' },
+		{
+			label: 'Name',
+			key: 'name',
+			type: 'link',
+			cellHref: (row) => `/price-lists/${String((row as { id?: string }).id ?? '')}`
+		},
 		{ label: 'Type', key: 'type', type: 'text' },
 		{ label: 'Status', key: 'status', type: 'text' },
 		{ label: 'Starts', key: 'starts_at', type: 'date' },

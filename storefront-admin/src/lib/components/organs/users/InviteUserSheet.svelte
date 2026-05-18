@@ -4,6 +4,7 @@
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import MultiSelectCombobox from '$lib/components/organs/multi-select-combobox/multi-select-combobox.svelte';
 	import { client } from '$lib/client.js';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	type Role = {
 		id: string;
@@ -13,6 +14,8 @@
 		updated_at: Date;
 		deleted_at: Date | null;
 	};
+
+	const SEARCH_DEBOUNCE_MS = 320;
 
 	let {
 		open = $bindable(false),
@@ -25,11 +28,15 @@
 	let email = $state('');
 	let roleIds = $state<string[]>([]);
 	let roles = $state<Role[]>([]);
-	let loading = $state(false);
+	let roleLabelCache = $state<Record<string, string>>({});
+	let rolesLoading = $state(false);
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
 
 	let prevOpen = $state(false);
+
+	let rolesFetchGeneration = $state(0);
+	let rolesSearchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 
 	function parseClientError(
 		result: { error?: { value?: { message?: string } } },
@@ -39,29 +46,76 @@
 		return typeof msg === 'string' && msg.trim().length > 0 ? msg : fallback;
 	}
 
+	function mergeCachedLabels(rows: Role[]) {
+		const next = { ...roleLabelCache };
+		for (const r of rows) next[r.id] = r.name;
+		roleLabelCache = next;
+	}
+
+	async function fetchRoles(search: string) {
+		const gen = ++rolesFetchGeneration;
+		rolesLoading = true;
+		try {
+			const res = await client.roles.get({
+				query: {
+					search: search.trim(),
+					limit: 50,
+					page: 1
+				} as Record<string, unknown>
+			});
+			if (gen !== rolesFetchGeneration) return;
+			if (res.error) {
+				throw new Error(parseClientError(res, 'Failed to load roles'));
+			}
+			const rows = ((res.data as { rows?: Role[] } | null)?.rows ?? []) as Role[];
+			roles = rows;
+			mergeCachedLabels(rows);
+		} catch (e) {
+			if (gen !== rolesFetchGeneration) return;
+			error = e instanceof Error ? e.message : String(e);
+			roles = [];
+		} finally {
+			if (gen === rolesFetchGeneration) rolesLoading = false;
+		}
+	}
+
+	function scheduleRoleSearch(query: string) {
+		clearTimeout(rolesSearchDebounceTimer);
+		rolesSearchDebounceTimer = setTimeout(() => {
+			void fetchRoles(query);
+		}, SEARCH_DEBOUNCE_MS);
+	}
+
 	$effect(() => {
 		const justOpened = open && !prevOpen;
 		prevOpen = open;
 		if (!justOpened) return;
 
+		clearTimeout(rolesSearchDebounceTimer);
+		rolesSearchDebounceTimer = undefined;
+
 		email = '';
 		roleIds = [];
+		roles = [];
+		roleLabelCache = {};
 		error = null;
-		loading = true;
-		client.roles
-			.get({ query: { limit: 100 } as Record<string, unknown> })
-			.then((res) => {
-				if (res.error) {
-					throw new Error(parseClientError(res, 'Failed to load roles'));
-				}
-				roles = ((res.data as { rows?: Role[] } | null)?.rows ?? []) as Role[];
-			})
-			.catch((e) => {
-				error = e instanceof Error ? e.message : String(e);
-			})
-			.finally(() => {
-				loading = false;
-			});
+		rolesLoading = false;
+		rolesFetchGeneration++;
+	});
+
+	$effect(() => {
+		if (!open) {
+			clearTimeout(rolesSearchDebounceTimer);
+		}
+	});
+
+	const roleComboboxOptions = $derived.by(() => {
+		const map = new SvelteMap<string, { id: string; value: string }>();
+		for (const r of roles) map.set(r.id, { id: r.id, value: r.name });
+		for (const id of roleIds) {
+			if (!map.has(id)) map.set(id, { id, value: roleLabelCache[id] ?? id });
+		}
+		return [...map.values()];
 	});
 
 	async function submit() {
@@ -120,17 +174,18 @@
 					</div>
 					<div class="space-y-2">
 						<label for="invite-role" class="block text-sm font-medium">Role (optional)</label>
-						{#if loading}
-							<p class="text-sm text-muted-foreground">Loading roles…</p>
-						{:else}
-							<MultiSelectCombobox
-								id="invite-role"
-								options={roles.map((r) => ({ id: r.id, value: r.name }))}
-								bind:value={roleIds}
-								placeholder="Select role"
-								disabled={submitting}
-							/>
-						{/if}
+						<MultiSelectCombobox
+							id="invite-role"
+							options={roleComboboxOptions}
+							filterFn={(opts) => opts}
+							bind:value={roleIds}
+							placeholder="Search roles…"
+							disabled={submitting}
+							loading={rolesLoading}
+							emptyMessage="No roles match your search."
+							onOpen={() => void fetchRoles('')}
+							onSearchChange={(query) => scheduleRoleSearch(query)}
+						/>
 					</div>
 					{#if error}
 						<p class="text-sm text-destructive">{error}</p>

@@ -58,6 +58,17 @@ export class PaginatedRolesProcess
       .selectFrom("roles")
       .where("deleted_at", "is", null);
 
+    const search = input.search?.trim();
+    if (search) {
+      const term = `%${search}%`;
+      query = query.where((eb) =>
+        eb.or([
+          eb("name", "ilike", term),
+          eb("description", "ilike", term),
+        ]),
+      );
+    }
+
     const countResult = await query
       .select(({ fn }) => fn.count<number>("id").as("count"))
       .executeTakeFirst();

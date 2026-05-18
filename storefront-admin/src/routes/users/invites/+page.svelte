@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { PageData } from './$types';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
 		PaginationTable,
@@ -7,7 +6,6 @@
 		TablePagination,
 		type TableColumn
 	} from '$lib/components/organs/index.js';
-	import InviteCreateSheet from '$lib/components/organs/invite/create/inviteCreate.svelte';
 	import Mail from '@lucide/svelte/icons/mail';
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import { page } from '$app/state';
@@ -15,8 +13,7 @@
 	import { client } from '$lib/client.js';
 	import { resolve } from '$app/paths';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
-
-	let { data }: { data: PageData } = $props();
+	import InviteUserSheet from '$lib/components/organs/users/InviteUserSheet.svelte';
 
 	type InviteRow = (typeof invites)[number];
 
@@ -127,7 +124,9 @@
 			</div>
 			<Button size="sm" onclick={() => (inviteOpen = true)}>Invite user</Button>
 		</div>
-		<PaginationTable>
+		<PaginationTable searchPlaceholder="Search invites">
+			<InviteUserSheet bind:open={inviteOpen} onInvited={() => paginateState.refetch()} />
+
 			{#if resendError}
 				<div
 					class="mb-4 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
@@ -207,8 +206,3 @@
 		</PaginationTable>
 	</div>
 </div>
-<InviteCreateSheet
-	bind:open={inviteOpen}
-	formData={data.inviteCreateForm.data as { email: string; role_ids: string[] }}
-	onSuccess={() => paginateState.refetch()}
-/>
