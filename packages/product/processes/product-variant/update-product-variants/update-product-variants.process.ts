@@ -7,6 +7,7 @@ import {
   type ProcessContract,
   ValidationError,
 } from "@danimai/core";
+import { randomUUID } from "node:crypto";
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
@@ -40,8 +41,8 @@ export class UpdateProductVariantsProcess
 
   /**
    * Executes the process business logic.
-   * Updates only product_variants fields; does not touch prices, media, or
-   * option-value relations.
+   * Updates product_variants fields and optionally upserts base prices.
+   * Does not touch media or option-value relations.
    */
   async runOperations(
     @ProcessContext({
@@ -55,6 +56,10 @@ export class UpdateProductVariantsProcess
     const product = await this.validateProduct(input);
 
     await this.updateProductVariant(this.db, input, product);
+
+    if (input.prices !== undefined) {
+      await this.upsertVariantPrices(this.db, input.id, input.prices);
+    }
 
     return undefined;
   }
@@ -182,5 +187,69 @@ export class UpdateProductVariantsProcess
       .where("id", "=", input.id)
       .where("deleted_at", "is", null)
       .execute();
+  }
+
+  async upsertVariantPrices(
+    trx: Kysely<Database>,
+    variantId: string,
+    prices: NonNullable<UpdateProductVariantProcessInput["prices"]>,
+  ) {
+    if (prices.length === 0) {
+      return;
+    }
+
+    let priceSet = await trx
+      .selectFrom("price_sets")
+      .where("variant_id", "=", variantId)
+      .where("deleted_at", "is", null)
+      .selectAll()
+      .executeTakeFirst();
+
+    if (!priceSet) {
+      priceSet = await trx
+        .insertInto("price_sets")
+        .values({
+          id: randomUUID(),
+          variant_id: variantId,
+          metadata: null,
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+    }
+
+    for (const price of prices) {
+      const currencyCode = price.currency_code.toLowerCase();
+      const existing = await trx
+        .selectFrom("prices")
+        .where("price_set_id", "=", priceSet.id)
+        .where("currency_code", "=", currencyCode)
+        .where("price_list_id", "is", null)
+        .where("deleted_at", "is", null)
+        .selectAll()
+        .executeTakeFirst();
+
+      if (existing) {
+        await trx
+          .updateTable("prices")
+          .set({ amount: price.amount.toString() })
+          .where("id", "=", existing.id)
+          .execute();
+        continue;
+      }
+
+      await trx
+        .insertInto("prices")
+        .values({
+          id: randomUUID(),
+          price_set_id: priceSet.id,
+          amount: price.amount.toString(),
+          currency_code: currencyCode,
+          min_quantity: price.min_quantity ?? null,
+          max_quantity: price.max_quantity ?? null,
+          price_list_id: price.price_list_id ?? null,
+          metadata: null,
+        })
+        .execute();
+    }
   }
 }

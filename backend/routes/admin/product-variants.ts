@@ -31,10 +31,20 @@ import {
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
+const ProductVariantPriceBodySchema = Type.Object({
+  amount: Type.Number(),
+  currency_code: Type.String(),
+  min_quantity: Type.Optional(Type.Number()),
+  max_quantity: Type.Optional(Type.Number()),
+  price_list_id: Type.Optional(Type.String({ format: "uuid" })),
+});
+
 const UpdateProductVariantBodySchema = Type.Object({
   title: Type.Optional(Type.String()),
   sku: Type.Optional(Type.String()),
   barcode: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  ean: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  upc: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   allow_backorder: Type.Optional(Type.Boolean()),
   manage_inventory: Type.Optional(Type.Boolean()),
   variant_rank: Type.Optional(Type.Number()),
@@ -42,6 +52,7 @@ const UpdateProductVariantBodySchema = Type.Object({
   thumbnail_media_id: Type.Optional(Type.Union([Type.String({ format: "uuid" }), Type.Null()])),
   media_ids: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
+  prices: Type.Optional(Type.Array(ProductVariantPriceBodySchema)),
 });
 
 export const productVariantRoutes = new Elysia({ prefix: "/product-variants" })

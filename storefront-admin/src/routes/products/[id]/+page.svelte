@@ -14,11 +14,11 @@
 		JSONComponent
 	} from '$lib/components/organs/index.js';
 	import { resolve } from '$app/paths';
-	import type { PageData } from './$types';
+	import type { ProductDetailPageData } from '$lib/components/organs/product/product-detail-forms.js';
 	import { setDetailContext, useDetailQuery } from '$lib/hooks';
 	import { client } from '$lib/client';
 
-	let { data }: { data: PageData } = $props();
+	let { data }: { data: ProductDetailPageData } = $props();
 
 	const productId = $derived(page.params?.id ?? '');
 	const detailQuery = useDetailQuery(async () => {
@@ -83,7 +83,7 @@
 					<div class="flex min-w-0 flex-col gap-6">
 						<ProductMediaCard productId={product?.id as string} />
 
-						<ProductVariant />
+						<ProductVariant productVariantUpdateForm={data.productVariantUpdateForm} />
 					</div>
 
 					<div

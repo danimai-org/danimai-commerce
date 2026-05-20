@@ -18,6 +18,14 @@
 	import type { TableColumn } from '$lib/components/organs/index.js';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { client, deleteProductVariants, postReplaceProductVariants } from '$lib/client.js';
+	import type { SuperValidated } from 'sveltekit-superforms';
+	import type { ProductVariantUpdateFormData } from '$lib/components/organs/product/product-detail-forms.js';
+
+	let {
+		productVariantUpdateForm
+	}: {
+		productVariantUpdateForm: SuperValidated<ProductVariantUpdateFormData>;
+	} = $props();
 
 	type ProductOptionValue = { id?: string; value?: string };
 	type ProductOption = {
@@ -74,16 +82,6 @@
 
 	let editVariantOpen = $state(false);
 	let editingVariant = $state<ProductVariantRow | null>(null);
-	let editVariantTitle = $state('');
-	let editVariantSize = $state('');
-	let editVariantMaterial = $state('');
-	let editVariantSku = $state('');
-	let editVariantEan = $state('');
-	let editVariantUpc = $state('');
-	let editVariantBarcode = $state('');
-	let editVariantPrice = $state('');
-	let editVariantError = $state<string | null>(null);
-	let editVariantSubmitting = $state(false);
 
 	const optionRefs = $derived(options.map((o) => ({ id: o.id, title: o.title })));
 
@@ -109,42 +107,6 @@
 
 	async function openEditVariantSheet(variant: ProductVariantRow) {
 		editingVariant = variant;
-		editVariantTitle = variant.title ?? '';
-		editVariantSku = variant.sku ?? '';
-		editVariantEan = variant.ean ?? '';
-		editVariantUpc = variant.upc ?? '';
-		editVariantBarcode = variant.barcode ?? '';
-		editVariantMaterial = '';
-		editVariantPrice = '';
-		editVariantError = null;
-
-		const entries = getVariantOptionEntries(variant, optionRefs);
-		editVariantSize = options.length === 1 && entries[0]?.value ? entries[0].value : '';
-
-		const cachedPrice = variantPricesMap.get(variant.id);
-		if (cachedPrice) {
-			editVariantPrice = (parseFloat(cachedPrice) / 100).toString();
-		}
-
-		try {
-			const res = await client['product-variants']({ id: variant.id }).get();
-			if (!res.error && res.data) {
-				const eurPrice = res.data.prices?.find(
-					(p) => p.currency_code?.toLowerCase() === 'eur'
-				)?.amount;
-				if (eurPrice) {
-					editVariantPrice = (parseFloat(eurPrice) / 100).toFixed(2);
-				}
-				const metadata = res.data.metadata;
-				if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
-					const material = (metadata as Record<string, unknown>).material;
-					if (typeof material === 'string') editVariantMaterial = material;
-				}
-			}
-		} catch {
-			// use row defaults
-		}
-
 		editVariantOpen = true;
 	}
 
@@ -154,52 +116,14 @@
 	}
 
 	function closeEditVariantSheet() {
-		if (editVariantSubmitting) return;
 		editVariantOpen = false;
 		editingVariant = null;
-		editVariantError = null;
 	}
 
-	async function submitEditVariant() {
-		const variant = editingVariant;
-		if (!variant?.id || editVariantSubmitting) return;
-		editVariantSubmitting = true;
-		editVariantError = null;
-		try {
-			let finalTitle = editVariantTitle.trim() || variant.title;
-			if (options.length === 1 && editVariantSize.trim()) {
-				finalTitle = editVariantSize.trim();
-			}
-
-			const trimmedSku = editVariantSku.trim();
-			const trimmedBarcode = editVariantBarcode.trim();
-			const body = {
-				title: finalTitle,
-				...(trimmedSku ? { sku: trimmedSku } : {}),
-				barcode: trimmedBarcode || null,
-				ean: editVariantEan.trim() || null,
-				upc: editVariantUpc.trim() || null,
-				allow_backorder: variant.allow_backorder ?? false,
-				manage_inventory: variant.manage_inventory,
-				...(editVariantMaterial.trim()
-					? { metadata: { material: editVariantMaterial.trim() } }
-					: {})
-			};
-
-			const response = await client['product-variants']({ id: variant.id }).put(body);
-			if (response.error) {
-				const err = response.error as { value?: { message?: string } };
-				throw new Error(err.value?.message ?? 'Failed to update variant');
-			}
-
-			closeEditVariantSheet();
-			await detailQuery?.refetch?.();
-			await loadVariants();
-		} catch (error) {
-			editVariantError = error instanceof Error ? error.message : String(error);
-		} finally {
-			editVariantSubmitting = false;
-		}
+	async function handleVariantSaved() {
+		closeEditVariantSheet();
+		await detailQuery?.refetch?.();
+		await loadVariants();
 	}
 
 	async function confirmDeleteVariant() {
@@ -586,25 +510,9 @@
 
 <ProductVariantEditSheet
 	bind:open={editVariantOpen}
+	{productVariantUpdateForm}
 	options={optionRefs}
-	{editVariantTitle}
-	{editVariantSize}
-	{editVariantMaterial}
-	{editVariantSku}
-	{editVariantEan}
-	{editVariantUpc}
-	{editVariantBarcode}
-	{editVariantPrice}
-	{editVariantError}
-	{editVariantSubmitting}
-	onTitleChange={(value) => (editVariantTitle = value)}
-	onSizeChange={(value) => (editVariantSize = value)}
-	onMaterialChange={(value) => (editVariantMaterial = value)}
-	onSkuChange={(value) => (editVariantSku = value)}
-	onEanChange={(value) => (editVariantEan = value)}
-	onUpcChange={(value) => (editVariantUpc = value)}
-	onBarcodeChange={(value) => (editVariantBarcode = value)}
-	onPriceChange={(value) => (editVariantPrice = value)}
-	onCancel={closeEditVariantSheet}
-	onSave={submitEditVariant}
+	variant={editingVariant}
+	{variantPricesMap}
+	onSaved={handleVariantSaved}
 />

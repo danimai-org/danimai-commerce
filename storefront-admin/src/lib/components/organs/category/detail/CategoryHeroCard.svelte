@@ -30,9 +30,8 @@
 	const categoryDescription = $derived(getDescription());
 </script>
 
-<div class="w-full min-w-0 lg:min-h-0 lg:flex-1">
-	<div class="flex flex-col gap-6">
-		<div class="rounded-lg border bg-card p-8 shadow-sm">
+<div class="flex h-full min-w-0 flex-1 flex-col">
+	<div class="flex h-full flex-1 flex-col rounded-lg border bg-card p-8 shadow-sm">
 			<div class="flex items-start justify-between gap-4">
 				<div class="space-y-6">
 					<div class="flex flex-wrap items-center gap-2">
@@ -81,7 +80,6 @@
 				</Button>
 			</div>
 		</div>
-	</div>
 </div>
 <EditCategoryHero
 	bind:open={formSheetOpen}

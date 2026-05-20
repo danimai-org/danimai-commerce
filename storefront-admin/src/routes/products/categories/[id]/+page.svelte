@@ -68,7 +68,7 @@
 		</div>
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
-			<div class="flex flex-col gap-6 p-6 lg:flex-row lg:items-start">
+			<div class="flex flex-col gap-3 p-6 lg:min-h-0 lg:flex-row lg:items-stretch">
 				<CategoryHeroCard />
 				<CategoryStatusCard
 					{category}

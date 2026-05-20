@@ -2,6 +2,7 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { client } from '$lib/client';
 	import { getDetailContext } from '$lib/hooks';
+	import { cn } from '$lib/utils.js';
 	import type { Product } from '../type';
 
 	const detailQuery = getDetailContext<Product>();
@@ -61,16 +62,22 @@
 		return s;
 	}
 
+	function statusBadgeClass(s: string | undefined): string {
+		if (s === 'published') return 'bg-green-500/10 text-green-700 dark:text-green-400';
+		if (s === 'proposed') return 'bg-amber-500/10 text-amber-700 dark:text-amber-400';
+		if (s === 'rejected') return 'bg-red-500/10 text-red-700 dark:text-red-400';
+		return 'bg-muted text-muted-foreground';
+	}
+
 	function statusDotClass(s: string | undefined): string {
-		if (s === 'published') return 'bg-emerald-500';
-		if (s === 'draft' || !s) return 'bg-muted-foreground/60';
-		if (s === 'proposed') return 'bg-amber-500';
-		if (s === 'rejected') return 'bg-red-500';
+		if (s === 'published') return 'bg-green-600';
+		if (s === 'proposed') return 'bg-amber-600';
+		if (s === 'rejected') return 'bg-red-600';
 		return 'bg-muted-foreground/60';
 	}
 </script>
 
-<div class="rounded-lg border border-gray-300 bg-card p-6 shadow-sm">
+<div class="min-w-0 rounded-lg border bg-card p-6 shadow-sm">
 	<h2 class="mb-4 font-semibold">Status</h2>
 	<Select.Root
 		type="single"
@@ -80,43 +87,30 @@
 				void updateStatus(v);
 			}
 		}}
+		disabled={submitting}
 	>
-		<Select.Trigger class="w-full">
-			<span class="flex items-center gap-2">
+		<Select.Trigger class="h-9 w-full">
+			<span
+				class={cn(
+					'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium',
+					statusBadgeClass(localStatus)
+				)}
+			>
 				<span
-					class={`inline-block size-2 shrink-0 rounded-full ${statusDotClass(localStatus)}`}
+					class={cn('size-1.5 shrink-0 rounded-sm', statusDotClass(localStatus))}
 					aria-hidden="true"
 				></span>
-				<span>{statusLabel(localStatus)}</span>
+				{statusLabel(localStatus)}
 			</span>
 		</Select.Trigger>
-		<Select.Content>
-			<Select.Item value="published" label="Active">
-				<span class="flex items-center gap-2">
-					<span class="inline-block size-2 shrink-0 rounded-full bg-emerald-500"></span>
-					<span>Active</span>
-				</span>
-			</Select.Item>
-			<Select.Item value="draft" label="Draft">
-				<span class="flex items-center gap-2">
-					<span class="inline-block size-2 shrink-0 rounded-full bg-muted-foreground/60"></span>
-					<span>Draft</span>
-				</span>
-			</Select.Item>
-			<Select.Item value="proposed" label="Unlisted">
-				<span class="flex items-center gap-2">
-					<span class="inline-block size-2 shrink-0 rounded-full bg-amber-500"></span>
-					<span>Unlisted</span>
-				</span>
-			</Select.Item>
-			<Select.Item value="rejected" label="Rejected">
-				<span class="flex items-center gap-2">
-					<span class="inline-block size-2 shrink-0 rounded-full bg-red-500"></span>
-					<span>Rejected</span>
-				</span>
-			</Select.Item>
+		<Select.Content class="min-w-[var(--bits-select-anchor-width)]">
+			<Select.Item value="published" label="Active">Active</Select.Item>
+			<Select.Item value="draft" label="Draft">Draft</Select.Item>
+			<Select.Item value="proposed" label="Unlisted">Unlisted</Select.Item>
+			<Select.Item value="rejected" label="Rejected">Rejected</Select.Item>
 		</Select.Content>
 	</Select.Root>
+
 	<h2 class="mt-6 mb-4 font-semibold">Visibility</h2>
 	<Select.Root
 		type="single"
@@ -125,11 +119,12 @@
 			if (v === 'public') void updateStatus('published');
 			if (v === 'private') void updateStatus('draft');
 		}}
+		disabled={submitting}
 	>
-		<Select.Trigger class="w-full">
-			{localStatus === 'published' ? 'Public' : 'Private'}
+		<Select.Trigger class="h-9 w-full">
+			<span class="text-sm">{localStatus === 'published' ? 'Public' : 'Private'}</span>
 		</Select.Trigger>
-		<Select.Content>
+		<Select.Content class="min-w-[var(--bits-select-anchor-width)]">
 			<Select.Item value="public" label="Public">Public</Select.Item>
 			<Select.Item value="private" label="Private">Private</Select.Item>
 		</Select.Content>
