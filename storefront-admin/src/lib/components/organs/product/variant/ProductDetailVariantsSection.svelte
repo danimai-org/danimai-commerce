@@ -42,9 +42,16 @@
 		values?: Array<{ id?: string; value?: string }>;
 	};
 
+	type OptionValueOverride = {
+		optionId: string;
+		title: string;
+		values: string[];
+	};
+
 	let {
 		variants = [],
 		options = [],
+		optionValueOverrides = null,
 		variantPricesMap = new Map<string, string>(),
 		loading = false,
 		onEditVariant = () => {},
@@ -53,6 +60,7 @@
 	}: {
 		variants?: ProductVariant[];
 		options?: ProductOption[];
+		optionValueOverrides?: OptionValueOverride[] | null;
 		variantPricesMap?: Map<string, string>;
 		loading?: boolean;
 		onEditVariant?: (row: Record<string, unknown>) => void;
@@ -67,7 +75,19 @@
 	let variantSearchQuery = $state('');
 
 	const optionsWithValues = $derived.by(() => {
+		if (optionValueOverrides && optionValueOverrides.length > 0) {
+			return optionValueOverrides.map((entry) => ({
+				option: {
+					id: entry.optionId,
+					title: entry.title,
+					product_id: null
+				},
+				values: entry.values
+			}));
+		}
+
 		if (options.length === 0) return [] as { option: ProductOption; values: string[] }[];
+
 		return options.map((opt, optIndex) => {
 			const valuesSet = new SvelteSet<string>();
 			if (Array.isArray(opt.values) && opt.values.length > 0) {

@@ -90,6 +90,53 @@ export class CreateProductVariantsProcess implements ProcessContract<
         ]);
       }
 
+      // Replace semantics: remove current variants and option values for this product
+      // before inserting the new set (avoids duplicate variant rows on each save).
+      const existingVariants = await trx
+        .selectFrom("product_variants")
+        .where("product_id", "=", input.product_id)
+        .where("deleted_at", "is", null)
+        .select("id")
+        .execute();
+
+      const existingVariantIds = existingVariants.map((row) => row.id);
+      if (existingVariantIds.length > 0) {
+        // price_sets / prices live in pricing schema; trx is widened like attachMediaToOwner below.
+        const pricingDb = trx as any;
+
+        const existingPriceSets = await pricingDb
+          .selectFrom("price_sets")
+          .where("variant_id", "in", existingVariantIds)
+          .select("id")
+          .execute();
+
+        const existingPriceSetIds = (existingPriceSets as { id: string }[]).map(
+          (ps) => ps.id,
+        );
+
+        if (existingPriceSetIds.length > 0) {
+          await pricingDb
+            .deleteFrom("prices")
+            .where("price_set_id", "in", existingPriceSetIds)
+            .execute();
+
+          await pricingDb
+            .deleteFrom("price_sets")
+            .where("id", "in", existingPriceSetIds)
+            .execute();
+        }
+
+        await trx
+          .deleteFrom("product_variants")
+          .where("id", "in", existingVariantIds)
+          .execute();
+      }
+
+      await trx
+        .deleteFrom("product_option_values")
+        .where("product_id", "=", input.product_id)
+        .execute();
+
       // Reuse existing global product_options by title (case-insensitive),
       // create rows for any titles that don't yet exist, then insert
       // per-product product_option_values keyed by (option_id, product_id).
