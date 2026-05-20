@@ -48,26 +48,25 @@ export class PaginatedProductAttributesProcess
       sorting_direction = SortOrder.DESC,
       search,
     } = input;
-    const { attribute_group_id } = input.filters ?? {};
-    console.log("attribute_group_id", input)
+    const { category_id } = input.filters ?? {};
     let query = this.db
       .selectFrom("product_attributes")
       .where("product_attributes.deleted_at", "is", null);
 
-    if (attribute_group_id) {
+    if (category_id) {
       query = query.innerJoin(
-        "product_attribute_group_relations",
+        "product_category_attribute_relations",
         (join) =>
           join
             .onRef(
-              "product_attribute_group_relations.product_attribute_id",
+              "product_category_attribute_relations.product_attribute_id",
               "=",
               "product_attributes.id",
             )
             .on(
-              "product_attribute_group_relations.attribute_group_id",
+              "product_category_attribute_relations.category_id",
               "=",
-              attribute_group_id,
+              category_id,
             ),
       );
     }

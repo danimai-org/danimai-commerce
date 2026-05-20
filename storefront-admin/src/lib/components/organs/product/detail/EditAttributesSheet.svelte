@@ -2,30 +2,29 @@
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import { Combobox } from '$lib/components/organs/index.js';
+	import { Combobox, type ComboboxOption } from '$lib/components/organs/index.js';
 	import { client } from '$lib/client';
+	import { SvelteMap } from 'svelte/reactivity';
 	import type { SuperValidated } from 'sveltekit-superforms';
-	import { onMount } from 'svelte';
 
-	type ProductAttributeGroup = {
+	type ProductAttributesForm = {
 		id: string;
 		attributes: Array<{
-			attribute_group_id: string;
 			attribute_id: string;
-			attribute_group_title?: string;
 			value: string;
 		}>;
 	};
 
-	type ProductAttributeGroupRow = { id: string; title: string };
-	type ProductAttributeRow = { id: string; title: string; type: string; group_id: string };
+	type ProductAttributeRow = { id: string; title: string; type: string };
+	type CategoryOption = { id: string; value: string };
 
 	interface Props {
 		open?: boolean;
 		productId: string;
-		attributeGroupId?: string;
+		categoryId?: string;
+		categoryTitle?: string;
 		productAttributesForm: SuperValidated<
-			ProductAttributeGroup,
+			ProductAttributesForm,
 			string | unknown,
 			Record<string, unknown>
 		>;
@@ -35,20 +34,64 @@
 	let {
 		open = $bindable(false),
 		productId,
-		attributeGroupId = '',
+		categoryId = '',
+		categoryTitle = '',
 		productAttributesForm,
 		onSaved = async () => {}
 	}: Props = $props();
 
-	let loading = $state(false);
 	let saving = $state(false);
 	let saveError = $state('');
-	let attributeGroups = $state<ProductAttributeGroupRow[]>([]);
-	let groupAttributes = $state<ProductAttributeRow[]>([]);
-	let groupAttributesLoading = $state(false);
-	let groupSearchLoading = $state(false);
-	let selectedGroupId = $state('');
-	let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+	let categoryAttributes = $state<ProductAttributeRow[]>([]);
+	let categoryAttributesLoading = $state(false);
+
+	let selectedCategoryId = $state('');
+	let prevOpen = $state(false);
+	let controlsKey = 0;
+
+	let categorySearch = $state('');
+	let debouncedCategorySearch = $state('');
+	let categoryLoading = $state(false);
+	let categoryFetchGen = 0;
+	let fetchedCategories = $state<CategoryOption[]>([]);
+	let selectedCategorySnapshot = $state<CategoryOption | null>(null);
+
+	function uniqById(options: CategoryOption[]): CategoryOption[] {
+		const map = new SvelteMap<string, CategoryOption>();
+		for (const option of options) map.set(option.id, option);
+		return Array.from(map.values());
+	}
+
+	/** Dropdown: API results only while searching; include selected label when search is empty. */
+	const categoriesOptions = $derived.by((): ComboboxOption[] => {
+		const fromApi = fetchedCategories.map((c) => ({ id: c.id, value: c.value }));
+		if (categorySearch.trim()) return fromApi;
+		const snap = selectedCategorySnapshot;
+		if (snap && !fromApi.some((o) => o.id === snap.id)) {
+			return uniqById([...fromApi, snap]).map((c) => ({ id: c.id, value: c.value }));
+		}
+		return fromApi;
+	});
+
+	const categoryVerified = $derived(
+		!!selectedCategoryId && fetchedCategories.some((c) => c.id === selectedCategoryId)
+	);
+
+	const selectedCategoryLabel = $derived(
+		selectedCategorySnapshot?.value ??
+			fetchedCategories.find((c) => c.id === selectedCategoryId)?.value ??
+			''
+	);
+
+	const categorySearchStale = $derived(
+		categorySearch.trim() !== debouncedCategorySearch.trim()
+	);
+
+	const categoryComboboxLoading = $derived(categorySearchStale || categoryLoading);
+
+	const passthroughComboboxFilter: (opts: ComboboxOption[], _query: string) => ComboboxOption[] = (
+		opts
+	) => opts;
 
 	function pickLabel(item: { title?: string; value?: string; name?: string }): string {
 		return item.title ?? item.value ?? item.name ?? '';
@@ -64,65 +107,115 @@
 		return [];
 	}
 
-	async function searchAttributeGroups(search: string = '') {
-		groupSearchLoading = true;
-		try {
-			const res = await client['product-attribute-groups'].get({
-				query: { page: 1, limit: 100, search, sorting_field: 'created_at' }
-			});
-			const rows = extractRows<{ id: string; title?: string }>(res);
-			attributeGroups = rows.map((row) => ({ id: row.id, title: pickLabel(row) }));
-		} catch {
-			/* keep existing options on error */
-		} finally {
-			groupSearchLoading = false;
-		}
+	function buildCategoryQuery(search: string) {
+		return {
+			page: 1,
+			limit: 100,
+			sorting_field: 'created_at',
+			search: search.trim() || undefined
+		};
 	}
-
-	function handleGroupSearch(query: string) {
-		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
-		searchDebounceTimer = setTimeout(() => searchAttributeGroups(query), 300);
-	}
-
-	onMount(async () => {
-		loading = true;
-		await searchAttributeGroups('');
-		const existingGroupId =
-			attributeGroupId || productAttributesForm?.data?.attributes?.[0]?.attribute_group_id || '';
-		selectedGroupId = existingGroupId || attributeGroups[0]?.id || '';
-		loading = false;
-	});
-
-	const selectedGroupTitle = $derived(
-		attributeGroups.find((group) => group.id === selectedGroupId)?.title ?? 'Attribute Group'
-	);
-
-	const attributeGroupOptions = $derived(
-		attributeGroups.map((group) => ({ id: group.id, value: group.title }))
-	);
 
 	$effect(() => {
-		const groupId = selectedGroupId;
-		if (!groupId) return;
+		const q = categorySearch;
+		const t = setTimeout(() => {
+			debouncedCategorySearch = q;
+		}, 300);
+		return () => clearTimeout(t);
+	});
+
+	function fetchCategories(sheetOpen: boolean, searchDebounce: string) {
+		const gen = ++categoryFetchGen;
+		if (!sheetOpen) {
+			categoryLoading = false;
+			return;
+		}
+		categoryLoading = true;
+		fetchedCategories = [];
+		void (async () => {
+			try {
+				const res = await client['product-categories'].get({
+					query: buildCategoryQuery(searchDebounce)
+				});
+				if (gen !== categoryFetchGen) return;
+				fetchedCategories = extractRows<{ id: string; value: string }>(res).map((c) => ({
+					id: c.id,
+					value: c.value
+				}));
+			} catch {
+				if (gen === categoryFetchGen) fetchedCategories = [];
+			} finally {
+				if (gen === categoryFetchGen) categoryLoading = false;
+			}
+		})();
+	}
+
+	function selectCategory(optionId: string) {
+		if (!optionId) {
+			selectedCategoryId = '';
+			selectedCategorySnapshot = null;
+			return;
+		}
+		selectedCategoryId = optionId;
+		const match = fetchedCategories.find((c) => c.id === optionId);
+		if (match) selectedCategorySnapshot = match;
+	}
+
+	$effect(() => {
+		if (categoryLoading || categorySearchStale) return;
+		const search = debouncedCategorySearch.trim();
+		if (!search || !selectedCategoryId) return;
+		if (!fetchedCategories.some((c) => c.id === selectedCategoryId)) {
+			selectedCategoryId = '';
+			selectedCategorySnapshot = null;
+			categoryAttributes = [];
+		}
+	});
+
+	$effect(() => {
+		fetchCategories(open, debouncedCategorySearch);
+	});
+
+	$effect(() => {
+		if (open && !prevOpen) {
+			controlsKey += 1;
+			selectedCategoryId = categoryId;
+			selectedCategorySnapshot =
+				categoryId ?
+					{ id: categoryId, value: categoryTitle.trim() || categoryId }
+				:	null;
+			categorySearch = '';
+			debouncedCategorySearch = '';
+			fetchedCategories = [];
+			saveError = '';
+		}
+		prevOpen = open;
+	});
+
+	$effect(() => {
+		const catId = selectedCategoryId;
+		if (!catId || !open || !categoryVerified) {
+			categoryAttributes = [];
+			return;
+		}
 
 		let cancelled = false;
-		groupAttributesLoading = true;
+		categoryAttributesLoading = true;
 		(async () => {
 			try {
 				const res = await client['product-attributes'].get({
-					query: { page: 1, limit: 100, filters: { attribute_group_id: groupId } }
+					query: { page: 1, limit: 100, filters: { category_id: catId } }
 				});
 
 				if (cancelled) return;
 				const rows = extractRows<ProductAttributeRow>(res);
-				groupAttributes = rows.map((row) => ({
+				categoryAttributes = rows.map((row) => ({
 					id: row.id,
 					title: pickLabel(row),
-					type: row.type ?? 'text',
-					group_id: row.group_id ?? groupId
+					type: row.type ?? 'text'
 				}));
 			} finally {
-				if (!cancelled) groupAttributesLoading = false;
+				if (!cancelled) categoryAttributesLoading = false;
 			}
 		})();
 		return () => {
@@ -132,30 +225,18 @@
 
 	$effect(() => {
 		const formData = productAttributesForm?.data;
-		const groupId = selectedGroupId;
-		if (!open || !formData || !groupId || loading || groupAttributesLoading) return;
+		if (!open || !formData || !categoryVerified || categoryAttributesLoading) return;
 
 		const current = [...(formData.attributes ?? [])];
-		const otherGroups = current.filter((a) => a.attribute_group_id !== groupId);
 
-		const nextForGroup = groupAttributes.map((attr) => {
-			const existing = current.find(
-				(a) => a.attribute_id === attr.id && a.attribute_group_id === groupId
-			);
-			return (
-				existing ?? {
-					attribute_group_id: groupId,
-					attribute_id: attr.id,
-					attribute_group_title: selectedGroupTitle,
-					value: ''
-				}
-			);
+		const nextForCategory = categoryAttributes.map((attr) => {
+			const existing = current.find((a) => a.attribute_id === attr.id);
+			return existing ?? { attribute_id: attr.id, value: '' };
 		});
 
-		formData.attributes = [...otherGroups, ...nextForGroup];
+		formData.attributes = nextForCategory;
 	});
 
-	/** When closed, strip attribute draft rows so the card uses product/API data instead of stale form rows. */
 	$effect(() => {
 		if (open) return;
 		const formData = productAttributesForm?.data;
@@ -166,16 +247,15 @@
 
 	function updateAttributeValue(attributeId: string, value: string) {
 		const attr = productAttributesForm?.data?.attributes?.find(
-			(a) => a.attribute_id === attributeId && a.attribute_group_id === selectedGroupId
+			(a) => a.attribute_id === attributeId
 		);
 		if (attr) attr.value = value;
 	}
 
 	function getSelectedValue(attributeId: string): string {
 		return (
-			productAttributesForm?.data?.attributes?.find(
-				(a) => a.attribute_id === attributeId && a.attribute_group_id === selectedGroupId
-			)?.value ?? ''
+			productAttributesForm?.data?.attributes?.find((a) => a.attribute_id === attributeId)
+				?.value ?? ''
 		);
 	}
 </script>
@@ -187,58 +267,75 @@
 		</Sheet.Header>
 
 		<div class="flex flex-1 flex-col gap-6 overflow-auto px-4 py-4">
-			{#if loading}
-				<p class="text-sm text-muted-foreground">Loading groups…</p>
-			{:else}
-				<div class="space-y-2">
-					<label for="edit-attribute-group" class="text-sm font-semibold"> Attribute Group</label>
+			{#key controlsKey}
+				<div class="flex flex-col gap-2">
+					<label for="edit-attr-category" class="text-sm font-medium">Category</label>
 					<Combobox
-						id="edit-attribute-group"
-						bind:value={selectedGroupId}
-						options={attributeGroupOptions}
-						placeholder="Select group"
-						loading={groupSearchLoading}
-						onSearchChange={handleGroupSearch}
+						id="edit-attr-category"
+						bind:value={selectedCategoryId}
+						options={categoriesOptions}
+						placeholder="Search categories…"
+						emptyMessage="No categories found"
+						disabled={saving}
+						loading={categoryComboboxLoading}
+						filterFn={passthroughComboboxFilter}
+						onValueChange={selectCategory}
+						onSearchChange={(q) => {
+							categorySearch = q;
+						}}
+						onOpenChange={(panelOpen) => {
+							if (panelOpen && open) fetchCategories(open, debouncedCategorySearch);
+						}}
 					/>
 				</div>
+			{/key}
 
-				{#if selectedGroupId}
-					{#if groupAttributesLoading}
-						<p class="text-sm text-muted-foreground">Loading attributes…</p>
-					{:else if groupAttributes.length > 0}
-						<div class="space-y-1">
-							<p class="text-sm font-semibold">Attributes</p>
-							<p class="text-xs text-muted-foreground">
-								Set values for each attribute in this group.
-							</p>
+			{#if !selectedCategoryId}
+				<p class="text-sm text-muted-foreground">
+					Select a category to view and edit attributes linked to it.
+				</p>
+			{:else if !categoryVerified && (categoryLoading || categorySearchStale)}
+				<p class="text-sm text-muted-foreground">Loading categories…</p>
+			{:else if !categoryVerified}
+				<p class="text-sm text-muted-foreground">
+					Select an existing category from the list to edit attributes.
+				</p>
+			{:else if categoryAttributesLoading}
+				<p class="text-sm text-muted-foreground">Loading attributes…</p>
+			{:else if categoryAttributes.length > 0}
+				<div class="space-y-1">
+					<p class="text-sm font-semibold">
+						Category: {selectedCategoryLabel || selectedCategoryId}
+					</p>
+					<p class="text-xs text-muted-foreground">
+						Set values for each attribute linked to this category.
+					</p>
+				</div>
+				<div class="rounded-lg border bg-card">
+					{#each categoryAttributes as attr, i (attr.id)}
+						<div
+							class="flex items-center gap-4 px-4 py-3{i < categoryAttributes.length - 1
+								? ' border-b'
+								: ''}"
+						>
+							<label
+								class="w-28 shrink-0 text-sm font-medium text-foreground capitalize"
+								for="attr-{attr.id}"
+							>
+								{attr.title}
+							</label>
+							<Input
+								id="attr-{attr.id}"
+								class="h-8 flex-1 bg-background"
+								placeholder="Enter {attr.title.toLowerCase()}"
+								value={getSelectedValue(attr.id)}
+								oninput={(e) => updateAttributeValue(attr.id, e.currentTarget.value)}
+							/>
 						</div>
-						<div class="rounded-lg border bg-card">
-							{#each groupAttributes as attr, i (attr.id)}
-								<div
-									class="flex items-center gap-4 px-4 py-3{i < groupAttributes.length - 1
-										? ' border-b'
-										: ''}"
-								>
-									<label
-										class="w-28 shrink-0 text-sm font-medium text-foreground capitalize"
-										for="attr-{attr.id}"
-									>
-										{attr.title}
-									</label>
-									<Input
-										id="attr-{attr.id}"
-										class="h-8 flex-1 bg-background"
-										placeholder="Enter {attr.title.toLowerCase()}"
-										value={getSelectedValue(attr.id)}
-										oninput={(e) => updateAttributeValue(attr.id, e.currentTarget.value)}
-									/>
-								</div>
-							{/each}
-						</div>
-					{:else}
-						<p class="text-sm text-muted-foreground">No attributes found in this group.</p>
-					{/if}
-				{/if}
+					{/each}
+				</div>
+			{:else}
+				<p class="text-sm text-muted-foreground">No attributes linked to this category.</p>
 			{/if}
 		</div>
 
@@ -248,7 +345,7 @@
 			{/if}
 			<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
 			<Button
-				disabled={saving}
+				disabled={saving || !categoryVerified}
 				onclick={async () => {
 					saving = true;
 					saveError = '';
@@ -256,12 +353,11 @@
 						const attrs = (productAttributesForm?.data?.attributes ?? [])
 							.filter((a) => a.attribute_id && a.value.trim())
 							.map((a) => ({
-								attribute_group_id: a.attribute_group_id,
 								attribute_id: a.attribute_id,
 								value: a.value.trim()
 							}));
 						const res = await client.products({ id: productId }).put({
-							attribute_group_id: selectedGroupId || undefined,
+							category_id: selectedCategoryId || undefined,
 							attributes: attrs
 						});
 						if (res.error) {

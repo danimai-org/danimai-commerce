@@ -24,7 +24,7 @@ const RetrieveProductAttributeSchema = Type.Object({
   title: Type.String(),
   type: Type.String(),
   value: Type.String(),
-  attribute_group_id: Type.Union([Type.String(), Type.Null()]),
+  category_id: Type.Union([Type.String(), Type.Null()]),
 });
 
 const RetrieveProductTagSchema = Type.Object({
@@ -54,7 +54,6 @@ export const RetrieveProductResponseSchema = Type.Object({
   updated_at: Type.Date(),
   category: Type.Union([RetrieveProductCategorySchema, Type.Null()]),
   collections: Type.Array(RetrieveProductCollectionSchema),
-  attribute_group_id: Type.Union([Type.String(), Type.Null()]),
   attributes: Type.Array(RetrieveProductAttributeSchema),
   tags: Type.Array(RetrieveProductTagSchema),
   status: Type.Enum(ProductStatusEnum),

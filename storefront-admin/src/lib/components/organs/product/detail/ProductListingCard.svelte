@@ -89,14 +89,11 @@
 	});
 
 	const filterKey = $derived.by(() => JSON.stringify(normalizedFilter));
-	const isAttributeOrAttributeGroupListing = $derived.by(() => {
+	const isAttributeListing = $derived.by(() => {
 		const f = normalizedFilter;
 		const attrId = typeof f.attribute_id === 'string' && f.attribute_id.trim().length > 0;
 		const attrIds = Array.isArray(f.attribute_ids) && f.attribute_ids.length > 0;
-		const groupId =
-			typeof f.attribute_group_id === 'string' && f.attribute_group_id.trim().length > 0;
-		const groupIds = Array.isArray(f.attribute_group_ids) && f.attribute_group_ids.length > 0;
-		return attrId || attrIds || groupId || groupIds;
+		return attrId || attrIds;
 	});
 	const count = $derived(pagination?.total ?? 0);
 	const totalPages = $derived(Math.max(1, pagination?.total_pages ?? 1));
@@ -314,7 +311,7 @@
 							: `Remove${selectedCount > 1 ? ` (${selectedCount})` : ''}`}
 					</Button>
 				{/if}
-				{#if !embedded && !isAttributeOrAttributeGroupListing}
+				{#if !embedded && !isAttributeListing}
 					<Button type="button" size="sm" onclick={openAddSheet}>Add</Button>
 				{/if}
 				<Button size="sm" variant="outline">
@@ -487,7 +484,7 @@
 		{@render listingInner()}
 	</div>
 
-	{#if !isAttributeOrAttributeGroupListing}
+	{#if !isAttributeListing}
 		<Sheet.Root
 			bind:open={addSheetOpen}
 			onOpenChange={(open: boolean) => {

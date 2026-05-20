@@ -16,6 +16,7 @@ export interface Database {
   products: ProductTable;
   product_images: ProductImageTable;
   product_categories: ProductCategoryTable;
+  product_category_attribute_relations: ProductCategoryAttributeRelationTable;
   product_collections: ProductCollectionTable;
   product_collection_relations: ProductCollectionRelationTable;
 
@@ -60,22 +61,6 @@ export type Product = Selectable<ProductTable>;
 export type NewProduct = Insertable<ProductTable>;
 export type ProductUpdate = Updateable<ProductTable>;
 
-// table product_attribute_groups
-export interface ProductAttributeGroupTable {
-  id: Generated<string>;
-  title: string;
-  metadata: unknown | null;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
-  deleted_at: Date | null;
-}
-
-export type ProductAttributeGroup = Selectable<ProductAttributeGroupTable>;
-export type NewProductAttributeGroup = Insertable<ProductAttributeGroupTable>;
-export type ProductAttributeGroupUpdate =
-  Updateable<ProductAttributeGroupTable>;
-
-
 // table product_attributes
 export interface ProductAttributeTable {
   id: Generated<string>;
@@ -107,22 +92,22 @@ export type ProductAttributeValueUpdate =
   Updateable<ProductAttributeValueTable>;
 
 
-// table product_attribute_group_relations
-export interface ProductAttributeGroupRelationTable {
+// table product_category_attribute_relations
+export interface ProductCategoryAttributeRelationTable {
   id: Generated<string>;
   product_attribute_id: string;
-  attribute_group_id: string;
+  category_id: string;
   required: boolean;
   rank: number;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }
-export type ProductAttributeGroupRelation =
-  Selectable<ProductAttributeGroupRelationTable>;
-export type NewProductAttributeGroupRelation =
-  Insertable<ProductAttributeGroupRelationTable>;
-export type ProductAttributeGroupRelationUpdate =
-  Updateable<ProductAttributeGroupRelationTable>;
+export type ProductCategoryAttributeRelation =
+  Selectable<ProductCategoryAttributeRelationTable>;
+export type NewProductCategoryAttributeRelation =
+  Insertable<ProductCategoryAttributeRelationTable>;
+export type ProductCategoryAttributeRelationUpdate =
+  Updateable<ProductCategoryAttributeRelationTable>;
 
 // table product_variants
 export interface ProductVariantTable {

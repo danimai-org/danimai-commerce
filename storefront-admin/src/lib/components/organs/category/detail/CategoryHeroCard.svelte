@@ -3,13 +3,13 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { getDetailContext } from '$lib/hooks';
-	import type { Category } from '../type';
+	import type { CategoryDetail } from '../type';
 	import EditCategoryHero from '$lib/components/organs/category/update/EditCategoryHero.svelte';
-	const detailQuery = getDetailContext<Category>();
+	const detailQuery = getDetailContext<CategoryDetail>();
 	let formSheetOpen = $state(false);
 	const category = $derived(detailQuery?.data ?? null);
 
-	function getHandle(c: Category | null): string {
+	function getHandle(c: CategoryDetail | null): string {
 		if (!c) return '';
 		return c.handle?.startsWith('/') ? c.handle : `/${c.handle ?? ''}`;
 	}

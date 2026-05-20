@@ -217,26 +217,10 @@
 	let collectionsList = $state<{ id: string; title: string; handle: string }[]>([]);
 	let categoriesList = $state<{ id: string; value: string; handle: string }[]>([]);
 	let tagsList = $state<{ id: string; value: string }[]>([]);
-	let attributesList = $state<
-		{
-			id: string;
-			title: string;
-			type: string;
-			attribute_group_id?: string | null;
-			product_attribute_group_id?: string | null;
-			attributeGroupId?: string | null;
-			attribute_group?: { id?: string | null } | null;
-			product_attribute_group?: { id?: string | null } | null;
-			group_id?: string | null;
-		}[]
-	>([]);
-	let attributeGroupsList = $state<{ id: string; title: string; value?: string; name?: string }[]>(
-		[]
-	);
+	let attributesList = $state<{ id: string; title: string; type: string }[]>([]);
 	let salesChannelsList = $state<{ id: string; name: string }[]>([]);
 
 	type CreateAttributeEntry = { attributeId: string; attributeTitle: string; value: string };
-	let createAttributeGroupId = $state('');
 	let createAttributeEntries = $state<CreateAttributeEntry[]>([]);
 
 	function syncVariantsFromOptions() {
@@ -284,12 +268,6 @@
 					}
 				: e
 		);
-		if (!createAttributeGroupId && attr) {
-			const attributeGroupId = resolveAttributeGroupId(attr);
-			if (attributeGroupId) {
-				createAttributeGroupId = attributeGroupId;
-			}
-		}
 	}
 
 	function setAttributeEntryValue(entryIndex: number, value: string) {
@@ -314,25 +292,6 @@
 
 	function pickLabel(row: { title?: string; value?: string; name?: string }): string {
 		return row.title ?? row.value ?? row.name ?? '';
-	}
-
-	function resolveAttributeGroupId(attribute: {
-		attribute_group_id?: string | null;
-		product_attribute_group_id?: string | null;
-		attributeGroupId?: string | null;
-		attribute_group?: { id?: string | null } | null;
-		product_attribute_group?: { id?: string | null } | null;
-		group_id?: string | null;
-	}): string {
-		return (
-			attribute.attribute_group_id ??
-			attribute.product_attribute_group_id ??
-			attribute.attributeGroupId ??
-			attribute.attribute_group?.id ??
-			attribute.product_attribute_group?.id ??
-			attribute.group_id ??
-			''
-		).trim();
 	}
 
 	const listQuery = createPaginationQuery({
@@ -360,7 +319,6 @@
 		createTagIds = [];
 		createSalesChannelIds = [];
 		createOptions = [];
-		createAttributeGroupId = '';
 		createAttributeEntries = [];
 		createMediaItems = [];
 		createError = null;
@@ -369,21 +327,13 @@
 		variantSearch = '';
 		variantPage = 1;
 		syncVariantsFromOptions();
-		const [
-			collectionsResponse,
-			categoriesResponse,
-			tagsResponse,
-			attributesResponse,
-			attributeGroupsResponse,
-			salesChannelsResponse
-		] = await Promise.allSettled([
-			client.collections.get({ query: listQuery }),
-			client['product-categories'].get({ query: listQuery }),
-			client['product-tags'].get({ query: listQuery }),
-			client['product-attributes'].get({ query: listQuery }),
-			client['product-attribute-groups'].get({ query: listQuery }),
-			client['sales-channels'].get({ query: listQuery })
-		]);
+		const [collectionsResponse, categoriesResponse, tagsResponse, salesChannelsResponse] =
+			await Promise.allSettled([
+				client.collections.get({ query: listQuery }),
+				client['product-categories'].get({ query: listQuery }),
+				client['product-tags'].get({ query: listQuery }),
+				client['sales-channels'].get({ query: listQuery })
+			]);
 
 		collectionsList =
 			collectionsResponse.status === 'fulfilled'
@@ -397,43 +347,7 @@
 			tagsResponse.status === 'fulfilled'
 				? extractRows<{ id: string; value: string }>(tagsResponse.value)
 				: [];
-		attributesList =
-			attributesResponse.status === 'fulfilled'
-				? extractRows<{
-						id: string;
-						title?: string;
-						value?: string;
-						name?: string;
-						type?: string;
-						attribute_group_id?: string | null;
-						product_attribute_group_id?: string | null;
-						attributeGroupId?: string | null;
-						attribute_group?: { id?: string | null } | null;
-						product_attribute_group?: { id?: string | null } | null;
-						group_id?: string | null;
-					}>(attributesResponse.value).map((row) => ({
-						id: row.id,
-						title: pickLabel(row),
-						type: row.type ?? '',
-						attribute_group_id: row.attribute_group_id,
-						product_attribute_group_id: row.product_attribute_group_id,
-						attributeGroupId: row.attributeGroupId,
-						attribute_group: row.attribute_group,
-						product_attribute_group: row.product_attribute_group,
-						group_id: row.group_id
-					}))
-				: [];
-		attributeGroupsList =
-			attributeGroupsResponse.status === 'fulfilled'
-				? extractRows<{ id: string; title?: string; value?: string; name?: string }>(
-						attributeGroupsResponse.value
-					).map((row) => ({
-						id: row.id,
-						title: pickLabel(row),
-						value: row.value,
-						name: row.name
-					}))
-				: [];
+		attributesList = [];
 
 		const fetchedSalesChannels =
 			salesChannelsResponse.status === 'fulfilled'
@@ -456,6 +370,34 @@
 		return createTitle.trim().length > 0;
 	}
 
+	async function loadCategoryAttributes(categoryId: string) {
+		if (!categoryId.trim()) {
+			attributesList = [];
+			return;
+		}
+		try {
+			const res = await client['product-attributes'].get({
+				query: {
+					...listQuery,
+					filters: { category_id: categoryId }
+				}
+			});
+			attributesList = extractRows<{ id: string; title?: string; type?: string }>(res).map(
+				(row) => ({
+					id: row.id,
+					title: pickLabel(row),
+					type: row.type ?? ''
+				})
+			);
+		} catch {
+			attributesList = [];
+		}
+	}
+
+	$effect(() => {
+		void loadCategoryAttributes(createCategoryId);
+	});
+
 	function goToStep2() {
 		if (!isDetailsStepValid()) {
 			createError = 'Title is required';
@@ -463,9 +405,6 @@
 		}
 		createError = null;
 		createStep = 2;
-		if (createAttributeEntries.length === 0) {
-			addAttributeEntry();
-		}
 	}
 
 	function goToStep3() {
@@ -473,8 +412,15 @@
 			createError = 'Title is required';
 			return;
 		}
+		if (!createCategoryId.trim()) {
+			createError = 'Select a category before adding attributes.';
+			return;
+		}
 		createError = null;
 		createStep = 3;
+		if (createAttributeEntries.length === 0) {
+			addAttributeEntry();
+		}
 	}
 
 	function goToStep4() {
@@ -564,7 +510,7 @@
 
 	const normalizedFieldErrors = $derived(($serverFieldErrors ?? {}) as Record<string, unknown>);
 	const titleError = $derived(firstError(normalizedFieldErrors.title));
-	const attributeGroupError = $derived(firstError(normalizedFieldErrors.attribute_group_id));
+	const categoryError = $derived(firstError(normalizedFieldErrors.category_id));
 	const variantsError = $derived(firstError(normalizedFieldErrors.variants));
 
 	function submitCreate(status: 'draft' | 'published') {
@@ -577,25 +523,8 @@
 			(entry) => entry.attributeId.trim() && entry.value.trim()
 		);
 		const hasAttributeEntries = selectedAttributeEntries.length > 0;
-		let effectiveAttributeGroupId = createAttributeGroupId.trim();
-		if (hasAttributeEntries && !effectiveAttributeGroupId) {
-			const inferredGroupIds = Array.from(
-				new Set(
-					selectedAttributeEntries
-						.map((entry) => {
-							const attr = attributesList.find((a) => a.id === entry.attributeId);
-							return attr ? resolveAttributeGroupId(attr) : '';
-						})
-						.filter((id) => id.length > 0)
-				)
-			);
-			if (inferredGroupIds.length === 1) {
-				effectiveAttributeGroupId = inferredGroupIds[0];
-				createAttributeGroupId = effectiveAttributeGroupId;
-			}
-		}
-		if (hasAttributeEntries && !effectiveAttributeGroupId) {
-			createError = 'Select an attribute group when setting attributes.';
+		if (hasAttributeEntries && !createCategoryId.trim()) {
+			createError = 'Select a category when setting attributes.';
 			return;
 		}
 		if (createHasVariants) {
@@ -658,7 +587,6 @@
 					price_amount: variant.priceAmount.trim() || undefined
 				};
 			}),
-			attribute_group_id: createAttributeGroupId,
 			attributes: createAttributeEntries
 				.filter((entry) => entry.attributeId && entry.value.trim())
 				.map((entry) => ({
@@ -726,7 +654,7 @@
 							{:else if createStep === 2}
 								<Info class="size-4" />
 							{/if}
-							Attributes
+							Organize
 						</button>
 						<button
 							type="button"
@@ -743,7 +671,7 @@
 							{:else if createStep === 3}
 								<Info class="size-4" />
 							{/if}
-							Organize
+							Attributes
 						</button>
 						<button
 							type="button"
@@ -787,20 +715,6 @@
 			{/if}
 
 			{#if createStep === 2}
-				<CreateProductStepAttributes
-					bind:createAttributeGroupId
-					{attributeGroupsList}
-					{createAttributeEntries}
-					{attributesList}
-					{addAttributeEntry}
-					{removeAttributeEntry}
-					{setAttributeEntryAttribute}
-					{setAttributeEntryValue}
-					{attributeGroupError}
-				/>
-			{/if}
-
-			{#if createStep === 3}
 				<CreateProductStepOrganize
 					bind:createDiscountable
 					bind:createCollectionIds
@@ -811,6 +725,19 @@
 					{collectionsList}
 					{categoriesList}
 					{tagsList}
+				/>
+			{/if}
+
+			{#if createStep === 3}
+				<CreateProductStepAttributes
+					bind:createCategoryId
+					{categoryError}
+					{createAttributeEntries}
+					{attributesList}
+					{addAttributeEntry}
+					{removeAttributeEntry}
+					{setAttributeEntryAttribute}
+					{setAttributeEntryValue}
 				/>
 			{/if}
 
@@ -851,7 +778,6 @@
 			<input type="hidden" name="has_variants" value={String(createHasVariants)} />
 			<input type="hidden" name="options" value={createOptionsJson} />
 			<input type="hidden" name="variants" value={createVariantsJson} />
-			<input type="hidden" name="attribute_group_id" value={createAttributeGroupId} />
 			<input type="hidden" name="attributes" value={createAttributesJson} />
 			<input
 				type="hidden"

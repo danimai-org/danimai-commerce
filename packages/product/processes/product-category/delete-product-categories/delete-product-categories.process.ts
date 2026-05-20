@@ -80,6 +80,11 @@ export class DeleteProductCategoriesProcess implements ProcessContract<typeof De
     if (ids.length === 0) return;
 
     await this.db
+      .deleteFrom("product_category_attribute_relations")
+      .where("category_id", "in", ids)
+      .execute();
+
+    await this.db
       .updateTable("products")
       .set({ category_id: null })
       .where("category_id", "in", ids)

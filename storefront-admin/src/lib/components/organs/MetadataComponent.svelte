@@ -9,7 +9,6 @@
 		| 'product-category'
 		| 'collection'
 		| 'product-attribute'
-		| 'product-attribute-group'
 		| 'region'
 		| 'sales-channel'
 		| 'store';

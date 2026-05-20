@@ -37,7 +37,6 @@ export const ProductUpdateSchema = z.object({
 	attributes: z
 		.array(
 			z.object({
-				attribute_group_id: z.string().uuid(),
 				attribute_id: z.string().uuid(),
 				value: z.string().default('')
 			})

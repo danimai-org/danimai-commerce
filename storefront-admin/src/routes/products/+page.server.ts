@@ -75,11 +75,6 @@ const ProductCreateSchema = z.object({
 			})
 		)
 		.default([]),
-	attribute_group_id: z
-		.string()
-		.uuid('Attribute group ID must be a valid UUID')
-		.optional()
-		.or(z.literal('')),
 	attributes: z.preprocess(
 		(value) => {
 			if (Array.isArray(value)) return value;
@@ -124,10 +119,6 @@ export const actions = {
 				data.collection_ids.length > 0
 					? Array.from(new Set(data.collection_ids.map((id) => id.trim()).filter(Boolean)))
 					: undefined;
-			const cleanAttributeGroupId = data.attribute_group_id?.trim()
-				? data.attribute_group_id
-				: undefined;
-
 			const optionsForApi = data.has_variants
 				? data.options
 						.filter((option) => option.title.trim() && option.values.length > 0)
@@ -157,21 +148,19 @@ export const actions = {
 				: undefined;
 
 			const hasAttributeEntries = data.attributes.length > 0;
-			if (hasAttributeEntries && !cleanAttributeGroupId) {
+			if (hasAttributeEntries && !cleanCategoryId) {
 				return fail(400, {
 					productCreateForm,
-					error: 'Select an attribute group when setting attributes.'
+					error: 'Select a category when setting attributes.'
 				});
 			}
 
-			const attributesForApi =
-				hasAttributeEntries && cleanAttributeGroupId
-					? data.attributes.map((attribute) => ({
-							attribute_group_id: cleanAttributeGroupId,
-							attribute_id: attribute.attribute_id,
-							value: attribute.value.trim()
-						}))
-					: undefined;
+			const attributesForApi = hasAttributeEntries
+				? data.attributes.map((attribute) => ({
+						attribute_id: attribute.attribute_id,
+						value: attribute.value.trim()
+					}))
+				: undefined;
 
 			const payload = {
 				title: data.title.trim(),
@@ -182,7 +171,6 @@ export const actions = {
 				is_giftcard: false,
 				discountable: data.discountable,
 				category_id: cleanCategoryId,
-				attribute_group_id: cleanAttributeGroupId,
 				tag_ids: data.tag_ids.length > 0 ? data.tag_ids : undefined,
 				sales_channel_ids: data.sales_channel_ids.length > 0 ? data.sales_channel_ids : undefined,
 				options: optionsForApi,

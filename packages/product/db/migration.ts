@@ -347,6 +347,32 @@ export async function up(db: Kysely<any>) {
     $$;
   `.execute(db);
   await sql`DROP TABLE IF EXISTS product_attribute_group_attributes CASCADE`.execute(db);
+
+  // Category–attribute relations (replaces attribute groups)
+  await createTableIfNotExists(db, () =>
+    db.schema
+      .createTable("product_category_attribute_relations")
+      .addColumn("id", "uuid", (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
+      .addColumn("category_id", "uuid", (col) =>
+        col.notNull().references("product_categories.id").onDelete("cascade"),
+      )
+      .addColumn("product_attribute_id", "uuid", (col) =>
+        col.notNull().references("product_attributes.id").onDelete("cascade"),
+      )
+      .addColumn("required", "boolean", (col) => col.notNull().defaultTo(false))
+      .addColumn("rank", "integer", (col) => col.notNull().defaultTo(0))
+      .addColumn("created_at", "timestamptz", (col) =>
+        col.notNull().defaultTo(sql`now()`),
+      )
+      .addColumn("updated_at", "timestamptz", (col) =>
+        col.notNull().defaultTo(sql`now()`),
+      )
+      .addUniqueConstraint("product_category_attribute_relations_category_attribute_unique", [
+        "category_id",
+        "product_attribute_id",
+      ]),
+  );
+
   await sql`ALTER TABLE product_images ADD COLUMN IF NOT EXISTS variant_id uuid REFERENCES product_variants(id) ON DELETE SET NULL`.execute(db);
   await sql`DROP TABLE IF EXISTS variant_attribute_values CASCADE`.execute(db);
 
@@ -371,6 +397,7 @@ export async function down(db: Kysely<any>) {
     "product_attributes",
     "product_images",
     "products",
+    "product_category_attribute_relations",
     "product_tags",
     "product_categories",
     "product_collections",

@@ -76,16 +76,6 @@ export class RetrieveProductProcess implements ProcessContract<
           )
           .on("product_collections.deleted_at", "is", null),
       )
-      // Product Attribute Group
-      .leftJoin("product_attribute_groups", (join) =>
-        join
-          .onRef(
-            "product_attribute_groups.id",
-            "=",
-            "products.attribute_group_id",
-          )
-          .on("product_attribute_groups.deleted_at", "is", null),
-      )
       // Product Attribute Values
       .leftJoin("product_attribute_values", (join) =>
         join
@@ -163,7 +153,7 @@ export class RetrieveProductProcess implements ProcessContract<
         "products.discountable",
         "products.is_giftcard",
         "products.thumbnail",
-        "products.attribute_group_id",
+        "products.category_id",
         () =>
           sql<Static<(typeof RetrieveProductSchema)["category"]> | null>`
         CASE
@@ -198,7 +188,7 @@ export class RetrieveProductProcess implements ProcessContract<
             'title', product_attributes.title,
             'type', product_attributes.type,
             'value', product_attribute_values.value,
-            'attribute_group_id', product_attribute_values.attribute_group_id
+            'category_id', products.category_id
           ))::json[]
         END
        `.as("attributes"),
@@ -242,7 +232,7 @@ export class RetrieveProductProcess implements ProcessContract<
         "products.discountable",
         "products.is_giftcard",
         "products.thumbnail",
-        "products.attribute_group_id",
+        "products.category_id",
       ])
       .executeTakeFirst();
 

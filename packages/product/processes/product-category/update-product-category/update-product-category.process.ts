@@ -10,6 +10,7 @@ import {
 } from "@danimai/core";
 import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
+import { randomUUID } from "crypto";
 import { type UpdateProductCategoryProcessOutput, UpdateProductCategorySchema } from "./update-product-category.schema";
 import type { Database } from "../../../db/type";
 
@@ -22,7 +23,7 @@ export const UPDATE_PRODUCT_CATEGORY_PROCESS = Symbol("UpdateProductCategory");
 
 /**
  * Updates a product category and validates parent hierarchy constraints.
- * Input: category id with partial mutable fields.
+ * Input: category id with partial mutable fields and optional attribute sync.
  * Output: updated category row.
  */
 @Process(UPDATE_PRODUCT_CATEGORY_PROCESS)
@@ -109,14 +110,60 @@ export class UpdateProductCategoryProcess
       }
     }
 
-    return this.db.updateTable("product_categories")
-      .set({
-        ...input,
-        updated_at: new Date(),
-      })
-      .where("id", "=", input.id)
-      .returningAll()
-      .executeTakeFirst();
+    if (input.attributes && input.attributes.length > 0) {
+      const attributes = await this.db
+        .selectFrom("product_attributes")
+        .where("id", "in", input.attributes.map((a) => a.attribute_id))
+        .where("deleted_at", "is", null)
+        .selectAll()
+        .execute();
+
+      if (attributes.length !== input.attributes.length) {
+        const missingIds = input.attributes
+          .filter((a) => !attributes.some((a2) => a2.id === a.attribute_id))
+          .map((a) => a.attribute_id);
+
+        throw new ValidationError(`Product attributes not found: ${missingIds.join(", ")}`, [{
+          type: "not_found",
+          message: `Product attributes not found: ${missingIds.join(", ")}`,
+          path: "attributes",
+        }]);
+      }
+    }
+
+    const { attributes, id: _categoryId, ...updateFields } = input;
+
+    return this.db.transaction().execute(async (trx) => {
+      const updated = await trx.updateTable("product_categories")
+        .set({
+          ...updateFields,
+          updated_at: new Date(),
+        })
+        .where("id", "=", input.id)
+        .returningAll()
+        .executeTakeFirst();
+
+      if (attributes !== undefined) {
+        await trx.deleteFrom("product_category_attribute_relations")
+          .where("category_id", "=", input.id)
+          .execute();
+
+        if (attributes.length > 0) {
+          await trx
+            .insertInto("product_category_attribute_relations")
+            .values(attributes.map((a, rank) => ({
+              id: randomUUID(),
+              category_id: input.id,
+              product_attribute_id: a.attribute_id,
+              required: a.required ?? false,
+              rank,
+            })))
+            .execute();
+        }
+      }
+
+      return updated;
+    });
   }
 
   private async getCategoryDescendants(categoryId: string): Promise<string[]> {

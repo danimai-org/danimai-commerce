@@ -6,14 +6,11 @@
 	import type { Product } from '../type';
 	import { getDetailContext } from '$lib/hooks';
 	import { client } from '$lib/client';
-	import { onMount } from 'svelte';
 
-	type ProductAttributeGroup = {
+	type ProductAttributesForm = {
 		id: string;
 		attributes: Array<{
-			attribute_group_id: string;
 			attribute_id: string;
-			attribute_group_title?: string;
 			value: string;
 		}>;
 	};
@@ -26,16 +23,16 @@
 		id: string;
 		title: string;
 		value: string;
-		attribute_group_id: string | null;
+		category_id: string | null;
 	};
 
 	let {
 		productAttributesForm = $bindable(
-			{} as SuperValidated<ProductAttributeGroup, string | unknown, Record<string, unknown>>
+			{} as SuperValidated<ProductAttributesForm, string | unknown, Record<string, unknown>>
 		)
 	}: {
 		productAttributesForm: SuperValidated<
-			ProductAttributeGroup,
+			ProductAttributesForm,
 			string | unknown,
 			Record<string, unknown>
 		>;
@@ -44,8 +41,7 @@
 	const detailQuery = getDetailContext<Product>();
 	const product = $derived(detailQuery?.data ?? null);
 
-	let groupTitlesById = $state<Record<string, string>>({});
-	let groupAttributeRows = $state<Array<{ id: string; title: string }>>([]);
+	let categoryAttributeRows = $state<Array<{ id: string; title: string }>>([]);
 
 	function extractRows<T>(payload: unknown): T[] {
 		if (!payload || typeof payload !== 'object') return [];
@@ -57,32 +53,22 @@
 		return [];
 	}
 
-	onMount(async () => {
-		try {
-			const res = await client['product-attribute-groups'].get({
-				query: { page: 1, limit: 100, search: '', sorting_field: 'created_at' }
-			});
-			const rows = extractRows<{ id: string; title?: string }>(res);
-			const next: Record<string, string> = {};
-			for (const row of rows) {
-				if (row?.id) next[row.id] = row.title ?? row.id;
-			}
-			groupTitlesById = next;
-		} catch {
-			groupTitlesById = {};
-		}
-	});
-	const productAttributeGroupId = $derived.by(() => {
-		const direct = (product as { attribute_group_id?: string | null } | null)?.attribute_group_id;
-		if (direct) return direct;
+	const productCategoryId = $derived.by(() => {
+		const cat = (product as { category?: { id?: string } | null } | null)?.category;
+		if (cat?.id) return cat.id;
 		const attrs = (product as { attributes?: ProductAttributeRow[] } | null)?.attributes ?? [];
-		return attrs[0]?.attribute_group_id ?? null;
+		return attrs[0]?.category_id ?? null;
+	});
+
+	const categoryTitle = $derived.by(() => {
+		const cat = (product as { category?: { value?: string; id?: string } | null } | null)?.category;
+		return cat?.value ?? 'Category';
 	});
 
 	$effect(() => {
-		const attrGroupId = productAttributeGroupId;
-		if (!attrGroupId) {
-			groupAttributeRows = [];
+		const categoryId = productCategoryId;
+		if (!categoryId) {
+			categoryAttributeRows = [];
 			return;
 		}
 
@@ -90,28 +76,26 @@
 		(async () => {
 			try {
 				const res = await client['product-attributes'].get({
-					query: { page: 1, limit: 100, filters: { attribute_group_id: attrGroupId } }
+					query: { page: 1, limit: 100, filters: { category_id: categoryId } }
 				});
 				if (cancelled) return;
-				groupAttributeRows = extractRows<{ id: string; title?: string }>(res).map((r) => ({
+				categoryAttributeRows = extractRows<{ id: string; title?: string }>(res).map((r) => ({
 					id: r.id,
 					title: r.title ?? r.id
 				}));
 			} catch {
-				if (!cancelled) groupAttributeRows = [];
+				if (!cancelled) categoryAttributeRows = [];
 			}
 		})();
 		return () => {
 			cancelled = true;
 		};
 	});
+
 	const attributesGroup = $derived.by<AttributeDisplayGroup[]>(() => {
 		const productAttributes =
 			(product as { attributes?: ProductAttributeRow[] } | null)?.attributes ?? [];
-		const attrGroupId = productAttributeGroupId;
-
-		const resolveGroupTitle = (groupId: string, fallback?: string) =>
-			groupTitlesById[groupId] || fallback || 'Attribute Group';
+		const categoryId = productCategoryId;
 
 		const grouped: AttributeDisplayGroup[] = [];
 		const upsertRow = (
@@ -137,53 +121,40 @@
 			for (const a of productAttributes) {
 				if (a?.id) attributeTitlesById[a.id] = a.title ?? a.id;
 			}
-			for (const ga of groupAttributeRows) {
-				attributeTitlesById[ga.id] = ga.title;
+			for (const ca of categoryAttributeRows) {
+				attributeTitlesById[ca.id] = ca.title;
 			}
+			const groupId = categoryId || 'ungrouped';
 			for (const [index, attr] of formAttributes.entries()) {
-				const groupId = attr.attribute_group_id || 'ungrouped';
-				const groupTitle = resolveGroupTitle(groupId, attr.attribute_group_title);
 				const attrTitle = attributeTitlesById[attr.attribute_id] ?? attr.attribute_id;
-				upsertRow(
-					groupId,
-					groupTitle,
-					`${attr.attribute_group_id}:${attr.attribute_id}:${index}`,
-					attrTitle,
-					attr.value
-				);
+				upsertRow(groupId, categoryTitle, `${attr.attribute_id}:${index}`, attrTitle, attr.value);
 			}
 			return grouped;
 		}
 
-		if (attrGroupId && groupAttributeRows.length > 0) {
+		if (categoryId && categoryAttributeRows.length > 0) {
 			const valuesByTitle: Record<string, string> = {};
-
 			for (const a of productAttributes) {
-				if (a?.title) {
-					valuesByTitle[a.title] = a.value;
-				}
+				if (a?.title) valuesByTitle[a.title] = a.value;
 			}
-			const groupTitle = resolveGroupTitle(attrGroupId);
-
-			for (const [index, ga] of groupAttributeRows.entries()) {
+			for (const [index, ca] of categoryAttributeRows.entries()) {
 				upsertRow(
-					attrGroupId,
-					groupTitle,
-					`${attrGroupId}:${ga.id}:${index}`,
-					ga.title,
-					valuesByTitle[ga.title] ?? ''
+					categoryId,
+					categoryTitle,
+					`${categoryId}:${ca.id}:${index}`,
+					ca.title,
+					valuesByTitle[ca.title] ?? ''
 				);
 			}
 			return grouped;
 		}
 
 		if (productAttributes.length === 0) return [];
+		const groupId = categoryId || 'ungrouped';
 		for (const [index, attr] of productAttributes.entries()) {
-			const groupId = attr.attribute_group_id || 'ungrouped';
-			const groupTitle = resolveGroupTitle(groupId);
 			upsertRow(
 				groupId,
-				groupTitle,
+				categoryTitle,
 				`${groupId}:${attr.id}:${index}`,
 				attr.title ?? attr.id,
 				attr.value
@@ -256,7 +227,8 @@
 <EditAttributesSheet
 	bind:open={editAttributesSheetOpen}
 	productId={product?.id ?? ''}
-	attributeGroupId={productAttributeGroupId ?? ''}
+	categoryId={productCategoryId ?? ''}
+	{categoryTitle}
 	{productAttributesForm}
 	onSaved={() => void detailQuery?.refetch?.()}
 />

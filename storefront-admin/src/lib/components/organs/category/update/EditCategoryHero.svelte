@@ -5,9 +5,9 @@
 	import { cn } from '$lib/utils.js';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { Toaster, toast } from 'svelte-sonner';
-	import type { Category } from '../type';
+	import type { CategoryDetail } from '../type';
 
-	type CategoryData = NonNullable<Category>;
+	type CategoryData = CategoryDetail;
 
 	let {
 		open = $bindable(false),

@@ -39,8 +39,6 @@ export { default as EditMetadataSheet } from './EditMetadataSheet.svelte';
 export * from './category/detail/index.js';
 export * from './collection/detail/index.js';
 export * from './tag/detail/index.js';
-export * from './attribute-group/detail/index.js';
-export * from './attribute-group/update/index.js';
 export * from './attribute/detail/index.js';
 export * from './attribute/create/index.js';
 export * from './product/variant/index.js';

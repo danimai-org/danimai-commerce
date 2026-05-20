@@ -12,7 +12,6 @@
 		| 'product-category'
 		| 'collection'
 		| 'product-attribute'
-		| 'product-attribute-group'
 		| 'region'
 		| 'sales-channel'
 		| 'store';
@@ -83,8 +82,6 @@
 				return c.collections({ id }).put({ metadata: meta });
 			case 'product-attribute':
 				return c['product-attributes']({ id }).put({ metadata: meta, id: id });
-			case 'product-attribute-group':
-				return c['product-attribute-groups']({ id }).put({ metadata: meta, id: id });
 			case 'region':
 				return c.regions({ id }).put({ metadata: meta });
 			case 'sales-channel':

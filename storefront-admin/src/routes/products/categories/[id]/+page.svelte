@@ -8,10 +8,12 @@
 	import {
 		CategoryHeroCard,
 		CategoryStatusCard,
+		CategoryAttributesCard,
 		ProductListingCard
 	} from '$lib/components/organs/index.js';
 	import JSONComponent from '$lib/components/organs/JSONComponent.svelte';
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
+	import { parseCategoryPayload } from '$lib/components/organs/category/type.js';
 	import { resolve } from '$app/paths';
 	import { setDetailContext, useDetailQuery } from '$lib/hooks';
 
@@ -19,13 +21,27 @@
 
 	const detailQuery = useDetailQuery(async () => {
 		const res = await client['product-categories']({ id: categoryId }).get();
-		return res.data;
-	}, ['category-detail', categoryId]);
+		if (res.error) {
+			const err = res.error as { value?: { message?: string }; message?: string };
+			throw new Error(
+				err?.value?.message ?? err?.message ?? 'Failed to load category'
+			);
+		}
+		const parsed = parseCategoryPayload(res.data);
+		if (!parsed) {
+			throw new Error('Category not found');
+		}
+		return parsed;
+	}, () => ['category-detail', categoryId]);
 
 	setDetailContext(detailQuery);
 
 	const category = $derived(detailQuery?.data ?? null);
-	const error = $derived(detailQuery?.error);
+	const error = $derived.by(() => {
+		const e = detailQuery?.error;
+		if (e == null) return null;
+		return e instanceof Error ? e.message : String(e);
+	});
 	const isPending = $derived(detailQuery?.isPending);
 
 	let selectedIds = $state<Set<string>>(new Set());
@@ -79,6 +95,7 @@
 			</div>
 
 			<div class="flex flex-col gap-8 p-6 pt-0">
+				<CategoryAttributesCard />
 				<ProductListingCard
 					title="Category Products"
 					filter={productListingFilter}

@@ -96,58 +96,39 @@ export class CreateProductProcess implements ProcessContract<
         }
       }
 
-      if (input.attribute_group_id) {
-        const attributeGroup = await trx
-          .selectFrom("product_attribute_groups")
-          .where("id", "=", input.attribute_group_id)
-          .where("deleted_at", "is", null)
-          .selectAll()
-          .executeTakeFirst();
+      if (input.category_id && input.attributes && input.attributes.length > 0) {
+        const attributes = await trx
+          .selectFrom("product_attributes")
+          .innerJoin("product_category_attribute_relations", (join) =>
+            join
+              .onRef(
+                "product_category_attribute_relations.product_attribute_id",
+                "=",
+                "product_attributes.id",
+              )
+              .on(
+                "product_category_attribute_relations.category_id",
+                "=",
+                input.category_id!,
+              ),
+          )
+          .where(
+            "product_category_attribute_relations.product_attribute_id",
+            "in",
+            input.attributes.map((a) => a.attribute_id),
+          )
+          .where("product_attributes.deleted_at", "is", null)
+          .select("product_attributes.id")
+          .execute();
 
-        if (!attributeGroup) {
-          throw new ValidationError("Attribute group not found", [
+        if (attributes.length !== input.attributes.length) {
+          throw new ValidationError("One or more attributes are not linked to this category", [
             {
               type: "not_found",
-              message: "Attribute group not found",
-              path: "attribute_group_id",
+              message: "One or more attributes are not linked to this category",
+              path: "attributes",
             },
           ]);
-        }
-
-        if (input.attributes && input.attributes.length > 0) {
-          const attributes = await trx
-            .selectFrom("product_attributes")
-            .innerJoin("product_attribute_group_relations", (join) =>
-              join
-                .onRef(
-                  "product_attribute_group_relations.product_attribute_id",
-                  "=",
-                  "product_attributes.id",
-                )
-                .on(
-                  "product_attribute_group_relations.attribute_group_id",
-                  "=",
-                  attributeGroup.id,
-                ),
-            )
-            .where(
-              "product_attribute_group_relations.product_attribute_id",
-              "in",
-              input.attributes.map((a) => a.attribute_id),
-            )
-            .where("deleted_at", "is", null)
-            .selectAll()
-            .execute();
-
-          if (attributes.length !== input.attributes.length) {
-            throw new ValidationError("One or more attributes not found", [
-              {
-                type: "not_found",
-                message: "One or more attributes not found",
-                path: "attributes",
-              },
-            ]);
-          }
         }
       }
 
@@ -208,7 +189,6 @@ export class CreateProductProcess implements ProcessContract<
           thumbnail: input.thumbnail,
           external_id: input.external_id,
           category_id: input.category_id,
-          attribute_group_id: input.attribute_group_id,
           metadata: input.metadata,
         })
         .returningAll()
@@ -469,7 +449,6 @@ export class CreateProductProcess implements ProcessContract<
             input.attributes.map((attribute) => ({
               id: randomUUID(),
               value: attribute.value,
-              attribute_group_id: attribute.attribute_group_id,
               attribute_id: attribute.attribute_id,
               product_id: product.id,
               metadata: null,

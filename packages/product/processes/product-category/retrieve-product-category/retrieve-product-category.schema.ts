@@ -8,6 +8,13 @@ export type RetrieveProductCategoryProcessInput = Static<
   typeof RetrieveProductCategorySchema
 >;
 
+const RetrieveProductCategoryAttributeSchema = Type.Object({
+  id: Type.String(),
+  title: Type.String(),
+  type: Type.String(),
+  required: Type.Boolean(),
+});
+
 export const ProductCategoryResponseSchema = Type.Object({
   id: Type.String(),
   value: Type.String(),
@@ -27,10 +34,11 @@ export const ProductCategoryResponseSchema = Type.Object({
   deleted_at: Type.Union([Type.Date(), Type.Null()]),
 });
 
-export const RetrieveProductCategoryResponseSchema = Type.Union([
-  ProductCategoryResponseSchema,
-  Type.Undefined(),
-]);
+export const RetrieveProductCategoryResponseSchema = Type.Object({
+  ...ProductCategoryResponseSchema.properties,
+  attributes: Type.Array(RetrieveProductCategoryAttributeSchema),
+});
+
 export type RetrieveProductCategoryProcessOutput = Static<
   typeof RetrieveProductCategoryResponseSchema
 >;

@@ -82,7 +82,7 @@ export class DeleteProductAttributesProcess implements ProcessContract<typeof De
           .execute();
 
         await trx
-          .deleteFrom("product_attribute_group_relations")
+          .deleteFrom("product_category_attribute_relations")
           .where("product_attribute_id", "in", input.ids)
           .execute();
 

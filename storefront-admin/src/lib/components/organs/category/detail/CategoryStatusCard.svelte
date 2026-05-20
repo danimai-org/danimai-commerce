@@ -3,14 +3,14 @@
 	import { client } from '$lib/client.js';
 	import { cn } from '$lib/utils.js';
 
-	import type { Category } from '../type.js';
+	import type { CategoryDetail } from '../type.js';
 
 	type CategoryResource = ReturnType<(typeof client)['product-categories']>;
 	type ProductCategoryPutBody = NonNullable<Parameters<CategoryResource['put']>[0]>;
 	type ProductCategoryPutStatus = NonNullable<ProductCategoryPutBody['status']>;
 
 	interface Props {
-		category: NonNullable<Category> | null;
+		category: CategoryDetail | null;
 		onUpdated?: () => void | Promise<void>;
 	}
 

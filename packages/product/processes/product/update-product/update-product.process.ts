@@ -52,13 +52,8 @@ export class UpdateProductProcess implements ProcessContract<
     const category = await this.validateCategory(input);
     const handle = await this.validateHandle(input);
 
-    if (input.attribute_groups !== undefined) {
-      await this.validateAttributeGroupIds(
-        input.attribute_groups.map((g) => g.attribute_group_id),
-      );
-    }
     if (!!input.attributes?.length) {
-      await this.validateAttributeValuesForGroups(input.id, input.attributes);
+      await this.validateAttributeValuesForCategory(input, input.attributes);
     }
     if (input.tag_ids !== undefined) {
       await this.validateTagIds(input.tag_ids);
@@ -71,9 +66,6 @@ export class UpdateProductProcess implements ProcessContract<
     }
 
     const updated = await this.updateProduct(input, category, handle);
-    if (!!input.attribute_groups?.length) {
-      await this.syncAttributeGroupRelations(input.id, input.attribute_groups);
-    }
     if (!!input.attributes?.length) {
       await this.syncAttributeValues(input.id, input.attributes);
     }
@@ -197,7 +189,6 @@ export class UpdateProductProcess implements ProcessContract<
       thumbnail?: string | null;
       external_id?: string | null;
       category_id?: string | null;
-      attribute_group_id?: string | null;
       metadata?: unknown;
     } = {
       title: input.title,
@@ -211,10 +202,6 @@ export class UpdateProductProcess implements ProcessContract<
 
     if (input.category_id !== undefined) {
       updateData.category_id = category?.id ?? null;
-    }
-
-    if (input.attribute_group_id !== undefined) {
-      updateData.attribute_group_id = input.attribute_group_id ?? null;
     }
 
     if (input.metadata !== undefined) {
@@ -237,36 +224,36 @@ export class UpdateProductProcess implements ProcessContract<
       .executeTakeFirst();
   }
 
-  async validateAttributeGroupIds(groupIds: string[]) {
-    if (groupIds.length === 0) return;
-    const existing = await this.db
-      .selectFrom("product_attribute_groups")
-      .where("id", "in", groupIds)
-      .where("deleted_at", "is", null)
-      .select("id")
-      .execute();
-    const found = new Set(existing.map((r) => r.id));
-    const missing = groupIds.filter((id) => !found.has(id));
-    if (missing.length > 0) {
-      throw new ValidationError("One or more attribute groups not found", [
-        {
-          type: "not_found",
-          message: `Attribute groups not found: ${missing.join(", ")}`,
-          path: "attribute_groups",
-        },
-      ]);
-    }
-  }
-
-  async validateAttributeValuesForGroups(
-    productId: string,
+  async validateAttributeValuesForCategory(
+    input: UpdateProductProcessInput,
     attributes: Array<{
-      attribute_group_id: string;
       attribute_id: string;
       value: string;
     }>,
   ) {
     if (attributes.length === 0) return;
+    const product = await this.db
+      .selectFrom("products")
+      .where("id", "=", input.id)
+      .where("deleted_at", "is", null)
+      .select(["category_id"])
+      .executeTakeFirst();
+
+    const categoryId =
+      input.category_id !== undefined
+        ? (input.category_id || null)
+        : (product?.category_id ?? null);
+
+    if (!categoryId) {
+      throw new ValidationError("Product must have a category to set attributes", [
+        {
+          type: "invalid",
+          message: "Product must have a category to set attributes",
+          path: "category_id",
+        },
+      ]);
+    }
+
     const attrIds = [...new Set(attributes.map((a) => a.attribute_id))];
     const existingAttrs = await this.db
       .selectFrom("product_attributes")
@@ -285,78 +272,29 @@ export class UpdateProductProcess implements ProcessContract<
         },
       ]);
     }
-    const groupAttrPairs = await this.db
-      .selectFrom("product_attribute_group_relations")
-      .select(["attribute_group_id", "product_attribute_id"])
+
+    const categoryAttrIds = await this.db
+      .selectFrom("product_category_attribute_relations")
+      .where("category_id", "=", categoryId)
+      .where("product_attribute_id", "in", attrIds)
+      .select("product_attribute_id")
       .execute();
-    const validPairs = new Set(
-      groupAttrPairs.map(
-        (r) => `${r.attribute_group_id}:${r.product_attribute_id}`,
-      ),
-    );
-    for (const a of attributes) {
-      if (!validPairs.has(`${a.attribute_group_id}:${a.attribute_id}`)) {
-        throw new ValidationError("Attribute not assigned to group", [
-          {
-            type: "invalid",
-            message: `Attribute ${a.attribute_id} is not assigned to group ${a.attribute_group_id}`,
-            path: "attributes",
-          },
-        ]);
-      }
+    const validAttrIds = new Set(categoryAttrIds.map((r) => r.product_attribute_id));
+    const invalidAttrs = attrIds.filter((id) => !validAttrIds.has(id));
+    if (invalidAttrs.length > 0) {
+      throw new ValidationError("Attribute not linked to category", [
+        {
+          type: "invalid",
+          message: `Attributes not linked to category: ${invalidAttrs.join(", ")}`,
+          path: "attributes",
+        },
+      ]);
     }
-    const productGroupIds = await this.db
-      .selectFrom("product_attribute_group_relations")
-      .where("product_attribute_id", "=", productId)
-      .select("attribute_group_id")
-      .execute()
-      .then((rows) => new Set(rows.map((r) => r.attribute_group_id)));
-    for (const a of attributes) {
-      if (!productGroupIds.has(a.attribute_group_id)) {
-        throw new ValidationError("Product must be linked to attribute group", [
-          {
-            type: "invalid",
-            message: `Product is not linked to group ${a.attribute_group_id}. Set attribute_groups first.`,
-            path: "attributes",
-          },
-        ]);
-      }
-    }
-  }
-
-  async syncAttributeGroupRelations(
-    productId: string,
-    groups: Array<{
-      attribute_group_id: string;
-      required?: boolean;
-      rank?: number;
-    }>,
-  ) {
-    await this.db
-      .deleteFrom("product_attribute_group_relations")
-      .where("product_attribute_id", "=", productId)
-      .execute();
-
-    if (groups.length === 0) return;
-
-    await this.db
-      .insertInto("product_attribute_group_relations")
-      .values(
-        groups.map((g, i) => ({
-          id: randomUUID(),
-          product_attribute_id: productId,
-          attribute_group_id: g.attribute_group_id,
-          required: g.required ?? false,
-          rank: g.rank ?? i,
-        })),
-      )
-      .execute();
   }
 
   async syncAttributeValues(
     productId: string,
     attributes: Array<{
-      attribute_group_id: string;
       attribute_id: string;
       value: string;
     }>,
@@ -370,7 +308,6 @@ export class UpdateProductProcess implements ProcessContract<
 
     const values = attributes.map((a) => ({
       id: randomUUID(),
-      attribute_group_id: a.attribute_group_id,
       attribute_id: a.attribute_id,
       product_id: productId,
       value: a.value,

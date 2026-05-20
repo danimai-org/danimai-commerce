@@ -14,21 +14,17 @@
 
 	let {
 		open = $bindable(false),
-		groupId = '',
-		groupTitle = '',
-		groupMetadata = null as unknown | null,
+		categoryId = '',
 		currentAttributeIds = [] as string[],
 		currentAttributeRequiredById = {} as Record<string, boolean>,
-		currentGroupAttributes = [] as CatalogRow[],
+		currentCategoryAttributes = [] as CatalogRow[],
 		onSuccess = () => {}
 	}: {
 		open?: boolean;
-		groupId?: string;
-		groupTitle?: string;
-		groupMetadata?: unknown | null;
+		categoryId?: string;
 		currentAttributeIds?: string[];
 		currentAttributeRequiredById?: Record<string, boolean>;
-		currentGroupAttributes?: CatalogRow[];
+		currentCategoryAttributes?: CatalogRow[];
 		onSuccess?: () => void | Promise<void>;
 	} = $props();
 
@@ -44,7 +40,6 @@
 	let attributeFetchGen = 0;
 	let prevSheetOpen = $state(false);
 	let attributesControlKey = $state(0);
-	/** Only fetch after the user opens the attribute combobox (not when the sheet mounts). */
 	let attributesFetchEnabled = $state(false);
 
 	$effect(() => {
@@ -62,7 +57,6 @@
 		}))
 	);
 
-	/** Keeps checkbox labels for anything selected before it appears in the catalog response. */
 	const comboboxOptions = $derived.by(() => {
 		const seen = new SvelteSet<string>();
 		const out: { id: string; value: string }[] = [];
@@ -113,21 +107,6 @@
 
 	function removeSelectedRow(id: string) {
 		selectedToAdd = selectedToAdd.filter((x) => x !== id);
-	}
-
-	function metadataPayload(): Record<string, string | number> {
-		if (
-			groupMetadata != null &&
-			typeof groupMetadata === 'object' &&
-			!Array.isArray(groupMetadata)
-		) {
-			const out: Record<string, string | number> = {};
-			for (const [k, v] of Object.entries(groupMetadata as Record<string, unknown>)) {
-				if (typeof v === 'string' || typeof v === 'number') out[k] = v;
-			}
-			if (Object.keys(out).length > 0) return out;
-		}
-		return { rank: 0 };
 	}
 
 	function close() {
@@ -199,12 +178,12 @@
 			attributeSearch = '';
 			debouncedAttributeSearch = '';
 
-			const groupRows = [...currentGroupAttributes];
+			const categoryRows = [...currentCategoryAttributes];
 			const ids = [...currentAttributeIds];
 
 			selectedToAdd = ids;
 			attributesById.clear();
-			mergeRowsIntoAttributesById(attributesById, groupRows);
+			mergeRowsIntoAttributesById(attributesById, categoryRows);
 
 			requiredByAttributeId = Object.fromEntries(
 				ids.map((id) => [id, currentAttributeRequiredById[id] ?? false])
@@ -266,8 +245,8 @@
 
 	async function submit(e: Event) {
 		e.preventDefault();
-		if (!groupId) {
-			toast.error('Missing attribute group');
+		if (!categoryId) {
+			toast.error('Missing category');
 			return;
 		}
 		const seen = new SvelteSet<string>();
@@ -285,10 +264,7 @@
 
 		submitting = true;
 		try {
-			const updated = await client['product-attribute-groups']({ id: groupId }).put({
-				id: groupId,
-				title: groupTitle.trim() || groupId,
-				metadata: metadataPayload(),
+			const updated = await client['product-categories']({ id: categoryId }).put({
 				attributes: nextIds.map((attribute_id) => ({
 					attribute_id,
 					required: requiredByAttributeId[attribute_id] ?? false
@@ -301,15 +277,15 @@
 					'error' in updated &&
 					(updated as { error?: unknown }).error)
 			) {
-				toast.error('Could not update this group');
+				toast.error('Could not update this category');
 				return;
 			}
 
-			const priorGroup = new Set(currentAttributeIds);
-			const addedCount = nextIds.filter((id) => !priorGroup.has(id)).length;
+			const priorCategory = new Set(currentAttributeIds);
+			const addedCount = nextIds.filter((id) => !priorCategory.has(id)).length;
 
-			if (addedCount === 1) toast.success('Attribute added to group');
-			else if (addedCount > 1) toast.success(`${addedCount} attributes added to group`);
+			if (addedCount === 1) toast.success('Attribute added to category');
+			else if (addedCount > 1) toast.success(`${addedCount} attributes added to category`);
 			else toast.success('Attributes updated');
 
 			open = false;
@@ -328,14 +304,14 @@
 			<div class="min-h-0 flex-1 overflow-auto p-6 pt-12">
 				<h2 class="text-lg font-semibold">Add attributes</h2>
 				<p class="mt-1 text-sm text-muted-foreground">
-					Select existing attributes from your catalog to attach to this group.
+					Select existing attributes from your catalog to attach to this category.
 				</p>
 				<div class="mt-6 flex flex-col gap-4">
 					<div class="flex flex-col gap-2">
-						<label for="add-to-group-attributes" class="text-sm font-medium">Attributes</label>
+						<label for="add-to-category-attributes" class="text-sm font-medium">Attributes</label>
 						{#key attributesControlKey}
 							<MultiSelectCombobox
-								id="add-to-group-attributes"
+								id="add-to-category-attributes"
 								options={comboboxOptions}
 								bind:value={selectedToAdd}
 								onOpen={onAttributeComboboxOpen}
@@ -414,7 +390,7 @@
 			<div class="flex shrink-0 justify-end gap-2 border-t border-border p-4">
 				<Button variant="outline" type="button" disabled={submitting} onclick={close}>Cancel</Button>
 				<Button type="submit" disabled={submitting}>
-					{submitting ? 'Saving…' : 'Add to group'}
+					{submitting ? 'Saving…' : 'Add to category'}
 				</Button>
 			</div>
 		</form>

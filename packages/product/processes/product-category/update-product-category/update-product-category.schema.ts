@@ -26,6 +26,12 @@ export const UpdateProductCategoryBodySchema = Type.Object({
   metadata: Type.Optional(
     Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()])),
   ),
+  attributes: Type.Optional(Type.Array(
+    Type.Object({
+      attribute_id: Type.String({ format: "uuid" }),
+      required: Type.Optional(Type.Boolean()),
+    }), { uniqueItems: true }
+  )),
 });
 
 export const UpdateProductCategorySchema = Type.Object({

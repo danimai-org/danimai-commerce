@@ -15,25 +15,22 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import { getDetailContext } from '$lib/hooks';
 	import { SvelteSet } from 'svelte/reactivity';
-	import type {
-		AttributeGroupAttribute,
-		AttributeGroupDetail
-	} from '$lib/components/organs/attribute-group/type.js';
+	import type { CategoryAttribute, CategoryDetail } from '$lib/components/organs/category/type.js';
 	import { client } from '$lib/client.js';
 	import { toast } from 'svelte-sonner';
-	import AddAttributeToGroupSheet from '$lib/components/organs/attribute-group/detail/AddAttributeToGroupSheet.svelte';
+	import AddAttributeToCategorySheet from '$lib/components/organs/category/detail/AddAttributeToCategorySheet.svelte';
 	import { createQuery } from '@tanstack/svelte-query';
 
-	const detailQuery = getDetailContext<AttributeGroupDetail | null>();
-	const groupId = $derived(detailQuery?.data?.id ?? '');
-	const groupAttributes = $derived(detailQuery?.data?.attributes ?? []);
+	const detailQuery = getDetailContext<CategoryDetail | null>();
+	const categoryId = $derived(detailQuery?.data?.id ?? '');
+	const categoryAttributes = $derived(detailQuery?.data?.attributes ?? []);
 
-	const selectedAttributeIds = $derived(groupAttributes.map((a) => a.id));
+	const selectedAttributeIds = $derived(categoryAttributes.map((a) => a.id));
 
 	const filteredAttributes = $derived.by(() => {
-		const byId = new Map(groupAttributes.map((a) => [a.id, a]));
+		const byId = new Map(categoryAttributes.map((a) => [a.id, a]));
 		const seen = new SvelteSet<string>();
-		const out: AttributeGroupAttribute[] = [];
+		const out: CategoryAttribute[] = [];
 		for (const id of selectedAttributeIds) {
 			if (seen.has(id)) continue;
 			const row = byId.get(id);
@@ -56,7 +53,7 @@
 	let addSheetOpen = $state(false);
 
 	let removeConfirmOpen = $state(false);
-	let attributeToRemove = $state<AttributeGroupAttribute | null>(null);
+	let attributeToRemove = $state<CategoryAttribute | null>(null);
 	let removeSubmitting = $state(false);
 	let removeError = $state<string | null>(null);
 
@@ -86,7 +83,7 @@
 	});
 
 	const attributeSearchQuery = createQuery(() => ({
-		queryKey: ['attribute-group-attributes-search', groupId, debouncedSearch],
+		queryKey: ['category-attributes-search', categoryId, debouncedSearch],
 		queryFn: async () => {
 			const res = await client['product-attributes'].get({
 				query: {
@@ -94,7 +91,7 @@
 					limit: 500,
 					search: debouncedSearch,
 					sorting_field: 'title',
-					filters: { attribute_group_id: groupId }
+					filters: { category_id: categoryId }
 				}
 			});
 			if (res.error) {
@@ -104,7 +101,7 @@
 			const rows = (res.data?.rows ?? []) as { id?: string }[];
 			return rows.map((r) => String(r.id ?? '')).filter(Boolean);
 		},
-		enabled: () => Boolean(groupId && debouncedSearch.length > 0),
+		enabled: () => Boolean(categoryId && debouncedSearch.length > 0),
 		refetchOnWindowFocus: false
 	}));
 
@@ -115,7 +112,7 @@
 	);
 
 	const displayRows = $derived.by(() => {
-		let rows: AttributeGroupAttribute[];
+		let rows: CategoryAttribute[];
 		const q = debouncedSearch;
 		const qlower = q.toLowerCase();
 		if (!q) {
@@ -179,22 +176,11 @@
 		typeFilter = next;
 	}
 
-	function metadataForPut(meta: unknown): Record<string, string | number> {
-		if (meta != null && typeof meta === 'object' && !Array.isArray(meta)) {
-			const out: Record<string, string | number> = {};
-			for (const [k, v] of Object.entries(meta as Record<string, unknown>)) {
-				if (typeof v === 'string' || typeof v === 'number') out[k] = v;
-			}
-			if (Object.keys(out).length > 0) return out;
-		}
-		return { rank: 0 };
-	}
-
-	function refetchGroup() {
+	function refetchCategory() {
 		void detailQuery?.refetch?.();
 	}
 
-	type AttributeRow = AttributeGroupAttribute;
+	type AttributeRow = CategoryAttribute;
 
 	function requestRemove(row: AttributeRow) {
 		attributeToRemove = row;
@@ -225,32 +211,29 @@
 		}
 	]);
 
-	async function confirmRemoveFromGroup() {
+	async function confirmRemoveFromCategory() {
 		const row = attributeToRemove;
-		const group = detailQuery?.data;
-		if (!row || !group?.id) return;
+		const category = detailQuery?.data;
+		if (!row || !category?.id) return;
 		removeSubmitting = true;
 		removeError = null;
 		try {
 			const nextIds = selectedAttributeIds.filter((id) => id !== row.id);
-			const byId = new Map(groupAttributes.map((a) => [a.id, a]));
-			const res = await client['product-attribute-groups']({ id: group.id }).put({
-				id: group.id,
-				title: group.title.trim(),
-				metadata: metadataForPut(group.metadata),
+			const byId = new Map(categoryAttributes.map((a) => [a.id, a]));
+			const res = await client['product-categories']({ id: category.id }).put({
 				attributes: nextIds.map((attribute_id) => ({
 					attribute_id,
 					required: byId.get(attribute_id)?.required ?? false
 				}))
 			});
 			if (res == null || (typeof res === 'object' && 'error' in res && res.error)) {
-				removeError = 'Could not update this group';
+				removeError = 'Could not update this category';
 				return;
 			}
-			toast.success('Attribute removed from group');
+			toast.success('Attribute removed from category');
 			removeConfirmOpen = false;
 			attributeToRemove = null;
-			refetchGroup();
+			refetchCategory();
 		} finally {
 			removeSubmitting = false;
 		}
@@ -356,7 +339,7 @@
 					class="flex min-h-[12rem] items-center justify-center rounded-lg border border-dashed bg-muted/20 px-4 py-8"
 				>
 					<p class="text-center text-sm text-muted-foreground">
-						No attributes selected for this group.
+						No attributes selected for this category.
 					</p>
 				</div>
 			{:else}
@@ -383,29 +366,27 @@
 	</div>
 </section>
 
-<AddAttributeToGroupSheet
+<AddAttributeToCategorySheet
 	bind:open={addSheetOpen}
-	groupId={detailQuery?.data?.id ?? ''}
-	groupTitle={detailQuery?.data?.title ?? ''}
-	groupMetadata={detailQuery?.data?.metadata ?? null}
+	categoryId={detailQuery?.data?.id ?? ''}
 	currentAttributeIds={selectedAttributeIds}
 	currentAttributeRequiredById={Object.fromEntries(
-		groupAttributes.map((a) => [a.id, a.required ?? false])
+		categoryAttributes.map((a) => [a.id, a.required ?? false])
 	)}
-	currentGroupAttributes={groupAttributes.map((a) => ({
+	currentCategoryAttributes={categoryAttributes.map((a) => ({
 		id: a.id,
 		title: a.title,
 		type: a.type
 	}))}
-	onSuccess={refetchGroup}
+	onSuccess={refetchCategory}
 />
 
 <DeleteConfirmationModal
 	bind:open={removeConfirmOpen}
-	entityName="attribute from group"
+	entityName="attribute from category"
 	entityTitle={attributeToRemove?.title ?? attributeToRemove?.id ?? ''}
-	customMessage="This removes the attribute from this group only. The attribute remains available in your catalog."
-	onConfirm={confirmRemoveFromGroup}
+	customMessage="This removes the attribute from this category only. The attribute remains available in your catalog."
+	onConfirm={confirmRemoveFromCategory}
 	onCancel={() => {
 		attributeToRemove = null;
 		removeError = null;
