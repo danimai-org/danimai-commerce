@@ -251,12 +251,12 @@
 					type="button"
 					variant="outline"
 					size="sm"
-					class="h-9 shrink-0 gap-1 rounded-lg"
+					class="h-9 shrink-0 gap-1 rounded-lg "
 					disabled={!detailQuery?.data}
 					onclick={() => (addSheetOpen = true)}
 				>
 					<Plus class="size-4" />
-					Add attribute
+					Add
 				</Button>
 				<Button
 					type="button"

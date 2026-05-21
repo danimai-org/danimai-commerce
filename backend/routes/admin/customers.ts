@@ -11,6 +11,7 @@ import {
   DELETE_CUSTOMER_ADDRESS_PROCESS,
   ADD_CUSTOMER_TO_GROUP_PROCESS,
   REMOVE_CUSTOMER_FROM_GROUP_PROCESS,
+  DELETE_CUSTOMERS_PROCESS,
   PaginatedCustomersProcess,
   CreateCustomersProcess,
   RetrieveCustomerProcess,
@@ -20,6 +21,7 @@ import {
   DeleteCustomerAddressProcess,
   AddCustomerToGroupProcess,
   RemoveCustomerFromGroupProcess,
+  DeleteCustomersProcess,
   PaginatedCustomersSchema,
   PaginatedCustomersResponseSchema,
   RetrieveCustomerResponseSchema,
@@ -32,10 +34,11 @@ import {
   CreateCustomersResponseSchema,
   CreateCustomerAddressSchema,
   ListCustomerAddressesSchema,
-  UpdateCustomerAddressSchema,
+  UpdateCustomerAddressBodySchema,
   DeleteCustomerAddressSchema,
   AddCustomerToGroupSchema,
   RemoveCustomerFromGroupSchema,
+  DeleteCustomersSchema,
 } from "@danimai/customer";
 import { handleProcessError } from "../../utils/error-handler";
 import {
@@ -199,7 +202,7 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
     },
     {
       params: Type.Object({ id: Type.String(), addressId: Type.String() }),
-      body: UpdateCustomerAddressSchema,
+      body: UpdateCustomerAddressBodySchema,
       response: {
         200: UpdateCustomerAddressResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -252,6 +255,27 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
         tags: ["Customers"],
         summary: "Create customer(s)",
         description: "Creates one or more customers",
+      },
+    }
+  )
+  .delete(
+    "/",
+    async ({ body: input }) => {
+      const process = getService<DeleteCustomersProcess>(DELETE_CUSTOMERS_PROCESS);
+      await process.runOperations({ input });
+      return { success: true };
+    },
+    {
+      body: DeleteCustomersSchema,
+      response: {
+        200: Type.Object({ success: Type.Literal(true) }),
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Customers"],
+        summary: "Delete customer(s)",
+        description: "Soft-deletes one or more customers",
       },
     }
   );

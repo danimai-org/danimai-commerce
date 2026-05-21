@@ -187,9 +187,7 @@
 		{#if attributesGroup.length > 0}
 			{#each attributesGroup as group (group.id)}
 				<div>
-					<dt
-						class="mb-2.5 border-b p-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase"
-					>
+					<dt class="mb-2.5 border-b text-xl font-bold text-muted-foreground uppercase">
 						{group.title}
 					</dt>
 					<div class="space-y-0 divide-y divide-border/60">

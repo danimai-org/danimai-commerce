@@ -12,8 +12,9 @@ import type { Logger } from "@logtape/logtape";
 import {
   AddCustomerToGroupSchema,
   type AddCustomerToGroupProcessInput,
+  type AddCustomerToGroupProcessOutput,
 } from "./add-customer-to-group.schema";
-import type { Database, CustomerGroupCustomer } from "../../../db/type";
+import type { Database } from "../../../db/type";
 
 /**
  * Handles the add customer to group process.
@@ -24,7 +25,7 @@ export const ADD_CUSTOMER_TO_GROUP_PROCESS = Symbol("AddCustomerToGroup");
 
 @Process(ADD_CUSTOMER_TO_GROUP_PROCESS)
 export class AddCustomerToGroupProcess
-  implements ProcessContract<CustomerGroupCustomer | undefined>
+  implements ProcessContract<typeof AddCustomerToGroupSchema, AddCustomerToGroupProcessOutput>
 {
   constructor(
     @InjectDB()
@@ -43,12 +44,14 @@ export class AddCustomerToGroupProcess
       schema: AddCustomerToGroupSchema,
     })
     context: ProcessContextType<typeof AddCustomerToGroupSchema>
-  ) {
+  ): Promise<AddCustomerToGroupProcessOutput> {
     const { input } = context;
     return this.addCustomerToGroup(input);
   }
 
-  async addCustomerToGroup(input: AddCustomerToGroupProcessInput) {
+  async addCustomerToGroup(
+    input: AddCustomerToGroupProcessInput
+  ): Promise<AddCustomerToGroupProcessOutput> {
     this.logger.info("Adding customer to group", {
       customer_id: input.customer_id,
       customer_group_id: input.customer_group_id,
@@ -89,15 +92,25 @@ export class AddCustomerToGroupProcess
       .select("customer_id")
       .executeTakeFirst();
     if (existing) {
-      return this.db
+      const row = await this.db
         .selectFrom("customer_group_customers")
         .where("customer_id", "=", input.customer_id)
         .where("customer_group_id", "=", input.customer_group_id)
         .selectAll()
         .executeTakeFirst();
+      if (!row) {
+        throw new ValidationError("Customer group membership not found", [
+          {
+            type: "not_found",
+            message: "Customer group membership not found",
+            path: "customer_group_id",
+          },
+        ]);
+      }
+      return row;
     }
 
-    return this.db
+    const row = await this.db
       .insertInto("customer_group_customers")
       .values({
         customer_id: input.customer_id,
@@ -105,5 +118,15 @@ export class AddCustomerToGroupProcess
       })
       .returningAll()
       .executeTakeFirst();
+    if (!row) {
+      throw new ValidationError("Failed to add customer to group", [
+        {
+          type: "internal",
+          message: "Failed to add customer to group",
+          path: "customer_group_id",
+        },
+      ]);
+    }
+    return row;
   }
 }

@@ -12,8 +12,9 @@ import type { Logger } from "@logtape/logtape";
 import {
   CreateCustomerAddressSchema,
   type CreateCustomerAddressProcessInput,
+  type CreateCustomerAddressProcessOutput,
 } from "./create-customer-address.schema";
-import type { Database, CustomerAddress } from "../../../db/type";
+import type { Database } from "../../../db/type";
 
 /**
  * Handles the create customer address process.
@@ -24,7 +25,10 @@ export const CREATE_CUSTOMER_ADDRESS_PROCESS = Symbol("CreateCustomerAddress");
 
 @Process(CREATE_CUSTOMER_ADDRESS_PROCESS)
 export class CreateCustomerAddressProcess
-  implements ProcessContract<CustomerAddress | undefined>
+  implements ProcessContract<
+    typeof CreateCustomerAddressSchema,
+    CreateCustomerAddressProcessOutput
+  >
 {
   constructor(
     @InjectDB()
@@ -43,12 +47,14 @@ export class CreateCustomerAddressProcess
       schema: CreateCustomerAddressSchema,
     })
     context: ProcessContextType<typeof CreateCustomerAddressSchema>
-  ) {
+  ): Promise<CreateCustomerAddressProcessOutput> {
     const { input } = context;
     return this.createAddress(input);
   }
 
-  async createAddress(input: CreateCustomerAddressProcessInput) {
+  async createAddress(
+    input: CreateCustomerAddressProcessInput
+  ): Promise<CreateCustomerAddressProcessOutput> {
     this.logger.info("Creating customer address", {
       customer_id: input.customer_id,
     });
@@ -65,7 +71,7 @@ export class CreateCustomerAddressProcess
       ]);
     }
 
-    return this.db
+    const row = await this.db
       .insertInto("customer_addresses")
       .values({
         customer_id: input.customer_id,
@@ -82,5 +88,15 @@ export class CreateCustomerAddressProcess
       })
       .returningAll()
       .executeTakeFirst();
+    if (!row) {
+      throw new ValidationError("Failed to create address", [
+        {
+          type: "internal",
+          message: "Failed to create address",
+          path: "customer_id",
+        },
+      ]);
+    }
+    return row;
   }
 }

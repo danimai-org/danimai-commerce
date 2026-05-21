@@ -11,8 +11,9 @@ import type { Logger } from "@logtape/logtape";
 import {
   ListCustomerAddressesSchema,
   type ListCustomerAddressesProcessInput,
+  type ListCustomerAddressesProcessOutput,
 } from "./list-customer-addresses.schema";
-import type { Database, CustomerAddress } from "../../../db/type";
+import type { Database } from "../../../db/type";
 
 /**
  * Handles the list customer addresses process.
@@ -23,7 +24,10 @@ export const LIST_CUSTOMER_ADDRESSES_PROCESS = Symbol("ListCustomerAddresses");
 
 @Process(LIST_CUSTOMER_ADDRESSES_PROCESS)
 export class ListCustomerAddressesProcess
-  implements ProcessContract<CustomerAddress[]>
+  implements ProcessContract<
+    typeof ListCustomerAddressesSchema,
+    ListCustomerAddressesProcessOutput
+  >
 {
   constructor(
     @InjectDB()

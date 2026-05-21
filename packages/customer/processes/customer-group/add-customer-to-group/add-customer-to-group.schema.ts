@@ -12,13 +12,10 @@ export type AddCustomerToGroupProcessInput = Static<
 export const CustomerGroupCustomerResponseSchema = Type.Object({
   customer_id: Type.String(),
   customer_group_id: Type.String(),
-  created_at: Type.Date(),
+  created_at: Type.String(),
 });
 
-export const AddCustomerToGroupResponseSchema = Type.Union([
-  CustomerGroupCustomerResponseSchema,
-  Type.Undefined(),
-]);
+export const AddCustomerToGroupResponseSchema = CustomerGroupCustomerResponseSchema;
 export type AddCustomerToGroupProcessOutput = Static<
   typeof AddCustomerToGroupResponseSchema
 >;

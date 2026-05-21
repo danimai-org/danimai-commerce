@@ -12,8 +12,9 @@ import type { Logger } from "@logtape/logtape";
 import {
   UpdateCustomerAddressSchema,
   type UpdateCustomerAddressProcessInput,
+  type UpdateCustomerAddressProcessOutput,
 } from "./update-customer-address.schema";
-import type { Database, CustomerAddress } from "../../../db/type";
+import type { Database } from "../../../db/type";
 
 /**
  * Handles the update customer address process.
@@ -24,7 +25,10 @@ export const UPDATE_CUSTOMER_ADDRESS_PROCESS = Symbol("UpdateCustomerAddress");
 
 @Process(UPDATE_CUSTOMER_ADDRESS_PROCESS)
 export class UpdateCustomerAddressProcess
-  implements ProcessContract<CustomerAddress | undefined>
+  implements ProcessContract<
+    typeof UpdateCustomerAddressSchema,
+    UpdateCustomerAddressProcessOutput
+  >
 {
   constructor(
     @InjectDB()
@@ -43,12 +47,14 @@ export class UpdateCustomerAddressProcess
       schema: UpdateCustomerAddressSchema,
     })
     context: ProcessContextType<typeof UpdateCustomerAddressSchema>
-  ) {
+  ): Promise<UpdateCustomerAddressProcessOutput> {
     const { input } = context;
     return this.updateAddress(input);
   }
 
-  async updateAddress(input: UpdateCustomerAddressProcessInput) {
+  async updateAddress(
+    input: UpdateCustomerAddressProcessInput
+  ): Promise<UpdateCustomerAddressProcessOutput> {
     this.logger.info("Updating customer address", {
       id: input.id,
       customer_id: input.customer_id,
@@ -67,7 +73,7 @@ export class UpdateCustomerAddressProcess
       ]);
     }
 
-    return this.db
+    const row = await this.db
       .updateTable("customer_addresses")
       .set({
         first_name: input.first_name ?? null,
@@ -80,11 +86,17 @@ export class UpdateCustomerAddressProcess
         country_code: input.country_code,
         province: input.province ?? null,
         postal_code: input.postal_code ?? null,
-        updated_at: new Date().toISOString(),
+        updated_at: new Date(),
       })
       .where("id", "=", input.id)
       .where("customer_id", "=", input.customer_id)
       .returningAll()
       .executeTakeFirst();
+    if (!row) {
+      throw new ValidationError("Address not found", [
+        { type: "not_found", message: "Address not found", path: "id" },
+      ]);
+    }
+    return row;
   }
 }

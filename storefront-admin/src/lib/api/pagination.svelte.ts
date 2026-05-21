@@ -1,6 +1,22 @@
 import { createQuery, type QueryFunction } from '@tanstack/svelte-query';
 import { PaginationSchema } from '@danimai/backend';
-import { type Static } from '@sinclair/typebox';
+import { type StaticDecode } from '@sinclair/typebox';
+
+export type PaginationQuery = StaticDecode<typeof PaginationSchema>;
+
+function coercePage(value: string | number | undefined): number | undefined {
+	if (value === undefined || value === null || value === '') return undefined;
+	const n = typeof value === 'string' ? parseInt(value, 10) : value;
+	const num = typeof n === 'number' && !Number.isNaN(n) ? n : undefined;
+	return num !== undefined ? Math.max(1, num) : undefined;
+}
+
+function coerceLimit(value: string | number | undefined): number | undefined {
+	if (value === undefined || value === null || value === '') return undefined;
+	const n = typeof value === 'string' ? parseInt(value, 10) : value;
+	const num = typeof n === 'number' && !Number.isNaN(n) ? n : undefined;
+	return num !== undefined ? Math.max(1, Math.min(100, num)) : undefined;
+}
 
 /**
  * Pagination meta returned by list APIs. Use createPaginationQuery(url.searchParams)
@@ -21,11 +37,28 @@ const searchParamsToObject = (searchParams: URLSearchParams) => {
 	return Object.fromEntries(searchParams.entries());
 };
 
-export const createPaginationQuery = <T extends Static<typeof PaginationSchema>>(
-	data: URLSearchParams | T
-) => {
-	const searchParams = data instanceof URLSearchParams ? searchParamsToObject(data) : data;
-	return searchParams;
+export const createPaginationQuery = <T extends Record<string, unknown> = Record<string, never>>(
+	data: URLSearchParams | (Partial<PaginationQuery> & T)
+): PaginationQuery & T => {
+	const raw: Record<string, unknown> =
+		data instanceof URLSearchParams
+			? searchParamsToObject(data)
+			: { ...(data as Record<string, unknown>) };
+
+	const page =
+		raw.page !== undefined ? coercePage(raw.page as string | number) : undefined;
+	const limit =
+		raw.limit !== undefined ? coerceLimit(raw.limit as string | number) : undefined;
+	const search = typeof raw.search === 'string' ? raw.search.trim() : raw.search;
+
+	const { page: _page, limit: _limit, search: _search, ...rest } = raw;
+
+	return {
+		...rest,
+		...(page !== undefined ? { page } : {}),
+		...(limit !== undefined ? { limit } : {}),
+		...(typeof search === 'string' ? { search } : {}),
+	} as PaginationQuery & T;
 };
 
 export type CreatePaginationOptions = {

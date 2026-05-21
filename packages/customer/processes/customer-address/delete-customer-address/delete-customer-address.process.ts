@@ -12,8 +12,9 @@ import type { Logger } from "@logtape/logtape";
 import {
   DeleteCustomerAddressSchema,
   type DeleteCustomerAddressProcessInput,
+  type DeleteCustomerAddressProcessOutput,
 } from "./delete-customer-address.schema";
-import type { Database, CustomerAddress } from "../../../db/type";
+import type { Database } from "../../../db/type";
 
 /**
  * Handles the delete customer address process.
@@ -24,7 +25,10 @@ export const DELETE_CUSTOMER_ADDRESS_PROCESS = Symbol("DeleteCustomerAddress");
 
 @Process(DELETE_CUSTOMER_ADDRESS_PROCESS)
 export class DeleteCustomerAddressProcess
-  implements ProcessContract<CustomerAddress | undefined>
+  implements ProcessContract<
+    typeof DeleteCustomerAddressSchema,
+    DeleteCustomerAddressProcessOutput
+  >
 {
   constructor(
     @InjectDB()
@@ -43,12 +47,14 @@ export class DeleteCustomerAddressProcess
       schema: DeleteCustomerAddressSchema,
     })
     context: ProcessContextType<typeof DeleteCustomerAddressSchema>
-  ) {
+  ): Promise<DeleteCustomerAddressProcessOutput> {
     const { input } = context;
     return this.deleteAddress(input);
   }
 
-  async deleteAddress(input: DeleteCustomerAddressProcessInput) {
+  async deleteAddress(
+    input: DeleteCustomerAddressProcessInput
+  ): Promise<DeleteCustomerAddressProcessOutput> {
     this.logger.info("Deleting customer address", {
       id: input.id,
       customer_id: input.customer_id,
@@ -67,15 +73,21 @@ export class DeleteCustomerAddressProcess
       ]);
     }
 
-    return this.db
+    const row = await this.db
       .updateTable("customer_addresses")
       .set({
-        deleted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        deleted_at: new Date(),
+        updated_at: new Date(),
       })
       .where("id", "=", input.id)
       .where("customer_id", "=", input.customer_id)
       .returningAll()
       .executeTakeFirst();
+    if (!row) {
+      throw new ValidationError("Address not found", [
+        { type: "not_found", message: "Address not found", path: "id" },
+      ]);
+    }
+    return row;
   }
 }
