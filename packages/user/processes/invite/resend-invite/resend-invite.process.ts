@@ -96,8 +96,8 @@ export class ResendInviteProcess implements ProcessContract<
       .executeTakeFirst();
 
     const frontendUrl =
-      (typeof process !== "undefined" && process.env?.FRONTEND_URL) ||
-      (typeof Bun !== "undefined" && (Bun as any).env?.FRONTEND_URL) ||
+      (typeof process !== "undefined" && process.env?.ADMIN_FRONTEND_URL) ||
+      (typeof Bun !== "undefined" && (Bun as any).env?.ADMIN_FRONTEND_URL) ||
       "";
     const base = frontendUrl.replace(/\/+$/, "");
     const inviteLink = base ? `${base}/accept-invite?token=${token}` : "";

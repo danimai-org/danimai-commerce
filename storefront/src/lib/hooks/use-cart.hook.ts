@@ -25,7 +25,7 @@ export const useCart = () => {
     },
     updateCartAddresses: {
       mutateAsync: async ({ id, addresses }: { id: string; addresses: any[] }) => {
-        const res = await client.admin.carts({ id }).addresses.put({
+        const res = await client.storefront.carts({ id }).addresses.put({
           shipping_address: {
             ...addresses[0],
             id: addresses[0]?.id ?? undefined,

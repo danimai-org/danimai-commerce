@@ -1,7 +1,7 @@
 import { client } from "$lib/api/client";
 
 export type Cart = NonNullable<
-  Awaited<ReturnType<ReturnType<(typeof client)["admin"]["carts"]>["get"]>>["data"]
+  Awaited<ReturnType<ReturnType<(typeof client)["storefront"]["carts"]>["get"]>>["data"]
 >;
 
 export type CartLineItem = Cart["line_items"][number];
@@ -57,7 +57,7 @@ async function ensureSessionId(): Promise<string> {
   }
   const existing = localStorage.getItem(SESSION_STORAGE_KEY);
   if (existing) return existing;
-  const res = await client.admin.auth.sessions.post({});
+  const res = await client.storefront.auth.sessions.post({});
   if (res.error) throw new Error(res.error.value?.message ?? "Unknown error");
   const session = res.data as { id: string };
   localStorage.setItem(SESSION_STORAGE_KEY, session.id);
@@ -65,7 +65,7 @@ async function ensureSessionId(): Promise<string> {
 }
 
 async function createCartRow(sessionId: string): Promise<Cart> {
-  const created = await client.admin.carts.post({
+  const created = await client.storefront.carts.post({
     session_id: sessionId,
     currency_code: DEFAULT_CART_CURRENCY_CODE,
   });
@@ -78,7 +78,7 @@ async function createCartRow(sessionId: string): Promise<Cart> {
 }
 
 async function retrieveCart(cartId: string): Promise<Cart | null> {
-  const res = await client.admin.carts({ id: cartId }).get();
+  const res = await client.storefront.carts({ id: cartId }).get();
   if (res.error || !res.data) return null;
   return res.data as Cart;
 }
@@ -138,7 +138,7 @@ export async function syncLineItems(
   id?: string,
 ): Promise<Cart> {
   const cartId = id ?? (await ensureCartId());
-  const res = await client.admin.carts({ id: cartId })["line-items"].put({
+  const res = await client.storefront.carts({ id: cartId })["line-items"].put({
     line_items: lineItems.map((item) => normalizeLineItemPayload(item)),
   });
   if (res.error || !res.data) {
@@ -152,7 +152,7 @@ export async function syncLineItems(
 
 export async function applyPromoCode(code: string, id?: string): Promise<Cart> {
   const cartId = id ?? (await ensureCartId());
-  const res = await client.admin.carts({ id: cartId })["promo-code"].put({
+  const res = await client.storefront.carts({ id: cartId })["promo-code"].put({
     code,
   });
   if (res.error || !res.data) {

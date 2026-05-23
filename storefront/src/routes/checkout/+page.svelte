@@ -222,20 +222,20 @@
     }
 
     async function fetchCartJson(cartId: string): Promise<ApiCart> {
-        const res = await client.admin.carts({ id: cartId }).get();
+        const res = await client.storefront.carts({ id: cartId }).get();
         if (res.error) throw new Error(treatyErrorMessage(res.error));
         return res.data as ApiCart;
     }
 
     async function putLineItems(cartId: string, line_items: LineItemPut[]) {
-        const res = await client.admin
+        const res = await client.storefront
             .carts({ id: cartId })
             ["line-items"].put({ line_items });
         if (res.error) throw new Error(treatyErrorMessage(res.error));
     }
 
     async function createCartWithCurrency(sessionId: string): Promise<string> {
-        const res = await client.admin.carts.post({
+        const res = await client.storefront.carts.post({
             session_id: sessionId,
             currency_code: DEFAULT_CART_CURRENCY_CODE,
         });
@@ -321,7 +321,7 @@
             const shipLabel = shippingMethodLabelFrom(f.shippingMethod);
             const payLabel = paymentMethodLabelFrom(f.paymentMethod);
             const readyCartId = await ensureCheckoutCartReady(cartId);
-            const res = await client.admin.orders["from-cart"].post({
+            const res = await client.storefront.orders["from-cart"].post({
                 cart_id: readyCartId,
                 metadata: {
                     shipping_method: shipLabel,

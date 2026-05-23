@@ -10,7 +10,9 @@ function treatyErrorMessage(err: unknown): string {
   return o?.value?.message ?? String(err);
 }
 
-export const load: LayoutServerLoad = async ({ cookies, request }) => {
+export const load: LayoutServerLoad = async ({ cookies, request, url }) => {
+  if (url.pathname === "/accept-invite") return {};
+
   const existingSessionId = cookies.get(SESSION_COOKIE_KEY);
   if (existingSessionId) return {};
 
@@ -28,7 +30,7 @@ export const load: LayoutServerLoad = async ({ cookies, request }) => {
   }
 
   // create empty cart
-  const cart = await client.admin.carts.post({
+  const cart = await client.storefront.carts.post({
     session_id: res.data.id,
   });
 
