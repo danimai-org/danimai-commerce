@@ -12,7 +12,7 @@ export type AddCustomerToGroupProcessInput = Static<
 export const CustomerGroupCustomerResponseSchema = Type.Object({
   customer_id: Type.String(),
   customer_group_id: Type.String(),
-  created_at: Type.String(),
+  created_at: Type.Date(),
 });
 
 export const AddCustomerToGroupResponseSchema = CustomerGroupCustomerResponseSchema;

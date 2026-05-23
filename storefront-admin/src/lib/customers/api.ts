@@ -201,7 +201,7 @@ export async function createCustomerAddress(
 	const res = await fetch(`${getApiBase()}/customers/${customerId}/addresses`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(body)
+		body: JSON.stringify({ ...body, customer_id: customerId })
 	});
 	if (!res.ok) {
 		const text = await res.text();

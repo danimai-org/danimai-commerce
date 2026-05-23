@@ -91,7 +91,7 @@
 					key: 'edit',
 					type: 'button',
 					onClick: (item) =>
-						paginateState.openEdit(item as Parameters<typeof paginateState.openEdit>[0])
+						goto(resolve(`/customers/${String((item as { id?: string }).id ?? '')}`, {}))
 				},
 				{
 					label: 'Delete',

@@ -37,7 +37,7 @@ import {
   UpdateCustomerAddressBodySchema,
   DeleteCustomerAddressSchema,
   AddCustomerToGroupSchema,
-  RemoveCustomerFromGroupSchema,
+  RemoveCustomerFromGroupQuerySchema,
   DeleteCustomersSchema,
 } from "@danimai/customer";
 import { handleProcessError } from "../../utils/error-handler";
@@ -49,6 +49,10 @@ import {
 const AddCustomerToGroupBodySchema = Type.Object({
   customer_group_id: Type.String(),
 });
+
+const AdminCreateCustomerAddressBodySchema = Type.Omit(CreateCustomerAddressSchema, [
+  "customer_id",
+]);
 
 export const customerRoutes = new Elysia({ prefix: "/customers" })
   .onError(({ error, set }) => handleProcessError(error, set))
@@ -154,7 +158,7 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
     },
     {
       params: Type.Object({ id: Type.String() }),
-      query: RemoveCustomerFromGroupSchema,
+      query: RemoveCustomerFromGroupQuerySchema,
       response: {
         200: Type.Object({ success: Type.Literal(true) }),
         400: ValidationErrorResponseSchema,
@@ -178,7 +182,7 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
     },
     {
       params: Type.Object({ id: Type.String() }),
-      body: CreateCustomerAddressSchema,
+      body: AdminCreateCustomerAddressBodySchema,
       response: {
         200: CreateCustomerAddressResponseSchema,
         400: ValidationErrorResponseSchema,

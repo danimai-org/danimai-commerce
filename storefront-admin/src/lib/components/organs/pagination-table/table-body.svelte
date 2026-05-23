@@ -16,6 +16,8 @@
 		openDeleteConfirm,
 		selectedIds,
 		onToggleSelect,
+		disabledIds,
+		disabledRowLabel = 'Already selected',
 		rowIdKey = 'id',
 		onRowClick,
 	}: {
@@ -26,6 +28,8 @@
 		openDeleteConfirm?: (item: Record<string, unknown>) => void;
 		selectedIds?: Set<string>;
 		onToggleSelect?: (id: string) => void;
+		disabledIds?: Set<string>;
+		disabledRowLabel?: string;
 		rowIdKey?: string;
 		onRowClick?: (item: Record<string, unknown>) => void;
 	} = $props();
@@ -137,19 +141,24 @@
 		</tr>
 	{:else}
 		{#each rows as row, i (row.id ?? i)}
+			{@const rowId = String(row[rowIdKey] ?? '')}
+			{@const isRowDisabled = disabledIds?.has(rowId) ?? false}
 			<tr
-				class="border-b transition-colors hover:bg-muted/30 {onRowClick ? 'cursor-pointer' : ''}"
-				onclick={() => onRowClick?.(row)}
+				class="border-b transition-colors hover:bg-muted/30 {onRowClick && !isRowDisabled
+					? 'cursor-pointer'
+					: ''}"
+				onclick={() => !isRowDisabled && onRowClick?.(row)}
 			>
 				{#if showSelection}
-					{@const rowId = String(row[rowIdKey] ?? '')}
 					<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
-						<input
-							type="checkbox"
-							class="h-4 w-4 rounded border-input"
-							checked={selectedIds?.has(rowId) ?? false}
-							onchange={() => onToggleSelect?.(rowId)}
-						/>
+						{#if !isRowDisabled}
+							<input
+								type="checkbox"
+								class="h-4 w-4 rounded border-input accent-primary"
+								checked={selectedIds?.has(rowId) ?? false}
+								onchange={() => onToggleSelect?.(rowId)}
+							/>
+						{/if}
 					</td>
 				{/if}
 				{#each columns as column, colIndex (column.key)}

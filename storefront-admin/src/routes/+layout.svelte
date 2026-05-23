@@ -1,7 +1,8 @@
 <script lang="ts">
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
-	import { user, logout } from '$lib/auth.js';
+	import { user, logout, authReady, initializeAuth } from '$lib/auth.js';
+	import { onMount } from 'svelte';
 	import { Collapsible, DropdownMenu } from 'bits-ui';
 	import {
 		SidebarContent,
@@ -83,6 +84,22 @@
 	$effect(() => {
 		if (path.startsWith('/customers')) customersOpen = true;
 	});
+
+	onMount(() => {
+		void initializeAuth();
+	});
+
+	$effect(() => {
+		if (!browser || !$authReady) return;
+		if (isPublicPath(path)) {
+			if ($user) goto(resolve('/', {}), { replaceState: true });
+			return;
+		}
+		if (!$user) {
+			console.debug('[auth] redirect to login after authReady');
+			goto(resolve('/login', {}), { replaceState: true });
+		}
+	});
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
@@ -91,6 +108,8 @@
 	<QueryClientProvider client={queryClient}>
 		{@render children()}
 	</QueryClientProvider>
+{:else if !$authReady || !$user}
+	<div class="flex min-h-dvh items-center justify-center text-muted-foreground">Loading…</div>
 {:else}
 	<QueryClientProvider client={queryClient}>
 		<TooltipProvider>

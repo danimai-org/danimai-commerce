@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { client } from '$lib/client';
+	import { updateCustomer } from '$lib/customers/api.js';
+	import { updateCustomerGroup } from '$lib/customer-groups/api.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -14,13 +16,22 @@
 		| 'product-attribute'
 		| 'region'
 		| 'sales-channel'
-		| 'store';
+		| 'store'
+		| 'customer'
+		| 'customer-group';
 
 	interface Props {
 		open: boolean;
 		productId: string | null | undefined;
 		metadata: Record<string, unknown> | null | undefined;
 		metadataEntity?: MetadataEntity;
+		customerFields?: {
+			email: string;
+			first_name: string | null;
+			last_name: string | null;
+			phone: string | null;
+		} | null;
+		entityName?: string | null;
 		onSaved: () => void | Promise<void>;
 	}
 
@@ -29,6 +40,8 @@
 		productId,
 		metadata,
 		metadataEntity = 'product',
+		customerFields = null,
+		entityName = null,
 		onSaved
 	}: Props = $props();
 
@@ -101,6 +114,26 @@
 					metadata: meta
 				});
 			}
+			case 'customer': {
+				if (!customerFields) {
+					throw new Error('Missing customer fields');
+				}
+				await updateCustomer(id, {
+					email: customerFields.email,
+					first_name: customerFields.first_name,
+					last_name: customerFields.last_name,
+					phone: customerFields.phone,
+					metadata: meta
+				});
+				return {};
+			}
+			case 'customer-group': {
+				if (!entityName) {
+					throw new Error('Missing customer group name');
+				}
+				await updateCustomerGroup(id, { name: entityName, metadata: meta });
+				return {};
+			}
 			default:
 				return client.products({ id }).put({ metadata: meta });
 		}
@@ -122,7 +155,7 @@
 				meta[k] = Number.isNaN(num) ? row.value : num;
 			}
 			const res = await putMetadataForEntity(metadataEntity, productId, meta);
-			if (res.error) {
+			if (res && 'error' in res && res.error) {
 				const err = res.error as { value?: { message?: string } };
 				throw new Error(err?.value?.message ?? String(res.error));
 			}

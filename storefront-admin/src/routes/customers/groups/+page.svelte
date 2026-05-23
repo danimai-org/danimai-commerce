@@ -46,7 +46,6 @@
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
 	const openCreate = $derived(paginateState.openCreate);
-	const openEdit = $derived(paginateState.openEdit);
 	const closeForm = $derived(paginateState.closeForm);
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
 	const deleteItem = $derived(paginateState.deleteItem);
@@ -78,7 +77,8 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => openEdit(item as Parameters<typeof openEdit>[0])
+					onClick: (item) =>
+						goto(resolve(`/customers/groups/${String((item as { id?: string }).id ?? '')}`, {}))
 				},
 				{
 					label: 'Delete',

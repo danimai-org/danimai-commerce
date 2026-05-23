@@ -11,16 +11,32 @@
 		| 'product-attribute'
 		| 'region'
 		| 'sales-channel'
-		| 'store';
+		| 'store'
+		| 'customer'
+		| 'customer-group';
 
 	interface Props {
 		productId: string | null | undefined;
 		metadata: Record<string, unknown> | null | undefined;
 		metadataEntity?: MetadataEntity;
+		customerFields?: {
+			email: string;
+			first_name: string | null;
+			last_name: string | null;
+			phone: string | null;
+		} | null;
+		entityName?: string | null;
 		onSaved: () => void | Promise<void>;
 	}
 
-	let { productId, metadata, metadataEntity = 'product', onSaved }: Props = $props();
+	let {
+		productId,
+		metadata,
+		metadataEntity = 'product',
+		customerFields = null,
+		entityName = null,
+		onSaved
+	}: Props = $props();
 
 	let metadataSheetOpen = $state(false);
 </script>
@@ -54,5 +70,7 @@
 	{productId}
 	{metadata}
 	{metadataEntity}
+	{customerFields}
+	{entityName}
 	onSaved={onSaved}
 />

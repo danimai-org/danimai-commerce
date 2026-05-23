@@ -89,7 +89,10 @@ export async function createCustomerGroup(payload: { name: string }): Promise<vo
 	}
 }
 
-export async function updateCustomerGroup(id: string, payload: { name: string }): Promise<void> {
+export async function updateCustomerGroup(
+	id: string,
+	payload: { name: string; metadata?: Record<string, unknown> | null }
+): Promise<void> {
 	const res = await fetch(`${getApiBase()}/customer-groups/${id}`, {
 		method: 'PUT',
 		headers: { 'Content-Type': 'application/json' },

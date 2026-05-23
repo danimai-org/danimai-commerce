@@ -8,8 +8,10 @@ export {
 } from './order/index.js';
 export { default as SalesChannelFormSheet } from './sales-channel/create/CreateSalesChannel.svelte';
 export { default as RoleFormSheet } from './role/Create/roleCreate.svelte';
-export { default as CustomerFormSheet } from './customer-form-sheet/customer-form-sheet.svelte';
-export { default as CustomerAddressFormSheet } from './customer-address-form-sheet/customer-address-form-sheet.svelte';
+export { default as CustomerFormSheet } from './customer/create/customer-form-sheet.svelte';
+export { default as CustomerAddressFormSheet } from './customer/detail/CustomerAddressSheet.svelte';
+export * from './customer/detail/index.js';
+export * from './customer-group/detail/index.js';
 export { default as LocationFormSheet } from './location/create/CreateLocation.svelte';
 export { default as CategoryFormSheet } from './category/create/categoryCreate.svelte';
 export { default as CollectionFormSheet } from './collection/create/collectionCreate.svelte';
