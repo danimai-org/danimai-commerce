@@ -256,7 +256,7 @@
 					onclick={() => (addSheetOpen = true)}
 				>
 					<Plus class="size-4" />
-					Add
+					Edit
 				</Button>
 				<Button
 					type="button"

@@ -7,6 +7,12 @@ export const CreateProductCategorySchema = Type.Object({
   parent_id: Type.Optional(Type.String({ format: "uuid", examples: ["123e4567-e89b-12d3-a456-426614174000"] })),
   status: Type.Optional(Type.Enum(ProductCategoryStatus, { examples: [ProductCategoryStatus.ACTIVE] })),
   visibility: Type.Optional(Type.Enum(ProductCategoryVisibility, { examples: [ProductCategoryVisibility.PUBLIC] })),
+  attributes: Type.Optional(
+    Type.Array(Type.Object({
+      id: Type.String({ format: "uuid" }),
+      required: Type.Boolean(),
+    }), { uniqueItems: true }),
+  ),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
 });
 

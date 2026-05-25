@@ -6,7 +6,6 @@
 	import { untrack } from 'svelte';
 	import { toast, Toaster } from 'svelte-sonner';
 	import { MultiSelectCombobox } from '../../multi-select-combobox';
-	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import X from '@lucide/svelte/icons/x';
 	import { TableHead, type TableColumn } from '$lib/components/organs/index.js';
 
@@ -327,16 +326,9 @@
 						{/key}
 					</div>
 
-					<section class="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-						<div class="border-b border-border bg-muted/40 px-4 py-3">
-							<h3 class="flex items-center gap-2 text-sm font-semibold tracking-tight">
-								<SlidersHorizontal
-									class="size-4 shrink-0 text-muted-foreground"
-									aria-hidden="true"
-								/>
-								Selected attributes
-							</h3>
-						</div>
+					<div class="flex flex-col gap-2">
+						<h3 class="text-sm font-medium">Selected attributes</h3>
+						<section class="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
 						<div class="sm:p-1">
 							{#if selectedRows.length === 0}
 								<div
@@ -384,13 +376,15 @@
 								</div>
 							{/if}
 						</div>
-					</section>
+						</section>
+					</div>
 				</div>
 			</div>
 			<div class="flex shrink-0 justify-end gap-2 border-t border-border p-4">
-				<Button variant="outline" type="button" disabled={submitting} onclick={close}>Cancel</Button>
+				<Button variant="outline" type="button" disabled={submitting} onclick={close}>Cancel</Button
+				>
 				<Button type="submit" disabled={submitting}>
-					{submitting ? 'Saving…' : 'Add to category'}
+					{submitting ? 'Saving…' : 'Save'}
 				</Button>
 			</div>
 		</form>

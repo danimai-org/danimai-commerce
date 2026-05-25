@@ -13,15 +13,12 @@
 		CategoryFormSheet
 	} from '$lib/components/organs/index.js';
 	import FolderTree from '@lucide/svelte/icons/folder-tree';
-	import RotateCw from '@lucide/svelte/icons/rotate-cw';
-	import Search from '@lucide/svelte/icons/search';
 	import { client } from '$lib/client.js';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import { createPaginationQuery, createPagination, type PaginationMeta } from '$lib/api';
 	import { untrack } from 'svelte';
 	import type { PageProps } from './$types';
-
 	const { data }: PageProps = $props();
 
 	const SEARCH_DEBOUNCE_MS = 300;
@@ -33,7 +30,7 @@
 		status?: string;
 		visibility?: string;
 	};
-
+	
 	const paginateState = createPagination(
 		async ({ queryKey }) => {
 			const qs = String(queryKey[2] ?? '');
@@ -99,15 +96,6 @@
 		goto(`?${searchParams.toString()}`, { replaceState: true, keepFocus: true });
 	}
 
-	/** Apply search immediately (shows all categories when query is empty). */
-	function runSearch() {
-		applySearchToUrl(paginateState.searchText);
-	}
-
-	function reloadCategories() {
-		void paginateState.refetch();
-	}
-
 	$effect(() => {
 		paginateState.searchText = page.url.searchParams.get('search') ?? '';
 	});
@@ -169,27 +157,13 @@
 				<span class="font-semibold">Categories</span>
 			</div>
 			<div class="flex flex-wrap items-center gap-2">
-				<Button variant="outline" size="sm" class="gap-1.5" onclick={runSearch}>
-					<Search class="size-4" />
-					Search
-				</Button>
-				<Button
-					variant="outline"
-					size="sm"
-					class="gap-1.5"
-					disabled={paginateState.loading}
-					onclick={reloadCategories}
-				>
-					<RotateCw class="size-4" />
-					Reload
-				</Button>
 				<Button size="sm" onclick={() => (createSheetOpen = true)}>Create</Button>
 			</div>
 		</div>
 
 		<PaginationTable
 			bind:searchQuery={paginateState.searchText}
-			searchPlaceholder="Search categories by name"
+			searchPlaceholder="Search categories"
 			showFilter={false}
 		>
 			{#if paginateState.error}

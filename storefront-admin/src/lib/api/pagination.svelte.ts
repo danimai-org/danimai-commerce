@@ -68,8 +68,8 @@ export type CreatePaginationOptions = {
 	keySuffix?: () => unknown[];
 };
 
-export const createPagination = <T>(
-	queryFn: QueryFunction<T>,
+export const createPagination = <TQuery, TItem = TQuery>(
+	queryFn: QueryFunction<TQuery>,
 	queryKey: string[],
 	initialSearchQuery?: ReturnType<typeof createPaginationQuery>,
 	options?: CreatePaginationOptions
@@ -79,12 +79,12 @@ export const createPagination = <T>(
 	const form = $state({
 		sheetOpen: false,
 		mode: 'create' as 'create' | 'edit',
-		item: null as T | null
+		item: null as TItem | null
 	});
 	const deleteState = $state({
 		confirmOpen: false,
 		submitting: false,
-		item: null as T | null,
+		item: null as TItem | null,
 		error: null as string | null
 	});
 
@@ -119,7 +119,7 @@ export const createPagination = <T>(
 		form.sheetOpen = true;
 	}
 
-	function openEdit(item: T) {
+	function openEdit(item: TItem) {
 		form.mode = 'edit';
 		form.item = item;
 		form.sheetOpen = true;
@@ -130,7 +130,7 @@ export const createPagination = <T>(
 		form.item = null;
 	}
 
-	function openDeleteConfirm(item: T) {
+	function openDeleteConfirm(item: TItem) {
 		deleteState.item = item;
 		deleteState.error = null;
 		deleteState.confirmOpen = true;
@@ -144,7 +144,7 @@ export const createPagination = <T>(
 		}
 	}
 
-	async function confirmDelete(deleteFn: (item: T) => Promise<void>) {
+	async function confirmDelete(deleteFn: (item: TItem) => Promise<void>) {
 		if (deleteState.item == null) return;
 		deleteState.submitting = true;
 		deleteState.error = null;

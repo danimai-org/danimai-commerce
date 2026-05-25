@@ -92,6 +92,34 @@ export class CreateProductCategoryProcess
       throw new InternalServerError("Failed to create product category");
     }
 
+    if (input.attributes) {
+      const existingAttributes = await this.db
+        .selectFrom("product_attributes")
+        .where("id", "in", input.attributes.map((attr) => attr.id))
+        .select("id")
+        .execute();
+
+
+      if (existingAttributes.length !== input.attributes.length) {
+        throw new ValidationError("Some attributes do not exist", existingAttributes.map((attr) => ({
+          type: "not_found",
+          message: "Attribute not found",
+          path: "attributes",
+          value: attr.id,
+        })));
+      }
+
+      await this.db
+        .insertInto("product_category_attribute_relations")
+        .values(input.attributes.map((attribute, index) => ({
+          rank: index + 1,
+          category_id: category.id,
+          product_attribute_id: attribute.id,
+          required: attribute.required,
+        })))
+        .execute();
+    }
+
     return category;
   }
 
