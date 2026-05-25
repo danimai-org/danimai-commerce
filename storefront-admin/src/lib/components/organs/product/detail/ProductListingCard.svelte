@@ -527,7 +527,7 @@
 							disabled={addSubmitting || sheetSelectedIds.size === 0}
 							onclick={submitAddSelected}
 						>
-							{addSubmitting ? 'Adding…' : 'Add selected'}
+							{addSubmitting ? 'Adding…' : 'Add Products'}
 						</Button>
 					{/if}
 				</Sheet.Footer>

@@ -18,8 +18,6 @@
 	import { toast } from 'svelte-sonner';
 	import { createPaginationQuery, createPagination, type PaginationMeta } from '$lib/api';
 	import { untrack } from 'svelte';
-	import type { PageProps } from './$types';
-	const { data }: PageProps = $props();
 
 	const SEARCH_DEBOUNCE_MS = 300;
 
@@ -31,7 +29,10 @@
 		visibility?: string;
 	};
 	
-	const paginateState = createPagination(
+	const paginateState = createPagination<
+		NonNullable<Awaited<ReturnType<typeof client['product-categories']['get']>>>,
+		CategoryRow
+	>(
 		async ({ queryKey }) => {
 			const qs = String(queryKey[2] ?? '');
 			const res = await client['product-categories'].get({
@@ -137,7 +138,7 @@
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => paginateState.openDeleteConfirm(item as CategoryRow)
+					onClick: (item) => paginateState.openDeleteConfirm(item)
 				}
 			]
 		}
@@ -209,14 +210,11 @@
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="category"
-	entityTitle={(paginateState.deleteItem as CategoryRow | null)?.value ??
-		(paginateState.deleteItem as CategoryRow | null)?.id ??
-		''}
+	entityTitle={paginateState.deleteItem?.value ?? paginateState.deleteItem?.id ?? ''}
 	customMessage="Delete this category? This action cannot be undone."
 	onConfirm={() =>
 		paginateState.confirmDelete(async (item) => {
-			const row = item as CategoryRow;
-			await client['product-categories'].delete({ category_ids: [row.id] });
+			await client['product-categories'].delete({ category_ids: [item.id] });
 			toast.success('Category deleted successfully');
 		})}
 	onCancel={paginateState.closeDeleteConfirm}
