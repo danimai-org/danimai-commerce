@@ -67,8 +67,5 @@ export const OrderResponseSchema = Type.Object({
   deleted_at: Type.Union([Type.Date(), Type.Null()]),
 });
 
-export const UpdateOrderResponseSchema = Type.Union([
-  OrderResponseSchema,
-  Type.Undefined(),
-]);
+export const UpdateOrderResponseSchema = OrderResponseSchema;
 export type UpdateOrderProcessOutput = Static<typeof UpdateOrderResponseSchema>;

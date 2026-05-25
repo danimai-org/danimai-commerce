@@ -14,6 +14,10 @@ import {
   UpdateOrderSchema,
 } from "./update-orders.schema";
 import type { Database, Order, OrderUpdate } from "@danimai/order/db";
+import {
+  hasOrdersCartIdColumn,
+  toOrderApiRow,
+} from "../order-response.util";
 
 /**
  * Handles the update orders process.
@@ -23,7 +27,9 @@ import type { Database, Order, OrderUpdate } from "@danimai/order/db";
 export const UPDATE_ORDERS_PROCESS = Symbol("UpdateOrders");
 
 @Process(UPDATE_ORDERS_PROCESS)
-export class UpdateOrdersProcess implements ProcessContract<Order | undefined> {
+export class UpdateOrdersProcess
+  implements ProcessContract<typeof UpdateOrderSchema, Order>
+{
   constructor(
     @InjectDB()
     private readonly db: Kysely<Database>,
@@ -79,12 +85,19 @@ export class UpdateOrdersProcess implements ProcessContract<Order | undefined> {
     if (input.shipping_address_id !== undefined)
       updateData.shipping_address_id = input.shipping_address_id;
     if (input.metadata !== undefined) updateData.metadata = input.metadata;
-    return this.db
+    const row = await this.db
       .updateTable("orders")
       .set(updateData)
       .where("id", "=", input.id)
       .where("deleted_at", "is", null)
       .returningAll()
       .executeTakeFirst();
+    if (!row) {
+      throw new ValidationError("Order not found", [
+        { type: "not_found", message: "Order not found", path: "id" },
+      ]);
+    }
+    const hasCartIdColumn = await hasOrdersCartIdColumn(this.db);
+    return toOrderApiRow(row, hasCartIdColumn);
   }
 }

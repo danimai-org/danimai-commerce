@@ -17,7 +17,11 @@
 </script>
 
 {#if open}
-  <div class={className}>
+  <div
+    class="absolute top-full right-0 z-50 {className ?? ''}"
+    style:margin-top="{sideOffset ?? 4}px"
+    role="menu"
+  >
     <slot />
   </div>
 {/if}

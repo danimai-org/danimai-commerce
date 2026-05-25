@@ -15,7 +15,7 @@
   setContext(DROPDOWN_CTX, ctx);
 </script>
 
-<div>
+<div class="relative">
   <slot />
 </div>
 

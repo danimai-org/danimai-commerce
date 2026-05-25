@@ -12,9 +12,13 @@ import {
 import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
-  PaginatedOrdersQuerySchema,
+  PaginatedOrdersSchema,
 } from "./paginated-orders.schema";
 import type { Database, Order } from "@danimai/order/db";
+import {
+  hasOrdersCartIdColumn,
+  toOrderApiRow,
+} from "../order-response.util";
 
 /**
  * Handles the paginated orders process.
@@ -39,8 +43,8 @@ export class PaginatedOrdersProcess
    * Output: operation result object or entity payload.
    */
   async runOperations(
-    @ProcessContext({ schema: PaginatedOrdersQuerySchema })
-    context: ProcessContextType<typeof PaginatedOrdersQuerySchema>
+    @ProcessContext({ schema: PaginatedOrdersSchema })
+    context: ProcessContextType<typeof PaginatedOrdersSchema>
   ) {
     const { input } = context;
     const page = typeof input.page === "number" ? input.page : (typeof input.page === "string" ? Math.max(1, parseInt(input.page, 10) || 1) : 1);
@@ -81,7 +85,9 @@ export class PaginatedOrdersProcess
     query = query.orderBy(sql.ref(`orders.${safeSortField}`), sortOrder);
 
     const offset = (page - 1) * limit;
-    const data = await query.selectAll().limit(limit).offset(offset).execute();
+    const rows = await query.selectAll().limit(limit).offset(offset).execute();
+    const hasCartIdColumn = await hasOrdersCartIdColumn(this.db);
+    const data = rows.map((row) => toOrderApiRow(row, hasCartIdColumn));
     return paginationResponse<Order>(data, total, { ...input, page, limit });
   }
 }

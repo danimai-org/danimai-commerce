@@ -4,7 +4,7 @@ import { getService } from "@danimai/core";
 import {
   PAGINATED_ORDERS_PROCESS,
   PaginatedOrdersProcess,
-  PaginatedOrdersQuerySchema,
+  PaginatedOrdersSchema,
   PaginatedOrdersResponseSchema,
   CREATE_ORDERS_PROCESS,
   CreateOrdersProcess,
@@ -34,11 +34,11 @@ export const orderRoutes = new Elysia({ prefix: "/orders" })
     async ({ query: input }) => {
       const process = getService<PaginatedOrdersProcess>(PAGINATED_ORDERS_PROCESS);
       return process.runOperations({
-        input: input as StaticDecode<typeof PaginatedOrdersQuerySchema>,
+        input: input as StaticDecode<typeof PaginatedOrdersSchema>,
       });
     },
     {
-      query: PaginatedOrdersQuerySchema,
+      query: PaginatedOrdersSchema,
       response: {
         200: PaginatedOrdersResponseSchema,
         400: ValidationErrorResponseSchema,

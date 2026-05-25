@@ -30,14 +30,6 @@ export const PaginatedOrdersSchema = Type.Object({
   filters: Type.Optional(ordersFiltersSchema),
 });
 
-/** Query-only schema for Elysia route. */
-export const PaginatedOrdersQuerySchema = Type.Intersect([
-  PaginationSchema,
-  Type.Object({
-    filters: Type.Optional(ordersFiltersSchema),
-  }),
-]);
-
 export type PaginatedOrdersProcessInput = Static<
   typeof PaginatedOrdersSchema
 >;

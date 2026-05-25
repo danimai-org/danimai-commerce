@@ -1,0 +1,950 @@
+<script lang="ts">
+	import { SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
+	import type { ComboboxOption } from '$lib/components/organs/combobox/combobox.svelte';
+	import { updateCustomer } from '$lib/customers/api';
+	import EditShippingAddressModal from '../EditShippingAddressModal.svelte';
+	import {
+		emptyShippingAddress,
+		hasShippingAddress,
+		type ShippingAddressValue
+	} from '../shipping-address';
+	import { client } from '$lib/client';
+	import CreateOrderHeader from './CreateOrderHeader.svelte';
+	import CreateOrderProductsSection from './CreateOrderProductsSection.svelte';
+	import CreateOrderPaymentSection from './CreateOrderPaymentSection.svelte';
+	import CreateOrderNotesSection from './CreateOrderNotesSection.svelte';
+	import CreateOrderCustomerSection from './CreateOrderCustomerSection.svelte';
+	import CreateOrderMarketsSection from './CreateOrderMarketsSection.svelte';
+	import CreateOrderTagsSection from './CreateOrderTagsSection.svelte';
+	import CreateOrderProductBrowserDialog from './CreateOrderProductBrowserDialog.svelte';
+	import CreateOrderMarkAsPaidModal from './CreateOrderMarkAsPaidModal.svelte';
+	import CreateOrderCreditCardSheet from './CreateOrderCreditCardSheet.svelte';
+	import CreateOrderEditContactModal from './CreateOrderEditContactModal.svelte';
+	import CreateOrderNotesModal from './CreateOrderNotesModal.svelte';
+	import CreateOrderAddTagsModal from './CreateOrderAddTagsModal.svelte';
+	import {
+		AVAILABLE_TAGS,
+		CUSTOMER_SEARCH_DEBOUNCE_MS,
+		CURRENCY_SEARCH_DEBOUNCE_MS,
+		type CreateOrderItem,
+		type Pagination,
+		type Product,
+		type CustomerListItem,
+		type SelectedCustomer,
+		type CurrencyRow,
+		type RegionRow
+	} from './types.js';
+
+	let {
+		active = false,
+		apiBase = 'http://localhost:8000/admin',
+		onSuccess,
+		onClose
+	}: {
+		active?: boolean;
+		apiBase?: string;
+		onSuccess?: (orderId: string) => void;
+		onClose?: () => void;
+	} = $props();
+
+	let productSearch = $state('');
+	let selectedRegion = $state<string>('');
+	let selectedCurrency = $state<string>('');
+	let notes = $state('');
+	let tags = $state('');
+	let orderItems = $state<CreateOrderItem[]>([]);
+	let discountAmount = $state<number>(0);
+	let shippingAmount = $state<number>(0);
+	let taxAmount = $state<number>(0);
+	let paymentDueLater = $state(false);
+	let creditCardSheetOpen = $state(false);
+	let billingCountry = $state('India');
+	let billingFirstName = $state('');
+	let billingLastName = $state('');
+	let billingCompany = $state('');
+	let billingAddress = $state('');
+	let billingApartment = $state('');
+	let billingCity = $state('');
+	let billingState = $state('');
+	let billingPinCode = $state('');
+	let billingPhoneCode = $state('+91');
+	let billingPhone = $state('');
+	let markAsPaidModalOpen = $state(false);
+	let notesModalOpen = $state(false);
+	let addTagsModalOpen = $state(false);
+	let creatingOrder = $state(false);
+
+	let tagSearch = $state('');
+	let selectedTagIds = $state<Set<number>>(new Set());
+
+	function openAddTagsModal() {
+		addTagsModalOpen = true;
+		tagSearch = '';
+		const current = tags
+			? tags
+					.split(',')
+					.map((t) => t.trim())
+					.filter(Boolean)
+			: [];
+		selectedTagIds = new Set(
+			AVAILABLE_TAGS.map((t, i) => (current.includes(t) ? i : -1)).filter((i) => i >= 0)
+		);
+	}
+	function saveTagsModal() {
+		tags = AVAILABLE_TAGS.filter((_, i) => selectedTagIds.has(i)).join(', ');
+		addTagsModalOpen = false;
+	}
+	function toggleTag(i: number) {
+		const next = new SvelteSet(selectedTagIds);
+		if (next.has(i)) next.delete(i);
+		else next.add(i);
+		selectedTagIds = next;
+	}
+	const filteredTags = $derived(
+		AVAILABLE_TAGS.map((label, i) => ({ label, i })).filter(
+			({ label }) => !tagSearch || label.toLowerCase().includes(tagSearch.toLowerCase())
+		)
+	);
+	const selectedTagsList = $derived(
+		tags
+			? tags
+					.split(',')
+					.map((t) => t.trim())
+					.filter(Boolean)
+			: []
+	);
+	function removeTag(label: string) {
+		tags = selectedTagsList.filter((t) => t !== label).join(', ');
+	}
+
+	let selectedCustomer = $state<SelectedCustomer | null>(null);
+	let editContactModalOpen = $state(false);
+	let editContactEmail = $state('');
+	let editContactPhone = $state('');
+	let editContactUpdateProfile = $state(true);
+	let editContactSaving = $state(false);
+	let editContactEmailInitial = $state('');
+	let editContactPhoneInitial = $state('');
+	let editShippingModalOpen = $state(false);
+	let editBillingModalOpen = $state(false);
+	let shippingAddress = $state<ShippingAddressValue>(emptyShippingAddress());
+	let billingAddressForm = $state<ShippingAddressValue>(emptyShippingAddress());
+
+	const editContactDirty = $derived(
+		editContactEmail.trim() !== editContactEmailInitial.trim() ||
+			editContactPhone.trim() !== editContactPhoneInitial.trim()
+	);
+	let regions = $state<RegionRow[]>([]);
+
+	let currencies = $state<CurrencyRow[]>([]);
+	let currencySearch = $state('');
+	let debouncedCurrencySearch = $state('');
+	let currenciesLoading = $state(false);
+	let currencyFetchSeq = 0;
+
+	$effect(() => {
+		const q = currencySearch;
+		const t = setTimeout(() => {
+			debouncedCurrencySearch = q;
+		}, CURRENCY_SEARCH_DEBOUNCE_MS);
+		return () => clearTimeout(t);
+	});
+
+	const currencySearchStale = $derived(currencySearch.trim() !== debouncedCurrencySearch.trim());
+	const currencyComboboxLoading = $derived(currenciesLoading || currencySearchStale);
+
+	function currencyParenContent(c: { code: string; symbol: string }) {
+		if (!c.symbol || c.symbol === c.code) return c.code;
+		return `${c.code} ${c.symbol}`;
+	}
+
+	function currencyLabel(c: CurrencyRow) {
+		return `${c.name} (${currencyParenContent(c)})`;
+	}
+
+	function withSelectedCurrencyFallback(
+		mapped: ComboboxOption[],
+		selectedCode: string
+	): ComboboxOption[] {
+		const code = selectedCode.trim();
+		if (!code || mapped.some((o) => o.id === code)) return mapped;
+		const row = selectedCurrencyData;
+		if (row) return [{ id: code, value: currencyLabel(row) }, ...mapped];
+		return [{ id: code, value: code }, ...mapped];
+	}
+
+	const passthroughCurrencyOptions = (opts: ComboboxOption[]) => opts;
+
+	const currencyComboboxOptions = $derived.by((): ComboboxOption[] =>
+		withSelectedCurrencyFallback(
+			currencies.map((c) => ({ id: c.code, value: currencyLabel(c) })),
+			selectedCurrency
+		)
+	);
+
+	const subtotal = $derived(orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0));
+	const total = $derived(subtotal + discountAmount + shippingAmount + taxAmount);
+	const itemCount = $derived(orderItems.reduce((sum, item) => sum + item.quantity, 0));
+
+	const selectedRegionData = $derived(regions.find((r) => r.id === selectedRegion));
+	const selectedCurrencyData = $derived(
+		currencies.find((c) => c.code === selectedCurrency) ||
+			currencies.find((c) => c.code === selectedRegionData?.currency_code)
+	);
+
+	function addOrderItem(item: CreateOrderItem) {
+		orderItems = [...orderItems, item];
+		if (orderItems.length > 0) {
+			taxAmount = Math.round(subtotal * 0.09 * 100) / 100;
+		}
+	}
+	function removeOrderItem(id: string) {
+		orderItems = orderItems.filter((item) => item.id !== id);
+		if (orderItems.length === 0) {
+			taxAmount = 0;
+		} else {
+			taxAmount = Math.round(subtotal * 0.09 * 100) / 100;
+		}
+	}
+	function updateItemQuantity(id: string, quantity: number) {
+		orderItems = orderItems.map((item) =>
+			item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item
+		);
+		taxAmount = Math.round(subtotal * 0.09 * 100) / 100;
+	}
+	function formatCurrency(amount: number): string {
+		const symbol = selectedCurrencyData?.symbol || '₹';
+		return `${symbol}${amount.toFixed(2)}`;
+	}
+
+	async function fetchRegions() {
+		try {
+			const res = await client.regions.get({ query: { page: 1, limit: 100 } });
+			if (res.error) return;
+			const list = (res.data?.rows ?? []) as {
+				id: string;
+				name: string;
+				currency_code: string;
+			}[];
+			regions = list;
+			ensureOrderMarketDefaults();
+		} catch (e) {
+			console.error('Failed to fetch regions:', e);
+		}
+	}
+
+	function ensureOrderMarketDefaults() {
+		if (!selectedRegion && regions.length > 0) {
+			selectedRegion = regions[0].id;
+		}
+		if (!selectedCurrency) {
+			const region = regions.find((r) => r.id === selectedRegion);
+			if (region?.currency_code) {
+				selectedCurrency = region.currency_code;
+			} else if (currencies.some((c) => c.code === 'INR')) {
+				selectedCurrency = 'INR';
+			} else if (currencies.length > 0) {
+				selectedCurrency = currencies[0].code;
+			}
+		}
+	}
+	async function fetchCurrenciesFromApi() {
+		const seq = ++currencyFetchSeq;
+		currenciesLoading = true;
+		try {
+			const search = debouncedCurrencySearch.trim();
+			if (search) {
+				const res = await client.currencies.get({
+					query: { page: 1, limit: 100, search }
+				});
+				if (seq !== currencyFetchSeq) return;
+				if (res.error) {
+					currencies = [];
+					return;
+				}
+				currencies = (res.data?.rows ?? []) as CurrencyRow[];
+				return;
+			}
+			const all: CurrencyRow[] = [];
+			let page = 1;
+			let hasNext = true;
+			while (hasNext) {
+				const res = await client.currencies.get({
+					query: { page, limit: 100 }
+				});
+				if (seq !== currencyFetchSeq) return;
+				if (res.error) break;
+				all.push(...((res.data?.rows ?? []) as CurrencyRow[]));
+				hasNext = res.data?.pagination?.has_next_page ?? false;
+				page += 1;
+			}
+			if (seq === currencyFetchSeq) currencies = all;
+		} catch (e) {
+			console.error('Failed to fetch currencies:', e);
+			if (seq === currencyFetchSeq) currencies = [];
+		} finally {
+			if (seq === currencyFetchSeq) currenciesLoading = false;
+		}
+	}
+
+	$effect(() => {
+		if (!active) return;
+		void debouncedCurrencySearch;
+		void fetchCurrenciesFromApi();
+	});
+
+	let productBrowserOpen = $state(false);
+	let productBrowserPage = $state(1);
+	let productBrowserSearch = $state('');
+	let productBrowserRawData = $state<{
+		products?: Product[];
+		count?: number;
+		offset?: number;
+		limit?: number;
+	} | null>(null);
+	let productBrowserLoading = $state(false);
+	let selectedProductIds = $state<string[]>([]);
+
+	async function fetchProducts() {
+		productBrowserLoading = true;
+		try {
+			const params = new SvelteURLSearchParams({
+				page: String(productBrowserPage),
+				limit: '20',
+				sorting_field: 'products.title',
+				sorting_direction: 'desc'
+			});
+			if (productBrowserSearch.trim()) params.append('search', productBrowserSearch.trim());
+			const res = await fetch(`${apiBase}/products?${params}`, { cache: 'no-store' });
+			if (!res.ok) throw new Error(await res.text());
+			const json = (await res.json()) as {
+				rows?: Product[];
+				pagination?: Pagination;
+			};
+			const pagination = json.pagination;
+			const limit = pagination?.limit ?? 20;
+			const page = pagination?.page ?? 1;
+			productBrowserRawData = {
+				products: json.rows ?? [],
+				count: pagination?.total ?? 0,
+				offset: (page - 1) * limit,
+				limit
+			};
+		} catch {
+			productBrowserRawData = null;
+		} finally {
+			productBrowserLoading = false;
+		}
+	}
+	function openProductBrowser() {
+		selectedProductIds = [];
+		productBrowserPage = 1;
+		productBrowserSearch = '';
+		productBrowserOpen = true;
+	}
+	function closeProductBrowser() {
+		productBrowserOpen = false;
+		selectedProductIds = [];
+	}
+	const productBrowserProducts = $derived(productBrowserRawData?.products ?? []);
+	const productBrowserLimit = $derived(productBrowserRawData?.limit ?? 20);
+	const productBrowserTotal = $derived(productBrowserRawData?.count ?? 0);
+	const productBrowserOffset = $derived(productBrowserRawData?.offset ?? 0);
+	const productBrowserPageNum = $derived(
+		productBrowserLimit > 0 ? Math.floor(productBrowserOffset / productBrowserLimit) + 1 : 1
+	);
+	const productBrowserTotalPages = $derived(
+		productBrowserLimit > 0 ? Math.ceil(productBrowserTotal / productBrowserLimit) : 1
+	);
+	const productBrowserPagination = $derived({
+		total: productBrowserTotal,
+		page: productBrowserPageNum,
+		limit: productBrowserLimit,
+		total_pages: productBrowserTotalPages,
+		has_next_page: productBrowserPageNum < productBrowserTotalPages,
+		has_previous_page: productBrowserPageNum > 1
+	});
+	const productBrowserStart = $derived((productBrowserPageNum - 1) * productBrowserLimit + 1);
+	const productBrowserEnd = $derived(
+		Math.min(productBrowserPageNum * productBrowserLimit, productBrowserTotal)
+	);
+	function toggleProductSelection(productId: string) {
+		selectedProductIds = selectedProductIds.includes(productId)
+			? selectedProductIds.filter((id) => id !== productId)
+			: [...selectedProductIds, productId];
+	}
+
+	async function addSelectedProducts() {
+		if (selectedProductIds.length === 0) {
+			closeProductBrowser();
+			return;
+		}
+		for (const productId of selectedProductIds) {
+			const product = productBrowserProducts.find((p) => p.id === productId);
+			if (!product) continue;
+			try {
+				const variantsRes = await fetch(`${apiBase}/product-variants?limit=100`, {
+					cache: 'no-store'
+				});
+				let variants: Array<{
+					id: string;
+					title: string;
+					product_id: string | null;
+					thumbnail: string | null;
+				}> = [];
+				if (variantsRes.ok) {
+					const variantsData = (await variantsRes.json()) as
+						| {
+								data?: Array<{
+									id: string;
+									title: string;
+									product_id: string | null;
+									thumbnail: string | null;
+								}>;
+						  }
+						| {
+								rows?: Array<{
+									id: string;
+									title: string;
+									product_id: string | null;
+									thumbnail: string | null;
+								}>;
+						  };
+					const raw =
+						'data' in variantsData && Array.isArray(variantsData.data)
+							? variantsData.data
+							: 'rows' in variantsData &&
+								  Array.isArray((variantsData as { rows?: typeof variants }).rows)
+								? (variantsData as { rows: typeof variants }).rows
+								: [];
+					variants = raw.filter((v) => v.product_id === productId);
+				}
+				const variant = variants[0];
+				let price = 0;
+				let currency = selectedCurrency || 'INR';
+				if (variant) {
+					try {
+						const variantRes = await fetch(`${apiBase}/product-variants/${variant.id}`, {
+							cache: 'no-store'
+						});
+						if (variantRes.ok) {
+							const variantData = (await variantRes.json()) as {
+								prices?: Array<{ amount: string; currency_code: string }>;
+							};
+							if (variantData.prices?.length) {
+								const matchingPrice = variantData.prices.find(
+									(p) => p.currency_code.toLowerCase() === currency.toLowerCase()
+								);
+								const priceToUse = matchingPrice || variantData.prices[0];
+								if (priceToUse) {
+									price = parseFloat(priceToUse.amount) / 100;
+									currency = priceToUse.currency_code;
+								}
+							}
+						}
+					} catch {
+						// Variant price is optional; keep defaults when fetch fails.
+					}
+				}
+				const thumbnail = variant?.thumbnail ?? product.thumbnail;
+				addOrderItem({
+					id: variant?.id ?? productId,
+					title: product.title,
+					price,
+					quantity: 1,
+					currency,
+					thumbnail
+				});
+			} catch {
+				addOrderItem({
+					id: productId,
+					title: product.title,
+					price: 0,
+					quantity: 1,
+					currency: selectedCurrency || 'INR',
+					thumbnail: product.thumbnail
+				});
+			}
+		}
+		closeProductBrowser();
+	}
+
+	let previousProductBrowserSearch = $state('');
+	$effect(() => {
+		if (productBrowserSearch !== previousProductBrowserSearch) {
+			previousProductBrowserSearch = productBrowserSearch;
+			productBrowserPage = 1;
+		}
+	});
+	$effect(() => {
+		if (!productBrowserOpen) return;
+		void productBrowserPage;
+		void productBrowserSearch;
+		fetchProducts();
+	});
+
+	let customerBrowserOpen = $state(false);
+	let customerBrowserPage = $state(1);
+	let customerBrowserSearch = $state('');
+	let debouncedCustomerBrowserSearch = $state('');
+
+	let selectedCustomerId = $state('');
+	let customerComboboxSearch = $state('');
+	let debouncedCustomerComboboxSearch = $state('');
+	let customerComboboxCustomers = $state<CustomerListItem[]>([]);
+	let customerComboboxLoading = $state(false);
+
+	function customerDisplayLabel(c: CustomerListItem): string {
+		const name = [c.first_name, c.last_name].filter(Boolean).join(' ');
+		return name ? `${name} (${c.email})` : c.email;
+	}
+
+	const passthroughComboboxOptions = (opts: ComboboxOption[]) => opts;
+
+	const customerComboboxOptions = $derived.by((): ComboboxOption[] => {
+		const q = debouncedCustomerComboboxSearch.trim().toLowerCase();
+		return customerComboboxCustomers
+			.map((c) => ({ id: c.id, value: customerDisplayLabel(c) }))
+			.filter((o) => !q || o.value.toLowerCase().includes(q));
+	});
+
+	$effect(() => {
+		const q = customerComboboxSearch;
+		const t = setTimeout(() => {
+			debouncedCustomerComboboxSearch = q;
+		}, CUSTOMER_SEARCH_DEBOUNCE_MS);
+		return () => clearTimeout(t);
+	});
+
+	$effect(() => {
+		const q = customerBrowserSearch;
+		const t = setTimeout(() => {
+			debouncedCustomerBrowserSearch = q;
+		}, CUSTOMER_SEARCH_DEBOUNCE_MS);
+		return () => clearTimeout(t);
+	});
+
+	async function fetchCustomersList(
+		page: number,
+		limit: number,
+		search: string
+	): Promise<{ rows: CustomerListItem[]; pagination: Pagination | null }> {
+		const params = new SvelteURLSearchParams({
+			page: String(page),
+			limit: String(limit)
+		});
+		if (search.trim()) params.append('search', search.trim());
+		const res = await fetch(`${apiBase}/customers?${params}`, { cache: 'no-store' });
+		if (!res.ok) throw new Error(await res.text());
+		const json = (await res.json()) as {
+			rows?: CustomerListItem[];
+			pagination?: Pagination;
+		};
+		return { rows: json.rows ?? [], pagination: json.pagination ?? null };
+	}
+
+	async function fetchCustomersForCombobox() {
+		customerComboboxLoading = true;
+		try {
+			const { rows } = await fetchCustomersList(1, 100, '');
+			customerComboboxCustomers = rows;
+		} catch {
+			customerComboboxCustomers = [];
+		} finally {
+			customerComboboxLoading = false;
+		}
+	}
+
+	function onCustomerComboboxOpen() {
+		void fetchCustomersForCombobox();
+	}
+
+	function applySelectedCustomer(c: CustomerListItem) {
+		const name = [c.first_name, c.last_name].filter(Boolean).join(' ') || c.email;
+		selectedCustomerId = c.id;
+		selectedCustomer = {
+			id: c.id,
+			name,
+			email: c.email,
+			phone: c.phone ?? null,
+			first_name: c.first_name,
+			last_name: c.last_name,
+			orderCount: 0
+		};
+	}
+
+	function openEditShippingModal() {
+		if (!selectedCustomer) return;
+		editShippingModalOpen = true;
+	}
+
+	function openEditContactModal() {
+		if (!selectedCustomer) return;
+		editContactEmail = selectedCustomer.email;
+		editContactPhone = selectedCustomer.phone ?? '';
+		editContactEmailInitial = editContactEmail;
+		editContactPhoneInitial = editContactPhone;
+		editContactUpdateProfile = true;
+		editContactModalOpen = true;
+	}
+
+	function closeEditContactModal() {
+		if (editContactSaving) return;
+		editContactModalOpen = false;
+	}
+
+	async function saveEditContact() {
+		if (!selectedCustomer || !editContactDirty) return;
+		editContactSaving = true;
+		try {
+			const email = editContactEmail.trim();
+			const phone = editContactPhone.trim() || null;
+			selectedCustomer = { ...selectedCustomer, email, phone };
+			if (editContactUpdateProfile) {
+				await updateCustomer(selectedCustomer.id, {
+					email,
+					first_name: selectedCustomer.first_name,
+					last_name: selectedCustomer.last_name,
+					phone
+				});
+			}
+			editContactModalOpen = false;
+		} finally {
+			editContactSaving = false;
+		}
+	}
+
+	function onCustomerComboboxValueChange(id: string) {
+		if (!id) {
+			selectedCustomer = null;
+			return;
+		}
+		const c = customerComboboxCustomers.find((x) => x.id === id);
+		if (c) applySelectedCustomer(c);
+	}
+
+	function removeSelectedCustomer() {
+		selectedCustomer = null;
+		selectedCustomerId = '';
+		shippingAddress = emptyShippingAddress();
+	}
+
+	function readBillingFields(): ShippingAddressValue {
+		return {
+			country: billingCountry,
+			first_name: billingFirstName,
+			last_name: billingLastName,
+			company: billingCompany,
+			address_1: billingAddress,
+			address_2: billingApartment,
+			city: billingCity,
+			state: billingState,
+			postal_code: billingPinCode,
+			phone_code: billingPhoneCode,
+			phone: billingPhone
+		};
+	}
+
+	function writeBillingFields(v: ShippingAddressValue) {
+		billingCountry = v.country;
+		billingFirstName = v.first_name;
+		billingLastName = v.last_name;
+		billingCompany = v.company;
+		billingAddress = v.address_1;
+		billingApartment = v.address_2;
+		billingCity = v.city;
+		billingState = v.state;
+		billingPinCode = v.postal_code;
+		billingPhoneCode = v.phone_code;
+		billingPhone = v.phone;
+	}
+
+	function openEditBillingModal() {
+		billingAddressForm = readBillingFields();
+		editBillingModalOpen = true;
+	}
+
+	const billingAddressDisplay = $derived(readBillingFields());
+
+	$effect(() => {
+		if (!customerBrowserOpen) return;
+		void debouncedCustomerBrowserSearch;
+		customerBrowserPage = 1;
+	});
+	$effect(() => {
+		if (!customerBrowserOpen) return;
+		void customerBrowserPage;
+		void debouncedCustomerBrowserSearch;
+	});
+
+	async function createOrder() {
+		if (orderItems.length === 0) return;
+		ensureOrderMarketDefaults();
+		if (!selectedCurrency) {
+			alert('Select a currency before creating the order.');
+			return;
+		}
+		creatingOrder = true;
+		try {
+			const orderData = {
+				orders: [
+					{
+						currency_code: selectedCurrency,
+						region_id: selectedRegion || null,
+						customer_id: selectedCustomer?.id ?? null,
+						email: selectedCustomer?.email ?? null,
+						payment_status: 'captured' as const,
+						status: 'pending' as const,
+						fulfillment_status: 'not_fulfilled' as const,
+						metadata: (() => {
+							const billingFields = readBillingFields();
+							const billing = hasShippingAddress(billingFields)
+								? {
+										first_name: billingFields.first_name.trim() || null,
+										last_name: billingFields.last_name.trim() || null,
+										company: billingFields.company.trim() || null,
+										address_1: billingFields.address_1.trim() || null,
+										address_2: billingFields.address_2.trim() || null,
+										city: billingFields.city.trim() || null,
+										state: billingFields.state.trim() || null,
+										postal_code: billingFields.postal_code.trim() || null,
+										country: billingFields.country.trim() || null,
+										phone_code: billingFields.phone_code.trim() || null,
+										phone: billingFields.phone.trim() || null
+									}
+								: null;
+							const shipping = hasShippingAddress(shippingAddress)
+								? {
+										first_name: shippingAddress.first_name.trim() || null,
+										last_name: shippingAddress.last_name.trim() || null,
+										company: shippingAddress.company.trim() || null,
+										address_1: shippingAddress.address_1.trim() || null,
+										address_2: shippingAddress.address_2.trim() || null,
+										city: shippingAddress.city.trim() || null,
+										state: shippingAddress.state.trim() || null,
+										postal_code: shippingAddress.postal_code.trim() || null,
+										country: shippingAddress.country.trim() || null,
+										phone_code: shippingAddress.phone_code.trim() || null,
+										phone: shippingAddress.phone.trim() || null
+									}
+								: null;
+							const meta: Record<string, unknown> = {
+								notes: notes || null,
+								tags: tags || null,
+								items: orderItems,
+								subtotal: subtotal,
+								discount_amount: discountAmount,
+								shipping_amount: shippingAmount,
+								tax_amount: taxAmount,
+								total: total,
+								billing_address: billing ? JSON.stringify(billing) : null,
+								shipping_address: shipping ? JSON.stringify(shipping) : null
+							};
+							return meta;
+						})()
+					}
+				]
+			};
+			const res = await client.orders.post(orderData);
+			if (res.error) {
+				const err = res.error as { value?: { message?: string } };
+				throw new Error(err.value?.message ?? 'Failed to create order');
+			}
+			const createdId = Array.isArray(res.data) ? res.data[0]?.id : undefined;
+			if (createdId) {
+				onClose?.();
+				markAsPaidModalOpen = false;
+				creditCardSheetOpen = false;
+				onSuccess?.(createdId);
+			}
+		} catch (e) {
+			console.error('Failed to create order:', e);
+			alert(e instanceof Error ? e.message : 'Failed to create order');
+		} finally {
+			creatingOrder = false;
+		}
+	}
+
+	$effect(() => {
+		if (active) {
+			productSearch = '';
+			selectedRegion = '';
+			selectedCurrency = '';
+			notes = '';
+			tags = '';
+			orderItems = [];
+			discountAmount = 0;
+			shippingAmount = 0;
+			taxAmount = 0;
+			paymentDueLater = false;
+			selectedCustomer = null;
+			selectedCustomerId = '';
+			editContactModalOpen = false;
+			editShippingModalOpen = false;
+			editBillingModalOpen = false;
+			shippingAddress = emptyShippingAddress();
+			billingAddressForm = emptyShippingAddress();
+			customerComboboxSearch = '';
+			debouncedCustomerComboboxSearch = '';
+			customerComboboxCustomers = [];
+			currencySearch = '';
+			debouncedCurrencySearch = '';
+			fetchRegions();
+		}
+	});
+</script>
+
+<div class="flex h-full flex-col bg-muted/30">
+	<CreateOrderHeader />
+	<div class="flex min-h-0 flex-1 gap-6 overflow-auto p-6">
+		<div class="flex min-w-0 flex-1 flex-col gap-6">
+			<CreateOrderProductsSection
+				bind:productSearch
+				{orderItems}
+				{formatCurrency}
+				onBrowse={openProductBrowser}
+				onRemoveItem={removeOrderItem}
+				onUpdateQuantity={updateItemQuantity}
+			/>
+			<CreateOrderPaymentSection
+				orderItemsCount={orderItems.length}
+				{itemCount}
+				{subtotal}
+				{discountAmount}
+				{shippingAmount}
+				{taxAmount}
+				{total}
+				bind:paymentDueLater
+				{formatCurrency}
+				onOpenCreditCard={() => (creditCardSheetOpen = true)}
+				onOpenMarkAsPaid={() => (markAsPaidModalOpen = true)}
+				onEnsureMarketDefaults={ensureOrderMarketDefaults}
+			/>
+		</div>
+		<div class="flex w-80 shrink-0 flex-col gap-6">
+			<CreateOrderNotesSection {notes} onEdit={() => (notesModalOpen = true)} />
+			<CreateOrderCustomerSection
+				{selectedCustomer}
+				bind:selectedCustomerId
+				{customerComboboxOptions}
+				{customerComboboxLoading}
+				{shippingAddress}
+				{billingAddressDisplay}
+				onCustomerValueChange={onCustomerComboboxValueChange}
+				onCustomerSearchChange={(v) => (customerComboboxSearch = v)}
+				{onCustomerComboboxOpen}
+				onEditContact={openEditContactModal}
+				onEditShipping={openEditShippingModal}
+				onEditBilling={openEditBillingModal}
+				onRemoveCustomer={removeSelectedCustomer}
+				filterFn={passthroughComboboxOptions}
+			/>
+			<CreateOrderMarketsSection
+				{selectedRegionData}
+				bind:selectedCurrency
+				{currencyComboboxOptions}
+				{currencyComboboxLoading}
+				onCurrencyChange={(v) => (selectedCurrency = v)}
+				onCurrencySearchChange={(v) => (currencySearch = v)}
+				onCurrencyOpen={() => void fetchCurrenciesFromApi()}
+				filterFn={passthroughCurrencyOptions}
+			/>
+			<CreateOrderTagsSection
+				{selectedTagsList}
+				onOpenAddTags={openAddTagsModal}
+				onRemoveTag={removeTag}
+			/>
+		</div>
+	</div>
+</div>
+
+<CreateOrderProductBrowserDialog
+	bind:open={productBrowserOpen}
+	bind:search={productBrowserSearch}
+	bind:page={productBrowserPage}
+	loading={productBrowserLoading}
+	products={productBrowserProducts}
+	{selectedProductIds}
+	pagination={productBrowserPagination}
+	rangeStart={productBrowserStart}
+	rangeEnd={productBrowserEnd}
+	onToggleProduct={toggleProductSelection}
+	onClose={closeProductBrowser}
+	onAddSelected={addSelectedProducts}
+/>
+
+<CreateOrderMarkAsPaidModal
+	bind:open={markAsPaidModalOpen}
+	totalFormatted={formatCurrency(total)}
+	{creatingOrder}
+	canCreate={orderItems.length > 0}
+	onCreate={createOrder}
+	onCancel={() => (markAsPaidModalOpen = false)}
+/>
+
+<CreateOrderCreditCardSheet
+	bind:open={creditCardSheetOpen}
+	bind:billingCountry
+	bind:billingFirstName
+	bind:billingLastName
+	bind:billingCompany
+	bind:billingAddress
+	bind:billingApartment
+	bind:billingCity
+	bind:billingState
+	bind:billingPinCode
+	bind:billingPhoneCode
+	bind:billingPhone
+	totalFormatted={formatCurrency(total)}
+	{creatingOrder}
+	canCreate={orderItems.length > 0}
+	onCreate={() => createOrder()}
+	onCancel={() => (creditCardSheetOpen = false)}
+/>
+
+<EditShippingAddressModal
+	bind:open={editShippingModalOpen}
+	bind:value={shippingAddress}
+	customerId={selectedCustomer?.id ?? ''}
+	customerFirstName={selectedCustomer?.first_name ?? null}
+	customerLastName={selectedCustomer?.last_name ?? null}
+	customerPhone={selectedCustomer?.phone ?? null}
+	saveToCustomerProfile={false}
+/>
+
+<EditShippingAddressModal
+	bind:open={editBillingModalOpen}
+	bind:value={billingAddressForm}
+	customerId={selectedCustomer?.id ?? ''}
+	customerFirstName={selectedCustomer?.first_name ?? null}
+	customerLastName={selectedCustomer?.last_name ?? null}
+	customerPhone={selectedCustomer?.phone ?? null}
+	title="Edit billing address"
+	submitLabel="Done"
+	idPrefix="bill"
+	saveToCustomerProfile={false}
+	onSave={(v) => writeBillingFields(v)}
+/>
+
+<CreateOrderEditContactModal
+	bind:open={editContactModalOpen}
+	bind:email={editContactEmail}
+	bind:phone={editContactPhone}
+	bind:updateProfile={editContactUpdateProfile}
+	saving={editContactSaving}
+	canSave={editContactDirty}
+	onSave={saveEditContact}
+	onCancel={closeEditContactModal}
+/>
+
+<CreateOrderNotesModal bind:open={notesModalOpen} bind:notes />
+
+<CreateOrderAddTagsModal
+	bind:open={addTagsModalOpen}
+	bind:tagSearch
+	{filteredTags}
+	{selectedTagIds}
+	onToggleTag={toggleTag}
+	onSave={saveTagsModal}
+	onCancel={() => (addTagsModalOpen = false)}
+/>

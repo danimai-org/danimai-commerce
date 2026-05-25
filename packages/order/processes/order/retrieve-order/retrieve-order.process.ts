@@ -11,6 +11,10 @@ import { Kysely } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import type { Database, Order } from "../../../db/type";
 import { RetrieveOrderSchema } from "./retrieve-order.schema";
+import {
+  hasOrdersCartIdColumn,
+  toOrderApiRow,
+} from "../order-response.util";
 
 /**
  * Handles the retrieve order process.
@@ -57,6 +61,45 @@ export class RetrieveOrderProcess
       ]);
     }
 
-    return order;
+    const hasCartIdColumn = await hasOrdersCartIdColumn(this.db);
+    const apiOrder = toOrderApiRow(order, hasCartIdColumn);
+
+    const meta =
+      typeof apiOrder.metadata === "object" && apiOrder.metadata !== null
+        ? (apiOrder.metadata as Record<string, unknown>)
+        : {};
+    const metaItems = meta.items;
+    const hasMetaItems = Array.isArray(metaItems) && metaItems.length > 0;
+
+    if (hasMetaItems) {
+      return apiOrder;
+    }
+
+    const lineItems = await this.db
+      .selectFrom("order_line_items")
+      .where("order_id", "=", input.id)
+      .where("deleted_at", "is", null)
+      .select(["id", "title", "thumbnail", "unit_price", "quantity", "variant_sku"])
+      .execute();
+
+    if (lineItems.length === 0) {
+      return apiOrder;
+    }
+
+    return {
+      ...apiOrder,
+      metadata: {
+        ...meta,
+        items: lineItems.map((li) => ({
+          id: li.id,
+          title: li.title,
+          price: Number.parseFloat(li.unit_price) || 0,
+          quantity: li.quantity,
+          currency: apiOrder.currency_code,
+          thumbnail: li.thumbnail,
+          sku: li.variant_sku,
+        })),
+      },
+    };
   }
 }

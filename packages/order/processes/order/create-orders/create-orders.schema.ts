@@ -1,12 +1,7 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { OrderResponseSchema } from "../update-orders/update-orders.schema";
 
-const Metadata = Type.Optional(
-  Type.Record(
-    Type.String(),
-    Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()])
-  )
-);
+const Metadata = Type.Optional(Type.Record(Type.String(), Type.Unknown()));
 
 const OrderStatus = Type.Union([
   Type.Literal("pending"),
