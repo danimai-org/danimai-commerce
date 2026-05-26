@@ -88,12 +88,14 @@
 		);
 	}
 	let error = $state<string | null>(null);
-	let submitting = $state(false);
+	let uploading = $state(false);
+	let saving = $state(false);
+	let removingMediaId = $state<string | null>(null);
+	const mediaBusy = $derived(uploading || saving || removingMediaId !== null);
 	let prevOpen = $state(false);
 	let primaryMediaId = $state<string | null>(null);
 	let primaryDirty = $state(false);
 	let rankDirty = $state(false);
-	let removingMediaId = $state<string | null>(null);
 	let sortableMedia = $state<MediaUploadItem[]>([]);
 	function normalizeMediaOrder(
 		media: MediaUploadItem[],
@@ -129,7 +131,7 @@
 		prevOpen = open;
 	});
 	$effect(() => {
-		if (!open) return;
+		if (!open || removingMediaId) return;
 		const currentMedia = productMedia;
 		const nextPrimary =
 			primaryMediaId !== null && currentMedia.some((item) => item.id === primaryMediaId)
@@ -185,7 +187,7 @@
 	async function uploadSelectedFiles(files: File[]) {
 		if (!files.length || !productId) return;
 		error = null;
-		submitting = true;
+		uploading = true;
 		try {
 			const result = await postImageMutation({ files });
 			applyImageMutationToProductCache(result);
@@ -194,7 +196,7 @@
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
-			submitting = false;
+			uploading = false;
 		}
 	}
 
@@ -205,7 +207,7 @@
 		}
 		if (!primaryDirty && !rankDirty) return;
 		error = null;
-		submitting = true;
+		saving = true;
 		try {
 			const normalizedMedia = normalizeMediaOrder(sortableMedia, primaryMediaId);
 			const normalizedPrimaryMediaId = normalizedMedia[0]?.id ?? null;
@@ -243,7 +245,7 @@
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
-			submitting = false;
+			saving = false;
 		}
 	}
 
@@ -252,7 +254,6 @@
 		error = null;
 		const wasPrimary = primaryMediaId === mediaId;
 		removingMediaId = mediaId;
-		submitting = true;
 		try {
 			const result = await postImageMutation({ delete_ids: [mediaId] });
 			applyImageMutationToProductCache(result);
@@ -270,7 +271,6 @@
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
 			removingMediaId = null;
-			submitting = false;
 		}
 	}
 </script>
@@ -291,7 +291,8 @@
 				<p class="text-sm font-medium">Upload images</p>
 				<MediaUpload
 					bind:value={sortableMedia}
-					disabled={submitting}
+					disabled={mediaBusy}
+					{uploading}
 					showHeroPreview={false}
 					pendingRemoveId={removingMediaId}
 					onPickFiles={uploadSelectedFiles}
@@ -328,10 +329,10 @@
 			{/if}
 		</div>
 		<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
-			<Button variant="outline" onclick={close} disabled={submitting}>Cancel</Button>
-			<Button onclick={savePrimary} disabled={submitting || (!primaryDirty && !rankDirty)}
-				>Save</Button
-			>
+			<Button variant="outline" onclick={close} disabled={mediaBusy}>Cancel</Button>
+			<Button onclick={savePrimary} disabled={mediaBusy || (!primaryDirty && !rankDirty)}>
+				{saving ? 'Saving…' : 'Save'}
+			</Button>
 		</Sheet.Footer>
 	</Sheet.Content>
 </Sheet.Root>

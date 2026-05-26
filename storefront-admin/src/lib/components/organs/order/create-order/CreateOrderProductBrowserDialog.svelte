@@ -15,13 +15,21 @@
 		orderDialogToolbar,
 		orderDialogXl
 	} from '../dialog-classes.js';
-	import { statusBadgeClass, type Pagination, type Product } from './types.js';
+	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import { cn } from '$lib/utils.js';
+	import {
+		PRODUCT_BROWSER_SKELETON_ROWS,
+		statusBadgeClass,
+		type Pagination,
+		type Product
+	} from './types.js';
 
 	let {
 		open = $bindable(false),
 		search = $bindable(''),
 		page = $bindable(1),
 		loading,
+		adding = false,
 		products,
 		selectedProductIds,
 		pagination,
@@ -35,15 +43,19 @@
 		search?: string;
 		page?: number;
 		loading: boolean;
+		adding?: boolean;
 		products: Product[];
-		selectedProductIds: string[];
+		selectedProductIds: Set<string>;
 		pagination: Pagination;
 		rangeStart: number;
 		rangeEnd: number;
 		onToggleProduct: (productId: string) => void;
 		onClose: () => void;
-		onAddSelected: () => void;
+		onAddSelected: () => void | Promise<void>;
 	} = $props();
+
+	const showSkeleton = $derived(loading && products.length === 0);
+	const isRefreshing = $derived(loading && products.length > 0);
 </script>
 
 <Dialog.Root bind:open>
@@ -83,76 +95,94 @@
 			</div>
 		</div>
 		<div class={orderDialogScrollArea}>
-			{#if loading}
-				<div class="flex items-center justify-center py-12">
-					<p class="text-sm text-muted-foreground">Loading…</p>
-				</div>
-			{:else}
-				<div class="overflow-x-auto rounded-lg border bg-card">
-					<table class="w-full min-w-[280px] text-sm">
-						<thead class="sticky top-0 border-b bg-muted/50">
-							<tr>
-								<th class="w-10 px-3 py-3 text-left font-medium sm:px-4"></th>
-								<th class="px-3 py-3 text-left font-medium sm:px-4">Product</th>
-								<th class="hidden px-4 py-3 text-left font-medium md:table-cell">Status</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#if products.length === 0}
-								<tr>
-									<td colspan="3" class="px-4 py-8 text-center text-muted-foreground"
-										>No products found.</td
-									>
+			<div
+				class={cn(
+					'-mx-4 overflow-x-auto rounded-lg border bg-card sm:mx-0',
+					isRefreshing && 'pointer-events-none opacity-60'
+				)}
+			>
+				<table class="w-full min-w-[32rem] text-sm">
+					<thead class="sticky top-0 z-10 border-b bg-muted/50">
+						<tr>
+							<th class="w-10 px-3 py-3 text-left font-medium sm:px-4"></th>
+							<th class="min-w-[12rem] px-3 py-3 text-left font-medium sm:px-4">Product</th>
+							<th class="w-28 px-3 py-3 text-left font-medium sm:px-4">Status</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#if showSkeleton}
+							{#each [...Array(PRODUCT_BROWSER_SKELETON_ROWS).keys()] as rowIndex (rowIndex)}
+								<tr class="border-b last:border-b-0">
+									<td class="px-3 py-3 sm:px-4">
+										<Skeleton class="size-4 rounded" />
+									</td>
+									<td class="px-3 py-3 sm:px-4">
+										<div class="flex items-center gap-3">
+											<Skeleton class="size-10 shrink-0 rounded-md" />
+											<Skeleton class="h-4 w-40 max-w-full" />
+										</div>
+									</td>
+									<td class="px-3 py-3 sm:px-4">
+										<Skeleton class="h-5 w-16 rounded-full" />
+									</td>
 								</tr>
-							{:else}
-								{#each products as product (product.id)}
-									<tr
-										class="cursor-pointer border-b transition-colors last:border-b-0 hover:bg-muted/30"
-										role="button"
-										tabindex="0"
-										onclick={() => onToggleProduct(product.id)}
-										onkeydown={(e) => e.key === 'Enter' && onToggleProduct(product.id)}
-									>
-										<td class="px-3 py-3 sm:px-4" onclick={(e) => e.stopPropagation()}>
-											<input
-												type="checkbox"
-												checked={selectedProductIds.includes(product.id)}
-												class="size-4 rounded border-input"
-												tabindex="-1"
-												onclick={(e) => e.stopPropagation()}
-												onchange={() => onToggleProduct(product.id)}
-											/>
-										</td>
-										<td class="px-3 py-3 sm:px-4">
-											<div class="flex min-w-0 items-center gap-3">
-												{#if product.thumbnail}
-													<img
-														src={product.thumbnail}
-														alt=""
-														class="size-10 shrink-0 rounded-md object-cover"
-													/>
-												{:else}
-													<div
-														class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
-													>
-														<ImageIcon class="size-5" />
-													</div>
-												{/if}
-												<span class="min-w-0 truncate font-medium">{product.title}</span>
-											</div>
-										</td>
-										<td class="hidden px-4 py-3 text-muted-foreground md:table-cell">
-											<span class={statusBadgeClass(product.status)}
-												>{product.status.replace(/_/g, ' ')}</span
-											>
-										</td>
-									</tr>
-								{/each}
-							{/if}
-						</tbody>
-					</table>
-				</div>
-			{/if}
+							{/each}
+						{:else if products.length === 0}
+							<tr>
+								<td colspan="3" class="px-4 py-8 text-center text-muted-foreground"
+									>No products found.</td
+								>
+							</tr>
+						{:else}
+							{#each products as product (product.id)}
+								<tr
+									class="cursor-pointer border-b transition-colors last:border-b-0 hover:bg-muted/30"
+									role="button"
+									tabindex="0"
+									onclick={() => onToggleProduct(product.id)}
+									onkeydown={(e) => e.key === 'Enter' && onToggleProduct(product.id)}
+								>
+									<td class="px-3 py-3 sm:px-4" onclick={(e) => e.stopPropagation()}>
+										<input
+											type="checkbox"
+											checked={selectedProductIds.has(product.id)}
+											class="size-4 rounded border-input"
+											tabindex="-1"
+											onclick={(e) => e.stopPropagation()}
+											onchange={() => onToggleProduct(product.id)}
+										/>
+									</td>
+									<td class="px-3 py-3 sm:px-4">
+										<div class="flex min-w-0 items-center gap-3">
+											{#if product.thumbnail}
+												<img
+													src={product.thumbnail}
+													alt=""
+													loading="lazy"
+													decoding="async"
+													class="size-10 shrink-0 rounded-md object-cover"
+												/>
+											{:else}
+												<div
+													class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
+												>
+													<ImageIcon class="size-5" />
+												</div>
+											{/if}
+											<span class="min-w-0 truncate font-medium">{product.title}</span>
+										</div>
+									</td>
+									<td class="px-3 py-3 whitespace-nowrap sm:px-4">
+										<span class={statusBadgeClass(product.status)}
+											>{product.status.replace(/_/g, ' ')}</span
+										>
+									</td>
+								</tr>
+							{/each}
+						{/if}
+					</tbody>
+				</table>
+			</div>
 		</div>
 		<Dialog.Footer class={orderDialogFooterBetween}>
 			<div class="flex w-full flex-col gap-3 sm:w-auto">
@@ -182,9 +212,27 @@
 				</p>
 			</div>
 			<div class={orderDialogFooterActions}>
-				<Button variant="outline" onclick={onClose}>Cancel</Button>
-				<Button onclick={onAddSelected} disabled={selectedProductIds.length === 0}>
-					Add {selectedProductIds.length > 0 ? `(${selectedProductIds.length})` : ''}
+				<Button variant="outline" onclick={onClose} disabled={adding}>Cancel</Button>
+				<Button
+					type="button"
+					onpointerdown={(e) => {
+						if (adding) e.preventDefault();
+					}}
+					onclick={() => {
+						if (adding) return;
+						void onAddSelected();
+					}}
+					disabled={adding || selectedProductIds.size === 0}
+					aria-busy={adding}
+				>
+					{#if adding}
+						<span
+							class="mr-2 inline-block size-3 animate-spin rounded-full border-2 border-current border-t-transparent"
+						></span>
+						Adding…
+					{:else}
+						Add {selectedProductIds.size > 0 ? `(${selectedProductIds.size})` : ''}
+					{/if}
 				</Button>
 			</div>
 		</Dialog.Footer>

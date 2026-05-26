@@ -12,18 +12,14 @@
 		currencyComboboxOptions,
 		currencyComboboxLoading,
 		onCurrencyChange,
-		onCurrencySearchChange,
-		onCurrencyOpen,
-		filterFn
+		onCurrencyOpen
 	}: {
 		selectedRegionData: RegionRow | undefined;
 		selectedCurrency?: string;
 		currencyComboboxOptions: ComboboxOption[];
 		currencyComboboxLoading: boolean;
 		onCurrencyChange: (v: string) => void;
-		onCurrencySearchChange: (v: string) => void;
 		onCurrencyOpen: () => void;
-		filterFn: (opts: ComboboxOption[]) => ComboboxOption[];
 	} = $props();
 </script>
 
@@ -55,9 +51,7 @@
 				placeholder="Select currency"
 				loading={currencyComboboxLoading}
 				emptyMessage="No currencies found."
-				{filterFn}
 				listboxClass="max-h-72"
-				onSearchChange={onCurrencySearchChange}
 				onOpen={onCurrencyOpen}
 			/>
 		</div>

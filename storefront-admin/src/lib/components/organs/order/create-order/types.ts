@@ -66,8 +66,9 @@ export const AVAILABLE_TAGS = [
 ] as const;
 
 export const CUSTOMER_SEARCH_DEBOUNCE_MS = 300;
-export const CURRENCY_SEARCH_DEBOUNCE_MS = 300;
 export const PRODUCT_SEARCH_DEBOUNCE_MS = 300;
+export const PRODUCT_BROWSER_PAGE_SIZE = 20;
+export const PRODUCT_BROWSER_SKELETON_ROWS = 8;
 
 export const CUSTOMER_MENU_ITEM_CLASS =
 	'relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50';

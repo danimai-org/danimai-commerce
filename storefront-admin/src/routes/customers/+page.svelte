@@ -115,6 +115,16 @@
 	let formSubmitting = $state(false);
 
 	$effect(() => {
+		if (page.url.searchParams.get('create') === '1') {
+			openCreate();
+			const params = new SvelteURLSearchParams(page.url.searchParams);
+			params.delete('create');
+			const qs = params.toString();
+			goto(resolve(`${page.url.pathname}${qs ? `?${qs}` : ''}`, {}), { replaceState: true });
+		}
+	});
+
+	$effect(() => {
 		if (formSheetOpen) {
 			formError = null;
 			if (formMode === 'edit' && formItem) {

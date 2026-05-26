@@ -33,7 +33,7 @@
 	} = $props();
 </script>
 
-<div class="rounded-lg border bg-card p-4">
+<div class="rounded-lg border border-border bg-card p-4 shadow-sm">
 	<div class="mb-4 font-medium">Payment</div>
 	{#if orderItemsCount > 0}
 	<div class="space-y-2 text-sm">

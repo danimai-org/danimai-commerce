@@ -7,9 +7,9 @@
 	import { DropdownMenu } from 'bits-ui';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import Pencil from '@lucide/svelte/icons/pencil';
-	import { getAccessToken, user as userStore } from '$lib/auth.js';
+	import { getApiBase, getValidAccessToken, user as userStore } from '$lib/auth.js';
 
-	const API_BASE = 'http://localhost:8000/admin';
+	const API_BASE = getApiBase();
 
 	type Profile = {
 		firstName: string;
@@ -20,7 +20,7 @@
 	let profile = $state<Profile>({
 		firstName: '',
 		lastName: '',
-		email: '',
+		email: ''
 	});
 
 	let loading = $state(true);
@@ -33,9 +33,9 @@
 	let draftLastName = $state('');
 
 	onMount(async () => {
-		const token = getAccessToken();
+		const token = await getValidAccessToken();
 		if (!token) return;
-		
+
 		// Initialize from user store as fallback
 		const storedUser = get(userStore);
 		if (storedUser?.id) {
@@ -44,10 +44,10 @@
 		if (storedUser?.email) {
 			profile.email = storedUser.email;
 		}
-		
+
 		try {
 			const res = await fetch(`${API_BASE}/auth/me`, {
-				headers: { Authorization: `Bearer ${token}` },
+				headers: { Authorization: `Bearer ${token}` }
 			});
 			if (res.ok) {
 				const user = (await res.json()) as {
@@ -63,7 +63,7 @@
 				profile = {
 					firstName: user.first_name ?? '',
 					lastName: user.last_name ?? '',
-					email: user.email ?? storedUser?.email ?? '',
+					email: user.email ?? storedUser?.email ?? ''
 				};
 			} else {
 				console.error('Failed to fetch profile on mount:', res.status, await res.text());
@@ -75,39 +75,6 @@
 		}
 	});
 
-	async function fetchProfile() {
-		const token = getAccessToken();
-		if (!token) return;
-		
-		const storedUser = get(userStore);
-		try {
-			const res = await fetch(`${API_BASE}/auth/me`, {
-				headers: { Authorization: `Bearer ${token}` },
-			});
-			if (res.ok) {
-				const user = (await res.json()) as {
-					id?: string;
-					first_name?: string | null;
-					last_name?: string | null;
-					email?: string | null;
-				};
-				if (user.id) {
-					userId = user.id;
-				}
-				// Ensure we handle null/undefined values correctly - convert null to empty string
-				profile = {
-					firstName: user.first_name ?? '',
-					lastName: user.last_name ?? '',
-					email: user.email ?? storedUser?.email ?? '',
-				};
-			} else {
-				console.error('Failed to fetch profile:', res.status, await res.text());
-			}
-		} catch (error) {
-			console.error('Error fetching profile:', error);
-		}
-	}
-
 	function openEdit() {
 		draftFirstName = profile.firstName;
 		draftLastName = profile.lastName;
@@ -116,45 +83,47 @@
 
 	async function saveProfile() {
 		if (!userId) return;
-		
+
 		saving = true;
 		saveError = null;
-		
+
 		try {
-			const token = getAccessToken();
+			const token = await getValidAccessToken();
 			if (!token) {
 				saveError = 'Not authenticated';
 				return;
 			}
-			
+
 			const trimmedFirstName = draftFirstName.trim();
 			const trimmedLastName = draftLastName.trim();
-			
+
 			// Send null for empty strings, otherwise send the trimmed value
 			const payload = {
 				first_name: trimmedFirstName === '' ? null : trimmedFirstName,
-				last_name: trimmedLastName === '' ? null : trimmedLastName,
+				last_name: trimmedLastName === '' ? null : trimmedLastName
 			};
-			
+
 			const res = await fetch(`${API_BASE}/users/${userId}`, {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json',
-					Authorization: `Bearer ${token}`,
+					Authorization: `Bearer ${token}`
 				},
-				body: JSON.stringify(payload),
+				body: JSON.stringify(payload)
 			});
-			
+
 			if (!res.ok) {
 				const text = await res.text();
 				let msg = text;
 				try {
 					const j = JSON.parse(text);
 					msg = j.message ?? text;
-				} catch {}
+				} catch {
+					//Parse the response and update profile immediately
+				}
 				throw new Error(msg);
 			}
-			
+
 			// Parse the response and update profile immediately
 			const updatedUser = (await res.json()) as {
 				id?: string;
@@ -162,15 +131,15 @@
 				last_name?: string | null;
 				email?: string | null;
 			};
-			
+
 			// Update profile state immediately from the response
 			// Convert null to empty string for consistent display
 			profile = {
 				firstName: updatedUser.first_name ?? '',
 				lastName: updatedUser.last_name ?? '',
-				email: updatedUser.email ?? profile.email,
+				email: updatedUser.email ?? profile.email
 			};
-			
+
 			// Close the edit dialog
 			editOpen = false;
 		} catch (e) {
@@ -180,22 +149,19 @@
 			saving = false;
 		}
 	}
-
 </script>
 
 <svelte:head>
-    <title>Settings</title>
-    <meta name="description" content="Manage settings." />
+	<title>Settings</title>
+	<meta name="description" content="Manage settings." />
 </svelte:head>
 
 <div class="flex h-full flex-col p-6">
 	<div class="mb-6 flex items-center justify-between">
 		<div>
 			<div class="mb-1 text-xs text-muted-foreground">Settings &gt; Profile</div>
-			<h1 class="text-lg font-semibold leading-none">Profile</h1>
-			<p class="mt-1 text-sm text-muted-foreground">
-				Manage your profile details.
-			</p>
+			<h1 class="text-lg leading-none font-semibold">Profile</h1>
+			<p class="mt-1 text-sm text-muted-foreground">Manage your profile details.</p>
 		</div>
 	</div>
 
@@ -290,13 +256,18 @@
 					</div>
 				</div>
 				<div class="flex justify-end gap-2 border-t p-4">
-					<Button type="button" variant="outline" onclick={() => { 
-						editOpen = false; 
-						saveError = null;
-						// Reset draft values to current profile when canceling
-						draftFirstName = profile.firstName;
-						draftLastName = profile.lastName;
-					}} disabled={saving}>
+					<Button
+						type="button"
+						variant="outline"
+						onclick={() => {
+							editOpen = false;
+							saveError = null;
+							// Reset draft values to current profile when canceling
+							draftFirstName = profile.firstName;
+							draftLastName = profile.lastName;
+						}}
+						disabled={saving}
+					>
 						Cancel
 					</Button>
 					<Button type="button" onclick={saveProfile} disabled={saving}>

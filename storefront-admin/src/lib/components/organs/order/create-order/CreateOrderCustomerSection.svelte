@@ -1,9 +1,12 @@
 <script lang="ts">
+	import { Button } from '$lib/components/ui/button/index.js';
 	import { DropdownMenu } from '$lib/components/ui/dropdown-menu/index.js';
 	import Combobox from '$lib/components/organs/combobox/combobox.svelte';
 	import type { ComboboxOption } from '$lib/components/organs/combobox/combobox.svelte';
 	import { CardSection } from '$lib/components/organs/order/card-section/index.js';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import {
 		hasShippingAddress,
 		formatShippingAddressSummary,
@@ -21,6 +24,8 @@
 		onCustomerValueChange,
 		onCustomerSearchChange,
 		onCustomerComboboxOpen,
+		onCreateCustomer,
+		onRefreshCustomers,
 		onEditContact,
 		onEditShipping,
 		onEditBilling,
@@ -36,6 +41,8 @@
 		onCustomerValueChange: (id: string) => void;
 		onCustomerSearchChange: (v: string) => void;
 		onCustomerComboboxOpen: () => void;
+		onCreateCustomer: () => void;
+		onRefreshCustomers: () => void | Promise<void>;
 		onEditContact: () => void;
 		onEditShipping: () => void;
 		onEditBilling: () => void;
@@ -154,7 +161,25 @@
 					onSearchChange={onCustomerSearchChange}
 					onOpen={onCustomerComboboxOpen}
 				/>
+				<Button
+					type="button"
+					variant="outline"
+					size="icon"
+					class="size-9 shrink-0"
+					disabled={customerComboboxLoading}
+					aria-label="Refresh customers"
+					onclick={() => void onRefreshCustomers()}
+				>
+					<RefreshCw
+						class={customerComboboxLoading ? 'size-4 animate-spin' : 'size-4'}
+						aria-hidden="true"
+					/>
+				</Button>
 			</div>
+			<Button type="button" variant="outline" size="sm" class="w-full" onclick={onCreateCustomer}>
+				<UserPlus class="size-4" aria-hidden="true" />
+				Create New Customer
+			</Button>
 		</div>
 	{/if}
 </CardSection>

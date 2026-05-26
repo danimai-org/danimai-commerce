@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
+	import { resolve } from '$app/paths';
+	import { SvelteMap, SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
 	import type { ComboboxOption } from '$lib/components/organs/combobox/combobox.svelte';
 	import { updateCustomer } from '$lib/customers/api';
 	import EditShippingAddressModal from '../EditShippingAddressModal.svelte';
@@ -25,8 +26,8 @@
 	import {
 		AVAILABLE_TAGS,
 		CUSTOMER_SEARCH_DEBOUNCE_MS,
-		CURRENCY_SEARCH_DEBOUNCE_MS,
 		PRODUCT_SEARCH_DEBOUNCE_MS,
+		PRODUCT_BROWSER_PAGE_SIZE,
 		type CreateOrderItem,
 		type Pagination,
 		type Product,
@@ -138,21 +139,8 @@
 	let regions = $state<RegionRow[]>([]);
 
 	let currencies = $state<CurrencyRow[]>([]);
-	let currencySearch = $state('');
-	let debouncedCurrencySearch = $state('');
 	let currenciesLoading = $state(false);
 	let currencyFetchSeq = 0;
-
-	$effect(() => {
-		const q = currencySearch;
-		const t = setTimeout(() => {
-			debouncedCurrencySearch = q;
-		}, CURRENCY_SEARCH_DEBOUNCE_MS);
-		return () => clearTimeout(t);
-	});
-
-	const currencySearchStale = $derived(currencySearch.trim() !== debouncedCurrencySearch.trim());
-	const currencyComboboxLoading = $derived(currenciesLoading || currencySearchStale);
 
 	function currencyParenContent(c: { code: string; symbol: string }) {
 		if (!c.symbol || c.symbol === c.code) return c.code;
@@ -174,8 +162,6 @@
 		return [{ id: code, value: code }, ...mapped];
 	}
 
-	const passthroughCurrencyOptions = (opts: ComboboxOption[]) => opts;
-
 	const currencyComboboxOptions = $derived.by((): ComboboxOption[] =>
 		withSelectedCurrencyFallback(
 			currencies.map((c) => ({ id: c.code, value: currencyLabel(c) })),
@@ -193,25 +179,30 @@
 			currencies.find((c) => c.code === selectedRegionData?.currency_code)
 	);
 
-	function addOrderItem(item: CreateOrderItem) {
-		orderItems = [...orderItems, item];
-		if (orderItems.length > 0) {
-			taxAmount = Math.round(subtotal * 0.09 * 100) / 100;
+	function recalcTaxFromItems(items: CreateOrderItem[]) {
+		if (items.length === 0) {
+			taxAmount = 0;
+			return;
 		}
+		const sum = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
+		taxAmount = Math.round(sum * 0.09 * 100) / 100;
 	}
+
+	function addOrderItems(items: CreateOrderItem[]) {
+		if (items.length === 0) return;
+		orderItems = [...orderItems, ...items];
+		recalcTaxFromItems(orderItems);
+	}
+
 	function removeOrderItem(id: string) {
 		orderItems = orderItems.filter((item) => item.id !== id);
-		if (orderItems.length === 0) {
-			taxAmount = 0;
-		} else {
-			taxAmount = Math.round(subtotal * 0.09 * 100) / 100;
-		}
+		recalcTaxFromItems(orderItems);
 	}
 	function updateItemQuantity(id: string, quantity: number) {
 		orderItems = orderItems.map((item) =>
 			item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item
 		);
-		taxAmount = Math.round(subtotal * 0.09 * 100) / 100;
+		recalcTaxFromItems(orderItems);
 	}
 	function formatCurrency(amount: number): string {
 		const symbol = selectedCurrencyData?.symbol || '₹';
@@ -249,37 +240,42 @@
 			}
 		}
 	}
+	function mapAvailableCurrency(row: {
+		code: string;
+		name: string;
+		symbol: string;
+		id?: string;
+	}): CurrencyRow {
+		return {
+			id: row.id ?? row.code,
+			code: row.code,
+			name: row.name,
+			symbol: row.symbol
+		};
+	}
+
 	async function fetchCurrenciesFromApi() {
 		const seq = ++currencyFetchSeq;
 		currenciesLoading = true;
 		try {
-			const search = debouncedCurrencySearch.trim();
-			if (search) {
-				const res = await client.currencies.get({
-					query: { page: 1, limit: 100, search }
-				});
-				if (seq !== currencyFetchSeq) return;
-				if (res.error) {
-					currencies = [];
-					return;
-				}
-				currencies = (res.data?.rows ?? []) as CurrencyRow[];
-				return;
-			}
 			const all: CurrencyRow[] = [];
 			let page = 1;
 			let hasNext = true;
 			while (hasNext) {
-				const res = await client.currencies.get({
+				const res = await client.currencies.available.get({
 					query: { page, limit: 100 }
 				});
 				if (seq !== currencyFetchSeq) return;
 				if (res.error) break;
-				all.push(...((res.data?.rows ?? []) as CurrencyRow[]));
+				const rows = res.data?.data ?? [];
+				all.push(...rows.map(mapAvailableCurrency));
 				hasNext = res.data?.pagination?.has_next_page ?? false;
 				page += 1;
 			}
-			if (seq === currencyFetchSeq) currencies = all;
+			if (seq === currencyFetchSeq) {
+				currencies = all;
+				ensureOrderMarketDefaults();
+			}
 		} catch (e) {
 			console.error('Failed to fetch currencies:', e);
 			if (seq === currencyFetchSeq) currencies = [];
@@ -287,12 +283,6 @@
 			if (seq === currencyFetchSeq) currenciesLoading = false;
 		}
 	}
-
-	$effect(() => {
-		if (!active) return;
-		void debouncedCurrencySearch;
-		void fetchCurrenciesFromApi();
-	});
 
 	let productBrowserOpen = $state(false);
 	let productBrowserPage = $state(1);
@@ -305,27 +295,34 @@
 		limit?: number;
 	} | null>(null);
 	let productBrowserLoading = $state(false);
+	let productFetchSeq = 0;
 	let selectedProductIds = $state<string[]>([]);
+	let addingProducts = $state(false);
+	let addSelectedProductsInFlight = false;
+
+	const selectedProductIdSet = $derived(new SvelteSet(selectedProductIds));
 
 	async function fetchProducts() {
+		const seq = ++productFetchSeq;
 		productBrowserLoading = true;
 		try {
 			const params = new SvelteURLSearchParams({
 				page: String(productBrowserPage),
-				limit: '20',
+				limit: String(PRODUCT_BROWSER_PAGE_SIZE),
 				sorting_field: 'products.title',
 				sorting_direction: 'desc'
 			});
 			if (debouncedProductBrowserSearch.trim())
 				params.append('search', debouncedProductBrowserSearch.trim());
 			const res = await fetch(`${apiBase}/products?${params}`, { cache: 'no-store' });
+			if (seq !== productFetchSeq) return;
 			if (!res.ok) throw new Error(await res.text());
 			const json = (await res.json()) as {
 				rows?: Product[];
 				pagination?: Pagination;
 			};
 			const pagination = json.pagination;
-			const limit = pagination?.limit ?? 20;
+			const limit = pagination?.limit ?? PRODUCT_BROWSER_PAGE_SIZE;
 			const page = pagination?.page ?? 1;
 			productBrowserRawData = {
 				products: json.rows ?? [],
@@ -334,9 +331,9 @@
 				limit
 			};
 		} catch {
-			productBrowserRawData = null;
+			if (seq === productFetchSeq) productBrowserRawData = null;
 		} finally {
-			productBrowserLoading = false;
+			if (seq === productFetchSeq) productBrowserLoading = false;
 		}
 	}
 	function openProductBrowser() {
@@ -379,98 +376,97 @@
 	}
 
 	async function addSelectedProducts() {
+		if (addSelectedProductsInFlight || addingProducts) return;
 		if (selectedProductIds.length === 0) {
 			closeProductBrowser();
 			return;
 		}
-		for (const productId of selectedProductIds) {
-			const product = productBrowserProducts.find((p) => p.id === productId);
-			if (!product) continue;
-			try {
-				const variantsRes = await fetch(`${apiBase}/product-variants?limit=100`, {
-					cache: 'no-store'
-				});
-				let variants: Array<{
-					id: string;
-					title: string;
-					product_id: string | null;
-					thumbnail: string | null;
-				}> = [];
-				if (variantsRes.ok) {
-					const variantsData = (await variantsRes.json()) as
-						| {
-								data?: Array<{
-									id: string;
-									title: string;
-									product_id: string | null;
-									thumbnail: string | null;
-								}>;
-						  }
-						| {
-								rows?: Array<{
-									id: string;
-									title: string;
-									product_id: string | null;
-									thumbnail: string | null;
-								}>;
-						  };
-					const raw =
-						'data' in variantsData && Array.isArray(variantsData.data)
-							? variantsData.data
-							: 'rows' in variantsData &&
-								  Array.isArray((variantsData as { rows?: typeof variants }).rows)
-								? (variantsData as { rows: typeof variants }).rows
-								: [];
-					variants = raw.filter((v) => v.product_id === productId);
-				}
-				const variant = variants[0];
-				let price = 0;
-				let currency = selectedCurrency || 'INR';
-				if (variant) {
+		addSelectedProductsInFlight = true;
+		addingProducts = true;
+		try {
+			const productsById = new Map(productBrowserProducts.map((p) => [p.id, p]));
+			const orderCurrency = selectedCurrency || 'INR';
+
+			const variantByProductId = new SvelteMap<
+				string,
+				{ id: string; thumbnail: string | null } | null
+			>();
+			await Promise.all(
+				selectedProductIds.map(async (productId) => {
 					try {
-						const variantRes = await fetch(`${apiBase}/product-variants/${variant.id}`, {
-							cache: 'no-store'
+						const res = await client['product-variants'].get({
+							query: { filters: { product_id: productId }, limit: '1', page: 1 }
 						});
-						if (variantRes.ok) {
-							const variantData = (await variantRes.json()) as {
-								prices?: Array<{ amount: string; currency_code: string }>;
-							};
-							if (variantData.prices?.length) {
-								const matchingPrice = variantData.prices.find(
-									(p) => p.currency_code.toLowerCase() === currency.toLowerCase()
-								);
-								const priceToUse = matchingPrice || variantData.prices[0];
-								if (priceToUse) {
-									price = parseFloat(priceToUse.amount) / 100;
-									currency = priceToUse.currency_code;
-								}
-							}
-						}
+						const row = res.data?.rows?.[0];
+						variantByProductId.set(
+							productId,
+							row ? { id: row.id, thumbnail: row.thumbnail ?? null } : null
+						);
+					} catch {
+						variantByProductId.set(productId, null);
+					}
+				})
+			);
+
+			const uniqueVariantIds = [
+				...new SvelteSet(
+					[...variantByProductId.values()]
+						.filter((v): v is { id: string; thumbnail: string | null } => v != null)
+						.map((v) => v.id)
+				)
+			];
+			const priceByVariantId = new SvelteMap<string, { price: number; currency: string }>();
+			await Promise.all(
+				uniqueVariantIds.map(async (variantId) => {
+					try {
+						const res = await client['product-variants']({ id: variantId }).get();
+						if (res.error) return;
+						const prices = res.data?.prices ?? [];
+						if (!prices.length) return;
+						const matchingPrice = prices.find(
+							(p) => p.currency_code.toLowerCase() === orderCurrency.toLowerCase()
+						);
+						const priceToUse = matchingPrice ?? prices[0];
+						if (!priceToUse) return;
+						priceByVariantId.set(variantId, {
+							price: parseFloat(String(priceToUse.amount)) / 100,
+							currency: priceToUse.currency_code
+						});
 					} catch {
 						// Variant price is optional; keep defaults when fetch fails.
 					}
+				})
+			);
+
+			const newItems: CreateOrderItem[] = [];
+			for (const productId of selectedProductIds) {
+				const product = productsById.get(productId);
+				if (!product) continue;
+				const variant = variantByProductId.get(productId) ?? null;
+				let price = 0;
+				let currency = orderCurrency;
+				if (variant) {
+					const priced = priceByVariantId.get(variant.id);
+					if (priced) {
+						price = priced.price;
+						currency = priced.currency;
+					}
 				}
-				const thumbnail = variant?.thumbnail ?? product.thumbnail;
-				addOrderItem({
+				newItems.push({
 					id: variant?.id ?? productId,
 					title: product.title,
 					price,
 					quantity: 1,
 					currency,
-					thumbnail
-				});
-			} catch {
-				addOrderItem({
-					id: productId,
-					title: product.title,
-					price: 0,
-					quantity: 1,
-					currency: selectedCurrency || 'INR',
-					thumbnail: product.thumbnail
+					thumbnail: variant?.thumbnail ?? product.thumbnail
 				});
 			}
+			addOrderItems(newItems);
+			closeProductBrowser();
+		} finally {
+			addSelectedProductsInFlight = false;
+			addingProducts = false;
 		}
-		closeProductBrowser();
 	}
 
 	$effect(() => {
@@ -577,6 +573,15 @@
 
 	function onCustomerComboboxOpen() {
 		customerComboboxHasOpened = true;
+	}
+
+	function openCreateCustomerInNewTab() {
+		window.open(resolve('/customers?create=1', {}), '_blank', 'noopener,noreferrer');
+	}
+
+	async function refreshCustomerCombobox() {
+		customerComboboxHasOpened = true;
+		await fetchCustomersForCombobox(customerComboboxSearch.trim());
 	}
 
 	$effect(() => {
@@ -814,8 +819,8 @@
 			debouncedCustomerComboboxSearch = '';
 			customerComboboxHasOpened = false;
 			customerComboboxCustomers = [];
-			currencySearch = '';
-			debouncedCurrencySearch = '';
+			currencies = [];
+			void fetchCurrenciesFromApi();
 			fetchRegions();
 		}
 	});
@@ -862,6 +867,8 @@
 				onCustomerValueChange={onCustomerComboboxValueChange}
 				onCustomerSearchChange={(v) => (customerComboboxSearch = v)}
 				{onCustomerComboboxOpen}
+				onCreateCustomer={openCreateCustomerInNewTab}
+				onRefreshCustomers={refreshCustomerCombobox}
 				onEditContact={openEditContactModal}
 				onEditShipping={openEditShippingModal}
 				onEditBilling={openEditBillingModal}
@@ -872,11 +879,11 @@
 				{selectedRegionData}
 				bind:selectedCurrency
 				{currencyComboboxOptions}
-				{currencyComboboxLoading}
+				currencyComboboxLoading={currenciesLoading}
 				onCurrencyChange={(v) => (selectedCurrency = v)}
-				onCurrencySearchChange={(v) => (currencySearch = v)}
-				onCurrencyOpen={() => void fetchCurrenciesFromApi()}
-				filterFn={passthroughCurrencyOptions}
+				onCurrencyOpen={() => {
+					if (currencies.length === 0 && !currenciesLoading) void fetchCurrenciesFromApi();
+				}}
 			/>
 			<CreateOrderTagsSection
 				{selectedTagsList}
@@ -892,8 +899,9 @@
 	bind:search={productBrowserSearch}
 	bind:page={productBrowserPage}
 	loading={productBrowserLoading}
+	adding={addingProducts}
 	products={productBrowserProducts}
-	{selectedProductIds}
+	selectedProductIds={selectedProductIdSet}
 	pagination={productBrowserPagination}
 	rangeStart={productBrowserStart}
 	rangeEnd={productBrowserEnd}

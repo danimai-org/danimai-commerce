@@ -80,11 +80,13 @@ export class UpdateProductProcess implements ProcessContract<
       await this.syncProductSalesChannels(input.id, input.sales_channel_ids);
     }
 
-    await this.syncProductMedia(
-      input.id,
-      input.media_ids,
-      input.thumbnail_media_id,
-    );
+    if (input.media_ids !== undefined || input.thumbnail_media_id !== undefined) {
+      await this.syncProductMedia(
+        input.id,
+        input.media_ids,
+        input.thumbnail_media_id,
+      );
+    }
 
     return (
       updated ??
@@ -190,15 +192,16 @@ export class UpdateProductProcess implements ProcessContract<
       external_id?: string | null;
       category_id?: string | null;
       metadata?: unknown;
-    } = {
-      title: input.title,
-      handle: input.handle,
-      description: input.description,
-      is_giftcard: input.is_giftcard,
-      discountable: input.discountable,
-      status: input.status as ProductStatusEnum,
-      external_id: input.external_id,
-    };
+    } = {};
+
+    if (input.title !== undefined) updateData.title = input.title;
+    if (handle !== undefined) updateData.handle = handle;
+    if (input.description !== undefined) updateData.description = input.description;
+    if (input.is_giftcard !== undefined) updateData.is_giftcard = input.is_giftcard;
+    if (input.discountable !== undefined) updateData.discountable = input.discountable;
+    if (input.status !== undefined) updateData.status = input.status as ProductStatusEnum;
+    if (input.external_id !== undefined) updateData.external_id = input.external_id;
+    if (input.thumbnail !== undefined) updateData.thumbnail = input.thumbnail;
 
     if (input.category_id !== undefined) {
       updateData.category_id = category?.id ?? null;

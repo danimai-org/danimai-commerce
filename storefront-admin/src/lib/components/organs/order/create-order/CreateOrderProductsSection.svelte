@@ -26,7 +26,7 @@
 	} = $props();
 </script>
 
-<div class="rounded-lg border bg-card p-4">
+<div class="rounded-lg border border-border bg-card p-4 shadow-sm">
 	<div class="mb-4 flex items-center gap-2">
 		<span class={statusBadgeClass('not_fulfilled')}>
 			<Package class="mr-1 size-3" />
@@ -60,9 +60,11 @@
 			</div>
 		</div>
 	{:else}
-		<div class="mb-4 space-y-4">
-			{#each orderItems as item, i (item.id + '-' + i)}
-				<div class="flex flex-wrap items-start gap-3 sm:flex-nowrap sm:gap-4">
+		<div class="mb-4 divide-y divide-border">
+			{#each orderItems as item (item.id)}
+				<div
+					class="flex flex-wrap items-start gap-3 py-4 first:pt-0 last:pb-0 sm:flex-nowrap sm:gap-4"
+				>
 					{#if item.thumbnail}
 						<img
 							src={item.thumbnail}

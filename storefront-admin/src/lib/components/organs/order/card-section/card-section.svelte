@@ -14,7 +14,7 @@
 	} = $props();
 </script>
 
-<div class="overflow-visible rounded-lg border bg-card p-4 {className}">
+<div class="overflow-visible rounded-lg border border-border bg-card p-4 shadow-sm {className}">
 	{#if title || headerAction}
 		<div class="mb-4 flex items-center justify-between">
 			{#if title}

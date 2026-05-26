@@ -22,6 +22,7 @@
 		maxFiles?: number;
 		editable?: boolean;
 		disabled?: boolean;
+		uploading?: boolean;
 		onPickFiles?: (files: File[]) => void | Promise<void>;
 		onRemoveRemote?: (id: string) => void | Promise<void>;
 		pendingRemoveId?: string | null;
@@ -35,6 +36,7 @@
 		maxFiles,
 		editable = true,
 		disabled = false,
+		uploading = false,
 		onPickFiles,
 		onRemoveRemote,
 		pendingRemoveId = null,
@@ -307,7 +309,7 @@
 			if (!disabled) fileInput?.click();
 		}}
 	>
-		{#if disabled && onPickFiles}
+		{#if uploading}
 			<div
 				class="size-8 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary"
 			></div>
