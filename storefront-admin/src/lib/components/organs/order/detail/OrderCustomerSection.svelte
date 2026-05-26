@@ -1,10 +1,9 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import { DropdownMenu } from 'bits-ui';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import { SearchInput } from '../search-input/index.js';
 	import { CardSection } from '../card-section/index.js';
+	import EditContactModal from '../EditContactModal.svelte';
 	import EditShippingAddressModal from '../EditShippingAddressModal.svelte';
 	import AddressDisplay from './AddressDisplay.svelte';
 	import type { CustomerInfo } from './load-order.js';
@@ -17,6 +16,7 @@
 		type OrderDetailOrder
 	} from './types.js';
 	import type { ShippingAddressValue } from '../shipping-address.js';
+	import { updateCustomer } from '$lib/customers/api.js';
 	import { client } from '$lib/client';
 
 	let {
@@ -31,14 +31,23 @@
 		onOrderUpdated?: () => void | Promise<void>;
 	} = $props();
 
-	let customerSearch = $derived('');
-	let editShippingModalOpen = $derived(false);
+	let customerSearch = $state('');
+	let editContactModalOpen = $state(false);
+	let editContactEmail = $state('');
+	let editContactPhone = $state('');
+	let editContactEmailInitial = $state('');
+	let editContactPhoneInitial = $state('');
+	let editContactSaving = $state(false);
+	let editShippingModalOpen = $state(false);
+
+	const editContactDirty = $derived(
+		editContactEmail.trim() !== editContactEmailInitial.trim() ||
+			editContactPhone.trim() !== editContactPhoneInitial.trim()
+	);
 
 	const metadata = $derived(getOrderMetadata(order));
 
-	const billingAddress = $derived(
-		parseMetadataAddress(metadata.billing_address)
-	);
+	const billingAddress = $derived(parseMetadataAddress(metadata.billing_address));
 
 	const shippingAddress = $derived.by((): OrderAddress | null => {
 		const fromShipping = parseMetadataAddress(metadata.shipping_address);
@@ -50,6 +59,44 @@
 	const hasShippingAddress = $derived(hasOrderAddress(shippingAddress));
 
 	let shippingAddressForm = $derived(toShippingAddressValue(shippingAddress));
+
+	function openEditContactModal() {
+		editContactEmail = order.email ?? '';
+		editContactPhone = customer.phone ?? '';
+		editContactEmailInitial = editContactEmail;
+		editContactPhoneInitial = editContactPhone;
+		editContactModalOpen = true;
+	}
+
+	function closeEditContactModal() {
+		if (editContactSaving) return;
+		editContactModalOpen = false;
+	}
+
+	async function saveEditContact() {
+		if (!editContactDirty) return;
+		editContactSaving = true;
+		try {
+			const email = editContactEmail.trim() || null;
+			const phone = editContactPhone.trim() || null;
+			const orderRes = await client.orders({ id: orderId }).patch({ email });
+			if (orderRes.error) {
+				throw new Error('Failed to update contact information');
+			}
+			if (order.customer_id) {
+				await updateCustomer(order.customer_id, {
+					email: email ?? '',
+					first_name: customer.firstName,
+					last_name: customer.lastName,
+					phone
+				});
+			}
+			editContactModalOpen = false;
+			await onOrderUpdated?.();
+		} finally {
+			editContactSaving = false;
+		}
+	}
 
 	async function saveShippingAddress(addr: ShippingAddressValue) {
 		const currentMeta =
@@ -86,7 +133,7 @@
 					<DropdownMenu.Item
 						textValue="Edit contact information"
 						class="relative flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-						onSelect={() => goto(resolve(`/orders/${orderId}/edit`, {}))}
+						onSelect={openEditContactModal}
 					>
 						Edit contact information
 					</DropdownMenu.Item>
@@ -102,11 +149,7 @@
 		</DropdownMenu.Root>
 	{/snippet}
 
-	<SearchInput
-		bind:value={customerSearch}
-		placeholder="Search or create a customer"
-		class="mb-4"
-	/>
+	<SearchInput bind:value={customerSearch} placeholder="Search or create a customer" class="mb-4" />
 
 	<div class="space-y-4 text-sm">
 		<div>
@@ -141,6 +184,15 @@
 	</div>
 </CardSection>
 
+<EditContactModal
+	bind:open={editContactModalOpen}
+	bind:email={editContactEmail}
+	bind:phone={editContactPhone}
+	saving={editContactSaving}
+	canSave={editContactDirty}
+	onSave={saveEditContact}
+	onCancel={closeEditContactModal}
+/>
 <EditShippingAddressModal
 	bind:open={editShippingModalOpen}
 	bind:value={shippingAddressForm}

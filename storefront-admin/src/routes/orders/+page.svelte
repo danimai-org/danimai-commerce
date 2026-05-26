@@ -71,7 +71,7 @@
 			textKey: 'order_label'
 		},
 		{ label: 'Status', key: 'status', type: 'text' },
-		{ label: 'Fulfillment', key: 'fulfillment_status', type: 'text' },
+		{ label: 'Fulfillment', key: 'fulfillment_status', type: 'statusBadge' },
 		{ label: 'Payment', key: 'payment_status', type: 'text' },
 		{ label: 'Customer', key: 'email', type: 'text' },
 		{ label: 'Date', key: 'created_at', type: 'date' }
