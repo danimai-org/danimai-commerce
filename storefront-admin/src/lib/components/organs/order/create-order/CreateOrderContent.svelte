@@ -26,6 +26,7 @@
 		AVAILABLE_TAGS,
 		CUSTOMER_SEARCH_DEBOUNCE_MS,
 		CURRENCY_SEARCH_DEBOUNCE_MS,
+		PRODUCT_SEARCH_DEBOUNCE_MS,
 		type CreateOrderItem,
 		type Pagination,
 		type Product,
@@ -296,6 +297,7 @@
 	let productBrowserOpen = $state(false);
 	let productBrowserPage = $state(1);
 	let productBrowserSearch = $state('');
+	let debouncedProductBrowserSearch = $state('');
 	let productBrowserRawData = $state<{
 		products?: Product[];
 		count?: number;
@@ -314,7 +316,8 @@
 				sorting_field: 'products.title',
 				sorting_direction: 'desc'
 			});
-			if (productBrowserSearch.trim()) params.append('search', productBrowserSearch.trim());
+			if (debouncedProductBrowserSearch.trim())
+				params.append('search', debouncedProductBrowserSearch.trim());
 			const res = await fetch(`${apiBase}/products?${params}`, { cache: 'no-store' });
 			if (!res.ok) throw new Error(await res.text());
 			const json = (await res.json()) as {
@@ -340,6 +343,7 @@
 		selectedProductIds = [];
 		productBrowserPage = 1;
 		productBrowserSearch = '';
+		debouncedProductBrowserSearch = '';
 		productBrowserOpen = true;
 	}
 	function closeProductBrowser() {
@@ -469,17 +473,22 @@
 		closeProductBrowser();
 	}
 
-	let previousProductBrowserSearch = $state('');
 	$effect(() => {
-		if (productBrowserSearch !== previousProductBrowserSearch) {
-			previousProductBrowserSearch = productBrowserSearch;
-			productBrowserPage = 1;
-		}
+		const q = productBrowserSearch;
+		const t = setTimeout(() => {
+			debouncedProductBrowserSearch = q;
+		}, PRODUCT_SEARCH_DEBOUNCE_MS);
+		return () => clearTimeout(t);
+	});
+	$effect(() => {
+		if (!productBrowserOpen) return;
+		void debouncedProductBrowserSearch;
+		productBrowserPage = 1;
 	});
 	$effect(() => {
 		if (!productBrowserOpen) return;
 		void productBrowserPage;
-		void productBrowserSearch;
+		void debouncedProductBrowserSearch;
 		fetchProducts();
 	});
 
@@ -491,8 +500,14 @@
 	let selectedCustomerId = $state('');
 	let customerComboboxSearch = $state('');
 	let debouncedCustomerComboboxSearch = $state('');
+	let customerComboboxHasOpened = $state(false);
 	let customerComboboxCustomers = $state<CustomerListItem[]>([]);
 	let customerComboboxLoading = $state(false);
+	let customerComboboxFetchId = 0;
+
+	const customerComboboxSearchPending = $derived(
+		customerComboboxSearch.trim() !== debouncedCustomerComboboxSearch.trim()
+	);
 
 	function customerDisplayLabel(c: CustomerListItem): string {
 		const name = [c.first_name, c.last_name].filter(Boolean).join(' ');
@@ -501,12 +516,12 @@
 
 	const passthroughComboboxOptions = (opts: ComboboxOption[]) => opts;
 
-	const customerComboboxOptions = $derived.by((): ComboboxOption[] => {
-		const q = debouncedCustomerComboboxSearch.trim().toLowerCase();
-		return customerComboboxCustomers
-			.map((c) => ({ id: c.id, value: customerDisplayLabel(c) }))
-			.filter((o) => !q || o.value.toLowerCase().includes(q));
-	});
+	const customerComboboxOptions = $derived(
+		customerComboboxCustomers.map((c) => ({
+			id: c.id,
+			value: customerDisplayLabel(c)
+		}))
+	);
 
 	$effect(() => {
 		const q = customerComboboxSearch;
@@ -543,21 +558,32 @@
 		return { rows: json.rows ?? [], pagination: json.pagination ?? null };
 	}
 
-	async function fetchCustomersForCombobox() {
+	async function fetchCustomersForCombobox(search: string) {
+		const fetchId = ++customerComboboxFetchId;
 		customerComboboxLoading = true;
 		try {
-			const { rows } = await fetchCustomersList(1, 100, '');
+			const { rows } = await fetchCustomersList(1, 100, search);
+			if (fetchId !== customerComboboxFetchId) return;
 			customerComboboxCustomers = rows;
 		} catch {
+			if (fetchId !== customerComboboxFetchId) return;
 			customerComboboxCustomers = [];
 		} finally {
-			customerComboboxLoading = false;
+			if (fetchId === customerComboboxFetchId) {
+				customerComboboxLoading = false;
+			}
 		}
 	}
 
 	function onCustomerComboboxOpen() {
-		void fetchCustomersForCombobox();
+		customerComboboxHasOpened = true;
 	}
+
+	$effect(() => {
+		if (!customerComboboxHasOpened) return;
+		const search = debouncedCustomerComboboxSearch;
+		void fetchCustomersForCombobox(search);
+	});
 
 	function applySelectedCustomer(c: CustomerListItem) {
 		const name = [c.first_name, c.last_name].filter(Boolean).join(' ') || c.email;
@@ -786,6 +812,7 @@
 			billingAddressForm = emptyShippingAddress();
 			customerComboboxSearch = '';
 			debouncedCustomerComboboxSearch = '';
+			customerComboboxHasOpened = false;
 			customerComboboxCustomers = [];
 			currencySearch = '';
 			debouncedCurrencySearch = '';
@@ -796,8 +823,10 @@
 
 <div class="flex h-full flex-col bg-muted/30">
 	<CreateOrderHeader />
-	<div class="flex min-h-0 flex-1 gap-6 overflow-auto p-6">
-		<div class="flex min-w-0 flex-1 flex-col gap-6">
+	<div
+		class="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-auto p-4 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_24rem]"
+	>
+		<div class="flex min-w-0 flex-col gap-4 sm:gap-6">
 			<CreateOrderProductsSection
 				bind:productSearch
 				{orderItems}
@@ -821,13 +850,13 @@
 				onEnsureMarketDefaults={ensureOrderMarketDefaults}
 			/>
 		</div>
-		<div class="flex w-80 shrink-0 flex-col gap-6">
+		<div class="flex w-full min-w-0 flex-col gap-4 sm:gap-6">
 			<CreateOrderNotesSection {notes} onEdit={() => (notesModalOpen = true)} />
 			<CreateOrderCustomerSection
 				{selectedCustomer}
 				bind:selectedCustomerId
 				{customerComboboxOptions}
-				{customerComboboxLoading}
+				customerComboboxLoading={customerComboboxLoading || customerComboboxSearchPending}
 				{shippingAddress}
 				{billingAddressDisplay}
 				onCustomerValueChange={onCustomerComboboxValueChange}

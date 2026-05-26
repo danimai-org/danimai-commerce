@@ -12,6 +12,12 @@
 	import User from '@lucide/svelte/icons/user';
 	import Calendar from '@lucide/svelte/icons/calendar';
 	import DollarSign from '@lucide/svelte/icons/dollar-sign';
+	import {
+		orderSheetBody,
+		orderSheetContent,
+		orderSheetFooter,
+		orderSheetHeader
+	} from '../dialog-classes.js';
 
 	let {
 		open = $bindable(false),
@@ -115,16 +121,16 @@
 </script>
 
 <Sheet.Root bind:open>
-	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
-		<div class="flex h-full flex-col">
-			<Sheet.Header class="flex flex-col gap-1 border-b px-6 py-4">
+	<Sheet.Content side="right" class={orderSheetContent}>
+		<div class="flex h-full min-h-0 flex-col">
+			<Sheet.Header class="{orderSheetHeader} flex flex-col gap-1">
 				<div class="flex items-center gap-2">
 					<CreditCard class="size-5 text-muted-foreground" />
 					<Sheet.Title>Collect Payment</Sheet.Title>
 				</div>
 				<Sheet.Description>Process credit card payment for this order.</Sheet.Description>
 			</Sheet.Header>
-			<div class="min-h-0 flex-1 overflow-auto px-6 py-6">
+			<div class={orderSheetBody}>
 				<div class="flex flex-col gap-6">
 					<div class="flex flex-col gap-4">
 						<h3 class="text-sm font-semibold">Billing address</h3>
@@ -307,7 +313,7 @@
 					</div>
 				</div>
 			</div>
-			<Sheet.Footer class="flex justify-end gap-2 border-t p-4">
+			<Sheet.Footer class={orderSheetFooter}>
 				<Button variant="outline" onclick={onCancel} disabled={creatingOrder}>Cancel</Button>
 				<Button
 					disabled={creatingOrder || !canCreate}

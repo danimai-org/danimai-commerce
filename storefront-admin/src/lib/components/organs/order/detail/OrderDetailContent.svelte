@@ -35,26 +35,30 @@
 	const itemCount = $derived(orderItems.reduce((sum, item) => sum + item.quantity, 0));
 </script>
 
-<OrderDetailHeader {order} {orderId} />
+<div class="flex h-full flex-col bg-muted/30">
+	<OrderDetailHeader {order} {orderId} />
 
-<div class="flex min-h-0 flex-1 gap-6 overflow-auto p-6">
-	<div class="flex min-w-0 flex-1 flex-col gap-6">
-		<OrderFulfillmentSection {order} {orderId} {orderItems} {onOrderUpdated} />
-		<OrderPaymentSection
-			{order}
-			{subtotal}
-			{taxAmount}
-			{total}
-			{paidAmount}
-			{itemCount}
-		/>
-		<OrderTimelineSection />
-	</div>
+	<div
+		class="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-auto p-4 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_24rem]"
+	>
+		<div class="flex min-w-0 flex-col gap-4 sm:gap-6">
+			<OrderFulfillmentSection {order} {orderId} {orderItems} {onOrderUpdated} />
+			<OrderPaymentSection
+				{order}
+				{subtotal}
+				{taxAmount}
+				{total}
+				{paidAmount}
+				{itemCount}
+			/>
+			<OrderTimelineSection />
+		</div>
 
-	<div class="flex w-80 flex-col gap-6">
-		<OrderNotesSection notes={metadata.notes} />
-		<OrderCustomerSection {order} {orderId} {customer} {onOrderUpdated} />
-		<OrderConversionSummary />
-		<OrderRiskSection />
+		<div class="flex w-full min-w-0 flex-col gap-4 sm:gap-6">
+			<OrderNotesSection notes={metadata.notes} />
+			<OrderCustomerSection {order} {orderId} {customer} {onOrderUpdated} />
+			<OrderConversionSummary />
+			<OrderRiskSection />
+		</div>
 	</div>
 </div>

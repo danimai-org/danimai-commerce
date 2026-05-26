@@ -3,15 +3,13 @@
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import CreateOrderProductBrowserDialog from '$lib/components/organs/order/create-order/CreateOrderProductBrowserDialog.svelte';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Package from '@lucide/svelte/icons/package';
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import Plus from '@lucide/svelte/icons/plus';
 	import X from '@lucide/svelte/icons/x';
-	import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
-	import Search from '@lucide/svelte/icons/search';
 	import { resolve } from '$app/paths';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
@@ -261,13 +259,25 @@
 			const params = new SvelteURLSearchParams({
 				page: String(productBrowserPage),
 				limit: '20',
-				sorting_field: 'created_at',
+				sorting_field: 'products.title',
 				sorting_direction: 'desc'
 			});
 			if (productBrowserSearch.trim()) params.append('search', productBrowserSearch.trim());
 			const res = await fetch(`${API_BASE}/products?${params}`, { cache: 'no-store' });
 			if (!res.ok) throw new Error(await res.text());
-			productBrowserRawData = (await res.json()) as typeof productBrowserRawData;
+			const json = (await res.json()) as {
+				rows?: Product[];
+				pagination?: { total?: number; limit?: number; page?: number };
+			};
+			const pagination = json.pagination;
+			const limit = pagination?.limit ?? 20;
+			const page = pagination?.page ?? 1;
+			productBrowserRawData = {
+				products: json.rows ?? [],
+				count: pagination?.total ?? 0,
+				offset: (page - 1) * limit,
+				limit
+			};
 		} catch {
 			productBrowserRawData = null;
 		} finally {
@@ -296,6 +306,20 @@
 	);
 	const productBrowserTotalPages = $derived(
 		productBrowserLimit > 0 ? Math.ceil(productBrowserTotal / productBrowserLimit) : 1
+	);
+	const productBrowserPagination = $derived({
+		total: productBrowserTotal,
+		page: productBrowserPageNum,
+		limit: productBrowserLimit,
+		total_pages: productBrowserTotalPages,
+		has_next_page: productBrowserPageNum < productBrowserTotalPages,
+		has_previous_page: productBrowserPageNum > 1
+	});
+	const productBrowserRangeStart = $derived(
+		productBrowserTotal === 0 ? 0 : productBrowserOffset + 1
+	);
+	const productBrowserRangeEnd = $derived(
+		Math.min(productBrowserOffset + productBrowserLimit, productBrowserTotal)
 	);
 
 	function toggleProductSelection(productId: string) {
@@ -363,17 +387,25 @@
 		closeAddProduct();
 	}
 
+	let previousProductBrowserSearch = $state('');
+	$effect(() => {
+		if (productBrowserSearch !== previousProductBrowserSearch) {
+			previousProductBrowserSearch = productBrowserSearch;
+			productBrowserPage = 1;
+		}
+	});
 	$effect(() => {
 		if (!addProductOpen) return;
-
+		void productBrowserPage;
+		void productBrowserSearch;
 		fetchProductsForEdit();
 	});
 </script>
 
-<div class="flex h-full flex-col">
+<div class="flex h-full flex-col bg-muted/30">
 	<div class="flex min-h-0 flex-1 flex-col">
 		{#if error}
-			<div class="p-6">
+			<div class="p-4 sm:p-6">
 				<div
 					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 				>
@@ -385,50 +417,52 @@
 				<p class="text-muted-foreground">Loading…</p>
 			</div>
 		{:else if order}
-			<!-- Header -->
-			<div class="border-b bg-background px-6 py-4">
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-2">
-						<Button
-							variant="ghost"
-							size="icon"
-							class="size-8"
-							onclick={() => goto(resolve(`/orders/${orderId}`, {}))}
-						>
-							<ArrowLeft class="size-4" />
-						</Button>
-						<div class="flex items-center gap-2">
-							<FileText class="size-4 text-muted-foreground" />
-							<span class="text-sm text-muted-foreground">#{order.display_id}</span>
-							<span class="text-sm text-muted-foreground">-</span>
-							<span class="text-lg font-semibold">Edit order</span>
-						</div>
+			<div class="shrink-0 border-b bg-background px-4 py-3 sm:px-6 sm:py-4">
+				<div class="flex min-w-0 items-center gap-2">
+					<Button
+						variant="ghost"
+						size="icon"
+						class="size-8 shrink-0"
+						onclick={() => goto(resolve(`/orders/${orderId}`, {}))}
+					>
+						<ArrowLeft class="size-4" />
+					</Button>
+					<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+						<FileText class="size-4 shrink-0 text-muted-foreground" />
+						<span class="text-sm text-muted-foreground">#{order.display_id}</span>
+						<span class="text-sm text-muted-foreground">-</span>
+						<span class="text-lg font-semibold">Edit order</span>
 					</div>
 				</div>
-				<div class="mt-2 text-sm text-muted-foreground">
+				<p class="mt-2 pl-10 text-sm text-muted-foreground sm:pl-12">
 					{formatDate(order.created_at)} from Draft Orders
-				</div>
+				</p>
 			</div>
 
-			<!-- Main Content -->
-			<div class="flex min-h-0 flex-1 gap-6 overflow-auto p-6">
-				<!-- Left Column -->
-				<div class="flex min-w-0 flex-1 flex-col gap-6">
+			<div
+				class="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-auto p-4 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_24rem]"
+			>
+				<div class="flex min-w-0 flex-col gap-4 sm:gap-6">
 					<!-- Unfulfilled / Products -->
 					<div class="rounded-lg border bg-card p-4">
-						<div class="mb-4 flex items-center justify-between">
+						<div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 							<span
-								class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400"
+								class="inline-flex w-fit items-center gap-1.5 rounded-full bg-amber-500/15 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400"
 							>
 								<Package class="size-3" />
 								Unfulfilled
 							</span>
-							<div class="flex items-center gap-2">
-								<Button variant="outline" size="sm" onclick={openAddProduct}>
+							<div class="flex flex-col gap-2 min-[420px]:flex-row">
+								<Button
+									variant="outline"
+									size="sm"
+									class="min-[420px]:flex-1"
+									onclick={openAddProduct}
+								>
 									<Plus class="size-4" />
 									Add product
 								</Button>
-								<Button variant="outline" size="sm">
+								<Button variant="outline" size="sm" class="min-[420px]:flex-1">
 									<Plus class="size-4" />
 									Add custom item
 								</Button>
@@ -436,7 +470,7 @@
 						</div>
 						<div class="overflow-hidden rounded-md border">
 							<div
-								class="grid grid-cols-[1fr_80px_100px_100px_40px] gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground"
+								class="hidden grid-cols-[1fr_80px_100px_100px_40px] gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground sm:grid"
 							>
 								<span>Product</span>
 								<span>Price</span>
@@ -444,17 +478,70 @@
 								<span>Total</span>
 								<span></span>
 							</div>
-							{#if editItems.length > 0}
-								<div
-									class="flex items-center gap-1.5 rounded-md border-b bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400"
-								>
-									<AlertTriangle class="size-3.5 shrink-0" />
-									This line item has -2 units in stock
-								</div>
-							{/if}
+						
 							{#each editItems as item (item.id)}
 								<div class="border-b bg-background px-3 py-3 last:border-b-0">
-									<div class="grid grid-cols-[1fr_80px_100px_100px_40px] items-center gap-2">
+									<!-- Mobile -->
+									<div class="flex flex-col gap-3 sm:hidden">
+										<div class="flex items-start gap-3">
+											{#if item.thumbnail}
+												<img
+													src={item.thumbnail}
+													alt={item.title}
+													class="size-12 shrink-0 rounded-md object-cover"
+												/>
+											{:else}
+												<div
+													class="flex size-12 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
+												>
+													<ImageIcon class="size-6" />
+												</div>
+											{/if}
+											<div class="min-w-0 flex-1">
+												<div class="font-medium">{item.title}</div>
+												{#if item.sku}
+													<div class="text-xs text-muted-foreground">{item.sku}</div>
+												{/if}
+											</div>
+											<Button
+												variant="ghost"
+												size="icon"
+												class="size-8 shrink-0 text-muted-foreground hover:text-destructive"
+												onclick={() => removeItem(item.id)}
+												aria-label="Remove"
+											>
+												<X class="size-4" />
+											</Button>
+										</div>
+										<div class="grid grid-cols-3 gap-2 text-sm">
+											<div>
+												<div class="text-xs text-muted-foreground">Price</div>
+												<div class="font-medium">{formatCurrency(item.price)}</div>
+											</div>
+											<div>
+												<div class="text-xs text-muted-foreground">Quantity</div>
+												<Input
+													type="number"
+													min="0"
+													value={item.quantity}
+													oninput={(e) =>
+														updateQuantity(
+															item.id,
+															parseInt((e.currentTarget as HTMLInputElement).value, 10)
+														)}
+													class="mt-1 h-8 w-full max-w-24"
+												/>
+											</div>
+											<div class="text-right">
+												<div class="text-xs text-muted-foreground">Total</div>
+												<div class="font-medium">{formatCurrency(item.price * item.quantity)}</div>
+											</div>
+										</div>
+									</div>
+									<!-- Desktop -->
+									<div
+										class="hidden grid-cols-[1fr_80px_100px_100px_40px] items-center gap-2 sm:grid"
+									>
 										<div class="flex min-w-0 items-center gap-3">
 											{#if item.thumbnail}
 												<img
@@ -548,9 +635,8 @@
 					</div>
 				</div>
 
-				<!-- Right Column - Summary -->
-				<div class="flex w-80 shrink-0 flex-col">
-					<div class="sticky top-6 rounded-lg border bg-card p-4">
+				<div class="flex w-full min-w-0 flex-col">
+					<div class="rounded-lg border bg-card p-4 lg:sticky lg:top-6">
 						<h3 class="mb-4 text-sm font-semibold">Summary</h3>
 						{#if updateError}
 							<p class="mb-4 text-sm text-destructive">{updateError}</p>
@@ -566,8 +652,7 @@
 				</div>
 			</div>
 
-			<!-- Footer -->
-			<div class="border-t bg-background px-6 py-4 text-center">
+			<div class="shrink-0 border-t bg-background px-4 py-3 text-center sm:px-6 sm:py-4">
 				<button
 					type="button"
 					class="cursor-pointer border-none bg-transparent text-sm text-primary hover:underline"
@@ -578,123 +663,17 @@
 	</div>
 </div>
 
-<!-- Add product dialog -->
-<Dialog.Root bind:open={addProductOpen}>
-	<Dialog.Content class="m-auto flex max-h-[85vh] max-w-3xl flex-col rounded-xl border shadow-lg">
-		<div class="flex flex-1 flex-col overflow-hidden">
-			<Dialog.Header class="flex flex-row items-center justify-between border-b px-6 py-4">
-				<Dialog.Title class="text-base font-semibold">Browse products</Dialog.Title>
-			</Dialog.Header>
-			<div class="flex flex-wrap items-center justify-between gap-4 border-b px-6 py-4">
-				<div class="relative ml-auto w-64">
-					<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-					<Input
-						type="search"
-						placeholder="Search products"
-						bind:value={productBrowserSearch}
-						class="h-9 rounded-md pl-9"
-					/>
-				</div>
-			</div>
-			<div class="flex flex-1 flex-col overflow-auto p-6">
-				{#if productBrowserLoading}
-					<div class="flex justify-center py-12">
-						<p class="text-sm text-muted-foreground">Loading…</p>
-					</div>
-				{:else}
-					<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-						<table class="w-full text-sm">
-							<thead class="sticky top-0 border-b bg-muted/50">
-								<tr>
-									<th class="w-10 px-4 py-3 text-left font-medium"></th>
-									<th class="px-4 py-3 text-left font-medium">Product</th>
-									<th class="px-4 py-3 text-left font-medium">Status</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#if productBrowserProducts.length === 0}
-									<tr>
-										<td colspan="3" class="px-4 py-8 text-center text-muted-foreground">
-											No products found.
-										</td>
-									</tr>
-								{:else}
-									{#each productBrowserProducts as product (product.id)}
-										<tr
-											class="cursor-pointer border-b transition-colors last:border-b-0 hover:bg-muted/30"
-											role="button"
-											tabindex="0"
-											onclick={() => toggleProductSelection(product.id)}
-											onkeydown={(e) => e.key === 'Enter' && toggleProductSelection(product.id)}
-										>
-											<td class="px-4 py-3">
-												<input
-													type="checkbox"
-													checked={selectedProductIds.includes(product.id)}
-													class="size-4 rounded border-input"
-													tabindex="-1"
-													onclick={(e) => e.stopPropagation()}
-													onchange={() => toggleProductSelection(product.id)}
-												/>
-											</td>
-											<td class="px-4 py-3">
-												<div class="flex items-center gap-3">
-													{#if product.thumbnail}
-														<img
-															src={product.thumbnail}
-															alt=""
-															class="size-10 shrink-0 rounded-md object-cover"
-														/>
-													{:else}
-														<div
-															class="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
-														>
-															<ImageIcon class="size-5" />
-														</div>
-													{/if}
-													<span class="font-medium">{product.title}</span>
-												</div>
-											</td>
-											<td class="px-4 py-3 text-muted-foreground">
-												{product.status?.replace(/_/g, ' ') ?? '–'}
-											</td>
-										</tr>
-									{/each}
-								{/if}
-							</tbody>
-						</table>
-					</div>
-				{/if}
-			</div>
-			<Dialog.Footer class="flex flex-wrap items-center justify-between gap-4 border-t px-6 py-4">
-				<div class="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={productBrowserPageNum <= 1}
-						onclick={() => (productBrowserPage = productBrowserPage - 1)}
-					>
-						Prev
-					</Button>
-					<span class="text-sm text-muted-foreground">
-						{productBrowserPageNum} of {productBrowserTotalPages} pages
-					</span>
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={productBrowserPageNum >= productBrowserTotalPages}
-						onclick={() => (productBrowserPage = productBrowserPage + 1)}
-					>
-						Next
-					</Button>
-				</div>
-				<div class="ml-auto flex items-center gap-2">
-					<Button variant="outline" onclick={closeAddProduct}>Cancel</Button>
-					<Button onclick={addSelectedProductsToOrder} disabled={selectedProductIds.length === 0}>
-						Add {selectedProductIds.length > 0 ? `(${selectedProductIds.length})` : ''}
-					</Button>
-				</div>
-			</Dialog.Footer>
-		</div>
-	</Dialog.Content>
-</Dialog.Root>
+<CreateOrderProductBrowserDialog
+	bind:open={addProductOpen}
+	bind:search={productBrowserSearch}
+	bind:page={productBrowserPage}
+	loading={productBrowserLoading}
+	products={productBrowserProducts}
+	{selectedProductIds}
+	pagination={productBrowserPagination}
+	rangeStart={productBrowserRangeStart}
+	rangeEnd={productBrowserRangeEnd}
+	onToggleProduct={toggleProductSelection}
+	onClose={closeAddProduct}
+	onAddSelected={addSelectedProductsToOrder}
+/>

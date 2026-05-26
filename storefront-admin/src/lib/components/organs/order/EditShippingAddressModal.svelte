@@ -20,6 +20,13 @@
 	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import Combobox from '$lib/components/organs/combobox/combobox.svelte';
+	import {
+		orderDialogBodyScroll,
+		orderDialogFooter,
+		orderDialogHeader,
+		orderDialogLg,
+		orderDialogTitle
+	} from './dialog-classes.js';
 	import type { ComboboxOption } from '$lib/components/organs/combobox/combobox.svelte';
 	type CountryOption = { code: string; name: string };
 	const STATE_OPTIONS = [
@@ -269,13 +276,11 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content
-		class="top-1/2 left-1/2 flex h-auto max-h-[90vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border p-0 shadow-lg"
-	>
-		<Dialog.Header class="border-b px-6 py-4">
-			<Dialog.Title class="text-base font-semibold">{title}</Dialog.Title>
+	<Dialog.Content class={orderDialogLg}>
+		<Dialog.Header class={orderDialogHeader}>
+			<Dialog.Title class={orderDialogTitle}>{title}</Dialog.Title>
 		</Dialog.Header>
-		<div class="flex flex-col gap-4 overflow-auto px-6 py-4">
+		<div class="flex flex-col gap-4 {orderDialogBodyScroll}">
 			{#if error}
 				<div
 					class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
@@ -325,7 +330,7 @@
 					}}
 				/>
 			</div>
-			<div class="grid grid-cols-2 gap-4">
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<div class="flex flex-col gap-2">
 					<label for="{idPrefix}-first-name" class="text-sm font-medium">First name</label>
 					<Input
@@ -372,7 +377,7 @@
 					disabled={saving}
 				/>
 			</div>
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
 				<div class="flex flex-col gap-2">
 					<label for="{idPrefix}-city" class="text-sm font-medium">City</label>
 					<Input id="{idPrefix}-city" bind:value={form.city} class="h-10" disabled={saving} />
@@ -418,9 +423,11 @@
 				</div>
 			</div>
 		</div>
-		<Dialog.Footer class="!flex-row justify-end gap-2 border-t px-6 py-4">
+		<Dialog.Footer class={orderDialogFooter}>
 			<Button variant="outline" onclick={close} disabled={saving}>Cancel</Button>
-			<Button onclick={save} disabled={!dirty || saving}>{saving ? 'Saving…' : submitLabel}</Button>
+			<Button onclick={save} disabled={!dirty || saving}
+				>{saving ? 'Saving…' : submitLabel}</Button
+			>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

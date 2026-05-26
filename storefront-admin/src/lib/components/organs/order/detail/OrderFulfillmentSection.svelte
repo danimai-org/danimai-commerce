@@ -77,11 +77,11 @@
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Portal>
 					<DropdownMenu.Content
-						class="z-50 min-w-40 rounded-md border  p-2 text-popover-foreground shadow-md"
+						class="z-50 min-w-40 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
 						sideOffset={4}
 					>
 						<DropdownMenu.Item
-							class="cursor-pointer rounded-sm bg-destructive/15 font-medium text-destructive focus:bg-destructive/20 focus:text-destructive"
+							class="relative flex w-full cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm font-medium text-destructive outline-none select-none hover:bg-destructive/15 focus:bg-destructive/15"
 							onSelect={() => updateFulfillmentStatus('not_fulfilled')}
 						>
 							Cancel fulfillment
@@ -100,7 +100,7 @@
 		{#if orderItems.length > 0}
 			<div class="space-y-4">
 				{#each orderItems as item (item.id)}
-					<div class="flex items-start gap-4">
+					<div class="flex flex-wrap items-start gap-3 sm:flex-nowrap sm:gap-4">
 						{#if item.thumbnail}
 							<img
 								src={item.thumbnail}
@@ -130,7 +130,9 @@
 								</span>
 							</div>
 						</div>
-						<div class="font-medium">{formatOrderCurrency(item.price * item.quantity)}</div>
+						<div class="ml-auto shrink-0 font-medium sm:ml-0"
+							>{formatOrderCurrency(item.price * item.quantity)}</div
+						>
 					</div>
 				{/each}
 			</div>
@@ -140,24 +142,24 @@
 	</div>
 
 	{#if !isFulfilled}
-		<div class="flex justify-end">
+		<div class="flex justify-stretch sm:justify-end">
 			{#if isUnfulfilled}
 				<button
 					type="button"
 					disabled={updating}
 					onclick={() => updateFulfillmentStatus('partially_fulfilled')}
-					class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 disabled:opacity-50"
+					class="inline-flex h-9 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 disabled:opacity-50 sm:w-auto"
 				>
 					Mark as in progress
 				</button>
 			{:else}
-				<div class="inline-flex">
+				<div class="inline-flex w-full sm:w-auto">
 					<button
 						type="button"
 						disabled={updating}
 						onclick={() =>
 							updateFulfillmentStatus(isInProgress ? 'fulfilled' : 'partially_fulfilled')}
-						class="inline-flex h-9 items-center justify-center rounded-l-md rounded-r-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 disabled:opacity-50"
+						class="inline-flex h-9 min-w-0 flex-1 items-center justify-center rounded-l-md rounded-r-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 disabled:opacity-50 sm:flex-none"
 					>
 						{isInProgress ? 'Mark as fulfilled' : 'Mark as in progress'}
 					</button>

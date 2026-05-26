@@ -54,17 +54,15 @@
 					class="h-9 rounded-md pl-9"
 				/>
 			</div>
-			<div class="flex flex-col gap-2 min-[420px]:flex-row">
-				<Button variant="outline" size="sm" class="min-[420px]:flex-1" onclick={onBrowse}>
-					Browse
-				</Button>
-				<Button variant="outline" size="sm" class="min-[420px]:flex-1">Add custom item</Button>
+			<div class="flex flex-row gap-2">
+				<Button variant="outline" size="sm" class="min-w-0 flex-1" onclick={onBrowse}>Browse</Button>
+				<Button variant="outline" size="sm" class="min-w-0 flex-1">Add custom item</Button>
 			</div>
 		</div>
 	{:else}
 		<div class="mb-4 space-y-4">
 			{#each orderItems as item, i (item.id + '-' + i)}
-				<div class="flex items-start gap-4">
+				<div class="flex flex-wrap items-start gap-3 sm:flex-nowrap sm:gap-4">
 					{#if item.thumbnail}
 						<img
 							src={item.thumbnail}
@@ -92,7 +90,7 @@
 							/>
 						</div>
 					</div>
-					<div class="flex items-start gap-2">
+					<div class="ml-auto flex shrink-0 items-start gap-2 sm:ml-0">
 						<span class="font-medium">{formatCurrency(item.price * item.quantity)}</span>
 						<button
 							type="button"
@@ -106,11 +104,9 @@
 				</div>
 			{/each}
 		</div>
-		<div class="mt-4 flex flex-col gap-2 min-[420px]:flex-row">
-			<Button variant="outline" size="sm" class="min-[420px]:flex-1" onclick={onBrowse}>
-				Browse
-			</Button>
-			<Button variant="outline" size="sm" class="min-[420px]:flex-1">Add custom item</Button>
+		<div class="mt-4 flex flex-row gap-2">
+			<Button variant="outline" size="sm" class="min-w-0 flex-1" onclick={onBrowse}>Browse</Button>
+			<Button variant="outline" size="sm" class="min-w-0 flex-1">Add custom item</Button>
 		</div>
 	{/if}
 </div>

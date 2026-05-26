@@ -132,10 +132,10 @@
 	}
 </script>
 
-<div class="flex h-full flex-col">
+<div class="flex h-full flex-col bg-muted/30">
 	<div class="flex min-h-0 flex-1 flex-col">
 		{#if error}
-			<div class="p-6">
+			<div class="p-4 sm:p-6">
 				<div
 					class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
 				>
@@ -147,38 +147,33 @@
 				<p class="text-muted-foreground">Loading…</p>
 			</div>
 		{:else if order}
-			<!-- Header -->
-			<div class="border-b bg-background px-6 py-4">
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-4">
-						<Button
-							variant="ghost"
-							size="icon"
-							class="size-8"
-							onclick={() => goto(resolve(`/orders/${orderId}`, {}))}
+			<div class="shrink-0 border-b bg-background px-4 py-3 sm:px-6 sm:py-4">
+				<div class="flex min-w-0 items-center gap-2 sm:gap-4">
+					<Button
+						variant="ghost"
+						size="icon"
+						class="size-8 shrink-0"
+						onclick={() => goto(resolve(`/orders/${orderId}`, {}))}
+					>
+						<ArrowLeft class="size-4" />
+					</Button>
+					<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+						<FileText class="size-4 shrink-0 text-muted-foreground" />
+						<span class="text-sm text-muted-foreground">></span>
+						<a
+							href={resolve(`/orders/${orderId}`, {})}
+							class="text-lg font-semibold hover:underline">#{order.display_id}</a
 						>
-							<ArrowLeft class="size-4" />
-						</Button>
-						<div class="flex items-center gap-3">
-							<div class="flex items-center gap-2">
-								<FileText class="size-4 text-muted-foreground" />
-								<span class="text-sm text-muted-foreground">></span>
-								<a
-									href={resolve(`/orders/${orderId}`, {})}
-									class="text-lg font-semibold hover:underline">#{order.display_id}</a
-								>
-								<span class="text-sm text-muted-foreground">></span>
-								<h1 class="text-lg font-semibold">Refund</h1>
-							</div>
-						</div>
+						<span class="text-sm text-muted-foreground">></span>
+						<h1 class="text-lg font-semibold">Refund</h1>
 					</div>
 				</div>
 			</div>
 
-			<!-- Main Content -->
-			<div class="flex min-h-0 flex-1 gap-6 overflow-auto p-6">
-				<!-- Left Column -->
-				<div class="flex min-w-0 flex-1 flex-col gap-6">
+			<div
+				class="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-auto p-4 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_24rem]"
+			>
+				<div class="flex min-w-0 flex-col gap-4 sm:gap-6">
 					<!-- Order items to refund -->
 					<div class="rounded-lg border bg-card p-4">
 						<div class="mb-4 flex items-center gap-2">
@@ -198,7 +193,7 @@
 							<div class="mb-4 space-y-4">
 								{#each orderItems as item (item.id)}
 									{@const qtyRefund = refundQuantities[item.id] ?? 0}
-									<div class="flex items-start gap-4">
+									<div class="flex flex-wrap items-start gap-3 sm:flex-nowrap sm:gap-4">
 										{#if item.thumbnail}
 											<img
 												src={item.thumbnail}
@@ -225,7 +220,9 @@
 												{formatCurrency(item.price)} × {item.quantity}
 											</div>
 										</div>
-										<div class="flex shrink-0 items-center gap-2">
+										<div
+											class="flex w-full shrink-0 flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end"
+										>
 											<Input
 												type="number"
 												min="0"
@@ -269,8 +266,7 @@
 					</div>
 				</div>
 
-				<!-- Right Column: Summary & Refund config -->
-				<div class="flex w-96 flex-col gap-6">
+				<div class="flex w-full min-w-0 flex-col gap-4 sm:gap-6">
 					<div class="rounded-lg border bg-card p-4">
 						<h3 class="mb-2 text-sm font-semibold">Summary</h3>
 						{#if !hasSelection}
@@ -327,7 +323,7 @@
 				</div>
 			</div>
 
-			<div class="border-t px-6 py-4 text-center">
+			<div class="shrink-0 border-t bg-background px-4 py-3 text-center sm:px-6 sm:py-4">
 				<button
 					type="button"
 					class="cursor-pointer border-none bg-transparent text-sm text-primary hover:underline"

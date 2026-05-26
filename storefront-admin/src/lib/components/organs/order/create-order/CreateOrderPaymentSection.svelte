@@ -87,11 +87,11 @@
 				<span>Payment due later</span>
 			</label>
 			{#if !paymentDueLater}
-				<div class="flex flex-row justify-end gap-2">
-					<Button variant="outline" size="sm" class="h-9">Send invoice</Button>
+				<div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
+					<Button variant="outline" size="sm" class="h-9 w-full sm:w-auto">Send invoice</Button>
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger
-							class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90"
+							class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 sm:w-auto"
 						>
 							Collect payment
 							<ChevronDown class="size-4" />

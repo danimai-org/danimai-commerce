@@ -51,11 +51,24 @@ export class PaginatedCustomersProcess
       limit = 10,
       sorting_field = "created_at",
       sorting_direction = SortOrder.DESC,
+      search,
     } = input;
 
     let query = this.db
       .selectFrom("customers")
       .where("deleted_at", "is", null);
+
+    if (search && search.trim()) {
+      const searchTerm = `%${search.trim().toLowerCase()}%`;
+      query = query.where((eb) =>
+        eb.or([
+          eb("email", "ilike", searchTerm),
+          eb("first_name", "ilike", searchTerm),
+          eb("last_name", "ilike", searchTerm),
+          eb("phone", "ilike", searchTerm),
+        ]),
+      );
+    }
 
     const countResult = await query
       .select(({ fn }) => fn.count<number>("id").as("count"))
