@@ -1,5 +1,11 @@
 <script lang="ts">
-	export type VariantItem = { id: string; title: string; priceDisplay: string };
+	export type VariantItem = {
+		id: string;
+		title: string;
+		priceDisplay: string;
+		sku?: string | null;
+		optionValues?: Array<{ title: string; value: string }>;
+	};
 
 	let {
 		variants = [],

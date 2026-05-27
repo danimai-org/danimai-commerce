@@ -72,71 +72,93 @@
     </nav>
 
     <div class="checkout-container">
-        <div class="checkout-main">
-            <header class="checkout-section-header">
-                <h1 class="checkout-title">{sectionTitle(currentStep)}</h1>
-                {#if sectionSubtitle(currentStep)}
-                    <p class="checkout-subtitle">
-                        {sectionSubtitle(currentStep)}
-                    </p>
+        <div class="checkout-columns-scroll">
+            <div class="checkout-main">
+                <header class="checkout-section-header">
+                    <h1 class="checkout-title">{sectionTitle(currentStep)}</h1>
+                    {#if sectionSubtitle(currentStep)}
+                        <p class="checkout-subtitle">
+                            {sectionSubtitle(currentStep)}
+                        </p>
+                    {/if}
+                </header>
+
+                {#if currentStep !== "review"}
+                    <form class="checkout-flow-form" method="POST" use:enhance>
+                        {#if currentStep === "addresses"}
+                            <CheckoutAddressStep
+                                {form}
+                                {errors}
+                                {constraints}
+                            />
+                        {:else if currentStep === "delivery"}
+                            <CheckoutDeliveryStep {form} onBack={goBack} />
+                        {:else if currentStep === "payment"}
+                            <CheckoutPaymentStep {form} onBack={goBack} />
+                        {/if}
+                    </form>
+                {:else}
+                    <section class="review-step">
+                        <div class="review-block">
+                            <h2 class="review-block-title">
+                                Shipping Address
+                            </h2>
+                            {#each reviewAddressLines() as line}
+                                <p class="review-line">{line}</p>
+                            {/each}
+                        </div>
+                        <div class="review-block">
+                            <h2 class="review-block-title">
+                                Shipping Method
+                            </h2>
+                            <p class="review-method">
+                                {reviewShippingMethod()}
+                            </p>
+                        </div>
+                        <div class="review-block">
+                            <h2 class="review-block-title">
+                                Payment Method
+                            </h2>
+                            <p class="review-method">
+                                {reviewPaymentMethod()}
+                            </p>
+                        </div>
+                        <p class="review-note">
+                            By placing your order, you agree to our terms and
+                            conditions.
+                        </p>
+                        <div class="review-actions">
+                            <button
+                                type="button"
+                                class="back-btn"
+                                onclick={goBack}
+                            >
+                                Back
+                            </button>
+                            <button
+                                type="button"
+                                class="place-order-btn"
+                                onclick={onPlaceOrder}
+                                disabled={isPlacingOrder}
+                            >
+                                {isPlacingOrder
+                                    ? "Placing..."
+                                    : "Place Order"}
+                            </button>
+                        </div>
+                        {#if placeOrderError}
+                            <p class="place-order-error">{placeOrderError}</p>
+                        {/if}
+                    </section>
                 {/if}
-            </header>
+            </div>
 
-            {#if currentStep !== "review"}
-                <form class="checkout-flow-form" method="POST" use:enhance>
-                    {#if currentStep === "addresses"}
-                        <CheckoutAddressStep {form} {errors} {constraints} />
-                    {:else if currentStep === "delivery"}
-                        <CheckoutDeliveryStep {form} onBack={goBack} />
-                    {:else if currentStep === "payment"}
-                        <CheckoutPaymentStep {form} onBack={goBack} />
-                    {/if}
-                </form>
-            {:else}
-                <section class="review-step">
-                    <div class="review-block">
-                        <h2 class="review-block-title">Shipping Address</h2>
-                        {#each reviewAddressLines() as line}
-                            <p class="review-line">{line}</p>
-                        {/each}
-                    </div>
-                    <div class="review-block">
-                        <h2 class="review-block-title">Shipping Method</h2>
-                        <p class="review-method">{reviewShippingMethod()}</p>
-                    </div>
-                    <div class="review-block">
-                        <h2 class="review-block-title">Payment Method</h2>
-                        <p class="review-method">{reviewPaymentMethod()}</p>
-                    </div>
-                    <p class="review-note">
-                        By placing your order, you agree to our terms and
-                        conditions.
-                    </p>
-                    <div class="review-actions">
-                        <button type="button" class="back-btn" onclick={goBack}>
-                            Back
-                        </button>
-                        <button
-                            type="button"
-                            class="place-order-btn"
-                            onclick={onPlaceOrder}
-                            disabled={isPlacingOrder}
-                        >
-                            {isPlacingOrder ? "Placing..." : "Place Order"}
-                        </button>
-                    </div>
-                    {#if placeOrderError}
-                        <p class="place-order-error">{placeOrderError}</p>
-                    {/if}
-                </section>
-            {/if}
+            <CheckoutOrderSummary
+                {items}
+                {subtotalDisplay}
+                {discountDisplay}
+                {totalDisplay}
+            />
         </div>
-
-        <CheckoutOrderSummary
-            {items}
-            {subtotalDisplay}
-            {discountDisplay}
-            {totalDisplay}
-        />
     </div>
 </main>

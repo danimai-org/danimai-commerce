@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { client } from '$lib/api/client';
 import { formatStoreMoney } from '$lib/money';
 import {
 	ACCOUNT_STORAGE_KEY,
@@ -8,6 +9,7 @@ import {
 } from '$lib/account/storage';
 
 export const ORDER_CACHE_KEY_PREFIX = 'dm_sf_order_';
+const ORDER_DETAIL_CACHE_PREFIX = 'dm_sf_order_detail_';
 
 export type OrderSummary = {
 	id: string;
@@ -47,6 +49,118 @@ export type OrderDetail = {
 };
 
 const defaultEmail = 'guest@denimai.com';
+
+type ApiOrder = {
+	id: string;
+	display_id?: number;
+	status?: string;
+	email?: string | null;
+	currency_code?: string;
+	metadata?: Record<string, unknown> | null;
+	created_at?: string | Date;
+};
+
+type ApiOrderItem = {
+	title?: string;
+	productName?: string;
+	thumbnail?: string | null;
+	productImage?: string | null;
+	variant?: string | null;
+	selectedVariant?: string | null;
+	quantity?: number;
+	price?: number;
+	productHandle?: string | null;
+};
+
+function readString(value: unknown): string | null {
+	if (typeof value !== 'string') return null;
+	const trimmed = value.trim();
+	return trimmed.length > 0 ? trimmed : null;
+}
+
+function addressLinesFromSnapshot(value: unknown): string[] {
+	if (!value || typeof value !== 'object') return [];
+	const row = value as Record<string, unknown>;
+	if (Array.isArray(row.lines)) {
+		return row.lines.map((line) => String(line));
+	}
+	const parts = [
+		[row.firstName, row.lastName].filter(Boolean).join(' '),
+		row.address1,
+		row.address2,
+		[row.city, row.state, row.postalCode].filter(Boolean).join(', '),
+		row.country,
+		row.phone
+	]
+		.map((part) => (part == null ? '' : String(part).trim()))
+		.filter(Boolean);
+	return parts.length > 0 ? parts : [];
+}
+
+export function orderDetailFromApi(order: ApiOrder): OrderDetail {
+	const meta =
+		typeof order.metadata === 'object' && order.metadata !== null
+			? order.metadata
+			: {};
+	const items = Array.isArray(meta.items) ? (meta.items as ApiOrderItem[]) : [];
+	const totals =
+		typeof meta.totals === 'object' && meta.totals !== null
+			? (meta.totals as Record<string, unknown>)
+			: {};
+	const customer =
+		typeof meta.customer === 'object' && meta.customer !== null
+			? (meta.customer as Record<string, unknown>)
+			: {};
+
+	const subtotalNum = Number(totals.subtotal) || 0;
+	const shippingNum = Number(totals.shipping) || 0;
+	const discountNum = Number(totals.discount) || 0;
+	const taxNum = Number(totals.tax) || 0;
+	const totalNum =
+		Number(totals.total) || subtotalNum + shippingNum + taxNum - discountNum;
+
+	return {
+		id: order.id,
+		number:
+			typeof order.display_id === 'number'
+				? String(order.display_id)
+				: order.id,
+		date: order.created_at ? new Date(order.created_at) : new Date(),
+		status: order.status ?? 'pending',
+		email:
+			readString(customer.email) ??
+			readString(order.email) ??
+			readString(meta.email) ??
+			'—',
+		items: items.map((item) => {
+			const title = item.productName ?? item.title ?? 'Item';
+			const variant = item.variant ?? item.selectedVariant ?? '';
+			const priceValue = Number(item.price) || 0;
+			return {
+				image: item.productImage ?? item.thumbnail ?? '',
+				imageAlt: title,
+				title,
+				variant: variant ?? '',
+				quantity: Math.max(1, Number(item.quantity) || 1),
+				price: formatStoreMoney(priceValue),
+				productHandle: item.productHandle ?? undefined
+			};
+		}),
+		shippingAddress: addressLinesFromSnapshot(meta.shipping_address),
+		shippingMethod:
+			readString(meta.shipping_method) ?? readString(meta.shippingMethod) ?? '—',
+		billingAddress: addressLinesFromSnapshot(meta.billing_address),
+		paymentMethod:
+			readString(meta.payment_method) ?? readString(meta.paymentMethod) ?? '—',
+		totals: {
+			subtotal: formatStoreMoney(subtotalNum),
+			shipping: formatStoreMoney(shippingNum),
+			discount: formatStoreMoney(discountNum),
+			tax: formatStoreMoney(taxNum),
+			total: formatStoreMoney(totalNum)
+		}
+	};
+}
 
 export const parseStoredOrders = (raw: string | null): OrderSummary[] => {
 	if (!raw) return [];
@@ -96,34 +210,60 @@ const placeholderFromSummary = (summary: OrderSummary): OrderDetail => ({
 	}
 });
 
-const loadFromCache = (cacheId: string): OrderDetail | null => {
+const persistOrderDetail = (detail: OrderDetail): void => {
+	if (!browser) return;
+	const payload = { ...detail, date: detail.date.toISOString() };
+	const serialized = JSON.stringify(payload);
+	localStorage.setItem(`${ORDER_DETAIL_CACHE_PREFIX}${detail.id}`, serialized);
+	sessionStorage.setItem(`${ORDER_CACHE_KEY_PREFIX}${detail.id}`, serialized);
+};
+
+const loadFromPersistentCache = (cacheId: string): OrderDetail | null => {
 	if (!browser || !cacheId) return null;
+	for (const storage of [localStorage, sessionStorage]) {
+		for (const prefix of [ORDER_DETAIL_CACHE_PREFIX, ORDER_CACHE_KEY_PREFIX]) {
+			try {
+				const raw = storage.getItem(`${prefix}${cacheId}`);
+				if (!raw) continue;
+				const parsed = JSON.parse(raw) as Omit<OrderDetail, 'date'> & { date: string };
+				return { ...parsed, date: new Date(parsed.date) };
+			} catch {
+				// try next storage key
+			}
+		}
+	}
+	return null;
+};
+
+export async function fetchOrderDetailFromApi(orderId: string): Promise<OrderDetail | null> {
+	if (!orderId.trim()) return null;
 	try {
-		const raw = sessionStorage.getItem(`${ORDER_CACHE_KEY_PREFIX}${cacheId}`);
-		if (!raw) return null;
-		const parsed = JSON.parse(raw) as Omit<OrderDetail, 'date'> & { date: string };
-		return { ...parsed, date: new Date(parsed.date) };
+		const res = await client.storefront.orders({ id: orderId }).get();
+		if (res.error || !res.data) return null;
+		const detail = orderDetailFromApi(res.data as ApiOrder);
+		persistOrderDetail(detail);
+		return detail;
 	} catch {
 		return null;
 	}
-};
+}
 
 export const loadOrderDetails = (summary: OrderSummary): OrderDetail => {
-	if (summary.orderId) {
-		const cached = loadFromCache(summary.orderId);
-		if (cached) return cached;
-	}
-	const cachedById = loadFromCache(summary.id);
-	if (cachedById) return cachedById;
+	const ref = summary.orderId || summary.id;
+	const cached = loadFromPersistentCache(ref);
+	if (cached) return cached;
 	return placeholderFromSummary(summary);
 };
 
-export const resolveOrderDetail = (orderRef: string): OrderDetail | null => {
+export const resolveOrderDetail = async (orderRef: string): Promise<OrderDetail | null> => {
 	if (!browser || !orderRef.trim()) return null;
 
 	const ref = orderRef.trim();
-	const fromCache = loadFromCache(ref);
+	const fromCache = loadFromPersistentCache(ref);
 	if (fromCache) return fromCache;
+
+	const fromApi = await fetchOrderDetailFromApi(ref);
+	if (fromApi) return fromApi;
 
 	const orders = loadOrdersForAccount();
 	const summary =
@@ -133,8 +273,10 @@ export const resolveOrderDetail = (orderRef: string): OrderDetail | null => {
 	if (!summary) return null;
 
 	if (summary.orderId) {
-		const cached = loadFromCache(summary.orderId);
-		if (cached) return cached;
+		const cachedByOrderId = loadFromPersistentCache(summary.orderId);
+		if (cachedByOrderId) return cachedByOrderId;
+		const apiByOrderId = await fetchOrderDetailFromApi(summary.orderId);
+		if (apiByOrderId) return apiByOrderId;
 	}
 
 	return placeholderFromSummary(summary);
@@ -156,4 +298,9 @@ export const displayOrderNumber = (detail: OrderDetail, summary?: OrderSummary |
 export const orderDetailsHref = (summary: OrderSummary): string => {
 	const ref = summary.orderId || summary.id;
 	return `/account/order/orderdetails?order=${encodeURIComponent(ref)}`;
+};
+
+/** Save a checkout-time snapshot to durable browser storage. */
+export const cacheOrderDetail = (detail: OrderDetail): void => {
+	persistOrderDetail(detail);
 };

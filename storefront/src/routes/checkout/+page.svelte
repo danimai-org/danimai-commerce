@@ -16,13 +16,19 @@
     } from "$lib/checkout/checkout-form-schema";
     import type { PageProps } from "./$types";
     import { client } from "$lib/api/client.js";
-    import { cartState, initCartState } from "$lib/cart/cart-state.svelte";
+    import {
+        cartState,
+        initCartState,
+        ensureCartId,
+    } from "$lib/cart/cart-state.svelte";
     import {
         fetchVariantDisplayMap,
         variantDisplayLabel,
         type VariantDisplayRow,
     } from "$lib/cart/variant-display-map";
     import { formatStoreMoney } from "$lib/money";
+    import { useCart } from "$lib/hooks/use-cart.hook";
+    import { cacheOrderDetail } from "$lib/account/order-data";
 
     let { data }: PageProps = $props();
 
@@ -30,7 +36,6 @@
     const CART_STORAGE_KEY = "dm_sf_cart_id";
     const SESSION_STORAGE_KEY = "dm_sf_session_id";
     const ACCOUNT_STORAGE_KEY = "dm_sf_account";
-    const ORDER_CACHE_KEY_PREFIX = "dm_sf_order_";
     const ORDERS_STORAGE_KEY_PREFIX = "dm_sf_orders_";
     const DEFAULT_CART_CURRENCY_CODE = "eur";
     type ApiCartLineItem = {
@@ -132,10 +137,12 @@
         { id: "payment" as const, label: "Payment" },
         { id: "review" as const, label: "Review" },
     ];
-    let currentStep = $state<CheckoutStep>("addresses");
 
+    let currentStep = $state<CheckoutStep>("addresses");
     let placeOrderError = $state("");
     let isPlacingOrder = $state(false);
+
+    const { updateCartAddresses } = useCart();
 
     const { form, errors, constraints, enhance } = superForm<CheckoutFormData>(
         data.checkoutForm,
@@ -146,10 +153,48 @@
             validators: zod4Client(checkoutFormSchema),
             applyAction: false,
             invalidateAll: false,
-            onUpdated({ form: validated }) {
+            onUpdated: async ({ form: validated }) => {
                 if (!validated.valid || !validated.posted) return;
-                if (currentStep === "addresses") currentStep = "delivery";
-                else if (currentStep === "delivery") currentStep = "payment";
+
+                if (currentStep === "addresses") {
+                    if (typeof window === "undefined") {
+                        currentStep = "delivery";
+                        return;
+                    }
+
+                    // Persist checkout addresses to the backend cart so later steps (delivery/payment/review)
+                    // and order creation have the correct address data.
+                    try {
+                        const cartId = await ensureCartId();
+                        const f = get(form);
+                        const shippingAddress = {
+                            address_1: f.address1 || null,
+                            address_2: f.address2 || null,
+                            company: f.company || null,
+                            city: f.city,
+                            province: f.state,
+                            postal_code: f.postalCode,
+                            country_code: f.country || null,
+                            phone: f.phone || null,
+                            metadata: {
+                                first_name: f.firstName,
+                                last_name: f.lastName,
+                                email: f.email,
+                            },
+                        };
+                        await updateCartAddresses.mutateAsync({
+                            id: cartId,
+                            addresses: [shippingAddress],
+                        });
+                    } catch (e) {
+                        console.error("Failed to save checkout addresses:", e);
+                    }
+
+                    currentStep = "delivery";
+                    return;
+                }
+
+                if (currentStep === "delivery") currentStep = "payment";
                 else if (currentStep === "payment") currentStep = "review";
             },
         },
@@ -323,6 +368,7 @@
                 metadata: {
                     shipping_method: shipLabel,
                     payment_method: payLabel,
+                    checkout_email: f.email,
                 },
             });
             if (res.error) throw new Error(treatyErrorMessage(res.error));
@@ -337,10 +383,10 @@
                 typeof created.display_id === "number"
                     ? String(created.display_id)
                     : "Pending";
-            const cachedOrder = {
+            cacheOrderDetail({
                 id: orderId,
                 number,
-                date: new Date().toISOString(),
+                date: new Date(),
                 status: created.status ?? "pending",
                 email: (created.email ?? f.email ?? "—") as string,
                 items: cartItems.map((item) => ({
@@ -356,11 +402,7 @@
                 billingAddress: orderAddressLines(),
                 paymentMethod: payLabel,
                 totals: orderTotals(),
-            };
-            sessionStorage.setItem(
-                `${ORDER_CACHE_KEY_PREFIX}${orderId}`,
-                JSON.stringify(cachedOrder),
-            );
+            });
             let existingOrders: Array<{
                 id?: string;
                 date?: string;
@@ -457,107 +499,125 @@
     </nav>
 
     <div class="checkout-container">
-        <div class="checkout-main">
-            <header class="checkout-section-header">
-                <h1 class="checkout-title">{sectionTitle(currentStep)}</h1>
-                {#if sectionSubtitle(currentStep)}
-                    <p class="checkout-subtitle">
-                        {sectionSubtitle(currentStep)}
-                    </p>
-                {/if}
-            </header>
-
-            {#if currentStep !== "review"}
-                <form class="checkout-flow-form" method="POST" use:enhance>
-                    {#if currentStep === "addresses"}
-                        <CheckoutAddressStep {form} {errors} {constraints} />
-                    {:else if currentStep === "delivery"}
-                        <CheckoutDeliveryStep {form} onBack={goBack} />
-                    {:else if currentStep === "payment"}
-                        <CheckoutPaymentStep {form} onBack={goBack} />
+        <div class="checkout-columns-scroll">
+            <div class="checkout-main">
+                <header class="checkout-section-header">
+                    <h1 class="checkout-title">{sectionTitle(currentStep)}</h1>
+                    {#if sectionSubtitle(currentStep)}
+                        <p class="checkout-subtitle">
+                            {sectionSubtitle(currentStep)}
+                        </p>
                     {/if}
-                </form>
-            {:else}
-                <div class="review-step">
-                    <section class="review-block">
-                        <h2 class="review-block-title">Shipping Address</h2>
-                        <p class="review-line">
-                            {`${$form.firstName} ${$form.lastName}`.trim() ||
-                                "—"}
-                        </p>
-                        <p class="review-line">{$form.address1 || "—"}</p>
-                        {#if $form.address2}
-                            <p class="review-line">{$form.address2}</p>
+                </header>
+
+                {#if currentStep !== "review"}
+                    <form class="checkout-flow-form" method="POST" use:enhance>
+                        {#if currentStep === "addresses"}
+                            <CheckoutAddressStep
+                                {form}
+                                {errors}
+                                {constraints}
+                            />
+                        {:else if currentStep === "delivery"}
+                            <CheckoutDeliveryStep {form} onBack={goBack} />
+                        {:else if currentStep === "payment"}
+                            <CheckoutPaymentStep {form} onBack={goBack} />
                         {/if}
-                        <p class="review-line">
-                            {[$form.city, $form.state, $form.postalCode]
-                                .filter(Boolean)
-                                .join(", ") || "—"}
+                    </form>
+                {:else}
+                    <div class="review-step">
+                        <section class="review-block">
+                            <h2 class="review-block-title">Shipping Address</h2>
+                            <p class="review-line">
+                                {`${$form.firstName} ${$form.lastName}`.trim() ||
+                                    "—"}
+                            </p>
+                            <p class="review-line">
+                                {$form.address1 || "—"}
+                            </p>
+                            {#if $form.address2}
+                                <p class="review-line">{$form.address2}</p>
+                            {/if}
+                            <p class="review-line">
+                                {[$form.city, $form.state, $form.postalCode]
+                                    .filter(Boolean)
+                                    .join(", ") || "—"}
+                            </p>
+                            <p class="review-line">
+                                {$form.country || "—"}
+                            </p>
+                        </section>
+                        <section class="review-block">
+                            <h2 class="review-block-title">Shipping Method</h2>
+                            <p class="review-method">
+                                {shippingMethodLabelFrom($form.shippingMethod)}
+                                <strong>{formatStoreMoney(0)}</strong>
+                            </p>
+                        </section>
+                        <section class="review-block">
+                            <h2 class="review-block-title">Billing Address</h2>
+                            <p class="review-line">
+                                {`${$form.firstName} ${$form.lastName}`.trim() ||
+                                    "—"}
+                            </p>
+                            <p class="review-line">
+                                {$form.address1 || "—"}
+                            </p>
+                            {#if $form.address2}
+                                <p class="review-line">{$form.address2}</p>
+                            {/if}
+                            <p class="review-line">
+                                {[$form.city, $form.state, $form.postalCode]
+                                    .filter(Boolean)
+                                    .join(", ") || "—"}
+                            </p>
+                            <p class="review-line">
+                                {$form.country || "—"}
+                            </p>
+                        </section>
+                        <section class="review-block">
+                            <h2 class="review-block-title">Payment Method</h2>
+                            <p class="review-method">
+                                {paymentMethodLabelFrom($form.paymentMethod)}
+                            </p>
+                        </section>
+                        <p class="review-note">
+                            When you place your order, your payment will be
+                            authorized and we'll start processing your order.
                         </p>
-                        <p class="review-line">{$form.country || "—"}</p>
-                    </section>
-                    <section class="review-block">
-                        <h2 class="review-block-title">Shipping Method</h2>
-                        <p class="review-method">
-                            {shippingMethodLabelFrom($form.shippingMethod)}
-                            <strong>{formatStoreMoney(0)}</strong>
-                        </p>
-                    </section>
-                    <section class="review-block">
-                        <h2 class="review-block-title">Billing Address</h2>
-                        <p class="review-line">
-                            {`${$form.firstName} ${$form.lastName}`.trim() ||
-                                "—"}
-                        </p>
-                        <p class="review-line">{$form.address1 || "—"}</p>
-                        {#if $form.address2}
-                            <p class="review-line">{$form.address2}</p>
+                        <div class="review-actions">
+                            <button
+                                type="button"
+                                class="back-btn"
+                                onclick={goBack}
+                            >
+                                Back
+                            </button>
+                            <button
+                                type="button"
+                                class="place-order-btn"
+                                onclick={placeOrder}
+                                disabled={isPlacingOrder}
+                            >
+                                {isPlacingOrder
+                                    ? "Placing order..."
+                                    : "Place order"}
+                            </button>
+                        </div>
+                        {#if placeOrderError}
+                            <p class="place-order-error">{placeOrderError}</p>
                         {/if}
-                        <p class="review-line">
-                            {[$form.city, $form.state, $form.postalCode]
-                                .filter(Boolean)
-                                .join(", ") || "—"}
-                        </p>
-                        <p class="review-line">{$form.country || "—"}</p>
-                    </section>
-                    <section class="review-block">
-                        <h2 class="review-block-title">Payment Method</h2>
-                        <p class="review-method">
-                            {paymentMethodLabelFrom($form.paymentMethod)}
-                        </p>
-                    </section>
-                    <p class="review-note">
-                        When you place your order, your payment will be
-                        authorized and we'll start processing your order.
-                    </p>
-                    <div class="review-actions">
-                        <button type="button" class="back-btn" onclick={goBack}
-                            >Back</button
-                        >
-                        <button
-                            type="button"
-                            class="place-order-btn"
-                            onclick={placeOrder}
-                            disabled={isPlacingOrder}
-                        >
-                            {isPlacingOrder
-                                ? "Placing order..."
-                                : "Place order"}
-                        </button>
                     </div>
-                    {#if placeOrderError}
-                        <p class="place-order-error">{placeOrderError}</p>
-                    {/if}
-                </div>
-            {/if}
-        </div>
+                {/if}
+            </div>
 
-        <CheckoutOrderSummary
-            items={cartItems}
-            {subtotalDisplay}
-            {discountDisplay}
-            {totalDisplay}
-        />
+            <CheckoutOrderSummary
+                items={cartItems}
+                {subtotalDisplay}
+                {discountDisplay}
+                {totalDisplay}
+            />
+        </div>
     </div>
 </main>
 

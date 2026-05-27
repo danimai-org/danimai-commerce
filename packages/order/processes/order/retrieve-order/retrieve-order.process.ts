@@ -15,6 +15,7 @@ import {
   hasOrdersCartIdColumn,
   toOrderApiRow,
 } from "../order-response.util";
+import { buildOrderDetailMetadata } from "../order-detail-response.util";
 
 /**
  * Handles the retrieve order process.
@@ -64,42 +65,55 @@ export class RetrieveOrderProcess
     const hasCartIdColumn = await hasOrdersCartIdColumn(this.db);
     const apiOrder = toOrderApiRow(order, hasCartIdColumn);
 
-    const meta =
-      typeof apiOrder.metadata === "object" && apiOrder.metadata !== null
-        ? (apiOrder.metadata as Record<string, unknown>)
-        : {};
-    const metaItems = meta.items;
-    const hasMetaItems = Array.isArray(metaItems) && metaItems.length > 0;
-
-    if (hasMetaItems) {
-      return apiOrder;
-    }
-
     const lineItems = await this.db
       .selectFrom("order_line_items")
       .where("order_id", "=", input.id)
       .where("deleted_at", "is", null)
-      .select(["id", "title", "thumbnail", "unit_price", "quantity", "variant_sku"])
+      .select([
+        "id",
+        "title",
+        "thumbnail",
+        "unit_price",
+        "quantity",
+        "variant_sku",
+        "variant_title",
+        "variant_option_values",
+        "product_title",
+        "product_handle",
+        "description",
+      ])
       .execute();
 
-    if (lineItems.length === 0) {
-      return apiOrder;
+    let shippingAddress = null;
+    if (order.shipping_address_id) {
+      shippingAddress = await this.db
+        .selectFrom("order_addresses")
+        .where("id", "=", order.shipping_address_id)
+        .where("deleted_at", "is", null)
+        .selectAll()
+        .executeTakeFirst() ?? null;
     }
+
+    let billingAddress = null;
+    if (order.billing_address_id) {
+      billingAddress = await this.db
+        .selectFrom("order_addresses")
+        .where("id", "=", order.billing_address_id)
+        .where("deleted_at", "is", null)
+        .selectAll()
+        .executeTakeFirst() ?? null;
+    }
+
+    const detailMetadata = buildOrderDetailMetadata(
+      apiOrder,
+      lineItems,
+      shippingAddress,
+      billingAddress,
+    );
 
     return {
       ...apiOrder,
-      metadata: {
-        ...meta,
-        items: lineItems.map((li) => ({
-          id: li.id,
-          title: li.title,
-          price: Number.parseFloat(li.unit_price) || 0,
-          quantity: li.quantity,
-          currency: apiOrder.currency_code,
-          thumbnail: li.thumbnail,
-          sku: li.variant_sku,
-        })),
-      },
+      metadata: detailMetadata,
     };
   }
 }

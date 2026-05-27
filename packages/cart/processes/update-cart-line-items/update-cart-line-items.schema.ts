@@ -2,10 +2,7 @@ import { Type, type Static } from "@sinclair/typebox";
 import { RetrieveCartResponseSchema } from "../retrieve-cart/retrieve-cart.schema";
 
 const Metadata = Type.Optional(
-  Type.Record(
-    Type.String(),
-    Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()])
-  )
+  Type.Record(Type.String(), Type.Unknown())
 );
 
 export const UpdateCartLineItemInputSchema = Type.Object({

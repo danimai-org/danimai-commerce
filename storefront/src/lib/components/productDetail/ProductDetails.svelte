@@ -19,6 +19,7 @@
         productId?: string | null;
         selectedVariantTitle: string;
         productThumbnail?: string | null;
+        productHandle?: string | null;
     };
     let {
         title = "",
@@ -32,6 +33,7 @@
         productId = null as string | null,
         selectedVariantTitle = "",
         productThumbnail = null,
+        productHandle = null,
     }: ProductDetailsProps = $props();
 
     async function addToCart() {
@@ -65,6 +67,10 @@
             description: descRaw || null,
             productId,
             unitPrice,
+            sku: selectedVariant?.sku ?? null,
+            variantTitle: descRaw || null,
+            optionValues: selectedVariant?.optionValues ?? null,
+            productHandle: productHandle ?? undefined,
         });
     }
 </script>

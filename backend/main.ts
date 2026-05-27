@@ -29,11 +29,11 @@ initialize({
       secret: Bun.env.JWT_SECRET || "",
     },
     aws: {
-      accessKeyId: Bun.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY,
-      region: Bun.env.AWS_REGION,
-      s3Bucket: Bun.env.AWS_S3_BUCKET,
-      mediaCloudfrontUrl: Bun.env.MEDIA_CLOUDFRONT_URL,
+      accessKeyId: Bun.env.AWS_ACCESS_KEY_ID || "",
+      secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY || "",
+      region: Bun.env.AWS_REGION || "",
+      s3Bucket: Bun.env.AWS_S3_BUCKET || "",
+      mediaCloudfrontUrl: Bun.env.MEDIA_CLOUDFRONT_URL || "",
     },
   },
 });

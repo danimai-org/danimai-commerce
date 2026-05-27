@@ -24,6 +24,10 @@ export const cartState = $state({
 let initPromise: Promise<Cart | null> | null = null;
 
 function normalizeLineItemPayload(item: Record<string, unknown>) {
+  const metadata =
+    typeof item.metadata === "object" && item.metadata !== null
+      ? (item.metadata as Record<string, unknown>)
+      : undefined;
   return {
     id: (item.id as string | undefined) ?? undefined,
     title: (item.title as string | null | undefined) ?? undefined,
@@ -33,6 +37,7 @@ function normalizeLineItemPayload(item: Record<string, unknown>) {
     product_id: (item.product_id as string | null | undefined) ?? undefined,
     quantity: (item.quantity as number | null | undefined) ?? undefined,
     unit_price: (item.unit_price as string | null | undefined) ?? undefined,
+    ...(metadata ? { metadata } : {}),
   };
 }
 
@@ -172,16 +177,38 @@ export async function addItem(input: {
   description?: string | null;
   productId?: string | null;
   unitPrice?: string | null;
+  sku?: string | null;
+  variantTitle?: string | null;
+  optionValues?: Array<{ title: string; value: string }> | null;
+  productHandle?: string | null;
 }) {
   const cart = (await initCartState()) ?? (await retrieveCart(await ensureCartId()));
   if (!cart) throw new Error("Cart is not available");
 
   const quantity = Math.max(1, input.quantity ?? 1);
+  const lineMetadata: Record<string, unknown> = {};
+  if (input.sku) lineMetadata.sku = input.sku;
+  if (input.variantTitle) lineMetadata.variant_title = input.variantTitle;
+  if (input.optionValues?.length) {
+    lineMetadata.variant_option_values = input.optionValues;
+  }
+  if (input.productHandle) lineMetadata.product_handle = input.productHandle;
+
   const existing = cart.line_items.find((li) => li.variant_id === input.variantId);
   const next = existing
     ? cart.line_items.map((li) =>
         li.id === existing.id
-          ? { ...li, quantity: (li.quantity ?? 0) + quantity }
+          ? {
+              ...li,
+              quantity: (li.quantity ?? 0) + quantity,
+              thumbnail: input.thumbnail ?? li.thumbnail,
+              title: input.title ?? li.title,
+              description: input.description?.trim() || li.description,
+              metadata:
+                Object.keys(lineMetadata).length > 0
+                  ? { ...(li.metadata as object), ...lineMetadata }
+                  : li.metadata,
+            }
           : li,
       )
     : [
@@ -194,6 +221,9 @@ export async function addItem(input: {
           description: input.description?.trim() || null,
           product_id: input.productId ?? null,
           unit_price: input.unitPrice ?? null,
+          ...(Object.keys(lineMetadata).length > 0
+            ? { metadata: lineMetadata }
+            : {}),
         } as Record<string, unknown>,
       ];
 

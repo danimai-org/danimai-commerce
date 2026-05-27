@@ -60,31 +60,40 @@
         ),
     );
 
-    const galleryImages = $derived([
-        product?.thumbnail,
-        ...variants.map((v) => v?.thumbnail ?? null),
-    ]);
+    const galleryImages = $derived(
+        [product?.thumbnail, ...variants.map((v) => v?.thumbnail)].filter(
+            (url): url is string => typeof url === "string" && url.length > 0,
+        ),
+    );
     const variantOptions = $derived(
-        variants.map((v) => ({
-            id: v?.id ?? ("" as string),
-            title: v?.title ?? ("" as string),
-            thumbnail: v?.thumbnail ?? product?.thumbnail ?? null,
-            priceDisplay: formatPrice(
-                v?.prices?.[0]?.amount ?? product?.variant?.price?.amount,
-                v?.prices?.[0]?.currency_code ??
-                    product?.variant?.price?.currency_code,
-            ),
-        })),
+        variants.map((v) => {
+            const row = v as {
+                id?: string;
+                title?: string;
+                sku?: string | null;
+                thumbnail?: string | null;
+                options?: Array<{ title?: string; value?: string }>;
+                prices?: Array<{ amount?: string; currency_code?: string }>;
+            };
+            return {
+                id: row?.id ?? "",
+                title: row?.title ?? "",
+                sku: row?.sku ?? null,
+                thumbnail: row?.thumbnail ?? product?.thumbnail ?? null,
+                optionValues: (row?.options ?? [])
+                    .map((opt) => ({
+                        title: String(opt?.title ?? ""),
+                        value: String(opt?.value ?? ""),
+                    }))
+                    .filter((opt) => opt.title || opt.value),
+                priceDisplay: formatPrice(
+                    row?.prices?.[0]?.amount ?? product?.variant?.price?.amount,
+                    row?.prices?.[0]?.currency_code ??
+                        product?.variant?.price?.currency_code,
+                ),
+            };
+        }),
     );
-    const productOptions = $derived(
-        (product?.options ?? []).map((option) => ({
-            id: option?.id ?? "",
-            title: option?.title ?? "",
-            value: option?.value ?? "",
-            rank: option?.rank ?? 0,
-        })),
-    );
-
     const accordionItems = [
         {
             key: "details",
@@ -117,6 +126,7 @@
                 productHref={`/products/${product?.handle}`}
                 productId={product?.id ?? null}
                 productThumbnail={product?.thumbnail ?? null}
+                productHandle={product?.handle ?? null}
                 selectedVariantTitle={variants.find(
                     (v) => v?.id === resolvedVariantId,
                 )?.title ?? ""}

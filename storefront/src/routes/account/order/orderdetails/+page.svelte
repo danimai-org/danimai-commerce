@@ -10,6 +10,7 @@
 
 	let order = $state<OrderDetail | null>(null);
 	let notFound = $state(false);
+	let loading = $state(true);
 
 	const orderRef = $derived($page.url.searchParams.get('order')?.trim() ?? '');
 
@@ -33,11 +34,20 @@
 		if (!ref) {
 			order = null;
 			notFound = true;
+			loading = false;
 			return;
 		}
-		const detail = resolveOrderDetail(ref);
-		order = detail;
-		notFound = !detail;
+		let cancelled = false;
+		loading = true;
+		void resolveOrderDetail(ref).then((detail) => {
+			if (cancelled) return;
+			order = detail;
+			notFound = !detail;
+			loading = false;
+		});
+		return () => {
+			cancelled = true;
+		};
 	});
 </script>
 
@@ -56,7 +66,9 @@
 	</header>
 
 	<div class="account-panel-body account-order-details__body">
-		{#if notFound || !order}
+		{#if loading}
+			<p class="account-empty">Loading order…</p>
+		{:else if notFound || !order}
 			<p class="account-empty">Order not found.</p>
 			<a href="/account/orders" class="account-order-details__back-link">Back to My Orders</a>
 		{:else}

@@ -12,6 +12,10 @@ import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import type { Database as OrderDatabase, Order } from "@danimai/order/db";
 import { CreateOrderFromCartSchema } from "./create-order-from-cart.schema";
+import {
+  parseAddressNames,
+  snapshotFromCartLineItem,
+} from "../order-snapshot.util";
 
 /**
  * Handles the create order from cart process.
@@ -197,11 +201,12 @@ export class CreateOrderFromCartProcess implements ProcessContract<
         .selectAll()
         .executeTakeFirst();
       if (ca) {
+        const names = parseAddressNames(ca.metadata);
         const inserted = await db
           .insertInto("order_addresses")
           .values({
-            first_name: "-",
-            last_name: "-",
+            first_name: names.firstName,
+            last_name: names.lastName,
             phone: ca.phone ?? null,
             company: ca.company ?? null,
             address_1: ca.address_1 ?? "-",
@@ -218,6 +223,14 @@ export class CreateOrderFromCartProcess implements ProcessContract<
       }
     }
 
+    const checkoutEmail =
+      typeof mergedMetadata === "object" &&
+      mergedMetadata !== null &&
+      typeof (mergedMetadata as Record<string, unknown>).checkout_email ===
+        "string"
+        ? String((mergedMetadata as Record<string, unknown>).checkout_email)
+        : null;
+
     const hasCartIdColumn = await this.hasOrdersCartIdColumn();
     const order = await db
       .insertInto("orders")
@@ -227,7 +240,7 @@ export class CreateOrderFromCartProcess implements ProcessContract<
         fulfillment_status: "not_fulfilled",
         payment_status: "not_paid",
         display_id: displayId,
-        email: cart.email ?? null,
+        email: checkoutEmail ?? cart.email ?? null,
         customer_id: cart.customer_id ?? null,
         sales_channel_id: input.sales_channel_id ?? null,
         region_id: cart.region_id ?? null,
@@ -242,32 +255,35 @@ export class CreateOrderFromCartProcess implements ProcessContract<
     const createdOrderLineItems = await db
       .insertInto("order_line_items")
       .values(
-        lineItems.map((li) => ({
-          order_id: order.id,
-          title: li.title ?? "Item",
-          description: li.description ?? null,
-          subtitle: null,
-          thumbnail: li.thumbnail ?? null,
-          variant_id: li.variant_id ?? null,
-          product_id: li.product_id ?? null,
-          product_title: null,
-          product_description: null,
-          product_subtitle: null,
-          product_type: null,
-          product_collection: null,
-          product_handle: null,
-          variant_sku: null,
-          variant_barcode: null,
-          variant_title: null,
-          variant_option_values: null,
-          requires_shipping: true,
-          is_discountable: true,
-          is_tax_inclusive: false,
-          compare_at_unit_price: null,
-          unit_price: li.unit_price ?? "0",
-          quantity: li.quantity ?? 1,
-          metadata: li.metadata ?? null,
-        })),
+        lineItems.map((li) => {
+          const snapshot = snapshotFromCartLineItem(li);
+          return {
+            order_id: order.id,
+            title: snapshot.productTitle ?? li.title ?? "Item",
+            description: li.description ?? null,
+            subtitle: null,
+            thumbnail: li.thumbnail ?? null,
+            variant_id: li.variant_id ?? null,
+            product_id: li.product_id ?? null,
+            product_title: snapshot.productTitle,
+            product_description: null,
+            product_subtitle: null,
+            product_type: null,
+            product_collection: null,
+            product_handle: snapshot.productHandle,
+            variant_sku: snapshot.variantSku,
+            variant_barcode: null,
+            variant_title: snapshot.variantTitle,
+            variant_option_values: snapshot.variantOptionValues,
+            requires_shipping: true,
+            is_discountable: true,
+            is_tax_inclusive: false,
+            compare_at_unit_price: null,
+            unit_price: li.unit_price ?? "0",
+            quantity: li.quantity ?? 1,
+            metadata: li.metadata ?? null,
+          };
+        }),
       )
       .returning("id")
       .execute();

@@ -1,10 +1,10 @@
 @layer components {
     /*Global css*/
     .product-page {
-        @apply max-w-5xl w-full m-auto mt-8 box-border overflow-x-hidden;
+        @apply max-w-5xl w-full m-auto mt-8 box-border overflow-x-visible;
     }
     .product-layout {
-        @apply grid grid-cols-1 md:grid-cols-2 gap-8 items-start;
+        @apply grid grid-cols-1 md:grid-cols-2 gap-8 items-start min-w-0 w-full;
     }
 
     .also-like {
@@ -21,11 +21,8 @@
     }
 
     .product-gallery {
-        @apply grid gap-4 items-start;
+        @apply grid gap-4 items-start sticky top-20 self-start h-fit z-10 min-w-0;
         grid-template-columns: minmax(0, 1fr);
-        position: sticky;
-        top: 2rem;
-        align-self: start;
     }
 
     .product-main-image {
@@ -92,7 +89,7 @@
     }
 
     .product-details {
-        @apply flex flex-col gap-5;
+        @apply flex flex-col gap-5 min-w-0;
     }
 
     .product-details .product-title {
