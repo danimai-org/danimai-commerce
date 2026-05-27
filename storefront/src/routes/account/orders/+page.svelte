@@ -1,298 +1,220 @@
 <script lang="ts">
-    import { SiteHeader, SiteFooter } from "$lib/components/layout";
-    import { formatStoreMoney } from "$lib/money";
-    import { browser } from "$app/environment";
-    import { onMount } from "svelte";
+	import { formatStoreMoney } from '$lib/money';
+	import { browser } from '$app/environment';
+	import {
+		ACCOUNT_STORAGE_KEY,
+		ORDERS_STORAGE_KEY_PREFIX,
+		parseStoredAccount,
+		storageKeyForEmail
+	} from '$lib/account/storage';
+	import {
+		displayOrderNumber,
+		loadOrderDetails,
+		orderDetailsHref,
+		parseStoredOrders,
+		type OrderDetail,
+		type OrderSummary
+	} from '$lib/account/order-data';
 
-    type OrderSummary = {
-        id: string;
-        orderId: string;
-        date: string;
-        total: number;
-        status: string;
-        payment: string;
-    };
+	const defaultEmail = 'guest@denimai.com';
 
-    type OrderDetail = {
-        id: string;
-        number: string;
-        date: Date;
-        status: string;
-        email: string;
-        items: Array<{
-            image: string;
-            imageAlt: string;
-            title: string;
-            variant: string;
-            quantity: number;
-            price: string;
-        }>;
-        shippingAddress: string[];
-        shippingMethod: string;
-        billingAddress: string[];
-        paymentMethod: string;
-        totals: {
-            subtotal: string;
-            shipping: string;
-            discount: string;
-            tax: string;
-            total: string;
-        };
-    };
+	let orders = $state<OrderSummary[]>([]);
+	let shipToOpenId = $state<string | null>(null);
 
-    const ACCOUNT_STORAGE_KEY = "dm_sf_account";
-    const ORDERS_STORAGE_KEY_PREFIX = "dm_sf_orders_";
-    const ORDER_CACHE_KEY_PREFIX = "dm_sf_order_";
-    let orders: OrderSummary[] = [];
-    let selectedOrderId = "";
-    let selectedOrder: OrderDetail | null = null;
+	const currentAccountEmail = (): string => {
+		if (!browser) return defaultEmail;
+		return parseStoredAccount(localStorage.getItem(ACCOUNT_STORAGE_KEY))?.email ?? defaultEmail;
+	};
 
-    const parseStoredOrders = (raw: string | null): OrderSummary[] => {
-        if (!raw) {
-            return [];
-        }
+	const formatLongDate = (value: string | Date): string => {
+		const parsed = value instanceof Date ? value : new Date(value);
+		if (Number.isNaN(parsed.getTime())) return String(value);
+		return parsed.toLocaleDateString('en-GB', {
+			day: 'numeric',
+			month: 'short',
+			year: 'numeric'
+		});
+	};
 
-        try {
-            const parsed = JSON.parse(raw);
-            if (!Array.isArray(parsed)) {
-                return [];
-            }
+	const addDays = (value: string | Date, days: number): Date => {
+		const parsed = value instanceof Date ? new Date(value) : new Date(value);
+		parsed.setDate(parsed.getDate() + days);
+		return parsed;
+	};
 
-            return parsed
-                .map((item) => ({
-                    id: String(item?.id ?? ""),
-                    orderId: String(item?.orderId ?? ""),
-                    date: String(item?.date ?? ""),
-                    total: Number(item?.total ?? 0),
-                    status: String(item?.status ?? ""),
-                    payment: String(item?.payment ?? ""),
-                }))
-                .filter((order) => order.id && order.date);
-        } catch {
-            return [];
-        }
-    };
+	const shipToName = (detail: OrderDetail): string => {
+		const first = detail.shippingAddress[0]?.trim();
+		if (first) return first;
+		return 'Customer';
+	};
 
-    const currentAccountEmail = (): string => {
-        if (!browser) {
-            return "guest@denimai.com";
-        }
-        try {
-            const parsed = JSON.parse(
-                localStorage.getItem(ACCOUNT_STORAGE_KEY) ?? "{}",
-            ) as { email?: unknown };
-            const email = String(parsed?.email ?? "")
-                .trim()
-                .toLowerCase();
-            return email || "guest@denimai.com";
-        } catch {
-            return "guest@denimai.com";
-        }
-    };
+	const statusHeading = (detail: OrderDetail): string => {
+		const normalized = detail.status.toLowerCase();
+		const placed = formatLongDate(detail.date);
+		if (normalized.includes('deliver')) {
+			return `Delivered ${formatLongDate(addDays(detail.date, 2))}`;
+		}
+		if (normalized.includes('ship')) {
+			return `Shipped ${formatLongDate(addDays(detail.date, 1))}`;
+		}
+		if (normalized.includes('cancel')) {
+			return 'Cancelled';
+		}
+		return `Order placed ${placed}`;
+	};
 
-    const ordersStorageKeyForEmail = (email: string): string => {
-        const normalized = email.trim().toLowerCase();
-        return `${ORDERS_STORAGE_KEY_PREFIX}${normalized || "guest@denimai.com"}`;
-    };
+	const statusSubtext = (detail: OrderDetail): string => {
+		const normalized = detail.status.toLowerCase();
+		if (normalized.includes('deliver')) return 'Package was handed to resident';
+		if (normalized.includes('ship')) return 'Your package is on the way';
+		if (normalized.includes('cancel')) return 'This order was cancelled';
+		if (normalized.includes('pending')) return 'We are preparing your order';
+		return `Payment: ${detail.paymentMethod}`;
+	};
 
-    const formatDate = (value: string): string => {
-        const parsed = new Date(value);
-        if (Number.isNaN(parsed.getTime())) return value;
-        return parsed.toLocaleDateString();
-    };
+	const returnWindowText = (detail: OrderDetail): string => {
+		const closedOn = formatLongDate(addDays(detail.date, 12));
+		return `Return window closed on ${closedOn}`;
+	};
 
-    const placeholderDetailsFromSummary = (summary: OrderSummary): OrderDetail => ({
-        id: summary.orderId || summary.id,
-        number: summary.id,
-        date: new Date(summary.date),
-        status: summary.status || "pending",
-        email: "—",
-        items: [],
-        shippingAddress: [],
-        shippingMethod: "—",
-        billingAddress: [],
-        paymentMethod: summary.payment || "—",
-        totals: {
-            subtotal: formatStoreMoney(summary.total),
-            shipping: formatStoreMoney(0),
-            discount: formatStoreMoney(0),
-            tax: formatStoreMoney(0),
-            total: formatStoreMoney(summary.total),
-        },
-    });
+	const lineItemsForOrder = (summary: OrderSummary): OrderDetail['items'] => {
+		const detail = loadOrderDetails(summary);
+		if (detail.items.length > 0) return detail.items;
+		return [
+			{
+				image: '',
+				imageAlt: 'Order item',
+				title: `Order #${summary.id}`,
+				variant: detail.paymentMethod,
+				quantity: 1,
+				price: formatStoreMoney(summary.total)
+			}
+		];
+	};
 
-    const loadOrderDetails = (summary: OrderSummary): OrderDetail => {
-        const cacheId = summary.orderId;
-        if (!cacheId || !browser) {
-            return placeholderDetailsFromSummary(summary);
-        }
-        try {
-            const raw = sessionStorage.getItem(`${ORDER_CACHE_KEY_PREFIX}${cacheId}`);
-            if (!raw) {
-                return placeholderDetailsFromSummary(summary);
-            }
-            const parsed = JSON.parse(raw) as Omit<OrderDetail, "date"> & {
-                date: string;
-            };
-            return {
-                ...parsed,
-                date: new Date(parsed.date),
-            };
-        } catch {
-            return placeholderDetailsFromSummary(summary);
-        }
-    };
+	const toggleShipTo = (orderId: string) => {
+		shipToOpenId = shipToOpenId === orderId ? null : orderId;
+	};
 
-    const selectOrder = (orderId: string) => {
-        selectedOrderId = orderId;
-        const summary = orders.find((entry) => entry.id === orderId);
-        selectedOrder = summary ? loadOrderDetails(summary) : null;
-    };
-
-    onMount(() => {
-        if (!browser) return;
-        const ordersKey = ordersStorageKeyForEmail(currentAccountEmail());
-        orders = parseStoredOrders(localStorage.getItem(ordersKey));
-        if (orders.length > 0) {
-            selectOrder(orders[0].id);
-        }
-    });
-
-    $: if (orders.length > 0 && !orders.some((order) => order.id === selectedOrderId)) {
-        selectOrder(orders[0].id);
-    }
+	$effect(() => {
+		if (!browser) return;
+		const ordersKey = storageKeyForEmail(
+			ORDERS_STORAGE_KEY_PREFIX,
+			currentAccountEmail(),
+			defaultEmail
+		);
+		orders = parseStoredOrders(localStorage.getItem(ordersKey));
+	});
 </script>
 
 <svelte:head>
-    <title>My Orders - Denimai</title>
+	<title>My Orders - Denimai</title>
 </svelte:head>
 
-<div class="page-account">
-    <SiteHeader />
+<section class="account-panel-inner account-panel-inner--orders">
+	<header class="account-panel-header">
+		<h2 class="account-panel-heading">My Orders</h2>
+	</header>
 
-    <main class="account-main">
-        <h1 class="account-title">My Orders</h1>
-        <p><a href="/account">Back to Account</a></p>
+	<div class="account-panel-body account-panel-body--orders">
+		{#if orders.length === 0}
+			<p class="account-empty">No orders yet.</p>
+		{:else}
+			<div class="orders-feed">
+				{#each orders as order (order.id)}
+					{@const detail = loadOrderDetails(order)}
+					{@const items = lineItemsForOrder(order)}
+					<article class="order-amazon-card">
+						<header class="order-amazon-card__meta">
+							<div class="order-meta-block">
+								<span class="order-meta-label">Order placed</span>
+								<strong class="order-meta-value">{formatLongDate(order.date)}</strong>
+							</div>
+							<div class="order-meta-block">
+								<span class="order-meta-label">Total</span>
+								<strong class="order-meta-value">{formatStoreMoney(order.total)}</strong>
+							</div>
+							<div class="order-meta-block order-meta-block--ship">
+								<span class="order-meta-label">Ship to</span>
+								<div class="order-ship-to">
+									<button
+										type="button"
+										class="order-ship-to__trigger"
+										aria-expanded={shipToOpenId === order.id}
+										onclick={() => toggleShipTo(order.id)}
+									>
+										{shipToName(detail)}
+										<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+											<path d="m6 9 6 6 6-6" />
+										</svg>
+									</button>
+									{#if shipToOpenId === order.id && detail.shippingAddress.length > 0}
+										<div class="order-ship-to__popover">
+											{#each detail.shippingAddress as line}
+												<p>{line}</p>
+											{/each}
+										</div>
+									{/if}
+								</div>
+							</div>
+							<div class="order-meta-block order-meta-block--actions">
+								<p class="order-meta-order-id">
+									<span class="order-meta-label">Order #</span>
+									<span class="order-meta-order-number">{displayOrderNumber(detail, order)}</span>
+								</p>
+								<p class="order-meta-links">
+									<a href={orderDetailsHref(order)} class="order-link-btn">View order details</a>
+									<span class="order-action-sep" aria-hidden="true">|</span>
+									<button type="button" class="order-link-btn order-link-btn--caret">
+										Invoice
+										<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+											<path d="m6 9 6 6 6-6" />
+										</svg>
+									</button>
+								</p>
+							</div>
+						</header>
 
-        <section class="account-section">
-            {#if orders.length === 0}
-                <p>No orders yet.</p>
-            {:else}
-                <div class="orders-list">
-                    {#each orders as order}
-                        <article class="order-card">
-                            <div class="order-header">
-                                <div>
-                                    <h3>Order #{order.id}</h3>
-                                    <p>{formatDate(order.date)}</p>
-                                </div>
-                                <strong>{formatStoreMoney(order.total)}</strong>
-                            </div>
-                            <p class="order-meta">
-                                Status: {order.status} Payment: {order.payment}
-                            </p>
-                            <button
-                                class="auth-submit"
-                                type="button"
-                                onclick={() => selectOrder(order.id)}
-                                disabled={selectedOrderId === order.id}
-                            >
-                                {selectedOrderId === order.id ? "Viewing details" : "View details"}
-                            </button>
-                        </article>
-                    {/each}
-                </div>
+						<div class="order-amazon-card__body">
+							<div class="order-delivery-status">
+								<h3>{statusHeading(detail)}</h3>
+								<p>{statusSubtext(detail)}</p>
+							</div>
 
-                {#if selectedOrder}
-                    <section class="order-section">
-                        <h3>Order Details</h3>
-                        <p><strong>Order ID:</strong> {selectedOrder.id}</p>
-                        <p><strong>Order Date:</strong> {selectedOrder.date.toLocaleDateString()}</p>
-                        <p><strong>Order Status:</strong> {selectedOrder.status}</p>
-                        <p><strong>Order Email:</strong> {selectedOrder.email}</p>
-                    </section>
+							<aside class="order-amazon-card__aside" aria-label="Order actions">
+								<button type="button" class="order-pill-btn order-pill-btn--full">Track package</button>
+							</aside>
 
-                    <section class="order-section">
-                        <h3>Items</h3>
-                        {#if selectedOrder.items.length === 0}
-                            <p>Item details are not available for this order yet.</p>
-                        {:else}
-                            <div class="items-list">
-                                {#each selectedOrder.items as item}
-                                    <article class="item-row">
-                                        <div class="item-main">
-                                            <img src={item.image} alt={item.imageAlt} loading="lazy" />
-                                            <div class="item-copy">
-                                                <p class="item-title">{item.title}</p>
-                                                <p class="item-variant">{item.variant}</p>
-                                                <p class="item-qty">Quantity: {item.quantity}</p>
-                                            </div>
-                                        </div>
-                                        <p class="item-price">{item.price}</p>
-                                    </article>
-                                {/each}
-                            </div>
-                        {/if}
-                    </section>
-
-                    <section class="order-section info-grid">
-                        <div class="info-cols">
-                            <div>
-                                <h3>Delivery Information</h3>
-                                <h4>Shipping Address</h4>
-                                {#if selectedOrder.shippingAddress.length === 0}
-                                    <p>—</p>
-                                {:else}
-                                    {#each selectedOrder.shippingAddress as line}
-                                        <p>{line}</p>
-                                    {/each}
-                                {/if}
-                            </div>
-                            <div>
-                                <h3>Shipping Method</h3>
-                                <h4>Method</h4>
-                                <p>{selectedOrder.shippingMethod}</p>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="order-section info-grid">
-                        <div class="info-cols">
-                            <div>
-                                <h3>Billing Information</h3>
-                                <h4>Billing Address</h4>
-                                {#if selectedOrder.billingAddress.length === 0}
-                                    <p>—</p>
-                                {:else}
-                                    {#each selectedOrder.billingAddress as line}
-                                        <p>{line}</p>
-                                    {/each}
-                                {/if}
-                            </div>
-                            <div>
-                                <h3>Payment Method</h3>
-                                <h4>Method</h4>
-                                <p>{selectedOrder.paymentMethod}</p>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="order-section summary-block">
-                        <h3>Summary</h3>
-                        <div class="summary-rows">
-                            <p><span>Subtotal</span><strong>{selectedOrder.totals.subtotal}</strong></p>
-                            <p><span>Shipping</span><strong>{selectedOrder.totals.shipping}</strong></p>
-                            <p><span>Discount</span><strong>{selectedOrder.totals.discount}</strong></p>
-                            <p><span>Tax</span><strong>{selectedOrder.totals.tax}</strong></p>
-                            <p class="summary-total">
-                                <span>Total</span><strong>{selectedOrder.totals.total}</strong>
-                            </p>
-                        </div>
-                    </section>
-                {/if}
-            {/if}
-        </section>
-    </main>
-
-    <SiteFooter />
-</div>
+							<div class="order-lines">
+								{#each items as item, index (index)}
+									<div class="order-line">
+										{#if item.image}
+											<img class="order-line__thumb" src={item.image} alt={item.imageAlt} loading="lazy" />
+										{:else}
+											<div class="order-line__thumb order-line__thumb--placeholder" aria-hidden="true"></div>
+										{/if}
+										<div class="order-line__content">
+											{#if item.productHandle}
+												<a href="/products/{item.productHandle}" class="order-line__title">{item.title}</a>
+											{:else}
+												<p class="order-line__title order-line__title--plain">{item.title}</p>
+											{/if}
+											{#if item.variant}
+												<p class="order-line__variant">{item.variant}</p>
+											{/if}
+											<p class="order-line__return">{returnWindowText(detail)}</p>
+											<div class="order-line__cta">
+												<a href="/store" class="order-pill-btn order-pill-btn--primary">Buy it again</a>
+												<a href="/store" class="order-pill-btn">View your item</a>
+											</div>
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					</article>
+				{/each}
+			</div>
+		{/if}
+	</div>
+</section>

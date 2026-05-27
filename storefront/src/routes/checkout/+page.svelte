@@ -16,7 +16,7 @@
     } from "$lib/checkout/checkout-form-schema";
     import type { PageProps } from "./$types";
     import { client } from "$lib/api/client.js";
-    import { cartState } from "$lib/cart/cart-state.svelte";
+    import { cartState, initCartState } from "$lib/cart/cart-state.svelte";
     import {
         fetchVariantDisplayMap,
         variantDisplayLabel,
@@ -137,8 +137,6 @@
     let placeOrderError = $state("");
     let isPlacingOrder = $state(false);
 
-    // `checkoutForm` comes from a one-shot load; superForm owns client state after init.
-    // svelte-ignore state_referenced_locally
     const { form, errors, constraints, enhance } = superForm<CheckoutFormData>(
         data.checkoutForm,
         {
@@ -164,7 +162,6 @@
             ? "Standard Worldwide Shipping"
             : method;
     }
-
     function paymentMethodLabelFrom(method: string): "Manual Payment" | string {
         return method === "manual" ? "Manual Payment" : method;
     }
@@ -399,7 +396,15 @@
                 ...existingOrders.filter((entry) => entry.id !== number),
             ];
             localStorage.setItem(ordersStorageKey, JSON.stringify(nextOrders));
+
             localStorage.removeItem(CART_STORAGE_KEY);
+            cartState.cart = null;
+            cartState.initialized = false;
+            cartState.loading = false;
+            cartState.error = null;
+            cartState.sheetOpen = false;
+            await initCartState(true);
+
             goto(`/order/confirmation?order=${orderId}`);
         } catch (error) {
             placeOrderError =

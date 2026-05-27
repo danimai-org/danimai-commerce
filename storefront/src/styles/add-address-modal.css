@@ -1,0 +1,114 @@
+@layer components {
+    .address-modal-root {
+        @apply fixed inset-0 z-[200] flex items-center justify-center p-4;
+    }
+
+    .address-modal-backdrop {
+        @apply absolute inset-0 border-none bg-black/40 cursor-pointer;
+    }
+
+    .address-modal {
+        @apply relative z-[1] w-full max-w-[420px] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-white py-6 px-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)];
+    }
+
+    .address-modal__header {
+        @apply flex items-center justify-between gap-4 mb-5;
+    }
+
+    .address-modal__title {
+        @apply m-0 text-lg font-semibold text-[#2a2a2a];
+    }
+
+    .address-modal__close {
+        @apply shrink-0 border-none bg-transparent p-1 text-[#5c6348] cursor-pointer flex items-center justify-center hover:text-[#3f4630];
+    }
+
+    .address-modal__form {
+        @apply flex flex-col gap-3;
+    }
+
+    .address-field {
+        @apply block;
+    }
+
+    .address-field--full {
+        @apply w-full;
+    }
+
+    .address-field input,
+    .address-field select {
+        @apply w-full box-border py-3 px-4 text-sm text-[#1a1a1a] bg-white border border-[#e0e0e0] rounded-lg outline-none;
+    }
+
+    .address-field input::placeholder {
+        @apply text-[#9a9a9a];
+    }
+
+    .address-field input:read-only {
+        @apply text-[#6b6b6b] bg-[#fafafa] cursor-default;
+    }
+
+    .address-field input:focus,
+    .address-field select:focus {
+        @apply border-[#b8c0a8] ring-1 ring-[#e8ede0];
+    }
+
+    .address-field-row {
+        @apply grid gap-3;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .address-field--select {
+        @apply relative;
+    }
+
+    .address-field--select select {
+        @apply appearance-none pr-9 cursor-pointer;
+    }
+
+    .address-field__chevron {
+        @apply absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#6b6b6b];
+    }
+
+    .address-field--phone {
+        @apply flex items-stretch overflow-hidden rounded-lg border border-[#e0e0e0] focus-within:border-[#b8c0a8] focus-within:ring-1 focus-within:ring-[#e8ede0];
+    }
+
+    .address-field--phone input {
+        @apply border-none rounded-none ring-0 flex-1 min-w-0;
+    }
+
+    .address-phone-prefix {
+        @apply flex items-center shrink-0 py-3 pl-4 pr-3 text-sm text-[#1a1a1a] border-r border-[#e0e0e0] bg-[#fafafa];
+    }
+
+    .address-default {
+        @apply flex items-center gap-3 mt-1 mb-2 cursor-pointer text-sm text-[#2a2a2a];
+    }
+
+    .address-default input {
+        @apply sr-only;
+    }
+
+    .address-default__box {
+        @apply w-[18px] h-[18px] rounded border border-[#c8cec0] bg-white shrink-0 relative;
+    }
+
+    .address-default input:checked + .address-default__box {
+        @apply bg-[#5c6348] border-[#5c6348];
+    }
+
+    .address-default input:checked + .address-default__box::after {
+        content: '';
+        @apply absolute left-[5px] top-[2px] w-[5px] h-[9px] border-r-2 border-b-2 border-white;
+        transform: rotate(45deg);
+    }
+
+    .address-modal__submit {
+        @apply w-full mt-2 py-3.5 px-4 border-none rounded-full text-sm font-medium text-white bg-[#c8c8c8] cursor-not-allowed;
+    }
+
+    .address-modal__submit:not(:disabled) {
+        @apply bg-[#5c6348] cursor-pointer hover:bg-[#4f5740];
+    }
+}

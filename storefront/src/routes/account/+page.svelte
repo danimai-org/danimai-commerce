@@ -1,145 +1,167 @@
 <script lang="ts">
-	import { SiteHeader, SiteFooter } from '$lib/components/layout';
-	import { formatStoreMoney } from '$lib/money';
-	import { page } from '$app/stores';
-	import { browser } from '$app/environment';
-	import { goto } from '$app/navigation';
+    import { page } from "$app/stores";
+    import { browser } from "$app/environment";
+    import {
+        ACCOUNT_STORAGE_KEY,
+        notifyAccountUpdated,
+        parseStoredAccount,
+    } from "$lib/account/storage";
 
-	type Account = {
-		name: string;
-		email: string;
-	};
+    const GENDER_OPTIONS = ["Male", "Female", "Other", "Prefer not to say"];
 
-	type Order = {
-		id: string;
-		date: string;
-		total: number;
-		status: string;
-		payment: string;
-	};
+    let fullName = $state("");
+    let email = $state("");
+    let phone = $state("");
+    let dateOfBirth = $state("");
+    let gender = $state("");
+    let saved = $state(false);
 
-	const ACCOUNT_STORAGE_KEY = 'dm_sf_account';
-	const ORDERS_STORAGE_KEY_PREFIX = 'dm_sf_orders_';
+    const loadProfile = () => {
+        if (!browser) return;
+        const fromUrlName = $page.url.searchParams.get("name")?.trim();
+        const fromUrlEmail = $page.url.searchParams.get("email")?.trim();
+        const stored = parseStoredAccount(
+            localStorage.getItem(ACCOUNT_STORAGE_KEY),
+        );
 
-	const defaultAccount: Account = {
-		name: 'Customer',
-		email: 'guest@denimai.com'
-	};
+        fullName = fromUrlName || stored?.name || "";
+        email = fromUrlEmail || stored?.email || "";
+        phone = stored?.phone ?? "";
+        dateOfBirth = stored?.dateOfBirth ?? "";
+        gender = stored?.gender ?? "";
+    };
 
-	const defaultOrders: Order[] = [];
+    $effect(() => {
+        $page.url.searchParams.get("name");
+        $page.url.searchParams.get("email");
+        loadProfile();
+    });
 
-	let account: Account = defaultAccount;
-	let orders: Order[] = defaultOrders;
+    const saveProfile = (event: SubmitEvent) => {
+        event.preventDefault();
+        if (!browser) return;
 
-	const ordersStorageKeyForEmail = (email: string): string => {
-		const normalized = email.trim().toLowerCase();
-		return `${ORDERS_STORAGE_KEY_PREFIX}${normalized || defaultAccount.email}`;
-	};
+        const name = fullName.trim();
+        const emailValue = email.trim();
+        if (!name || !emailValue) return;
 
-	const parseStoredOrders = (raw: string | null): Order[] => {
-		if (!raw) {
-			return [];
-		}
+        const existing = parseStoredAccount(
+            localStorage.getItem(ACCOUNT_STORAGE_KEY),
+        );
+        localStorage.setItem(
+            ACCOUNT_STORAGE_KEY,
+            JSON.stringify({
+                ...existing,
+                name,
+                email: emailValue,
+                phone: phone.trim(),
+                dateOfBirth: dateOfBirth.trim(),
+                gender: gender.trim(),
+            }),
+        );
 
-		try {
-			const parsed = JSON.parse(raw);
-			if (!Array.isArray(parsed)) {
-				return [];
-			}
-
-			return parsed
-				.map((item) => ({
-					id: String(item?.id ?? ''),
-					date: String(item?.date ?? ''),
-					total: Number(item?.total ?? 0),
-					status: String(item?.status ?? ''),
-					payment: String(item?.payment ?? '')
-				}))
-				.filter((order) => order.id && order.date);
-		} catch {
-			return [];
-		}
-	};
-
-	const parseStoredAccount = (raw: string | null): Account | null => {
-		if (!raw) {
-			return null;
-		}
-
-		try {
-			const parsed = JSON.parse(raw);
-			const name = String(parsed?.name ?? '').trim();
-			const email = String(parsed?.email ?? '').trim();
-			if (!email) {
-				return null;
-			}
-
-			return {
-				name: name || defaultAccount.name,
-				email
-			};
-		} catch {
-			return null;
-		}
-	};
-
-	$: {
-		const name = $page.url.searchParams.get('name')?.trim();
-		const email = $page.url.searchParams.get('email')?.trim();
-		const storedAccount = browser ? parseStoredAccount(localStorage.getItem(ACCOUNT_STORAGE_KEY)) : null;
-
-		account = {
-			name: name || storedAccount?.name || defaultAccount.name,
-			email: email || storedAccount?.email || defaultAccount.email
-		};
-	}
-
-	$: if (browser) {
-		const savedOrders = parseStoredOrders(localStorage.getItem(ordersStorageKeyForEmail(account.email)));
-		orders = savedOrders;
-	}
+        notifyAccountUpdated();
+        saved = true;
+        setTimeout(() => {
+            saved = false;
+        }, 2500);
+    };
 </script>
 
 <svelte:head>
     <title>My Account - Denimai</title>
 </svelte:head>
 
-<div class="page-account">
-    <SiteHeader />
+<section class="account-panel-inner">
+    <header class="account-panel-header">
+        <h2 class="account-panel-heading">My Account</h2>
+    </header>
 
-    <main class="account-main">
-        <h1 class="account-title">My Account</h1>
+    <form class="account-profile-form" onsubmit={saveProfile}>
+        <label class="account-profile-field account-profile-field--full">
+            <span class="account-profile-label">Full Name</span>
+            <input
+                bind:value={fullName}
+                type="text"
+                autocomplete="name"
+                required
+            />
+        </label>
 
-        <section class="account-section">
-            <h2>Account Details</h2>
-            <p><strong>Name:</strong> {account.name}</p>
-            <p><strong>Email:</strong> {account.email}</p>
-        </section>
+        <div class="account-profile-row">
+            <label class="account-profile-field">
+                <span class="account-profile-label">Email</span>
+                <input
+                    bind:value={email}
+                    type="email"
+                    autocomplete="email"
+                    required
+                />
+            </label>
+            <label class="account-profile-field account-profile-field--phone">
+                <span class="account-profile-label">Phone number</span>
+                <span class="account-profile-phone">
+                    <span
+                        class="account-profile-phone-prefix"
+                        aria-hidden="true">+91</span
+                    >
+                    <input
+                        bind:value={phone}
+                        type="tel"
+                        placeholder="Enter phone number"
+                        autocomplete="tel-national"
+                        inputmode="tel"
+                    />
+                </span>
+            </label>
+        </div>
 
-        <section class="account-section">
-            <h2>Order History</h2>
+        <div class="account-profile-row">
+            <label class="account-profile-field">
+                <span class="account-profile-label">Date Of Birth</span>
+                <input
+                    bind:value={dateOfBirth}
+                    type="text"
+                    placeholder="DD/MM/YYYY"
+                    autocomplete="bday"
+                />
+            </label>
+            <label class="account-profile-field account-profile-field--select">
+                <span class="account-profile-label">Gender</span>
+                <select bind:value={gender}>
+                    <option value="">Gender</option>
+                    {#each GENDER_OPTIONS as option}
+                        <option value={option}>{option}</option>
+                    {/each}
+                </select>
+                <svg
+                    class="account-profile-chevron"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                >
+                    <path d="m6 9 6 6 6-6" />
+                </svg>
+            </label>
+        </div>
 
-			{#if orders.length === 0}
-				<p>No orders yet.</p>
-			{:else}
-				<div class="orders-list">
-					{#each orders as order}
-						<article class="order-card">
-							<div class="order-header">
-								<div>
-									<h3>Order #{order.id}</h3>
-									<p>{order.date}</p>
-								</div>
-								<strong>{formatStoreMoney(order.total)}</strong>
-							</div>
-							<p class="order-meta">Status: {order.status} Payment: {order.payment}</p>
-						</article>
-					{/each}
-				</div>
-			{/if}
-			<button class="auth-submit" type="button" onclick={() => goto('/account/orders')}>View all orders</button>
-        </section>
-    </main>
+        <a href="/login" class="account-profile-password-link"
+            >Change Password</a
+        >
 
-    <SiteFooter />
-</div>
+        <div class="account-profile-actions">
+            {#if saved}
+                <p class="account-profile-saved" role="status">
+                    Changes saved.
+                </p>
+            {/if}
+            <button type="submit" class="account-profile-save"
+                >Save Changes</button
+            >
+        </div>
+    </form>
+</section>

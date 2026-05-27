@@ -1,49 +1,583 @@
 @layer components {
     .page-account {
-        @apply min-h-screen flex flex-col;
+        @apply min-h-screen flex flex-col overflow-x-clip;
     }
 
-    .account-main {
-        @apply flex-1 max-w-4xl mx-auto py-10 px-6 pb-16 w-full box-border;
+    .account-shell {
+        @apply flex-1 w-full min-w-0 max-w-[var(--section-max-width,1200px)] mx-auto py-8 px-5 pb-16 box-border;
     }
 
-    .account-title {
-        @apply text-[clamp(2rem,5vw,2.75rem)] m-0 mb-8;
+    .account-grid {
+        @apply grid gap-x-10 gap-y-0 items-start w-full max-w-full min-w-0;
+        grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
     }
 
-    .account-section {
-        @apply mb-9;
+    @media (max-width: 900px) {
+        .account-grid {
+            @apply grid-cols-1 gap-6;
+        }
     }
 
-    .account-section h2 {
-        @apply text-2xl m-0 mb-4;
+    .account-sidebar {
+        @apply pb-8 min-w-0;
     }
 
-    .account-section p {
+    @media (max-width: 900px) {
+        .account-sidebar {
+            @apply border-b border-[#e2e2de] pb-6;
+        }
+    }
+
+    .account-profile {
+        @apply flex gap-4 items-start mb-8;
+    }
+
+    .account-avatar {
+        @apply shrink-0 w-14 h-14 rounded-sm bg-[#ebe6df] text-[#5c5c5c] text-lg font-medium flex items-center justify-center;
+    }
+
+    .account-greeting {
+        @apply m-0 mb-1 text-base text-[#1a1a1a] flex items-center gap-2;
+    }
+
+    .account-edit-name {
+        @apply p-0 border-none bg-transparent text-[#6b7355] cursor-not-allowed opacity-60;
+    }
+
+    .account-email {
+        @apply m-0 mb-3 text-sm text-[#6b6b6b] break-all;
+    }
+
+    .account-reward-badge {
+        @apply m-0 inline-block text-xs text-[#4f5a3d] bg-[#eef2e4] rounded-full py-1 px-3;
+    }
+
+    .account-nav {
+        @apply flex flex-col gap-5;
+    }
+
+    .account-nav-label {
+        @apply m-0 mb-2 text-[0.6875rem] font-bold tracking-[0.08em] uppercase text-[#1a1a1a];
+    }
+
+    .account-nav-item {
+        @apply flex items-center gap-3 py-2 text-[0.9375rem] text-[#6b7355] no-underline border-none bg-transparent w-full text-left cursor-pointer hover:text-[#3f4630];
+    }
+
+    .account-nav-item--active {
+        @apply text-[#1a1a1a] font-medium;
+    }
+
+    .account-nav-icon {
+        @apply shrink-0 flex items-center justify-center text-[#6b7355];
+    }
+
+    .account-nav-item--active .account-nav-icon {
+        @apply text-[#1a1a1a];
+    }
+
+    .account-nav-chevron {
+        @apply ml-auto shrink-0 text-[#9a9a94];
+    }
+
+    .account-sidebar-footer {
+        @apply mt-10 pt-6 flex flex-col gap-2;
+    }
+
+    .account-footer-link {
+        @apply text-sm text-[#6b6b6b] no-underline hover:text-[#1a1a1a];
+    }
+
+    .account-logout {
+        @apply mt-4 w-full py-2.5 px-4 rounded-md border border-[#d4d4ce] bg-white text-[#1a1a1a] text-sm cursor-pointer hover:bg-[#fafaf8];
+    }
+
+    .account-panel {
+        @apply min-w-0 max-w-full;
+    }
+
+    .account-panel-inner {
+        @apply border border-[#e2e2de] bg-white rounded-sm max-w-full min-w-0;
+    }
+
+    .account-panel-header {
+        @apply py-4 px-6 border-b border-[#e2e2de];
+    }
+
+    .account-panel-heading {
+        @apply m-0 text-sm font-bold tracking-[0.12em] uppercase text-[#1a1a1a];
+    }
+
+    .account-panel-toolbar {
+        @apply flex items-center justify-between gap-4 py-4 px-6 border-b border-[#ecece8];
+    }
+
+    .account-panel-subtitle {
+        @apply m-0 text-base font-medium text-[#1a1a1a];
+    }
+
+    .account-add-link {
+        @apply border-none bg-transparent p-0 text-sm text-[#1a1a1a] underline cursor-pointer hover:text-[#6b7355];
+    }
+
+    .account-panel-body {
+        @apply py-5 px-6;
+    }
+
+    .account-empty,
+    .account-placeholder {
+        @apply m-0 text-[#6b6b6b];
+    }
+
+    .account-address-list {
+        @apply list-none m-0 p-0 flex flex-col gap-4;
+    }
+
+    .account-address-card {
+        @apply border border-[#e2e2de] rounded-md p-4;
+    }
+
+    .account-address-card--selected {
+        @apply border-[#c8cec0];
+    }
+
+    .account-address-select {
+        @apply flex gap-3 items-start cursor-pointer;
+    }
+
+    .account-address-select input {
+        @apply sr-only;
+    }
+
+    .account-address-radio {
+        @apply mt-1 w-4 h-4 rounded-full border border-[#9a9a94] shrink-0 relative;
+    }
+
+    .account-address-select input:checked + .account-address-radio {
+        @apply border-[#6b7355];
+    }
+
+    .account-address-select input:checked + .account-address-radio::after {
+        content: "";
+        @apply absolute inset-[3px] rounded-full bg-[#6b7355];
+    }
+
+    .account-address-copy {
+        @apply flex flex-col gap-1 text-sm text-[#3f3f3f];
+    }
+
+    .account-address-copy strong {
+        @apply text-[#1a1a1a] text-base font-medium;
+    }
+
+    .account-address-phone {
+        @apply text-[#6b6b6b];
+    }
+
+    .account-address-actions {
+        @apply mt-3 pl-7 text-sm text-[#6b7355];
+    }
+
+    .account-text-link {
+        @apply border-none bg-transparent p-0 text-inherit underline cursor-pointer hover:text-[#3f4630];
+    }
+
+    .account-action-sep {
+        @apply mx-1 text-[#c8c8c2];
+    }
+
+    .account-address-form {
+        @apply py-4 px-6 border-b border-[#ecece8];
+    }
+
+    .account-form-grid {
+        @apply grid gap-3;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .account-form-span {
+        grid-column: 1 / -1;
+    }
+
+    .account-address-form label {
+        @apply flex flex-col gap-1 text-sm text-[#3f3f3f];
+    }
+
+    .account-address-form input {
+        @apply border border-[#e2e2de] rounded-sm py-2 px-3 text-[#1a1a1a] bg-white;
+    }
+
+    .account-form-actions {
+        @apply mt-4 flex gap-3 flex-wrap;
+    }
+
+    .account-btn-primary {
+        @apply py-2.5 px-5 border border-[#1a1a1a] bg-[#1a1a1a] text-white text-sm cursor-pointer hover:bg-[#333];
+    }
+
+    .account-btn-primary--compact {
+        @apply mt-2;
+    }
+
+    .account-btn-ghost {
+        @apply py-2.5 px-5 border border-[#d4d4ce] bg-white text-[#1a1a1a] text-sm cursor-pointer hover:bg-[#fafaf8];
+    }
+
+    .account-panel-inner--orders,
+    .account-panel-body--orders {
+        @apply p-0;
+    }
+
+    .account-panel-inner--orders .account-panel-header {
+        @apply px-6;
+    }
+
+    .account-panel-body--orders {
+        @apply py-5 px-6;
+    }
+
+    .orders-feed {
+        @apply flex flex-col gap-5;
+    }
+
+    .order-amazon-card {
+        @apply border border-[#d5d9d9] rounded-lg overflow-hidden bg-white max-w-full min-w-0;
+    }
+
+    .order-amazon-card__meta {
+        @apply grid gap-4 py-4 px-5 bg-[#f0f2f2] border-b border-[#d5d9d9];
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    @media (max-width: 900px) {
+        .order-amazon-card__meta {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 520px) {
+        .order-amazon-card__meta {
+            @apply grid-cols-1;
+        }
+    }
+
+    .order-meta-block {
+        @apply min-w-0;
+    }
+
+    .order-meta-block--actions {
+        @apply md:text-right;
+    }
+
+    .order-meta-label {
+        @apply block text-[0.6875rem] tracking-wide uppercase text-[#565959] mb-1;
+    }
+
+    .order-meta-value {
+        @apply block text-sm font-normal text-[#0f1111];
+    }
+
+    .order-meta-order-id {
+        @apply m-0 mb-1 text-sm text-[#0f1111];
+    }
+
+    .order-meta-order-id .order-meta-label {
+        @apply inline normal-case tracking-normal text-sm text-[#0f1111] mr-1 mb-0;
+    }
+
+    .order-meta-order-number {
+        @apply inline font-medium;
+    }
+
+    .order-meta-links {
+        @apply m-0 text-sm flex flex-wrap items-center gap-x-1 gap-y-1;
+    }
+
+    .order-link-btn {
+        @apply border-none bg-transparent p-0 text-[#007185] cursor-pointer inline-flex items-center gap-1 no-underline hover:text-[#c7511f] hover:underline;
+    }
+
+    a.order-link-btn {
+        @apply inline-flex;
+    }
+
+    .order-ship-to {
+        @apply relative;
+    }
+
+    .order-ship-to__trigger {
+        @apply border-none bg-transparent p-0 text-sm text-[#007185] cursor-pointer inline-flex items-center gap-1 hover:text-[#c7511f] hover:underline;
+    }
+
+    .order-ship-to__popover {
+        @apply absolute left-0 top-full z-10 mt-1 min-w-[12rem] py-2 px-3 bg-white border border-[#d5d9d9] rounded shadow-sm text-sm text-[#0f1111];
+    }
+
+    .order-ship-to__popover p {
+        @apply m-0 leading-snug;
+    }
+
+    .order-action-sep {
+        @apply mx-1 text-[#565959];
+    }
+
+    .order-amazon-card__body {
+        @apply grid gap-y-5 gap-x-6 py-5 px-5 w-full box-border;
+        grid-template-columns: minmax(0, 1fr) 11.5rem;
+    }
+
+    @media (max-width: 768px) {
+        .order-amazon-card__body {
+            @apply grid-cols-1;
+        }
+    }
+
+    .order-delivery-status {
+        @apply min-w-0;
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .order-delivery-status h3 {
+        @apply m-0 mb-1 text-lg font-bold text-[#0f1111];
+    }
+
+    .order-delivery-status p {
+        @apply m-0 text-sm text-[#565959];
+    }
+
+    .order-amazon-card__aside {
+        @apply flex flex-col gap-2;
+        grid-column: 2;
+        grid-row: 1;
+        align-self: start;
+    }
+
+    @media (max-width: 768px) {
+        .order-amazon-card__aside {
+            grid-column: 1;
+            grid-row: 2;
+        }
+
+        .order-delivery-status {
+            grid-row: 1;
+        }
+
+        .order-lines {
+            grid-row: 3;
+        }
+    }
+
+    .order-lines {
+        @apply w-full border-t border-[#e3e6e6] pt-5;
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    @media (max-width: 768px) {
+        .order-lines {
+            grid-row: 3;
+        }
+    }
+
+    .order-expanded-details {
+        @apply pt-4 border-t border-[#e3e6e6] text-sm text-[#0f1111];
+        grid-column: 1 / -1;
+        grid-row: 3;
+    }
+
+    @media (max-width: 768px) {
+        .order-expanded-details {
+            grid-row: 4;
+        }
+    }
+
+    .order-line {
+        @apply flex gap-4;
+    }
+
+    .order-lines .order-line:not(:last-child) {
+        @apply border-b border-[#e3e6e6] pb-5 mb-5;
+    }
+
+    .order-line__thumb {
+        @apply w-[84px] h-[84px] object-cover rounded-sm bg-[#f3f3f0] shrink-0;
+    }
+
+    .order-line__thumb--placeholder {
+        @apply bg-[#ececec];
+    }
+
+    .order-line__content {
+        @apply min-w-0 flex-1;
+    }
+
+    .order-line__title {
+        @apply block m-0 mb-1 text-sm text-[#007185] no-underline leading-snug hover:text-[#c7511f] hover:underline;
+    }
+
+    .order-line__title--plain {
+        @apply text-[#0f1111] hover:text-[#0f1111] hover:no-underline;
+    }
+
+    .order-line__variant {
+        @apply m-0 mb-1 text-sm text-[#565959];
+    }
+
+    .order-line__return {
+        @apply m-0 mb-3 text-xs text-[#565959];
+    }
+
+    .order-line__cta {
+        @apply flex flex-wrap gap-2;
+    }
+
+    .order-line__cta .order-pill-btn {
+        @apply border border-[#d5d9d9];
+    }
+
+    .order-line__cta .order-pill-btn--primary {
+        @apply hover:border-[#d5a429];
+    }
+
+    .order-pill-btn {
+        @apply inline-flex items-center justify-center min-h-[31px] py-1.5 px-4 text-[0.8125rem] leading-tight text-[#0f1111] bg-white border border-[#d5d9d9] rounded-full no-underline cursor-pointer shadow-[0_2px_5px_rgba(213,217,217,0.5)] hover:bg-[#f7fafa];
+    }
+
+    .order-pill-btn--primary {
+        @apply bg-[#f7ca99] hover:bg-[#f7ca00] hover:border-[#d5a429];
+    }
+
+    .order-pill-btn--full {
+        @apply w-full text-center;
+    }
+
+    .order-expanded-details p {
         @apply my-1;
     }
 
-    .orders-list {
-        @apply flex flex-col gap-4;
+    .order-expanded-summary {
+        @apply mt-3 max-w-xs;
     }
 
-    .order-card {
-        @apply border border-[#e6e6e6] rounded-lg py-4 px-5 bg-white;
+    .order-expanded-summary p {
+        @apply flex justify-between gap-4;
     }
 
-    .order-header {
-        @apply flex justify-between items-start gap-4 mb-2;
+    .order-expanded-summary-total {
+        @apply mt-2 pt-2 border-t border-[#e3e6e6] font-medium;
     }
 
-    .order-header h3 {
-        @apply m-0 text-base;
+    .account-profile-form {
+        @apply py-5 px-6 flex flex-col gap-4;
     }
 
-    .order-header p {
-        @apply mt-0.5 text-[#5c5c5c];
+    .account-profile-label {
+        @apply block mb-1.5 text-sm text-[#3f3f3f];
     }
 
-    .order-meta {
-        @apply text-[#3f3f3f];
+    .account-profile-field input,
+    .account-profile-field select {
+        @apply w-full box-border py-3 px-4 text-sm text-[#1a1a1a] bg-white border border-[#e0e0e0] rounded-lg outline-none;
+    }
+
+    .account-profile-field input::placeholder {
+        @apply text-[#9a9a9a];
+    }
+
+    .account-profile-field input:focus,
+    .account-profile-field select:focus {
+        @apply border-[#b8c0a8] ring-1 ring-[#e8ede0];
+    }
+
+    .account-profile-field--full {
+        @apply w-full;
+    }
+
+    .account-profile-row {
+        @apply grid gap-4;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @media (max-width: 640px) {
+        .account-profile-row {
+            @apply grid-cols-1;
+        }
+    }
+
+    .account-profile-field--select {
+        @apply relative block;
+    }
+
+    .account-profile-field--select select {
+        @apply appearance-none pr-9 cursor-pointer;
+    }
+
+    .account-profile-chevron {
+        @apply absolute right-3 bottom-3 pointer-events-none text-[#6b6b6b];
+    }
+
+    .account-profile-field--phone .account-profile-phone {
+        @apply flex items-stretch overflow-hidden rounded-lg border border-[#e0e0e0] focus-within:border-[#b8c0a8] focus-within:ring-1 focus-within:ring-[#e8ede0];
+    }
+
+    .account-profile-phone-prefix {
+        @apply flex items-center shrink-0 py-3 pl-4 pr-3 text-sm text-[#1a1a1a] border-r border-[#e0e0e0] bg-[#fafafa];
+    }
+
+    .account-profile-field--phone input {
+        @apply border-none rounded-none ring-0 flex-1 min-w-0;
+    }
+
+    .account-profile-password-link {
+        @apply text-sm text-[#5c6348] no-underline hover:underline w-fit;
+    }
+
+    .account-profile-actions {
+        @apply flex flex-col items-center gap-2 pt-2;
+    }
+
+    .account-profile-saved {
+        @apply m-0 text-sm text-[#5c6348];
+    }
+
+    .account-profile-save {
+        @apply min-w-[200px] py-3 px-8 border-none rounded-lg bg-[#5c6348] text-white text-sm font-medium cursor-pointer hover:bg-[#4f5740];
+    }
+
+    .account-order-details__header {
+        @apply flex items-center gap-3;
+    }
+
+    .account-order-details__back {
+        @apply flex items-center justify-center text-[#5c6348] no-underline hover:text-[#3f4630];
+    }
+
+    .account-order-details__back-link {
+        @apply text-sm text-[#007185] no-underline hover:underline;
+    }
+
+    .account-order-details__body {
+        @apply py-5 px-6;
+    }
+
+    .order-details-overview {
+        @apply mb-4 pb-4 border-b border-[#e3e6e6];
+    }
+
+    .order-details-number {
+        @apply m-0 mb-3 text-lg font-semibold text-[#0f1111];
+    }
+
+    .order-details-overview p {
+        @apply m-0 mb-1 text-sm text-[#333];
+    }
+
+    .order-details-overview p span {
+        @apply font-medium mr-1;
+    }
+
+    .item-main--placeholder {
+        @apply w-[52px] h-16 bg-[#efefef];
     }
 }

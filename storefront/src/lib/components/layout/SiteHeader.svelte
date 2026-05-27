@@ -376,8 +376,9 @@
                             aria-label="Account"
                         >
                             {#if isLoggedIn}
-                                <span class="account-dropdown-link" role="menuitem"
-                                    >{accountEmail}</span
+                                <span
+                                    class="account-dropdown-link"
+                                    role="menuitem">{accountEmail}</span
                                 >
                                 <a
                                     href="/account"
@@ -385,27 +386,6 @@
                                     role="menuitem"
                                     onclick={() => (accountMenuOpen = false)}
                                     >My Account</a
-                                >
-                                <a
-                                    href="/account/orders"
-                                    class="account-dropdown-link"
-                                    role="menuitem"
-                                    onclick={() => (accountMenuOpen = false)}
-                                    >My Orders</a
-                                >
-                                <button
-                                    type="button"
-                                    class="account-dropdown-link"
-                                    role="menuitem"
-                                    onclick={logout}>Logout</button
-                                >
-                            {:else}
-                                <a
-                                    href="/login"
-                                    class="account-dropdown-link"
-                                    role="menuitem"
-                                    onclick={() => (accountMenuOpen = false)}
-                                    >Login</a
                                 >
                             {/if}
                         </div>
@@ -593,4 +573,3 @@
         </nav>
     </aside>
 {/if}
-
