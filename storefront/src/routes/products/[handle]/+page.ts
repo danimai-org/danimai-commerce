@@ -1,48 +1,101 @@
 import type { PageLoad } from "./$types";
 import { client } from "$lib/api/client.js";
 
-export type ProductPageProduct = Awaited<
-  ReturnType<(typeof client)["storefront"]["products"]["get"]>
->["data"];
+export type ProductPageMedia = {
+  id: string;
+  url: string;
+  rank: number;
+};
 
-export type ProductPageVariant = Awaited<
-  ReturnType<ReturnType<(typeof client)["admin"]["product-variants"]>["get"]>
->["data"];
+export type ProductPageVariant = {
+  id: string;
+  title: string;
+  sku: string | null;
+  thumbnail: string | null;
+  variant_rank: number | null;
+  options: Array<{ id: string; title: string; value: string; rank: number }>;
+  prices: Array<{
+    amount: string;
+    currency_code: string;
+    min_quantity: number | null;
+    max_quantity: number | null;
+    price_list_id: string | null;
+  }>;
+};
+
+export type ProductPageProduct = {
+  id: string;
+  title: string;
+  handle: string;
+  thumbnail: string | null;
+  description: string | null;
+  media: ProductPageMedia[];
+  variant: {
+    id: string;
+    title: string;
+    sku: string | null;
+    thumbnail: string | null;
+    variant_rank: number | null;
+    price: {
+      amount: string;
+      currency_code: string;
+      min_quantity: number | null;
+      max_quantity: number | null;
+      price_list_id: string | null;
+    } | null;
+  } | null;
+  variants: ProductPageVariant[];
+};
+
+type ProductListItem = NonNullable<
+  Awaited<ReturnType<(typeof client)["storefront"]["products"]["get"]>>["data"]
+>["rows"][number];
+
+export type ProductPageData = {
+  error: string | null;
+  product: ProductPageProduct | null;
+  variantRows: ProductPageVariant[];
+  otherProducts: ProductListItem[];
+};
 
 export const load: PageLoad = async ({
   params,
-}: {
-  params: { handle: string };
-}) => {
+}): Promise<ProductPageData> => {
   const handle = params.handle
     ? decodeURIComponent(String(params.handle)).trim()
     : "";
 
   if (!handle) {
-    return { error: "No product handle provided", product: null, variants: [] };
+    return {
+      error: "No product handle provided",
+      product: null,
+      variantRows: [],
+      otherProducts: [],
+    };
   }
 
-  const res = await client.storefront["products"].get({
-    query: { search: handle, limit: "1" },
-  });
-  const product = res.data?.rows?.[0];
+  const res = await client.storefront.products({ handle }).get();
 
-  if (!product) {
-    return { error: "Product not found", product: null, variants: [] };
+  if (res.error || !res.data) {
+    return {
+      error: "Product not found",
+      product: null,
+      variantRows: [],
+      otherProducts: [],
+    };
   }
 
-  const variantRes = await client.admin["product-variants"].get({
-    query: { filters: { product_id: product.id }, limit: "100" },
-  });
-
-  const otherProductsRes = await client.storefront["products"].get({
+  const product = res.data as ProductPageProduct;
+  const otherProductsRes = await client.storefront.products.get({
     query: { limit: "4" },
   });
 
   return {
     product,
-    variantRows: (variantRes.data?.rows ?? []) as ProductPageVariant[],
-    otherProducts: otherProductsRes.data?.rows ?? [],
+    variantRows: product.variants ?? [],
+    otherProducts: (otherProductsRes.data?.rows ?? []).filter(
+      (item) => item?.handle !== product.handle,
+    ),
     error: null,
   };
 };

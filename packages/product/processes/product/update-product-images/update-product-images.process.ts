@@ -68,6 +68,8 @@ export class UpdateProductImagesProcess {
     const uploaded = await this.uploadMedia(input, files);
 
     if (uploaded.length > 0) {
+      await this.assignUploadRanks(mediaDb, input.id, uploaded.map((item) => item.id));
+
       const productRow = await this.db
         .selectFrom("products")
         .where("id", "=", input.id)
@@ -159,5 +161,53 @@ export class UpdateProductImagesProcess {
       owner_type: media.owner_type,
       owner_id: media.owner_id,
     }));
+  }
+
+  private async assignUploadRanks(
+    mediaDb: Kysely<ProductMediaDatabase>,
+    productId: string,
+    uploadedIds: string[],
+  ) {
+    if (uploadedIds.length === 0) return;
+
+    const existingRows = await mediaDb
+      .selectFrom("media_files")
+      .where("owner_type", "=", "product")
+      .where("owner_id", "=", productId)
+      .where("deleted_at", "is", null)
+      .select(["id", "metadata"])
+      .execute();
+
+    let maxRank = -1;
+    for (const row of existingRows) {
+      const metadata =
+        row.metadata !== null &&
+        typeof row.metadata === "object" &&
+        !Array.isArray(row.metadata)
+          ? (row.metadata as Record<string, unknown>)
+          : null;
+      const rankValue = metadata?.rank;
+      if (typeof rankValue === "number" && Number.isFinite(rankValue)) {
+        maxRank = Math.max(maxRank, rankValue);
+      }
+    }
+
+    for (let i = 0; i < uploadedIds.length; i++) {
+      const mediaId = uploadedIds[i]!;
+      const row = existingRows.find((item) => item.id === mediaId);
+      const prev =
+        row?.metadata !== null &&
+        typeof row?.metadata === "object" &&
+        !Array.isArray(row.metadata)
+          ? (row.metadata as Record<string, unknown>)
+          : {};
+      const metadata = { ...prev, rank: maxRank + 1 + i };
+      await mediaDb
+        .updateTable("media_files")
+        .set({ metadata })
+        .where("id", "=", mediaId)
+        .where("deleted_at", "is", null)
+        .execute();
+    }
   }
 }

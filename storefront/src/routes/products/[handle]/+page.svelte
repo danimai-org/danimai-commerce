@@ -8,11 +8,12 @@
     import ProductGridSection from "$lib/components/ProductGridSection.svelte";
 
     import { formatStoreMoney } from "$lib/money";
+    import type { ProductPageData } from "./+page.js";
 
-    let { data } = $props();
-    const product = $derived(data?.product);
-    const variants = $derived(data?.variantRows ?? []);
-    const otherProducts = $derived(data?.otherProducts ?? []);
+    let { data }: { data: ProductPageData } = $props();
+    const product = $derived(data.product);
+    const variants = $derived(data.variantRows ?? []);
+    const otherProducts = $derived(data.otherProducts ?? []);
     let selectedVariantId = $state<string | null>(null);
     let quantity = $state(1);
     let selectedImageIndex = $state<number>(0);
@@ -52,19 +53,38 @@
         return formatStoreMoney(decimalAmount);
     }
 
+    const selectedVariant = $derived(
+        variants.find((v) => v?.id === resolvedVariantId) ?? null,
+    );
+
     const priceLabel = $derived(
         formatPrice(
-            product?.variant?.price?.amount ?? product?.variant?.price?.amount,
-            product?.variant?.price?.currency_code ??
+            selectedVariant?.prices?.[0]?.amount ?? product?.variant?.price?.amount,
+            selectedVariant?.prices?.[0]?.currency_code ??
                 product?.variant?.price?.currency_code,
         ),
     );
 
-    const galleryImages = $derived(
-        [product?.thumbnail, ...variants.map((v) => v?.thumbnail)].filter(
-            (url): url is string => typeof url === "string" && url.length > 0,
-        ),
-    );
+    const galleryImages = $derived.by(() => {
+        const media = product?.media ?? [];
+        const fromMedia = [...media]
+            .sort((a, b) => (a?.rank ?? 0) - (b?.rank ?? 0))
+            .map((item) => item?.url?.trim?.() ?? "")
+            .filter((url): url is string => url.length > 0);
+        if (fromMedia.length > 0) return fromMedia;
+        const thumb = product?.thumbnail?.trim?.() ?? "";
+        return thumb ? [thumb] : [];
+    });
+
+    $effect(() => {
+        const images = galleryImages;
+        const thumb = selectedVariant?.thumbnail?.trim?.() ?? "";
+        if (!thumb || images.length === 0) return;
+        const index = images.indexOf(thumb);
+        if (index >= 0) {
+            selectedImageIndex = index;
+        }
+    });
     const variantOptions = $derived(
         variants.map((v) => {
             const row = v as {
@@ -114,7 +134,11 @@
 {:else}
     <main class="product-page">
         <div class="product-layout">
-            <ProductGallery images={galleryImages} bind:selectedImageIndex />
+            <ProductGallery
+                images={galleryImages}
+                bind:selectedImageIndex
+                alt={product?.title ?? "Product"}
+            />
 
             <ProductDetails
                 title={product?.title ?? "Loading..."}

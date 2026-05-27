@@ -15,7 +15,7 @@
 	import CreateProductStepVariants from './CreateProductStepVariants.svelte';
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import { get } from 'svelte/store';
-	import { previewUrl, type MediaUploadLocalItem } from '$lib/components/shared/media-upload.types.js';
+	import { type MediaUploadLocalItem } from '$lib/components/shared/media-upload.types.js';
 
 	interface Props {
 		open: boolean;
@@ -127,18 +127,26 @@
 						throw new Error('Product created but media upload could not start (missing product id).');
 					}
 					if (createdProductId && createMediaItems.length > 0) {
+						const expectedCount = createMediaItems.length;
 						const uploaded = await uploadProductImages(
 							createdProductId,
 							createMediaItems.map((m: MediaUploadLocalItem) => m.file)
 						);
-						if (uploaded.length > 0) {
-							const res = await client.products({ id: createdProductId }).put({
-								thumbnail_media_id: uploaded[0]?.id
-							});
-							if (res.error) {
-								const err = res.error as { value?: { message?: string } };
-								throw new Error(err?.value?.message ?? String(res.error));
-							}
+						if (uploaded.length === 0) {
+							throw new Error('Product created but no images were uploaded.');
+						}
+						if (uploaded.length < expectedCount) {
+							throw new Error(
+								`Product created but only ${uploaded.length} of ${expectedCount} images uploaded.`
+							);
+						}
+						const res = await client.products({ id: createdProductId }).put({
+							thumbnail_media_id: uploaded[0]?.id ?? null,
+							media_ids: uploaded.map((item) => item.id)
+						});
+						if (res.error) {
+							const err = res.error as { value?: { message?: string } };
+							throw new Error(err?.value?.message ?? String(res.error));
 						}
 					}
 					createError = null;
@@ -779,11 +787,6 @@
 			<input type="hidden" name="options" value={createOptionsJson} />
 			<input type="hidden" name="variants" value={createVariantsJson} />
 			<input type="hidden" name="attributes" value={createAttributesJson} />
-			<input
-				type="hidden"
-				name="thumbnail"
-				value={previewUrl(createMediaItems[0]).trim()}
-			/>
 
 			<div class="flex shrink-0 flex-wrap justify-end gap-2 border-t p-4">
 				<Button type="button" variant="outline" onclick={closeCreate}>Cancel</Button>

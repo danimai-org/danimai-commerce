@@ -24,8 +24,7 @@
     }
 
     .checkout-columns-scroll {
-        @apply grid grid-cols-[1fr_380px] gap-12 items-start overflow-y-auto overflow-x-clip pb-8;
-        max-height: calc(100vh - 14rem);
+        @apply grid grid-cols-[1fr_380px] gap-12 items-start pb-8;
     }
 
     .checkout-main {
@@ -86,7 +85,7 @@
 
     @media (max-width: 1024px) {
         .checkout-columns-scroll {
-            @apply grid-cols-1 overflow-y-visible max-h-none;
+            @apply grid-cols-1;
         }
     }
 
@@ -254,7 +253,31 @@
     }
 
     .checkout-summary {
-        @apply bg-[#f8f8f8] rounded-lg p-6 sticky top-6 z-10 h-fit self-start;
+        @apply bg-[#f8f8f8] rounded-lg p-6 sticky top-6 z-10 self-start;
+        max-height: calc(100vh - 8rem);
+        overflow-x: visible;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+        scrollbar-width: thin;
+        scrollbar-color: #b8b8b8 #f0f0f0;
+    }
+
+    .checkout-summary::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .checkout-summary::-webkit-scrollbar-track {
+        background: #f0f0f0;
+        border-radius: 4px;
+    }
+
+    .checkout-summary::-webkit-scrollbar-thumb {
+        background: #b8b8b8;
+        border-radius: 4px;
+    }
+
+    .checkout-summary::-webkit-scrollbar-thumb:hover {
+        background: #999;
     }
 
     .checkout-summary .summary-title {
@@ -330,7 +353,7 @@
 
     @media (max-width: 1024px) {
         .checkout-summary {
-            @apply static;
+            @apply static max-h-none overflow-visible;
         }
     }
 }

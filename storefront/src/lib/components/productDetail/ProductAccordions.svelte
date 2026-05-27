@@ -27,10 +27,26 @@
 		<button
 			type="button"
 			class="accordion"
+			class:open={openAccordion === item.key}
 			onclick={() => toggle(item.key)}
 			aria-expanded={openAccordion === item.key}
 		>
-			{item.title}
+			<span class="accordion-title">{item.title}</span>
+			<svg
+				class="accordion-arrow"
+				xmlns="http://www.w3.org/2000/svg"
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<polyline points="6 9 12 15 18 9" />
+			</svg>
 		</button>
 		{#if openAccordion === item.key}
 			<div class="accordion-panel">

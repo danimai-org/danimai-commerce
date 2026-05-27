@@ -4,4 +4,5 @@ export * from "./update-product";
 export * from "./update-product-images";
 export * from "./paginated-products";
 export * from "./storefront-paginated-products";
+export * from "./storefront-retrieve-product";
 export * from "./retrieve-product";

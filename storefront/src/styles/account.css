@@ -117,7 +117,7 @@
     }
 
     .account-add-link {
-        @apply border-none bg-transparent p-0 text-sm text-[#1a1a1a] underline cursor-pointer hover:text-[#6b7355];
+        @apply border-none bg-[#6b6b] py-2 px-4 rounded text-sm text-[#1a1a1a]  cursor-pointer;
     }
 
     .account-panel-body {
@@ -126,7 +126,7 @@
 
     .account-empty,
     .account-placeholder {
-        @apply m-0 text-[#6b6b6b];
+        @apply m-0 text-[#6b6b6b] border-b;
     }
 
     .account-address-list {

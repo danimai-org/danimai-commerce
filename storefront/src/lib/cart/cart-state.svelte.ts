@@ -197,35 +197,35 @@ export async function addItem(input: {
   const existing = cart.line_items.find((li) => li.variant_id === input.variantId);
   const next = existing
     ? cart.line_items.map((li) =>
-        li.id === existing.id
-          ? {
-              ...li,
-              quantity: (li.quantity ?? 0) + quantity,
-              thumbnail: input.thumbnail ?? li.thumbnail,
-              title: input.title ?? li.title,
-              description: input.description?.trim() || li.description,
-              metadata:
-                Object.keys(lineMetadata).length > 0
-                  ? { ...(li.metadata as object), ...lineMetadata }
-                  : li.metadata,
-            }
-          : li,
-      )
+      li.id === existing.id
+        ? {
+          ...li,
+          quantity: (li.quantity ?? 0) + quantity,
+          thumbnail: input.thumbnail ?? li.thumbnail,
+          title: input.title ?? li.title,
+          description: input.description?.trim() || li.description,
+          metadata:
+            Object.keys(lineMetadata).length > 0
+              ? { ...(li.metadata as object), ...lineMetadata }
+              : li.metadata,
+        }
+        : li,
+    )
     : [
-        ...cart.line_items,
-        {
-          variant_id: input.variantId,
-          quantity,
-          thumbnail: input.thumbnail ?? null,
-          title: input.title ?? null,
-          description: input.description?.trim() || null,
-          product_id: input.productId ?? null,
-          unit_price: input.unitPrice ?? null,
-          ...(Object.keys(lineMetadata).length > 0
-            ? { metadata: lineMetadata }
-            : {}),
-        } as Record<string, unknown>,
-      ];
+      ...cart.line_items,
+      {
+        variant_id: input.variantId,
+        quantity,
+        thumbnail: input.thumbnail ?? null,
+        title: input.title ?? null,
+        description: input.description?.trim() || null,
+        product_id: input.productId ?? null,
+        unit_price: input.unitPrice ?? null,
+        ...(Object.keys(lineMetadata).length > 0
+          ? { metadata: lineMetadata }
+          : {}),
+      } as Record<string, unknown>,
+    ];
 
   return syncLineItems(next as Array<LineItemPayload>, cart.id);
 }

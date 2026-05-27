@@ -13,6 +13,10 @@ import {
 } from "./storefront-paginated-products.schema";
 import type { Database } from "../../../db/type";
 import { paginationResponse } from "@danimai/core/pagination";
+import {
+  firstMediaUrl,
+  loadProductMediaByProductIds,
+} from "../product-media.util";
 
 export const STOREFRONT_PAGINATED_PRODUCTS_PROCESS = Symbol("StorefrontPaginatedProducts");
 
@@ -263,6 +267,8 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
       .orderBy(sql`variant_images.rank asc nulls last`)
       .execute();
 
+    const mediaByProductId = await loadProductMediaByProductIds(this.db, productIds);
+
     const variantsByProduct = new Map<string, StorefrontPaginatedProductsProcessOutput["rows"][number]["variant"]>();
     for (const row of variants) {
       variantsByProduct.set(row.product_id, {
@@ -292,8 +298,10 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
     const productsWithVariants = products.map((row) => {
       const { product_thumbnail, product_level_thumbnail, ...productBase } = row as ProductAggRow;
       const variant = variantsByProduct.get(row.id) ?? null;
+      const mediaThumb = firstMediaUrl(mediaByProductId.get(row.id) ?? []);
       const productThumb =
         product_thumbnail ??
+        mediaThumb ??
         product_level_thumbnail ??
         null;
       const thumbnail = (variant?.thumbnail ?? null) ?? productThumb ?? null;
