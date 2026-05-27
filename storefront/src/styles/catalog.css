@@ -31,7 +31,19 @@
     }
 
     .catalog-toolbar {
-        @apply flex flex-wrap items-center gap-x-6 gap-y-4 max-w-[1200px] mx-auto py-2 px-6 pb-4 text-[0.875rem] text-[#555] border-b border-[#eee];
+        @apply flex flex-col gap-3 w-full max-w-[1200px] mx-auto py-2 px-6 pb-4 text-[0.875rem] text-[#555] border-b border-[#eee] box-border overflow-x-hidden;
+    }
+
+    .toolbar-row {
+        @apply flex items-center gap-3 min-w-0 w-full max-w-full overflow-hidden;
+    }
+
+    .toolbar-row-filters {
+        @apply gap-2 min-w-0 overflow-hidden;
+    }
+
+    .toolbar-row-sort {
+        @apply justify-between gap-4;
     }
 
     .catalog-toolbar-meta {
@@ -63,7 +75,13 @@
     }
 
     .toolbar-filters {
-        @apply flex flex-wrap items-center gap-x-4 gap-y-2;
+        @apply flex flex-nowrap items-center gap-2 min-w-0 flex-1 overflow-x-auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .toolbar-filters::-webkit-scrollbar {
+        display: none;
     }
 
     .toolbar-label {
@@ -71,14 +89,42 @@
     }
 
     .toolbar-group {
-        @apply flex items-center gap-2 ml-auto;
+        @apply flex items-center gap-2 min-w-0 shrink-0;
     }
 
     .toolbar-select {
-        @apply text-[0.875rem] py-[0.35rem] px-2 border border-[#ddd] rounded-md bg-white text-[#1a1a1a] cursor-pointer;
+        @apply text-[0.875rem] py-[0.35rem] px-2 border border-[#ddd] rounded-md bg-white text-[#1a1a1a] cursor-pointer shrink-0;
+    }
+
+    .toolbar-row-filters .toolbar-label {
+        @apply shrink-0;
     }
 
     .product-count {
-        @apply text-[0.875rem] text-[#666];
+        @apply text-[0.875rem] text-[#666] shrink-0 whitespace-nowrap;
+    }
+
+    @media (min-width: 1024px) {
+        .catalog-toolbar {
+            @apply flex-row flex-wrap items-center gap-x-6 gap-y-3;
+        }
+
+        .toolbar-row-filters {
+            @apply flex-1 min-w-0;
+        }
+
+        .toolbar-row-sort {
+            @apply flex-none justify-end gap-6;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .catalog-toolbar {
+            @apply px-4 py-3;
+        }
+
+        .catalog-toolbar-meta {
+            @apply px-4 pb-3;
+        }
     }
 }

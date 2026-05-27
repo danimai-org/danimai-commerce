@@ -1,7 +1,7 @@
 @layer components {
     /* Global */
     .collection-main {
-        @apply min-h-[40vh];
+        @apply min-h-[40vh] w-full max-w-full overflow-x-hidden;
     }
 
     .collection-hero {
@@ -16,5 +16,15 @@
 
     .collection-error {
         @apply max-w-[1200px] mx-auto my-8 px-6 text-[#c00] text-center;
+    }
+
+    @media (max-width: 640px) {
+        .collection-hero {
+            @apply min-h-[140px] py-8 px-4;
+        }
+
+        .collection-hero-title {
+            @apply text-center;
+        }
     }
 }

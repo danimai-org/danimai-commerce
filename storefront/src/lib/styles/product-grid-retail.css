@@ -2,9 +2,11 @@
 
 section.products-section {
     max-width: var(--section-max-width, 1200px);
+    width: 100%;
     margin: 0 auto;
     padding: var(--section-padding-y, 4rem) var(--section-padding-x, 1.5rem);
     box-sizing: border-box;
+    overflow-x: hidden;
 }
 
 section.products-section .section-title {

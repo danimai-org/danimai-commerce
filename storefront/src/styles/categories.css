@@ -1,6 +1,6 @@
 @layer components {
     .category-main {
-        @apply min-h-[40vh];
+        @apply min-h-[40vh] w-full max-w-full overflow-x-hidden;
     }
 
     .category-hero {
@@ -16,5 +16,11 @@
 
     .category-error {
         @apply max-w-[1200px] mx-auto my-8 px-6 text-[#c00] text-center;
+    }
+
+    @media (max-width: 640px) {
+        .category-hero {
+            @apply min-h-[140px] py-8 px-4;
+        }
     }
 }

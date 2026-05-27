@@ -31,6 +31,9 @@
     let cartCount = $state(0);
     let searchOpen = $state(false);
     let menuOpen = $state(false);
+    let topsOpen = $state(false);
+    let bottomsOpen = $state(false);
+    let collectionsOpen = $state(false);
     let accountMenuOpen = $state(false);
     let navWide = $state(false);
     let isLoggedIn = $state(false);
@@ -46,6 +49,7 @@
         const mq = window.matchMedia("(min-width: 768px)");
         const set = () => {
             navWide = mq.matches;
+            if (mq.matches) menuOpen = false;
         };
         set();
         mq.addEventListener("change", set);
@@ -161,6 +165,13 @@
     );
     const bottoms = $derived(navCategoryPool.filter(isBottomCategory));
     const tops = $derived(navCategoryPool.filter((c) => !isBottomCategory(c)));
+
+    $effect(() => {
+        if (menuOpen) return;
+        topsOpen = false;
+        bottomsOpen = false;
+        collectionsOpen = false;
+    });
 
     $effect(() => {
         if (!menuOpen) return;
@@ -421,27 +432,29 @@
                         <span class="cart-badge">{cartCount}</span>
                     {/if}
                 </button>
-                <button
-                    type="button"
-                    class="icon-btn menu-trigger"
-                    aria-label="Open menu"
-                    aria-expanded={menuOpen}
-                    onclick={() => (menuOpen = !menuOpen)}
-                >
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        aria-hidden="true"
-                        ><circle cx="5" cy="12" r="1.5" /><circle
-                            cx="12"
-                            cy="12"
-                            r="1.5"
-                        /><circle cx="19" cy="12" r="1.5" /></svg
+                {#if !navWide}
+                    <button
+                        type="button"
+                        class="icon-btn menu-trigger"
+                        aria-label="Open menu"
+                        aria-expanded={menuOpen}
+                        onclick={() => (menuOpen = !menuOpen)}
                     >
-                </button>
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            aria-hidden="true"
+                            ><circle cx="5" cy="12" r="1.5" /><circle
+                                cx="12"
+                                cy="12"
+                                r="1.5"
+                            /><circle cx="19" cy="12" r="1.5" /></svg
+                        >
+                    </button>
+                {/if}
             </div>
         </div>
     </nav>
@@ -452,7 +465,7 @@
     {/if}
 </header>
 
-{#if menuOpen}
+{#if menuOpen && !navWide}
     <button
         type="button"
         class="drawer-backdrop"
@@ -485,50 +498,128 @@
         </div>
         <nav class="drawer-nav">
             <section class="drawer-section">
-                <h2 class="drawer-cat">Tops</h2>
-                <a
-                    href="/categories/all-tops"
-                    class="drawer-link"
-                    onclick={() => (menuOpen = false)}>All Tops</a
+                <button
+                    type="button"
+                    class="drawer-cat-toggle"
+                    aria-expanded={topsOpen}
+                    onclick={() => (topsOpen = !topsOpen)}
                 >
-                {#each tops as top}
-                    <a
-                        href="/categories/{top.handle}"
-                        class="drawer-link"
-                        onclick={() => (menuOpen = false)}>{top.value}</a
+                    <span class="drawer-cat">Tops</span>
+                    <svg
+                        class="drawer-chevron"
+                        class:drawer-chevron--open={topsOpen}
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        ><path d="m15 18-6-6 6-6" /></svg
                     >
-                {/each}
+                </button>
+                {#if topsOpen}
+                    <div class="drawer-sub">
+                        <a
+                            href="/categories/all-tops"
+                            class="drawer-link"
+                            onclick={() => (menuOpen = false)}>All Tops</a
+                        >
+                        {#each tops as top}
+                            <a
+                                href="/categories/{top.handle}"
+                                class="drawer-link"
+                                onclick={() => (menuOpen = false)}
+                                >{top.value}</a
+                            >
+                        {/each}
+                    </div>
+                {/if}
             </section>
             <section class="drawer-section">
-                <h2 class="drawer-cat">Bottoms</h2>
-                <a
-                    href="/categories/all-bottoms"
-                    class="drawer-link"
-                    onclick={() => (menuOpen = false)}>All Bottoms</a
+                <button
+                    type="button"
+                    class="drawer-cat-toggle"
+                    aria-expanded={bottomsOpen}
+                    onclick={() => (bottomsOpen = !bottomsOpen)}
                 >
-                {#each bottoms as bottom}
-                    <a
-                        href="/categories/{bottom.handle}"
-                        class="drawer-link"
-                        onclick={() => (menuOpen = false)}>{bottom.value}</a
+                    <span class="drawer-cat">Bottoms</span>
+                    <svg
+                        class="drawer-chevron"
+                        class:drawer-chevron--open={bottomsOpen}
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        ><path d="m15 18-6-6 6-6" /></svg
                     >
-                {/each}
+                </button>
+                {#if bottomsOpen}
+                    <div class="drawer-sub">
+                        <a
+                            href="/categories/all-bottoms"
+                            class="drawer-link"
+                            onclick={() => (menuOpen = false)}>All Bottoms</a
+                        >
+                        {#each bottoms as bottom}
+                            <a
+                                href="/categories/{bottom.handle}"
+                                class="drawer-link"
+                                onclick={() => (menuOpen = false)}
+                                >{bottom.value}</a
+                            >
+                        {/each}
+                    </div>
+                {/if}
             </section>
             <section class="drawer-section">
-                <h2 class="drawer-cat">Collections</h2>
-                {#each navCollections as col}
-                    <a
-                        href="/collections/{col.handle}"
-                        class="drawer-link"
-                        onclick={() => (menuOpen = false)}>{col.title}</a
+                <button
+                    type="button"
+                    class="drawer-cat-toggle"
+                    aria-expanded={collectionsOpen}
+                    onclick={() => (collectionsOpen = !collectionsOpen)}
+                >
+                    <span class="drawer-cat">Collections</span>
+                    <svg
+                        class="drawer-chevron"
+                        class:drawer-chevron--open={collectionsOpen}
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        ><path d="m15 18-6-6 6-6" /></svg
                     >
-                {/each}
-                {#if navCollections.length === 0}
-                    <a
-                        href="/store"
-                        class="drawer-link"
-                        onclick={() => (menuOpen = false)}>Shop all</a
-                    >
+                </button>
+                {#if collectionsOpen}
+                    <div class="drawer-sub">
+                        {#each navCollections as col}
+                            <a
+                                href="/collections/{col.handle}"
+                                class="drawer-link"
+                                onclick={() => (menuOpen = false)}
+                                >{col.title}</a
+                            >
+                        {/each}
+                        {#if navCollections.length === 0}
+                            <a
+                                href="/store"
+                                class="drawer-link"
+                                onclick={() => (menuOpen = false)}>Shop all</a
+                            >
+                        {/if}
+                    </div>
                 {/if}
             </section>
             <a

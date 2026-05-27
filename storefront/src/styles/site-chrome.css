@@ -1,7 +1,7 @@
 @layer components {
     .site-header {
         --header-bg: #fff;
-        @apply sticky top-0 z-[100] overflow-visible;
+        @apply sticky top-0 z-[100] w-full max-w-full;
         background: var(--header-bg);
     }
 
@@ -18,7 +18,7 @@
     }
 
     .nav {
-        @apply flex justify-between items-center max-w-[var(--section-max-width,1200px)] mx-auto gap-4 box-border;
+        @apply flex justify-between items-center max-w-[var(--section-max-width,1200px)] w-full min-w-0 mx-auto gap-4 box-border;
         padding: 0.75rem var(--section-padding-x, 1.5rem);
     }
 
@@ -136,18 +136,14 @@
         @apply block py-2 px-4 text-[0.9375rem] text-[#1a1a1a] no-underline hover:bg-[#f5f5f5];
     }
 
-    .menu-trigger {
-        @apply flex;
+    .icon-btn {
+        @apply bg-transparent border-none p-1 cursor-pointer text-[#2a2a2a] flex items-center justify-center hover:text-black;
     }
 
     @media (min-width: 768px) {
-        .menu-trigger {
+        .icon-btn.menu-trigger {
             @apply hidden;
         }
-    }
-
-    .icon-btn {
-        @apply bg-transparent border-none p-1 cursor-pointer text-[#2a2a2a] flex items-center justify-center hover:text-black;
     }
 
     .cart-btn {
@@ -203,16 +199,64 @@
         @apply flex flex-col gap-[0.65rem];
     }
 
+    .drawer-cat-toggle {
+        @apply flex w-full items-center justify-between gap-3 rounded-sm border-none bg-transparent py-1.5 px-1 -mx-1 cursor-pointer text-left transition-colors duration-150;
+    }
+
+    .drawer-cat-toggle:hover,
+    .drawer-cat-toggle:focus-visible {
+        @apply bg-[#f5f5f0];
+    }
+
+    .drawer-cat-toggle:hover .drawer-cat,
+    .drawer-cat-toggle:focus-visible .drawer-cat {
+        color: #6d6d45;
+    }
+
+    .drawer-cat-toggle:hover .drawer-chevron,
+    .drawer-cat-toggle:focus-visible .drawer-chevron {
+        color: #6d6d45;
+    }
+
     .drawer-cat {
-        @apply m-0 text-[0.8125rem] font-bold tracking-wide uppercase text-[#1a1a1a];
+        @apply m-0 text-[0.8125rem] font-bold tracking-wide uppercase text-[#1a1a1a] transition-colors duration-150;
+    }
+
+    .drawer-chevron {
+        @apply shrink-0 text-[#1a1a1a] transition-[transform,color] duration-200 ease-out;
+    }
+
+    .drawer-chevron--open {
+        transform: rotate(90deg);
+        color: #808050;
+    }
+
+    .drawer-sub {
+        @apply flex flex-col gap-[0.35rem];
     }
 
     .drawer-link {
-        @apply block py-[0.15rem] pl-2 pr-0 text-[0.9375rem] font-normal text-[#2a2a2a] no-underline leading-normal hover:text-black;
+        @apply block rounded-sm py-2 pl-2 pr-1 text-[0.9375rem] font-normal text-[#2a2a2a] no-underline leading-normal transition-colors duration-150;
+    }
+
+    .drawer-link:hover,
+    .drawer-link:focus-visible {
+        @apply bg-[#f5f5f0] no-underline;
+        color: #6d6d45;
+    }
+
+    .drawer-link-button {
+        @apply block w-full rounded-sm py-2 pl-2 pr-1 text-left text-[0.9375rem] font-normal text-[#2a2a2a] leading-normal border-none bg-transparent cursor-pointer transition-colors duration-150;
+    }
+
+    .drawer-link-button:hover,
+    .drawer-link-button:focus-visible {
+        @apply bg-[#f5f5f0];
+        color: #6d6d45;
     }
 
     .drawer-link--standalone {
-        @apply pl-0 font-medium mt-1;
+        @apply pl-1 font-medium mt-1;
     }
 
     @media (min-width: 768px) {
