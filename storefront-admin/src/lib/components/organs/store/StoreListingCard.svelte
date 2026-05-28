@@ -74,6 +74,8 @@
 	const regionDisplay = $derived.by(() => {
 		const id = store?.default_region_id;
 		if (!id) return null;
+		const fromStore = (store as { default_region?: { name?: string | null } })?.default_region?.name ?? null;
+		if (fromStore) return fromStore;
 		const rows = regionsQuery.data?.data?.rows ?? [];
 		const fromList = rows.find((r) => r.id === id)?.name ?? null;
 		if (fromList) return fromList;
@@ -192,11 +194,6 @@
 								<td class="py-3 align-middle font-medium text-foreground">
 									{#if regionDisplay}
 										{regionDisplay}
-									{:else if store.default_region_id}
-										<span
-											class="inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 font-mono text-xs text-foreground"
-											>{store.default_region_id}</span
-										>
 									{:else}
 										<span class="text-muted-foreground">—</span>
 									{/if}

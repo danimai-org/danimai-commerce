@@ -76,9 +76,7 @@
 	});
 
 	const searchNoHits = $derived(
-		debouncedSearch.trim().length > 0 &&
-			!listLoading &&
-			availableList.length === 0
+		debouncedSearch.trim().length > 0 && !listLoading && availableList.length === 0
 	);
 
 	const idleEmptyBrowse = $derived(
@@ -161,9 +159,9 @@
 </script>
 
 <Sheet.Root bind:open>
-	<Sheet.Content side="right" class="w-full max-w-2xl sm:max-w-2xl">
+	<Sheet.Content side="right" class="w-full max-w-2xl overflow-hidden p-0 sm:max-w-2xl">
 		<div class="flex h-full flex-col">
-			<div class="border-b p-4">
+			<div class="border-b px-4 py-4">
 				<h2 class="text-lg font-semibold">Add currencies</h2>
 
 				<div class="relative mt-4">
@@ -179,9 +177,9 @@
 				</div>
 			</div>
 
-			<div class="flex-1 overflow-auto p-4">
+			<div class="flex-1 overflow-auto">
 				<table class="w-full text-sm">
-					<thead class="sticky top-0 border-b bg-muted/50">
+					<thead class="sticky top-0 border-b bg-muted">
 						<tr>
 							<th class="w-10 px-4 py-3">
 								<input
@@ -246,7 +244,7 @@
 					</tbody>
 				</table>
 			</div>
-			<div class="flex items-center justify-between border-t p-4">
+			<div class="flex items-center justify-between border-t px-4 py-4">
 				<p class="text-sm text-muted-foreground">
 					Selected: {toAdd.length}
 				</p>

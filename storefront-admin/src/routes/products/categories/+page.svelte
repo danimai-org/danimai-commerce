@@ -165,7 +165,7 @@
 		<PaginationTable
 			bind:searchQuery={paginateState.searchText}
 			searchPlaceholder="Search categories"
-			showFilter={false}
+			showFilter={true}
 		>
 			{#if paginateState.error}
 				<div

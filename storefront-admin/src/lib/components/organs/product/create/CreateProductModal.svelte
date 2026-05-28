@@ -7,7 +7,7 @@
 	import Info from '@lucide/svelte/icons/info';
 	import Check from '@lucide/svelte/icons/check';
 	import { cn } from '$lib/utils.js';
-	import { client } from '$lib/client.js';
+	import { client, postProductImages } from '$lib/client.js';
 	import { superForm } from 'sveltekit-superforms/client';
 	import CreateProductStepDetails from './CreateProductStepDetails.svelte';
 	import CreateProductStepAttributes from './CreateProductStepAttributes.svelte';
@@ -16,6 +16,7 @@
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import { get } from 'svelte/store';
 	import { type MediaUploadLocalItem } from '$lib/components/shared/media-upload.types.js';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	interface Props {
 		open: boolean;
@@ -77,16 +78,11 @@
 	let submitStatus = $state<'draft' | 'published'>('draft');
 	let submitPending = $state(false);
 	let createdProductId = $state<string | null>(null);
-	const apiBaseUrl = 'http://localhost:8000';
 
 	async function uploadProductImages(productId: string, files: File[]) {
 		if (!files.length) return [] as Array<{ id: string; url: string }>;
-		const body = new FormData();
-		for (const file of files) body.append('files', file);
-		const response = await fetch(`${apiBaseUrl}/admin/products/${productId}/images`, {
-			method: 'POST',
-			body
-		});
+		const response = await postProductImages(productId, { files });
+
 		if (!response.ok) {
 			const payload = (await response.json().catch(() => null)) as { message?: string } | null;
 			throw new Error(payload?.message ?? 'Failed to upload product images');
@@ -124,7 +120,9 @@
 			if (form.valid) {
 				try {
 					if (!createdProductId && createMediaItems.length > 0) {
-						throw new Error('Product created but media upload could not start (missing product id).');
+						throw new Error(
+							'Product created but media upload could not start (missing product id).'
+						);
 					}
 					if (createdProductId && createMediaItems.length > 0) {
 						const expectedCount = createMediaItems.length;
@@ -225,11 +223,33 @@
 	let collectionsList = $state<{ id: string; title: string; handle: string }[]>([]);
 	let categoriesList = $state<{ id: string; value: string; handle: string }[]>([]);
 	let tagsList = $state<{ id: string; value: string }[]>([]);
-	let attributesList = $state<{ id: string; title: string; type: string }[]>([]);
+	let attributesList = $state<{ id: string; title: string; type: string; options: string[] }[]>([]);
+	let attributesLoading = $state(false);
+	let attributesLoadError = $state<string | null>(null);
 	let salesChannelsList = $state<{ id: string; name: string }[]>([]);
+	let collectionSearch = $state('');
+	let categorySearch = $state('');
+	let tagSearch = $state('');
+	let salesChannelSearch = $state('');
+	let debouncedCollectionSearch = $state('');
+	let debouncedCategorySearch = $state('');
+	let debouncedTagSearch = $state('');
+	let debouncedSalesChannelSearch = $state('');
+	let collectionsLoading = $state(false);
+	let categoriesLoading = $state(false);
+	let tagsLoading = $state(false);
+	let salesChannelsLoading = $state(false);
+	let collectionFetchGen = 0;
+	let categoryFetchGen = 0;
+	let tagFetchGen = 0;
+	let salesChannelFetchGen = 0;
 
 	type CreateAttributeEntry = { attributeId: string; attributeTitle: string; value: string };
 	let createAttributeEntries = $state<CreateAttributeEntry[]>([]);
+	let attributesFetchGen = 0;
+	let previousCategoryId = $state('');
+	const ORGANIZE_SEARCH_DEBOUNCE_MS = 350;
+	const ORGANIZE_SEARCH_MIN_CHARS = 2;
 
 	function syncVariantsFromOptions() {
 		const newV = generateVariantsFromOptions(createOptions);
@@ -250,37 +270,9 @@
 		variantPage = 1;
 	}
 
-	function addAttributeEntry() {
-		createAttributeEntries = [
-			...createAttributeEntries,
-			{ attributeId: '', attributeTitle: '', value: '' }
-		];
-	}
-
-	function removeAttributeEntry(index: number) {
-		createAttributeEntries = createAttributeEntries.filter((_, i) => i !== index);
-	}
-
-	function setAttributeEntryAttribute(index: number, attributeId: string) {
-		const attr = attributesList.find((a) => a.id === attributeId);
-		createAttributeEntries = createAttributeEntries.map((e, i) =>
-			i === index
-				? {
-						...e,
-						attributeId: attributeId,
-						attributeTitle:
-							attr?.title ??
-							(attr as { value?: string; name?: string } | undefined)?.value ??
-							(attr as { value?: string; name?: string } | undefined)?.name ??
-							''
-					}
-				: e
-		);
-	}
-
-	function setAttributeEntryValue(entryIndex: number, value: string) {
-		createAttributeEntries = createAttributeEntries.map((e, i) =>
-			i === entryIndex ? { ...e, value } : e
+	function setAttributeEntryValue(attributeId: string, value: string) {
+		createAttributeEntries = createAttributeEntries.map((entry) =>
+			entry.attributeId === attributeId ? { ...entry, value } : entry
 		);
 	}
 
@@ -302,6 +294,12 @@
 		return row.title ?? row.value ?? row.name ?? '';
 	}
 
+	function mergeById<T extends { id: string }>(existing: T[], incoming: T[]): T[] {
+		const merged = new SvelteMap(existing.map((item) => [item.id, item] as const));
+		for (const item of incoming) merged.set(item.id, item);
+		return Array.from(merged.values());
+	}
+
 	const listQuery = createPaginationQuery({
 		page: 1,
 		limit: 100,
@@ -313,6 +311,110 @@
 		limit?: string | number;
 		sorting_field?: string;
 	};
+
+	function buildSearchQuery(search: string) {
+		const normalized = search.trim();
+		return {
+			...listQuery,
+			search: normalized || undefined
+		};
+	}
+
+	async function fetchCollections(search: string, allowEmpty = false) {
+		const query = search.trim();
+		if (!allowEmpty && query.length < ORGANIZE_SEARCH_MIN_CHARS) {
+			collectionsLoading = false;
+			return;
+		}
+		const gen = ++collectionFetchGen;
+		collectionsLoading = true;
+		try {
+			const res = await client.collections.get({ query: buildSearchQuery(query) });
+			if (gen !== collectionFetchGen) return;
+			const fetched = extractRows<{ id: string; title: string; handle?: string }>(res).map(
+				(row) => ({
+					id: row.id,
+					title: row.title,
+					handle: row.handle ?? ''
+				})
+			);
+			collectionsList = mergeById(collectionsList, fetched);
+		} catch {
+			/* keep existing options */
+		} finally {
+			if (gen === collectionFetchGen) collectionsLoading = false;
+		}
+	}
+
+	async function fetchCategories(search: string, allowEmpty = false) {
+		const query = search.trim();
+		if (!allowEmpty && query.length < ORGANIZE_SEARCH_MIN_CHARS) {
+			categoriesLoading = false;
+			return;
+		}
+		const gen = ++categoryFetchGen;
+		categoriesLoading = true;
+		try {
+			const res = await client['product-categories'].get({ query: buildSearchQuery(query) });
+			if (gen !== categoryFetchGen) return;
+			const fetched = extractRows<{
+				id: string;
+				value?: string;
+				title?: string;
+				name?: string;
+				handle?: string;
+			}>(res).map((row) => ({
+				id: row.id,
+				value: pickLabel(row),
+				handle: row.handle ?? ''
+			}));
+			categoriesList = mergeById(categoriesList, fetched);
+		} catch {
+			/* keep existing options */
+		} finally {
+			if (gen === categoryFetchGen) categoriesLoading = false;
+		}
+	}
+
+	async function fetchTags(search: string, allowEmpty = false) {
+		const query = search.trim();
+		if (!allowEmpty && query.length < ORGANIZE_SEARCH_MIN_CHARS) {
+			tagsLoading = false;
+			return;
+		}
+		const gen = ++tagFetchGen;
+		tagsLoading = true;
+		try {
+			const res = await client['product-tags'].get({ query: buildSearchQuery(query) });
+			if (gen !== tagFetchGen) return;
+			const fetched = extractRows<{ id: string; value: string }>(res);
+			tagsList = mergeById(tagsList, fetched);
+		} catch {
+			/* keep existing options */
+		} finally {
+			if (gen === tagFetchGen) tagsLoading = false;
+		}
+	}
+
+	async function fetchSalesChannels(search: string, allowEmpty = false) {
+		const query = search.trim();
+		if (!allowEmpty && query.length < ORGANIZE_SEARCH_MIN_CHARS) {
+			salesChannelsLoading = false;
+			return;
+		}
+		const gen = ++salesChannelFetchGen;
+		salesChannelsLoading = true;
+		try {
+			const res = await client['sales-channels'].get({ query: buildSearchQuery(query) });
+			if (gen !== salesChannelFetchGen) return;
+			const fetched = extractRows<{ id: string; name: string }>(res);
+			salesChannelsList = mergeById(salesChannelsList, fetched);
+		} catch {
+			/* keep existing options */
+		} finally {
+			if (gen === salesChannelFetchGen) salesChannelsLoading = false;
+		}
+	}
 
 	async function init() {
 		createStep = 1;
@@ -328,46 +430,39 @@
 		createSalesChannelIds = [];
 		createOptions = [];
 		createAttributeEntries = [];
+		attributesList = [];
+		attributesLoading = false;
+		attributesLoadError = null;
+		collectionsList = [];
+		categoriesList = [];
+		tagsList = [];
+		salesChannelsList = [];
+		collectionSearch = '';
+		categorySearch = '';
+		tagSearch = '';
+		salesChannelSearch = '';
+		debouncedCollectionSearch = '';
+		debouncedCategorySearch = '';
+		debouncedTagSearch = '';
+		debouncedSalesChannelSearch = '';
+		collectionsLoading = false;
+		categoriesLoading = false;
+		tagsLoading = false;
+		salesChannelsLoading = false;
+		collectionFetchGen = 0;
+		categoryFetchGen = 0;
+		tagFetchGen = 0;
+		salesChannelFetchGen = 0;
 		createMediaItems = [];
 		createError = null;
 		submitPending = false;
 		createdProductId = null;
 		variantSearch = '';
 		variantPage = 1;
+		previousCategoryId = '';
+		attributesFetchGen = 0;
 		syncVariantsFromOptions();
-		const [collectionsResponse, categoriesResponse, tagsResponse, salesChannelsResponse] =
-			await Promise.allSettled([
-				client.collections.get({ query: listQuery }),
-				client['product-categories'].get({ query: listQuery }),
-				client['product-tags'].get({ query: listQuery }),
-				client['sales-channels'].get({ query: listQuery })
-			]);
-
-		collectionsList =
-			collectionsResponse.status === 'fulfilled'
-				? extractRows<{ id: string; title: string; handle: string }>(collectionsResponse.value)
-				: [];
-		categoriesList =
-			categoriesResponse.status === 'fulfilled'
-				? extractRows<{ id: string; value: string; handle: string }>(categoriesResponse.value)
-				: [];
-		tagsList =
-			tagsResponse.status === 'fulfilled'
-				? extractRows<{ id: string; value: string }>(tagsResponse.value)
-				: [];
 		attributesList = [];
-
-		const fetchedSalesChannels =
-			salesChannelsResponse.status === 'fulfilled'
-				? extractRows<{ id: string; name: string; is_default?: boolean }>(
-						salesChannelsResponse.value
-					)
-				: [];
-		salesChannelsList = fetchedSalesChannels.map((ch) => ({ id: ch.id, name: ch.name }));
-		const defaultChannels = fetchedSalesChannels.filter((ch) => ch.is_default);
-		if (defaultChannels.length > 0) {
-			createSalesChannelIds = defaultChannels.map((ch) => ch.id);
-		}
 	}
 
 	function closeCreate() {
@@ -378,32 +473,112 @@
 		return createTitle.trim().length > 0;
 	}
 
-	async function loadCategoryAttributes(categoryId: string) {
-		if (!categoryId.trim()) {
+	$effect(() => {
+		const categoryId = createCategoryId.trim();
+		const changed = categoryId !== previousCategoryId;
+		if (changed) {
+			previousCategoryId = categoryId;
+			createAttributeEntries = [];
 			attributesList = [];
+			attributesLoadError = null;
+		}
+		if (!categoryId) {
+			attributesLoading = false;
+			attributesLoadError = null;
 			return;
 		}
-		try {
-			const res = await client['product-attributes'].get({
-				query: {
-					...listQuery,
-					filters: { category_id: categoryId }
-				}
-			});
-			attributesList = extractRows<{ id: string; title?: string; type?: string }>(res).map(
-				(row) => ({
+		const currentGen = ++attributesFetchGen;
+		attributesLoading = true;
+		void (async () => {
+			try {
+				const res = await client['product-attributes'].get({
+					query: {
+						...listQuery,
+						filters: { category_id: categoryId }
+					}
+				});
+				if (currentGen !== attributesFetchGen) return;
+				const nextAttributes = extractRows<{
+					id: string;
+					title?: string;
+					type?: string;
+					options?: string[];
+					values?: string[];
+					metadata?: { options?: string[]; values?: string[] };
+				}>(res).map((row) => ({
 					id: row.id,
 					title: pickLabel(row),
-					type: row.type ?? ''
-				})
-			);
-		} catch {
-			attributesList = [];
-		}
-	}
+					type: row.type ?? 'text',
+					options: row.options ?? row.values ?? row.metadata?.options ?? row.metadata?.values ?? []
+				}));
+				attributesList = nextAttributes;
+				createAttributeEntries = nextAttributes.map((attribute) => ({
+					attributeId: attribute.id,
+					attributeTitle: attribute.title,
+					value: ''
+				}));
+				attributesLoadError = null;
+			} catch {
+				if (currentGen !== attributesFetchGen) return;
+				attributesList = [];
+				createAttributeEntries = [];
+				attributesLoadError = 'Failed to load attributes for this category.';
+			} finally {
+				if (currentGen === attributesFetchGen) attributesLoading = false;
+			}
+		})();
+	});
 
 	$effect(() => {
-		void loadCategoryAttributes(createCategoryId);
+		const q = collectionSearch;
+		const t = setTimeout(() => {
+			debouncedCollectionSearch = q;
+		}, ORGANIZE_SEARCH_DEBOUNCE_MS);
+		return () => clearTimeout(t);
+	});
+
+	$effect(() => {
+		const q = categorySearch;
+		const t = setTimeout(() => {
+			debouncedCategorySearch = q;
+		}, ORGANIZE_SEARCH_DEBOUNCE_MS);
+		return () => clearTimeout(t);
+	});
+
+	$effect(() => {
+		const q = tagSearch;
+		const t = setTimeout(() => {
+			debouncedTagSearch = q;
+		}, ORGANIZE_SEARCH_DEBOUNCE_MS);
+		return () => clearTimeout(t);
+	});
+
+	$effect(() => {
+		const q = salesChannelSearch;
+		const t = setTimeout(() => {
+			debouncedSalesChannelSearch = q;
+		}, ORGANIZE_SEARCH_DEBOUNCE_MS);
+		return () => clearTimeout(t);
+	});
+
+	$effect(() => {
+		if (createStep !== 2) return;
+		void fetchCollections(debouncedCollectionSearch);
+	});
+
+	$effect(() => {
+		if (createStep !== 2) return;
+		void fetchCategories(debouncedCategorySearch);
+	});
+
+	$effect(() => {
+		if (createStep !== 2) return;
+		void fetchTags(debouncedTagSearch);
+	});
+
+	$effect(() => {
+		if (createStep !== 2) return;
+		void fetchSalesChannels(debouncedSalesChannelSearch);
 	});
 
 	function goToStep2() {
@@ -426,9 +601,6 @@
 		}
 		createError = null;
 		createStep = 3;
-		if (createAttributeEntries.length === 0) {
-			addAttributeEntry();
-		}
 	}
 
 	function goToStep4() {
@@ -488,11 +660,18 @@
 		JSON.stringify(
 			createVariants.map((variant, index) => {
 				const availableCount = String(variant.availableCount ?? '').trim();
+				const optionValues = Object.entries(variant.options ?? {})
+					.map(([title, value]) => ({
+						title: title.trim(),
+						value: String(value ?? '').trim()
+					}))
+					.filter((option) => option.title && option.value);
 				return {
 					title: variant.title,
-					options: variant.options,
+					option_values: optionValues,
 					sku: variant.sku.trim() || undefined,
 					available_count: availableCount ? parseInt(availableCount, 10) : undefined,
+					manage_inventory: variant.manage_inventory,
 					allow_backorder: variant.allow_backorder,
 					variant_rank: index,
 					price_amount: variant.priceAmount.trim() || undefined
@@ -585,11 +764,18 @@
 				})),
 			variants: createVariants.map((variant, index) => {
 				const availableCount = String(variant.availableCount ?? '').trim();
+				const optionValues = Object.entries(variant.options ?? {})
+					.map(([title, value]) => ({
+						title: title.trim(),
+						value: String(value ?? '').trim()
+					}))
+					.filter((option) => option.title && option.value);
 				return {
 					title: variant.title,
-					options: variant.options,
+					option_values: optionValues,
 					sku: variant.sku.trim() || undefined,
 					available_count: availableCount ? parseInt(availableCount, 10) : undefined,
+					manage_inventory: variant.manage_inventory,
 					allow_backorder: variant.allow_backorder,
 					variant_rank: index,
 					price_amount: variant.priceAmount.trim() || undefined
@@ -730,6 +916,38 @@
 					bind:createTagIds
 					bind:createSalesChannelIds
 					bind:salesChannelsList
+					{collectionsLoading}
+					{categoriesLoading}
+					{tagsLoading}
+					{salesChannelsLoading}
+					onCollectionSearchChange={(value: string) => {
+						collectionSearch = value;
+					}}
+					onCollectionOpenChange={(isOpen: boolean) => {
+						if (!isOpen || collectionSearch.trim()) return;
+						void fetchCollections('', true);
+					}}
+					onCategorySearchChange={(value: string) => {
+						categorySearch = value;
+					}}
+					onCategoryOpenChange={(isOpen: boolean) => {
+						if (!isOpen || categorySearch.trim()) return;
+						void fetchCategories('', true);
+					}}
+					onTagSearchChange={(value: string) => {
+						tagSearch = value;
+					}}
+					onTagOpenChange={(isOpen: boolean) => {
+						if (!isOpen || tagSearch.trim()) return;
+						void fetchTags('', true);
+					}}
+					onSalesChannelSearchChange={(value: string) => {
+						salesChannelSearch = value;
+					}}
+					onSalesChannelOpenChange={(isOpen: boolean) => {
+						if (!isOpen || salesChannelSearch.trim()) return;
+						void fetchSalesChannels('', true);
+					}}
 					{collectionsList}
 					{categoriesList}
 					{tagsList}
@@ -740,11 +958,11 @@
 				<CreateProductStepAttributes
 					bind:createCategoryId
 					{categoryError}
+					{categoriesList}
 					{createAttributeEntries}
 					{attributesList}
-					{addAttributeEntry}
-					{removeAttributeEntry}
-					{setAttributeEntryAttribute}
+					{attributesLoading}
+					{attributesLoadError}
 					{setAttributeEntryValue}
 				/>
 			{/if}

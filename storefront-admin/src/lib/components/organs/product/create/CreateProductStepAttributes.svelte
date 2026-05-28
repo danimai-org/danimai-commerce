@@ -1,14 +1,12 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import { Combobox, type ComboboxOption } from '$lib/components/organs/index.js';
-	import X from '@lucide/svelte/icons/x';
 
 	type CreateAttributeEntry = { attributeId: string; attributeTitle: string; value: string };
 
 	let {
 		createCategoryId = $bindable(''),
 		categoryError = null as string | null,
+		categoriesList = [] as { id: string; value: string; handle?: string }[],
 		createAttributeEntries = [] as CreateAttributeEntry[],
 		attributesList = [] as {
 			id: string;
@@ -16,14 +14,15 @@
 			value?: string;
 			name?: string;
 			type: string;
+			options?: string[];
 		}[],
-		addAttributeEntry,
-		removeAttributeEntry,
-		setAttributeEntryAttribute,
+		attributesLoading = false,
+		attributesLoadError = null as string | null,
 		setAttributeEntryValue
 	}: {
 		createCategoryId: string;
 		categoryError: string | null;
+		categoriesList: { id: string; value: string; handle?: string }[];
 		createAttributeEntries: CreateAttributeEntry[];
 		attributesList: {
 			id: string;
@@ -31,26 +30,46 @@
 			value?: string;
 			name?: string;
 			type: string;
+			options?: string[];
 		}[];
-		addAttributeEntry: () => void;
-		removeAttributeEntry: (index: number) => void;
-		setAttributeEntryAttribute: (index: number, attributeId: string) => void;
-		setAttributeEntryValue: (entryIndex: number, value: string) => void;
+		attributesLoading: boolean;
+		attributesLoadError: string | null;
+		setAttributeEntryValue: (attributeId: string, value: string) => void;
 	} = $props();
 
 	function getLabel(item: { title?: string; value?: string; name?: string }): string {
 		return item.title ?? item.value ?? item.name ?? '';
 	}
 
-	function getAttributeOptions(entryIndex: number): ComboboxOption[] {
-		return attributesList
-			.filter(
-				(a) =>
-					!createAttributeEntries.some((e2, i2) => i2 !== entryIndex && e2.attributeId === a.id)
-			)
-			.map((attr) => ({ id: attr.id, value: getLabel(attr) }))
-			.filter((attr) => attr.value.trim());
+	function getEntryValue(attributeId: string): string {
+		return createAttributeEntries.find((entry) => entry.attributeId === attributeId)?.value ?? '';
 	}
+
+	function getInputType(type: string): 'text' | 'number' {
+		const normalized = type.trim().toLowerCase();
+		if (
+			normalized.includes('number') ||
+			normalized.includes('int') ||
+			normalized.includes('float') ||
+			normalized.includes('decimal')
+		) {
+			return 'number';
+		}
+		return 'text';
+	}
+
+	function isSelectType(type: string): boolean {
+		const normalized = type.trim().toLowerCase();
+		return normalized.includes('select') || normalized.includes('enum');
+	}
+
+	function getPlaceholder(label: string): string {
+		return `Enter ${label.toLowerCase()}`;
+	}
+
+	const selectedCategoryName = $derived(
+		categoriesList.find((category) => category.id === createCategoryId)?.value ?? ''
+	);
 </script>
 
 <div class="flex-1 overflow-auto p-4 pt-4 sm:p-6 sm:pt-4">
@@ -71,47 +90,61 @@
 			{#if categoryError}
 				<p class="text-xs text-destructive">{categoryError}</p>
 			{/if}
-			{#each createAttributeEntries as entry, entryIndex (entryIndex)}
-				<div class="flex flex-col gap-3 rounded-lg border p-4">
-					<div class="flex items-start justify-between gap-2">
-						<span class="text-sm font-medium">Attribute {entryIndex + 1}</span>
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon"
-							class="size-8 shrink-0"
-							onclick={() => removeAttributeEntry(entryIndex)}
-							aria-label="Remove attribute"
-						>
-							<X class="size-4" />
-						</Button>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="create-attr-select-{entryIndex}" class="text-sm font-medium"
-							>Attribute</label
-						>
-						<Combobox
-							id="create-attr-select-{entryIndex}"
-							value={entry.attributeId}
-							options={getAttributeOptions(entryIndex)}
-							placeholder="Select attribute"
-							emptyMessage="No attributes found for this category"
-							triggerClass="w-full"
-							onValueChange={(id) => setAttributeEntryAttribute(entryIndex, id)}
-						/>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="create-attr-value-{entryIndex}" class="text-sm font-medium">Value</label>
-						<Input
-							id="create-attr-value-{entryIndex}"
-							value={entry.value}
-							placeholder="Enter value"
-							oninput={(e) => setAttributeEntryValue(entryIndex, e.currentTarget.value)}
-						/>
-					</div>
+			{#if attributesLoading}
+				<p class="text-sm text-muted-foreground">Loading attributes...</p>
+			{:else if attributesLoadError}
+				<p class="text-sm text-destructive">{attributesLoadError}</p>
+			{:else if attributesList.length === 0}
+				<p class="text-sm text-muted-foreground">No attributes linked to this category.</p>
+			{:else}
+				<div class="space-y-1">
+					<p class="text-sm font-semibold">
+						Category: {selectedCategoryName || 'Selected category'}
+					</p>
+					<p class="text-xs text-muted-foreground">
+						Set values for each attribute linked to this category.
+					</p>
 				</div>
-			{/each}
-			<Button type="button" variant="outline" onclick={addAttributeEntry}>Add attribute</Button>
+				<div class="rounded-lg border bg-card">
+					{#each attributesList as attribute, i (attribute.id)}
+						<div
+							class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4{i <
+							attributesList.length - 1
+								? ' border-b'
+								: ''}"
+						>
+							<label
+								class="w-full shrink-0 text-sm font-medium text-foreground capitalize sm:w-40"
+								for="create-attr-value-{attribute.id}"
+							>
+								{getLabel(attribute)}
+							</label>
+							{#if isSelectType(attribute.type ?? '') && (attribute.options?.length ?? 0) > 0}
+								<select
+									id="create-attr-value-{attribute.id}"
+									class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm sm:flex-1"
+									value={getEntryValue(attribute.id)}
+									onchange={(e) => setAttributeEntryValue(attribute.id, e.currentTarget.value)}
+								>
+									<option value="">Select {getLabel(attribute).toLowerCase()}</option>
+									{#each attribute.options ?? [] as optionValue (optionValue)}
+										<option value={optionValue}>{optionValue}</option>
+									{/each}
+								</select>
+							{:else}
+								<Input
+									id="create-attr-value-{attribute.id}"
+									class="h-9 flex-1 bg-background"
+									type={getInputType(attribute.type ?? '')}
+									placeholder={getPlaceholder(getLabel(attribute))}
+									value={getEntryValue(attribute.id)}
+									oninput={(e) => setAttributeEntryValue(attribute.id, e.currentTarget.value)}
+								/>
+							{/if}
+						</div>
+					{/each}
+				</div>
+			{/if}
 		{/if}
 	</div>
 </div>

@@ -336,12 +336,12 @@
 
 	<div
 		class={cn(
-			'min-h-0 overflow-y-auto pr-4 pl-6',
+			'min-h-0 overflow-y-auto',
 			embedded ? 'flex-1 px-2 py-2 sm:px-4' : 'max-h-[min(55vh,28rem)]'
 		)}
 	>
 		<table class="w-full text-sm">
-			<thead class="sticky top-0 z-10 border-b bg-muted/20 text-left backdrop-blur-sm">
+			<thead class="sticky top-0 z-10 border-b bg-muted/20 text-left backdrop-blur-md">
 				<tr>
 					<th class="w-10 px-4 py-3 align-middle">
 						<input

@@ -249,15 +249,18 @@ export class CreateProductProcess implements ProcessContract<
             .insertInto("product_option_values")
             .values(
               input.options
-                .map((o, rank) => ({
-                  id: randomUUID(),
-                  value: o.title,
-                  option_id:
-                    options.find((option) => option.title === o.title)?.id ??
-                    "",
-                  product_id: product.id,
-                  rank: rank,
-                }))
+                .flatMap((o, optionRank) => {
+                  const optionId =
+                    options.find((option) => option.title === o.title)?.id ?? "";
+                  if (!optionId) return [];
+                  return o.values.map((value) => ({
+                    id: randomUUID(),
+                    value,
+                    option_id: optionId,
+                    product_id: product.id,
+                    rank: optionRank,
+                  }));
+                })
                 .filter((o) => o.option_id !== ""),
             )
             .returningAll()

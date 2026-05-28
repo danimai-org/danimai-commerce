@@ -66,7 +66,15 @@ const ProductCreateSchema = z.object({
 		.array(
 			z.object({
 				title: z.string().min(1, 'Variant title is required'),
-				options: z.record(z.string(), z.string()),
+				option_values: z
+					.array(
+						z.object({
+							title: z.string().min(1, 'Option title is required'),
+							value: z.string().min(1, 'Option value is required')
+						})
+					)
+					.min(1, 'Variant option values are required'),
+				options: z.record(z.string(), z.string()).optional(),
 				sku: z.string().optional(),
 				available_count: z.number().int().min(0).optional(),
 				allow_backorder: z.boolean().default(false),
@@ -128,13 +136,41 @@ export const actions = {
 						}))
 				: undefined;
 
+			const optionsByTitle = new Map(
+				(optionsForApi ?? []).map((option) => [option.title, new Set(option.values)])
+			);
+
 			const variantsForApi = data.has_variants
 				? data.variants.map((variant, index) => {
 						const parsedPrice = variant.price_amount?.trim()
 							? parseFloat(variant.price_amount.trim())
 							: Number.NaN;
+						const rawByTitle = new Map<string, string>();
+						for (const option of variant.option_values ?? []) {
+							const title = option.title.trim();
+							const value = option.value.trim();
+							if (title && value) rawByTitle.set(title, value);
+						}
+						for (const [title, value] of Object.entries(variant.options ?? {})) {
+							const cleanTitle = title.trim();
+							const cleanValue = value.trim();
+							if (cleanTitle && cleanValue && !rawByTitle.has(cleanTitle)) {
+								rawByTitle.set(cleanTitle, cleanValue);
+							}
+						}
+						const optionValues = (optionsForApi ?? []).map((option) => {
+							const direct = rawByTitle.get(option.title);
+							if (direct) return { title: option.title, value: direct };
+							// Single-option products can still infer value from variant title.
+							if ((optionsForApi?.length ?? 0) === 1) {
+								const fromTitle = variant.title.trim();
+								if (fromTitle) return { title: option.title, value: fromTitle };
+							}
+							return { title: option.title, value: '' };
+						});
 						return {
 							title: variant.title.trim(),
+							option_values: optionValues,
 							sku: variant.sku?.trim() ? variant.sku.trim() : undefined,
 							manage_inventory: variant.available_count !== undefined,
 							allow_backorder: variant.allow_backorder,
@@ -146,6 +182,26 @@ export const actions = {
 						};
 					})
 				: undefined;
+
+			if (data.has_variants && variantsForApi && variantsForApi.length > 0) {
+				for (const variant of variantsForApi) {
+					for (const optionValue of variant.option_values) {
+						if (!optionValue.title || !optionValue.value) {
+							return fail(400, {
+								productCreateForm,
+								error: 'Each variant must include all option values.'
+							});
+						}
+						const allowedValues = optionsByTitle.get(optionValue.title);
+						if (!allowedValues || !allowedValues.has(optionValue.value)) {
+							return fail(400, {
+								productCreateForm,
+								error: `Invalid variant option value for "${optionValue.title}".`
+							});
+						}
+					}
+				}
+			}
 
 			const hasAttributeEntries = data.attributes.length > 0;
 			if (hasAttributeEntries && !cleanCategoryId) {

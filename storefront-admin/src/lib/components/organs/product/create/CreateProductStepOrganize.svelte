@@ -15,7 +15,19 @@
 		collectionsList = $bindable([]),
 		categoriesList = $bindable([]),
 		tagsList = $bindable([]),
-		salesChannelsList = $bindable([])
+		salesChannelsList = $bindable([]),
+		collectionsLoading = false,
+		categoriesLoading = false,
+		tagsLoading = false,
+		salesChannelsLoading = false,
+		onCollectionSearchChange = (_query: string) => {},
+		onCollectionOpenChange = (_open: boolean) => {},
+		onCategorySearchChange = (_query: string) => {},
+		onCategoryOpenChange = (_open: boolean) => {},
+		onTagSearchChange = (_query: string) => {},
+		onTagOpenChange = (_open: boolean) => {},
+		onSalesChannelSearchChange = (_query: string) => {},
+		onSalesChannelOpenChange = (_open: boolean) => {}
 	} = $props();
 </script>
 
@@ -68,6 +80,9 @@
 					.map((col) => ({ id: col.id, value: col.title }))}
 				placeholder="Select collection"
 				emptyMessage="No collections found"
+				loading={collectionsLoading}
+				onSearchChange={onCollectionSearchChange}
+				onOpenChange={onCollectionOpenChange}
 			/>
 			{#if createCollectionIds.length > 0}
 				<div class="flex flex-wrap items-center gap-2">
@@ -105,6 +120,9 @@
 				options={categoriesList.map((cat) => ({ id: cat.id, value: cat.value }))}
 				placeholder="Select category"
 				emptyMessage="No categories found"
+				loading={categoriesLoading}
+				onSearchChange={onCategorySearchChange}
+				onOpenChange={onCategoryOpenChange}
 			/>
 			{#if createCategoryId}
 				<p class="text-xs text-muted-foreground">1 selected</p>
@@ -124,6 +142,9 @@
 				options={tagsList
 					.filter((t) => !createTagIds.includes(t.id))
 					.map((t) => ({ id: t.id, value: t.value }))}
+				loading={tagsLoading}
+				onSearchChange={onTagSearchChange}
+				onOpenChange={onTagOpenChange}
 			/>
 			{#if createTagIds.length > 0}
 				<div class="flex flex-wrap items-center gap-2">
@@ -163,6 +184,9 @@
 				options={salesChannelsList
 					.filter((ch) => !createSalesChannelIds.includes(ch.id))
 					.map((ch) => ({ id: ch.id, value: ch.name }))}
+				loading={salesChannelsLoading}
+				onSearchChange={onSalesChannelSearchChange}
+				onOpenChange={onSalesChannelOpenChange}
 			/>
 			{#if createSalesChannelIds.length > 0}
 				<div class="flex flex-wrap items-center gap-2">

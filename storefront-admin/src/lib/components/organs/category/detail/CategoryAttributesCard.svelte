@@ -323,11 +323,11 @@
 			</div>
 		{/if}
 	</div>
-	<div class="p-4 sm:p-6">
+	<div>
 		<PaginationTable showToolbar={false}>
 			{#if attributeSearchQuery.isError && debouncedSearch}
 				<div
-					class="mb-3 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+					class="mx-4 mt-4 mb-3 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive sm:mx-6 sm:mt-6"
 				>
 					{attributeSearchQuery.error instanceof Error
 						? attributeSearchQuery.error.message
@@ -336,14 +336,14 @@
 			{/if}
 			{#if filteredAttributes.length === 0}
 				<div
-					class="flex min-h-[12rem] items-center justify-center rounded-lg border border-dashed bg-muted/20 px-4 py-8"
+					class="m-4 flex min-h-[12rem] items-center justify-center rounded-lg border border-dashed bg-muted/20 px-4 py-8 sm:m-6"
 				>
 					<p class="text-center text-sm text-muted-foreground">
 						No attributes selected for this category.
 					</p>
 				</div>
 			{:else}
-				<div class="min-h-0 overflow-auto rounded-lg border bg-card">
+				<div class="min-h-0 overflow-auto">
 					<table class="w-full text-sm">
 						<TableHead columns={tableColumns} />
 						<TableBody
