@@ -4,9 +4,9 @@ import { InventoryLevelResponseSchema } from "../update-inventory-level";
 export const CreateInventoryLevelSchema = Type.Object({
   inventory_item_id: Type.String({ format: "uuid" }),
   location_id: Type.String({ format: "uuid" }),
-  available_quantity: Type.Number({ default: 0 }),
-  stocked_quantity: Type.Number({ default: 0 }),
-  reserved_quantity: Type.Number({ default: 0 }),
+  available_quantity: Type.Optional(Type.Number({ minimum: 0, default: 0 })),
+  stocked_quantity: Type.Number({ minimum: 0, default: 0 }),
+  reserved_quantity: Type.Number({ minimum: 0, default: 0 }),
   metadata: Type.Optional(
     Type.Record(
       Type.String(),

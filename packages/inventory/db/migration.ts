@@ -19,6 +19,13 @@ export async function up(db: Kysely<any>) {
     .addColumn("deleted_at", "timestamptz")
     .execute();
 
+  await db.schema
+    .createIndex("inventory_items_sku_unique_active_idx")
+    .on("inventory_items")
+    .column("sku")
+    .unique()
+    .execute();
+
   // Inventory Levels (must be created after inventory_items)
   await db.schema
     .createTable("inventory_levels")
@@ -38,6 +45,29 @@ export async function up(db: Kysely<any>) {
       col.notNull().defaultTo(sql`now()`)
     )
     .addColumn("deleted_at", "timestamptz")
+    .addCheckConstraint(
+      "inventory_levels_stocked_non_negative_chk",
+      sql`stocked_quantity >= 0`
+    )
+    .addCheckConstraint(
+      "inventory_levels_reserved_non_negative_chk",
+      sql`reserved_quantity >= 0`
+    )
+    .addCheckConstraint(
+      "inventory_levels_available_non_negative_chk",
+      sql`available_quantity >= 0`
+    )
+    .addCheckConstraint(
+      "inventory_levels_available_formula_chk",
+      sql`available_quantity = stocked_quantity - reserved_quantity`
+    )
+    .execute();
+
+  await db.schema
+    .createIndex("inventory_levels_inventory_item_location_unique_active_idx")
+    .on("inventory_levels")
+    .columns(["inventory_item_id", "location_id"])
+    .unique()
     .execute();
 
   // Reservation Items (must be created after inventory_items)
@@ -59,6 +89,10 @@ export async function up(db: Kysely<any>) {
       col.notNull().defaultTo(sql`now()`)
     )
     .addColumn("deleted_at", "timestamptz")
+    .addCheckConstraint(
+      "reservation_items_quantity_positive_chk",
+      sql`quantity > 0`
+    )
     .execute();
 }
 

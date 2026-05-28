@@ -47,8 +47,14 @@ export class UpdateOrdersProcess
     context: ProcessContextType<typeof UpdateOrderSchema>
   ) {
     const { input } = context;
-    await this.validateOrder(input);
-    return this.updateOrder(input);
+    const existingOrder = await this.validateOrder(input);
+    const updated = await this.updateOrder(input);
+
+    if (existingOrder.status !== "canceled" && input.status === "canceled") {
+      await this.restockCanceledOrderItems(input.id);
+    }
+
+    return updated;
   }
 
   async validateOrder(input: UpdateOrderProcessInput) {
@@ -64,6 +70,61 @@ export class UpdateOrdersProcess
       ]);
     }
     return row;
+  }
+
+  private async restockCanceledOrderItems(orderId: string) {
+    const db = this.db as any;
+    const orderLineItems = await db
+      .selectFrom("order_line_items")
+      .where("order_id", "=", orderId)
+      .where("deleted_at", "is", null)
+      .select(["variant_id", "quantity"])
+      .execute();
+
+    for (const lineItem of orderLineItems as Array<{ variant_id: string | null; quantity: number | null }>) {
+      const quantity = Math.max(0, lineItem.quantity ?? 0);
+      if (!lineItem.variant_id || quantity <= 0) continue;
+
+      const variant = await db
+        .selectFrom("product_variants")
+        .where("id", "=", lineItem.variant_id)
+        .where("deleted_at", "is", null)
+        .select(["sku", "manage_inventory"])
+        .executeTakeFirst();
+
+      if (!variant || !variant.manage_inventory || !variant.sku) continue;
+
+      const inventoryItem = await db
+        .selectFrom("inventory_items")
+        .where("sku", "=", variant.sku)
+        .where("deleted_at", "is", null)
+        .select(["id"])
+        .executeTakeFirst();
+
+      if (!inventoryItem) continue;
+
+      const levels = await db
+        .selectFrom("inventory_levels")
+        .where("inventory_item_id", "=", inventoryItem.id)
+        .where("deleted_at", "is", null)
+        .select(["id", "stocked_quantity", "reserved_quantity"])
+        .orderBy("updated_at", "asc")
+        .execute();
+
+      const primaryLevel = levels[0];
+      if (!primaryLevel) continue;
+
+      const nextStocked = primaryLevel.stocked_quantity + quantity;
+      await db
+        .updateTable("inventory_levels")
+        .set({
+          stocked_quantity: nextStocked,
+          available_quantity: nextStocked - primaryLevel.reserved_quantity,
+          updated_at: new Date(),
+        })
+        .where("id", "=", primaryLevel.id)
+        .execute();
+    }
   }
 
   async updateOrder(input: UpdateOrderProcessInput) {

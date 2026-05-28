@@ -4,8 +4,8 @@ import { Type, type Static } from "@sinclair/typebox";
 // Body schemas
 export const UpdateInventoryLevelBodySchema = Type.Object({
   location_id: Type.Optional(Type.String({ format: "uuid" })),
-  stocked_quantity: Type.Optional(Type.Number()),
-  reserved_quantity: Type.Optional(Type.Number()),
+  stocked_quantity: Type.Optional(Type.Number({ minimum: 0 })),
+  reserved_quantity: Type.Optional(Type.Number({ minimum: 0 })),
   metadata: Type.Optional(
     Type.Record(
       Type.String(),

@@ -24,6 +24,12 @@ import {
 export const UPDATE_CART_LINE_ITEMS_PROCESS = Symbol("UpdateCartLineItems");
 
 type LineItemIn = UpdateCartLineItemsProcessInput["line_items"][number];
+type VariantInventoryInfo = {
+  id: string;
+  sku: string | null;
+  manage_inventory: boolean;
+  allow_backorder: boolean;
+};
 
 /**
  * Helper: lineItemPatch.
@@ -172,6 +178,230 @@ export class UpdateCartLineItemsProcess
       .where("id", "=", input.id)
       .execute();
 
+    await this.syncCartInventoryReservations(db, input.id);
+
     return loadCartWithRelations(this.db, input.id);
+  }
+
+  private async syncCartInventoryReservations(db: Kysely<Database>, cartId: string) {
+    const rawDb = db as any;
+    const cartLineItems = await db
+      .selectFrom("cart_line_items")
+      .where("cart_id", "=", cartId)
+      .where("deleted_at", "is", null)
+      .select(["id", "variant_id", "quantity"])
+      .execute();
+
+    const activeLineIds = cartLineItems.map((line) => line.id);
+
+    const staleReservations = await rawDb
+      .selectFrom("reservation_items")
+      .where(sql`metadata->>'cart_id'`, "=", cartId)
+      .where("deleted_at", "is", null)
+      .select(["id", "line_item_id", "quantity", "inventory_item_id", "location_id"])
+      .execute();
+
+    const staleRows = staleReservations.filter((row: { line_item_id: string | null }) =>
+      row.line_item_id == null ? true : !activeLineIds.includes(row.line_item_id)
+    );
+    await this.releaseReservations(rawDb, staleRows);
+
+    for (const line of cartLineItems) {
+      const quantity = Math.max(0, line.quantity ?? 0);
+      const variantId = line.variant_id;
+      if (!variantId || quantity === 0) {
+        const existingForLine = staleReservations.filter(
+          (row: { line_item_id: string | null }) => row.line_item_id === line.id
+        );
+        await this.releaseReservations(rawDb, existingForLine);
+        continue;
+      }
+
+      const variant = await this.getVariantInventoryInfo(rawDb, variantId);
+      if (!variant || !variant.manage_inventory || !variant.sku) {
+        const existingForLine = staleReservations.filter(
+          (row: { line_item_id: string | null }) => row.line_item_id === line.id
+        );
+        await this.releaseReservations(rawDb, existingForLine);
+        continue;
+      }
+
+      const inventoryItem = await rawDb
+        .selectFrom("inventory_items")
+        .where("sku", "=", variant.sku)
+        .where("deleted_at", "is", null)
+        .select(["id"])
+        .executeTakeFirst();
+
+      if (!inventoryItem) {
+        throw new ValidationError("Inventory item not found for variant SKU", [
+          {
+            type: "not_found",
+            message: "Inventory item not found for managed variant",
+            path: "line_items",
+          },
+        ]);
+      }
+
+      const levels = await rawDb
+        .selectFrom("inventory_levels")
+        .where("inventory_item_id", "=", inventoryItem.id)
+        .where("deleted_at", "is", null)
+        .select(["id", "location_id", "available_quantity", "reserved_quantity"])
+        .orderBy("available_quantity", "desc")
+        .execute();
+
+      const totalAvailable = levels.reduce(
+        (sum: number, level: { available_quantity: number }) => sum + Math.max(0, level.available_quantity),
+        0
+      );
+
+      if (!variant.allow_backorder && totalAvailable < quantity) {
+        throw new ValidationError("Insufficient inventory for cart line item", [
+          {
+            type: "invalid",
+            message: "Requested quantity exceeds available inventory",
+            path: "line_items",
+          },
+        ]);
+      }
+
+      const reservationsForLine = await rawDb
+        .selectFrom("reservation_items")
+        .where("line_item_id", "=", line.id)
+        .where("inventory_item_id", "=", inventoryItem.id)
+        .where("deleted_at", "is", null)
+        .select(["id", "quantity", "location_id", "inventory_item_id", "line_item_id"])
+        .execute();
+
+      const reservedNow = reservationsForLine.reduce(
+        (sum: number, row: { quantity: number }) => sum + row.quantity,
+        0
+      );
+
+      const targetReserved = Math.min(quantity, totalAvailable);
+      if (reservedNow > targetReserved) {
+        await this.releaseReservationQuantity(rawDb, reservationsForLine, reservedNow - targetReserved);
+      } else if (targetReserved > reservedNow) {
+        await this.reserveFromLevels(
+          rawDb,
+          levels,
+          inventoryItem.id,
+          line.id,
+          cartId,
+          targetReserved - reservedNow
+        );
+      }
+    }
+  }
+
+  private async getVariantInventoryInfo(rawDb: any, variantId: string): Promise<VariantInventoryInfo | null> {
+    return rawDb
+      .selectFrom("product_variants")
+      .where("id", "=", variantId)
+      .where("deleted_at", "is", null)
+      .select(["id", "sku", "manage_inventory", "allow_backorder"])
+      .executeTakeFirst();
+  }
+
+  private async reserveFromLevels(
+    rawDb: any,
+    levels: Array<{ id: string; location_id: string; available_quantity: number; reserved_quantity: number }>,
+    inventoryItemId: string,
+    lineItemId: string,
+    cartId: string,
+    quantity: number
+  ) {
+    let remaining = quantity;
+    for (const level of levels) {
+      if (remaining <= 0) break;
+      const canReserve = Math.min(remaining, Math.max(0, level.available_quantity));
+      if (canReserve <= 0) continue;
+
+      await rawDb
+        .insertInto("reservation_items")
+        .values({
+          inventory_item_id: inventoryItemId,
+          location_id: level.location_id,
+          quantity: canReserve,
+          line_item_id: lineItemId,
+          description: "cart_reservation",
+          metadata: { source: "cart", cart_id: cartId },
+        })
+        .execute();
+
+      await rawDb
+        .updateTable("inventory_levels")
+        .set({
+          reserved_quantity: level.reserved_quantity + canReserve,
+          available_quantity: level.available_quantity - canReserve,
+          updated_at: new Date(),
+        })
+        .where("id", "=", level.id)
+        .execute();
+
+      level.reserved_quantity += canReserve;
+      level.available_quantity -= canReserve;
+      remaining -= canReserve;
+    }
+  }
+
+  private async releaseReservationQuantity(
+    rawDb: any,
+    rows: Array<{ id: string; quantity: number; location_id: string; inventory_item_id: string; line_item_id: string | null }>,
+    quantityToRelease: number
+  ) {
+    let remaining = quantityToRelease;
+    for (const row of rows) {
+      if (remaining <= 0) break;
+      const releaseQty = Math.min(remaining, row.quantity);
+
+      const level = await rawDb
+        .selectFrom("inventory_levels")
+        .where("inventory_item_id", "=", row.inventory_item_id)
+        .where("location_id", "=", row.location_id)
+        .where("deleted_at", "is", null)
+        .select(["id", "available_quantity", "reserved_quantity"])
+        .executeTakeFirst();
+
+      if (level) {
+        await rawDb
+          .updateTable("inventory_levels")
+          .set({
+            reserved_quantity: Math.max(0, level.reserved_quantity - releaseQty),
+            available_quantity: level.available_quantity + releaseQty,
+            updated_at: new Date(),
+          })
+          .where("id", "=", level.id)
+          .execute();
+      }
+
+      if (releaseQty === row.quantity) {
+        await rawDb
+          .updateTable("reservation_items")
+          .set({ deleted_at: new Date(), updated_at: new Date() })
+          .where("id", "=", row.id)
+          .where("deleted_at", "is", null)
+          .execute();
+      } else {
+        await rawDb
+          .updateTable("reservation_items")
+          .set({ quantity: row.quantity - releaseQty, updated_at: new Date() })
+          .where("id", "=", row.id)
+          .where("deleted_at", "is", null)
+          .execute();
+      }
+
+      remaining -= releaseQty;
+    }
+  }
+
+  private async releaseReservations(
+    rawDb: any,
+    rows: Array<{ id: string; quantity: number; inventory_item_id: string; location_id: string; line_item_id: string | null }>
+  ) {
+    if (rows.length === 0) return;
+    const total = rows.reduce((sum, row) => sum + row.quantity, 0);
+    await this.releaseReservationQuantity(rawDb, rows, total);
   }
 }

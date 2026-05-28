@@ -94,7 +94,12 @@
 							metadata={product?.metadata ?? {}}
 							onSaved={() => {}}
 						/>
-						<JSONComponent {product} options={[]} variants={[]} category={null} />
+						<JSONComponent
+							{product}
+							options={(product as { options?: unknown[] } | null)?.options ?? []}
+							variants={(product as { variants?: unknown[] } | null)?.variants ?? []}
+							category={(product as { category?: unknown } | null)?.category ?? null}
+						/>
 					</div>
 				</div>
 			</div>

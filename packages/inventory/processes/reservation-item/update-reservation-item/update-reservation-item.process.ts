@@ -51,31 +51,51 @@ export class UpdateReservationItemProcess
     const item = await this.db.selectFrom("reservation_items")
       .where("id", "=", input.id)
       .where("deleted_at", "is", null)
-      .select(["inventory_item_id", "id"])
+      .select(["inventory_item_id", "id", "location_id", "quantity"])
       .executeTakeFirst();
 
     if (!item) {
       throw new NotFoundError("Reservation item not found");
     }
 
-    if (input.location_id) {
-      const existingReservationItem = await this.db.selectFrom("reservation_items")
-        .where("id", "!=", input.id)
-        .where("inventory_item_id", "=", item.inventory_item_id)
-        .where("location_id", "=", input.location_id)
-        .select("id")
-        .executeTakeFirst();
+    const nextLocationId = input.location_id ?? item.location_id;
+    const nextQuantity = input.quantity ?? item.quantity;
+    const movedLocation = nextLocationId !== item.location_id;
+    const quantityDelta = nextQuantity - item.quantity;
 
-      if (existingReservationItem) {
-        throw new ValidationError("Reservation item already exists", [{
-          type: "already_exists",
-          message: "Reservation item already exists for this inventory item and location",
-          path: "location_id",
-        }]);
-      }
+    const targetLevel = await this.db
+      .selectFrom("inventory_levels")
+      .where("inventory_item_id", "=", item.inventory_item_id)
+      .where("location_id", "=", nextLocationId)
+      .where("deleted_at", "is", null)
+      .select(["id", "available_quantity", "reserved_quantity", "stocked_quantity"])
+      .executeTakeFirst();
+
+    if (!targetLevel) {
+      throw new ValidationError("Target inventory level not found", [{
+        type: "not_found",
+        message: "Target inventory level not found",
+        path: "location_id",
+      }]);
     }
 
-    return this.db
+    if (movedLocation) {
+      if (nextQuantity > targetLevel.available_quantity) {
+        throw new ValidationError("Insufficient available quantity", [{
+          type: "invalid",
+          message: "Reservation quantity exceeds available quantity at target location",
+          path: "quantity",
+        }]);
+      }
+    } else if (quantityDelta > 0 && quantityDelta > targetLevel.available_quantity) {
+      throw new ValidationError("Insufficient available quantity", [{
+        type: "invalid",
+        message: "Reservation quantity exceeds available quantity",
+        path: "quantity",
+      }]);
+    }
+
+    const updatedReservation = await this.db
       .updateTable("reservation_items")
       .set({
         ...input,
@@ -85,5 +105,59 @@ export class UpdateReservationItemProcess
       .where("id", "=", input.id)
       .returningAll()
       .executeTakeFirstOrThrow();
+
+    if (movedLocation) {
+      const sourceLevel = await this.db
+        .selectFrom("inventory_levels")
+        .where("inventory_item_id", "=", item.inventory_item_id)
+        .where("location_id", "=", item.location_id)
+        .where("deleted_at", "is", null)
+        .select(["id", "available_quantity", "reserved_quantity"])
+        .executeTakeFirst();
+
+      if (!sourceLevel) {
+        throw new ValidationError("Source inventory level not found", [{
+          type: "not_found",
+          message: "Source inventory level not found",
+          path: "location_id",
+        }]);
+      }
+
+      await this.db
+        .updateTable("inventory_levels")
+        .set({
+          reserved_quantity: Math.max(0, sourceLevel.reserved_quantity - item.quantity),
+          available_quantity: sourceLevel.available_quantity + item.quantity,
+          updated_at: new Date(),
+        })
+        .where("id", "=", sourceLevel.id)
+        .execute();
+
+      await this.db
+        .updateTable("inventory_levels")
+        .set({
+          reserved_quantity: targetLevel.reserved_quantity + nextQuantity,
+          available_quantity: targetLevel.available_quantity - nextQuantity,
+          updated_at: new Date(),
+        })
+        .where("id", "=", targetLevel.id)
+        .execute();
+
+      return updatedReservation;
+    }
+
+    if (quantityDelta !== 0) {
+      await this.db
+        .updateTable("inventory_levels")
+        .set({
+          reserved_quantity: targetLevel.reserved_quantity + quantityDelta,
+          available_quantity: targetLevel.available_quantity - quantityDelta,
+          updated_at: new Date(),
+        })
+        .where("id", "=", targetLevel.id)
+        .execute();
+    }
+
+    return updatedReservation;
   }
 }

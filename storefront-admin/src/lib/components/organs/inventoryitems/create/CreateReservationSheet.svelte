@@ -7,6 +7,7 @@
 	import { client } from '$lib/client.js';
 	import { cn } from '$lib/utils.js';
 	import type { InventoryLevelWithLocation } from '../type.js';
+	import { Toaster, toast } from 'svelte-sonner';
 
 	let {
 		open = $bindable(false),
@@ -44,14 +45,16 @@
 		return level.location_id;
 	}
 
-	const selectedLevel = $derived(
-		levels.find((l) => l.location_id === selectedLocationId) ?? null
-	);
+	const selectedLevel = $derived(levels.find((l) => l.location_id === selectedLocationId) ?? null);
 
 	const summaryTitle = $derived(variantTitle ?? '—');
 	const summarySku = $derived(variantSku ?? itemSku ?? '—');
-	const summaryStocked = $derived(selectedLevel != null ? String(selectedLevel.stocked_quantity) : '—');
-	const summaryAvailable = $derived(selectedLevel != null ? String(selectedLevel.available_quantity) : '—');
+	const summaryStocked = $derived(
+		selectedLevel != null ? String(selectedLevel.stocked_quantity) : '—'
+	);
+	const summaryAvailable = $derived(
+		selectedLevel != null ? String(selectedLevel.available_quantity) : '—'
+	);
 
 	const quantityNum = $derived(Math.max(0, parseInt(quantityInput, 10) || 0));
 	const maxReservable = $derived(selectedLevel?.available_quantity ?? 0);
@@ -105,13 +108,17 @@
 			}
 			close();
 			await onCreated();
+			toast.success('Reservation created');
 		} catch (e) {
 			formError = e instanceof Error ? e.message : String(e);
+			toast.error(formError);
 		} finally {
 			saving = false;
 		}
 	}
 </script>
+
+<Toaster richColors position="top-center" />
 
 <Sheet.Root bind:open>
 	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">
@@ -143,7 +150,8 @@
 							<Select.Trigger class="w-full">
 								<span class="flex w-full items-center justify-between gap-2 truncate">
 									<span class="truncate"
-										>{inventoryItems.find((i) => i.id === selectedItemId)?.label ?? 'Select item'}</span
+										>{inventoryItems.find((i) => i.id === selectedItemId)?.label ??
+											'Select item'}</span
 									>
 									<ChevronDown class="size-4 shrink-0 opacity-50" />
 								</span>

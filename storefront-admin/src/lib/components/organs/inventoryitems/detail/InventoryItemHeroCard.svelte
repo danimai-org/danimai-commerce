@@ -5,6 +5,7 @@
 	import type { InventoryItemDetailData } from '../type.js';
 	import EditInventoryHero from '$lib/components/organs/inventoryitems/update/EditInventoryHero.svelte';
 	import AddVariantSheet from '$lib/components/organs/inventoryitems/detail/AddVariantSheet.svelte';
+	import { client } from '$lib/client.js';
 
 	let formSheetOpen = $state(false);
 	let variantSheetOpen = $state(false);
@@ -12,6 +13,7 @@
 	let addVariantTitle = $state('');
 	let addVariantSubmitting = $state(false);
 	let productsList = $state<{ id: string; title: string }[]>([]);
+	let addVariantError = $state<string | null>(null);
 	const detailQuery = getDetailContext<InventoryItemDetailData>();
 	const detail = $derived(detailQuery?.data ?? null);
 
@@ -26,6 +28,32 @@
 	function openEditHero() {
 		if (!detail?.item) return;
 		formSheetOpen = true;
+	}
+
+	async function loadProductsForVariantSheet() {
+		try {
+			const res = await client.products.get({
+				query: { page: 1, limit: 200 }
+			});
+			const rows = ((res?.data as { rows?: { id: string; title: string }[] } | undefined)?.rows ?? []).filter(
+				(row): row is { id: string; title: string } =>
+					typeof row?.id === 'string' && typeof row?.title === 'string'
+			);
+			productsList = rows;
+		} catch {
+			productsList = [];
+		}
+	}
+
+	async function openAddVariantSheet() {
+		if (!detail?.item?.sku) return;
+		addVariantError = null;
+		addVariantProductId = '';
+		addVariantTitle = '';
+		if (productsList.length === 0) {
+			await loadProductsForVariantSheet();
+		}
+		variantSheetOpen = true;
 	}
 
 	const totals = $derived.by(() => {
@@ -82,7 +110,7 @@
 								variant="outline"
 								size="sm"
 								class="mt-3"
-								onclick={() => (variantSheetOpen = true)}>Add variant</Button
+								onclick={openAddVariantSheet}>Add variant</Button
 							>
 						{:else}
 							<p class="mt-3 text-xs text-muted-foreground">
@@ -123,12 +151,14 @@
 <AddVariantSheet
 	bind:open={variantSheetOpen}
 	sku={detail?.item?.sku}
-	error={null}
+	error={addVariantError}
 	bind:productId={addVariantProductId}
 	bind:title={addVariantTitle}
 	{productsList}
 	submitting={addVariantSubmitting}
-	onSubmit={() => {
+	onSubmit={async () => {
+		addVariantError =
+			'Variant creation from inventory detail is not implemented yet. Create/edit the variant in Product detail and set the same SKU to link it.';
 		void detailQuery?.refetch?.();
 	}}
 />

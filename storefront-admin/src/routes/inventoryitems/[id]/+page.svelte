@@ -262,10 +262,13 @@
 	}
 
 	const variantsRows = $derived(
-		(data?.associated_variants ?? []).slice(
-			variantsOffset,
-			variantsOffset + variantsLimit
-		) as Record<string, unknown>[]
+		(data?.associated_variants ?? [])
+			.slice(variantsOffset, variantsOffset + variantsLimit)
+			.map((variant) => ({
+				...variant,
+				product_title:
+					(variant.product_id ? data?.product_summaries?.[variant.product_id]?.title : null) ?? '—'
+			})) as Record<string, unknown>[]
 	);
 	const levelsRows = $derived(
 		(data?.levels ?? []).slice(levelsOffset, levelsOffset + levelsLimit).map((l) => {
@@ -287,6 +290,7 @@
 	const variantsColumns: TableColumn[] = [
 		{ label: 'Title', key: 'title', type: 'text' },
 		{ label: 'SKU', key: 'sku', type: 'text' },
+		{ label: 'Product', key: 'product_title', type: 'text' },
 		{ label: 'Product ID', key: 'product_id', type: 'text' }
 	];
 

@@ -51,16 +51,40 @@ export class DeleteReservationItemsProcess
       .selectFrom("reservation_items")
       .where("id", "in", input.ids)
       .where("deleted_at", "is", null)
-      .select("id")
+      .select(["id", "inventory_item_id", "location_id", "quantity"])
       .execute();
 
     if (rows.length !== input.ids.length) {
       throw new NotFoundError("Reservation items not found");
     }
 
+    for (const reservation of rows) {
+      const level = await this.db
+        .selectFrom("inventory_levels")
+        .where("inventory_item_id", "=", reservation.inventory_item_id)
+        .where("location_id", "=", reservation.location_id)
+        .where("deleted_at", "is", null)
+        .select(["id", "available_quantity", "reserved_quantity"])
+        .executeTakeFirst();
+
+      if (level) {
+        await this.db
+          .updateTable("inventory_levels")
+          .set({
+            reserved_quantity: Math.max(0, level.reserved_quantity - reservation.quantity),
+            available_quantity: level.available_quantity + reservation.quantity,
+            updated_at: new Date(),
+          })
+          .where("id", "=", level.id)
+          .execute();
+      }
+    }
+
     await this.db
-      .deleteFrom("reservation_items")
+      .updateTable("reservation_items")
+      .set({ deleted_at: new Date(), updated_at: new Date() })
       .where("id", "in", input.ids)
+      .where("deleted_at", "is", null)
       .execute();
   }
 }

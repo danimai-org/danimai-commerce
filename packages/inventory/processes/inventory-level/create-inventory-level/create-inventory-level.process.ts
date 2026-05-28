@@ -3,7 +3,6 @@ import {
   InjectLogger,
   Process,
   ProcessContext,
-  NotFoundError,
   type ProcessContextType,
   type ProcessContract,
   ValidationError,
@@ -48,9 +47,25 @@ export class CreateInventoryLevelProcess
     const { input } = context;
     this.logger.info("Creating inventory level", { input });
 
+    const inventoryItem = await this.db
+      .selectFrom("inventory_items")
+      .where("id", "=", input.inventory_item_id)
+      .where("deleted_at", "is", null)
+      .select("id")
+      .executeTakeFirst();
+
+    if (!inventoryItem) {
+      throw new ValidationError("Inventory item not found", [{
+        type: "not_found",
+        message: "Inventory item not found",
+        path: "inventory_item_id",
+      }]);
+    }
+
     const existingLevel = await this.db.selectFrom("inventory_levels")
       .where("inventory_item_id", "=", input.inventory_item_id)
       .where("location_id", "=", input.location_id)
+      .where("deleted_at", "is", null)
       .select("id")
       .executeTakeFirst();
 
@@ -62,9 +77,22 @@ export class CreateInventoryLevelProcess
       }]);
     }
 
+    if (input.reserved_quantity > input.stocked_quantity) {
+      throw new ValidationError("Reserved quantity cannot exceed stocked quantity", [{
+        type: "invalid",
+        message: "Reserved quantity cannot exceed stocked quantity",
+        path: "reserved_quantity",
+      }]);
+    }
+
+    const availableQuantity = input.stocked_quantity - input.reserved_quantity;
+
     return this.db
       .insertInto("inventory_levels")
-      .values(input)
+      .values({
+        ...input,
+        available_quantity: availableQuantity,
+      })
       .returningAll()
       .executeTakeFirstOrThrow();
   }

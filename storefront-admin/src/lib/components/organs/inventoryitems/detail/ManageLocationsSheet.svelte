@@ -17,6 +17,7 @@
 	import { client } from '$lib/client.js';
 	import { DropdownMenu } from 'bits-ui';
 	import type { InventoryLevelWithLocation } from '$lib/components/organs/inventoryitems/type.js';
+import { Toaster, toast } from 'svelte-sonner';
 
 	type ManageLocationsDetail = {
 		item: { id: string };
@@ -125,13 +126,14 @@
 		try {
 			const stocked = Math.max(0, parseInt(addStockedQty, 10) || 0);
 			const reserved = Math.max(0, parseInt(addReservedQty, 10) || 0);
-			const available_quantity = Math.max(0, stocked - reserved);
+				if (reserved > stocked) {
+					throw new Error('Reserved quantity cannot exceed in-stock quantity');
+				}
 			const res = await client.inventory.levels.post({
 				inventory_item_id: detail.item.id,
 				location_id: addLocationId,
 				stocked_quantity: stocked,
-				reserved_quantity: reserved,
-				available_quantity
+					reserved_quantity: reserved
 			});
 			if (res?.error) {
 				throw new Error(String(res?.error?.value?.message ?? 'Failed to add inventory level'));
@@ -142,8 +144,10 @@
 			addAvailableQty = '0';
 			await onDetailRefetch();
 			syncEditsFromDetail();
+			toast.success('Inventory level added');
 		} catch (e) {
 			levelsError = e instanceof Error ? e.message : String(e);
+			toast.error(levelsError);
 		} finally {
 			levelsSaving = false;
 		}
@@ -157,22 +161,28 @@
 			for (const level of detail.levels) {
 				const stocked = Math.max(0, parseInt(levelStockEdit[level.id] ?? '', 10) || 0);
 				const reserved = Math.max(0, parseInt(levelReservedEdit[level.id] ?? '', 10) || 0);
-				const available_quantity = Math.max(0, stocked - reserved);
-				const res = await client.inventory.levels.post({
-					inventory_item_id: detail.item.id,
-					location_id: level.location_id,
+				if (reserved > stocked) {
+					throw new Error('Reserved quantity cannot exceed in-stock quantity');
+				}
+				const res = await fetch(`http://localhost:8000/admin/inventory/levels/${level.id}`, {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
 					stocked_quantity: stocked,
-					reserved_quantity: reserved,
-					available_quantity
+					reserved_quantity: reserved
+					})
 				});
-				if (res?.error) {
-					throw new Error(String(res?.error?.value?.message ?? 'Failed to save inventory levels'));
+				if (!res.ok) {
+					const payload = (await res.json().catch(() => null)) as { message?: string } | null;
+					throw new Error(payload?.message ?? 'Failed to save inventory levels');
 				}
 			}
 			await onDetailRefetch();
 			syncEditsFromDetail();
+			toast.success('Inventory levels updated');
 		} catch (e) {
 			levelsError = e instanceof Error ? e.message : String(e);
+			toast.error(levelsError);
 		} finally {
 			levelsSaving = false;
 		}
@@ -188,13 +198,17 @@
 			}
 			await onDetailRefetch();
 			syncEditsFromDetail();
+			toast.success('Inventory level removed');
 		} catch (e) {
 			levelsError = e instanceof Error ? e.message : String(e);
+			toast.error(levelsError);
 		} finally {
 			levelsSaving = false;
 		}
 	}
 </script>
+
+<Toaster richColors position="top-center" />
 
 <Sheet.Root bind:open>
 	<Sheet.Content side="right" class="w-full max-w-lg sm:max-w-lg">

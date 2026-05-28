@@ -291,6 +291,8 @@ export class CreateProductProcess implements ProcessContract<
           .returningAll()
           .execute();
 
+        await this.ensureManagedVariantInventoryItems(trx as any, createdVariants);
+
         const variantOptionsRelations: NewProductVariantOptionRelation[] =
           input.variants.flatMap((variant, index) =>
             variant.option_values.map((option, index) => ({
@@ -523,6 +525,49 @@ export class CreateProductProcess implements ProcessContract<
       .set({ thumbnail: thumbnailMedia.url })
       .where("id", "=", options.ownerId)
       .where("deleted_at", "is", null)
+      .execute();
+  }
+
+  private async ensureManagedVariantInventoryItems(
+    trx: any,
+    variants: Array<{ sku: string | null; manage_inventory: boolean }>
+  ) {
+    const managedSkus = Array.from(
+      new Set(
+        variants
+          .filter((variant) => variant.manage_inventory && typeof variant.sku === "string" && variant.sku.trim() !== "")
+          .map((variant) => String(variant.sku).trim())
+      )
+    );
+    if (managedSkus.length === 0) return;
+
+    const existingInventory = await trx
+      .selectFrom("inventory_items")
+      .where("sku", "in", managedSkus)
+      .where("deleted_at", "is", null)
+      .select(["sku"])
+      .execute();
+
+    const existingSkuSet = new Set(
+      (existingInventory as Array<{ sku: string | null }>)
+        .map((row) => row.sku)
+        .filter((sku): sku is string => typeof sku === "string")
+    );
+
+    const rowsToCreate = managedSkus
+      .filter((sku) => !existingSkuSet.has(sku))
+      .map((sku) => ({
+        id: randomUUID(),
+        sku,
+        requires_shipping: true,
+        metadata: null,
+      }));
+
+    if (rowsToCreate.length === 0) return;
+
+    await trx
+      .insertInto("inventory_items")
+      .values(rowsToCreate)
       .execute();
   }
 }

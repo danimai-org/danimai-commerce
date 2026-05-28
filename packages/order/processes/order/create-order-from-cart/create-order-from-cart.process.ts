@@ -130,6 +130,10 @@ export class CreateOrderFromCartProcess implements ProcessContract<
       ]);
     }
 
+    await this.validateManagedInventory(
+      lineItems as Array<{ variant_id: string | null; quantity: number | null; id: string }>
+    );
+
     const lineIds = lineItems.map((l) => l.id);
     const taxLines = await this.db
       .selectFrom("cart_line_item_tax_lines")
@@ -350,6 +354,10 @@ export class CreateOrderFromCartProcess implements ProcessContract<
         .execute();
     }
 
+    await this.finalizeInventoryReservations(
+      lineItems as Array<{ variant_id: string | null; quantity: number | null; id: string }>
+    );
+
     await db
       .updateTable("carts")
       .set({
@@ -363,5 +371,130 @@ export class CreateOrderFromCartProcess implements ProcessContract<
       ...order,
       cart_id: input.cart_id,
     } as Order;
+  }
+
+  private async validateManagedInventory(
+    lineItems: Array<{ variant_id: string | null; quantity: number | null; id: string }>
+  ) {
+    const db = this.db as any;
+    for (const lineItem of lineItems) {
+      const quantity = Math.max(0, lineItem.quantity ?? 0);
+      if (!lineItem.variant_id || quantity <= 0) continue;
+
+      const variant = await db
+        .selectFrom("product_variants")
+        .where("id", "=", lineItem.variant_id)
+        .where("deleted_at", "is", null)
+        .select(["id", "sku", "manage_inventory", "allow_backorder"])
+        .executeTakeFirst();
+
+      if (!variant || !variant.manage_inventory || !variant.sku) continue;
+
+      const inventoryItem = await db
+        .selectFrom("inventory_items")
+        .where("sku", "=", variant.sku)
+        .where("deleted_at", "is", null)
+        .select(["id"])
+        .executeTakeFirst();
+
+      if (!inventoryItem) {
+        throw new ValidationError("Inventory item not found for managed variant", [
+          {
+            type: "not_found",
+            message: "Inventory item not found for managed variant",
+            path: "cart_id",
+          },
+        ]);
+      }
+
+      const reservedRows = await db
+        .selectFrom("reservation_items")
+        .where("line_item_id", "=", lineItem.id)
+        .where("inventory_item_id", "=", inventoryItem.id)
+        .where("deleted_at", "is", null)
+        .select(["quantity"])
+        .execute();
+
+      const reservedQuantity = reservedRows.reduce(
+        (sum: number, row: { quantity: number }) => sum + row.quantity,
+        0
+      );
+
+      if (!variant.allow_backorder && reservedQuantity < quantity) {
+        throw new ValidationError("Insufficient reserved inventory for order placement", [
+          {
+            type: "invalid",
+            message: "Not enough inventory is reserved for one or more line items",
+            path: "cart_id",
+          },
+        ]);
+      }
+    }
+  }
+
+  private async finalizeInventoryReservations(
+    lineItems: Array<{ variant_id: string | null; quantity: number | null; id: string }>
+  ) {
+    const db = this.db as any;
+    for (const lineItem of lineItems) {
+      const quantity = Math.max(0, lineItem.quantity ?? 0);
+      if (!lineItem.variant_id || quantity <= 0) continue;
+
+      const variant = await db
+        .selectFrom("product_variants")
+        .where("id", "=", lineItem.variant_id)
+        .where("deleted_at", "is", null)
+        .select(["id", "sku", "manage_inventory"])
+        .executeTakeFirst();
+
+      if (!variant || !variant.manage_inventory || !variant.sku) continue;
+
+      const inventoryItem = await db
+        .selectFrom("inventory_items")
+        .where("sku", "=", variant.sku)
+        .where("deleted_at", "is", null)
+        .select(["id"])
+        .executeTakeFirst();
+
+      if (!inventoryItem) continue;
+
+      const reservations = await db
+        .selectFrom("reservation_items")
+        .where("line_item_id", "=", lineItem.id)
+        .where("inventory_item_id", "=", inventoryItem.id)
+        .where("deleted_at", "is", null)
+        .select(["id", "location_id", "quantity"])
+        .execute();
+
+      for (const reservation of reservations as Array<{ id: string; location_id: string; quantity: number }>) {
+        const level = await db
+          .selectFrom("inventory_levels")
+          .where("inventory_item_id", "=", inventoryItem.id)
+          .where("location_id", "=", reservation.location_id)
+          .where("deleted_at", "is", null)
+          .select(["id", "stocked_quantity", "reserved_quantity"])
+          .executeTakeFirst();
+
+        if (!level) continue;
+
+        await db
+          .updateTable("inventory_levels")
+          .set({
+            stocked_quantity: Math.max(0, level.stocked_quantity - reservation.quantity),
+            reserved_quantity: Math.max(0, level.reserved_quantity - reservation.quantity),
+            available_quantity: Math.max(0, level.stocked_quantity - reservation.quantity - (level.reserved_quantity - reservation.quantity)),
+            updated_at: new Date(),
+          })
+          .where("id", "=", level.id)
+          .execute();
+
+        await db
+          .updateTable("reservation_items")
+          .set({ deleted_at: new Date(), updated_at: new Date() })
+          .where("id", "=", reservation.id)
+          .where("deleted_at", "is", null)
+          .execute();
+      }
+    }
   }
 }

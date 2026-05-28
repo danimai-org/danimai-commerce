@@ -34,7 +34,10 @@
 
 	onMount(async () => {
 		const token = await getValidAccessToken();
-		if (!token) return;
+		if (!token) {
+			loading = false;
+			return;
+		}
 
 		// Initialize from user store as fallback
 		const storedUser = get(userStore);
@@ -156,19 +159,15 @@
 	<meta name="description" content="Manage settings." />
 </svelte:head>
 
-<div class="flex h-full flex-col p-6">
-	<div class="mb-6 flex items-center justify-between">
-		<div>
-			<div class="mb-1 text-xs text-muted-foreground">Settings &gt; Profile</div>
-			<h1 class="text-lg leading-none font-semibold">Profile</h1>
-			<p class="mt-1 text-sm text-muted-foreground">Manage your profile details.</p>
-		</div>
+<div class="mx-auto w-full max-w-5xl p-4 sm:p-6">
+	<div class="mb-6">
+		<div class="mb-1 text-xs text-muted-foreground">Settings</div>
+		<h1 class="text-xl font-semibold tracking-tight">Profile</h1>
+		<p class="mt-1 text-sm text-muted-foreground">Manage your profile details.</p>
 	</div>
 
-	<div class="flex flex-1 justify-center">
-		<!-- Profile card -->
-		<div class="w-full max-w-3xl">
-			<div class="rounded-lg border bg-card">
+	<div class="w-full max-w-3xl">
+		<div class="overflow-hidden rounded-lg border bg-card shadow-sm">
 				<div class="flex items-center justify-between border-b px-6 py-4">
 					<div>
 						<h2 class="text-base font-medium">Profile</h2>
@@ -189,7 +188,7 @@
 								<DropdownMenu.Item
 									textValue="Edit"
 									class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50"
-									onSelect={openEdit}
+								onSelect={openEdit}
 								>
 									<Pencil class="size-4" />
 									Edit
@@ -200,32 +199,31 @@
 				</div>
 
 				<div class="divide-y text-sm">
-					<div class="grid grid-cols-[160px,1fr] items-center px-6 py-3">
-						<div class="text-muted-foreground">Name</div>
-						<div>
+					<div class="grid gap-1 px-6 py-4 sm:grid-cols-[160px,1fr] sm:items-center sm:gap-4">
+						<div class="font-medium text-muted-foreground">Name</div>
+						<div class="font-medium">
 							{#if loading}
 								<span class="text-muted-foreground">Loading…</span>
 							{:else if profile.firstName || profile.lastName}
 								{`${profile.firstName} ${profile.lastName}`.trim()}
 							{:else}
-								-
+								—
 							{/if}
 						</div>
 					</div>
-					<div class="grid grid-cols-[160px,1fr] items-center px-6 py-3">
-						<div class="text-muted-foreground">Email ID</div>
-						<div>
+					<div class="grid gap-1 px-6 py-4 sm:grid-cols-[160px,1fr] sm:items-center sm:gap-4">
+						<div class="font-medium text-muted-foreground">Email</div>
+						<div class="font-medium">
 							{#if loading}
 								<span class="text-muted-foreground">Loading…</span>
 							{:else if profile.email}
 								{profile.email}
 							{:else}
-								-
+								—
 							{/if}
 						</div>
 					</div>
 				</div>
-			</div>
 		</div>
 	</div>
 

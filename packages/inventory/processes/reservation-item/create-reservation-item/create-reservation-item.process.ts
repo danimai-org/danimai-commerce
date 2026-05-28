@@ -3,6 +3,7 @@ import {
   InjectLogger,
   Process,
   ProcessContext,
+  NotFoundError,
   ValidationError,
   type ProcessContextType,
   type ProcessContract,
@@ -45,24 +46,42 @@ export class CreateReservationItemProcess
     context: ProcessContextType<typeof CreateReservationItemSchema>
   ) {
     const { input } = context;
-    const existingReservationItem = await this.db.selectFrom("reservation_items")
+    const level = await this.db
+      .selectFrom("inventory_levels")
       .where("inventory_item_id", "=", input.inventory_item_id)
       .where("location_id", "=", input.location_id)
-      .select("id")
+      .where("deleted_at", "is", null)
+      .select(["id", "available_quantity", "reserved_quantity", "stocked_quantity"])
       .executeTakeFirst();
 
-    if (existingReservationItem) {
-      throw new ValidationError("Reservation item already exists", [{
-        type: "already_exists",
-        message: "Reservation item already exists for this inventory item and location",
-        path: "location_id",
+    if (!level) {
+      throw new NotFoundError("Inventory level not found for this location");
+    }
+
+    if (input.quantity > level.available_quantity) {
+      throw new ValidationError("Insufficient available quantity", [{
+        type: "invalid",
+        message: "Reservation quantity exceeds available quantity",
+        path: "quantity",
       }]);
     }
 
-    return this.db
+    const reservation = await this.db
       .insertInto("reservation_items")
       .values(input)
       .returningAll()
       .executeTakeFirstOrThrow();
+
+    await this.db
+      .updateTable("inventory_levels")
+      .set({
+        reserved_quantity: level.reserved_quantity + input.quantity,
+        available_quantity: level.available_quantity - input.quantity,
+        updated_at: new Date(),
+      })
+      .where("id", "=", level.id)
+      .execute();
+
+    return reservation;
   }
 }

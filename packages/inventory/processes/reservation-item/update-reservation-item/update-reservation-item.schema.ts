@@ -1,13 +1,13 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { ReservationItemResponseSchema } from "../retrieve-reservation-item/retrieve-reservation-item.schema";
 export const UpdateReservationItemParamSchema = Type.Object({
-  id: Type.String(),
+  id: Type.String({ format: "uuid" }),
 });
 export const UpdateReservationItemSchema = Type.Object({
   ...UpdateReservationItemParamSchema.properties,
   location_id: Type.Optional(Type.String({ format: "uuid" })),
-  quantity: Type.Optional(Type.Number()),
-  line_item_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  quantity: Type.Optional(Type.Number({ minimum: 1 })),
+  line_item_id: Type.Optional(Type.Union([Type.String({ format: "uuid" }), Type.Null()])),
   description: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   metadata: Type.Optional(
     Type.Union([

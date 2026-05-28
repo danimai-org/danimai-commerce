@@ -23,6 +23,23 @@ export const InventoryItemWithRelationsResponseSchema = Type.Composite([
   Type.Object({
     inventory_levels: Type.Array(InventoryLevelResponseSchema),
     reservation_items: Type.Array(ReservationItemResponseSchema),
+    associated_variants: Type.Array(
+      Type.Object({
+        id: Type.String({ format: "uuid" }),
+        title: Type.String(),
+        sku: Type.Union([Type.String(), Type.Null()]),
+        product_id: Type.Union([Type.String({ format: "uuid" }), Type.Null()]),
+        thumbnail: Type.Union([Type.String(), Type.Null()]),
+      })
+    ),
+    product_summaries: Type.Record(
+      Type.String(),
+      Type.Object({
+        id: Type.String({ format: "uuid" }),
+        title: Type.Union([Type.String(), Type.Null()]),
+        thumbnail: Type.Union([Type.String(), Type.Null()]),
+      })
+    ),
   }),
 ]);
 

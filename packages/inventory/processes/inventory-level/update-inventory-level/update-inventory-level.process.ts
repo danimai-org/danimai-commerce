@@ -9,7 +9,7 @@ import {
   ValidationError,
 } from "@danimai/core";
 import type { Logger } from "@logtape/logtape";
-import { Kysely, sql } from "kysely";
+import { Kysely } from "kysely";
 import type { Database } from "../../../db";
 import {
   UpdateInventoryLevelSchema,
@@ -51,7 +51,7 @@ export class UpdateInventoryLevelProcess
       .selectFrom("inventory_levels")
       .where("id", "=", input.id)
       .where("deleted_at", "is", null)
-      .select(["inventory_item_id", "id"])
+      .select(["inventory_item_id", "id", "stocked_quantity", "reserved_quantity"])
       .executeTakeFirstOrThrow();
 
     if (!item) {
@@ -64,6 +64,7 @@ export class UpdateInventoryLevelProcess
         .where("id", "!=", input.id)
         .where("inventory_item_id", "=", item.inventory_item_id)
         .where("location_id", "=", input.location_id)
+        .where("deleted_at", "is", null)
         .select("id")
         .executeTakeFirst();
 
@@ -76,10 +77,22 @@ export class UpdateInventoryLevelProcess
       }
     }
 
+    const nextStockedQuantity = input.stocked_quantity ?? item.stocked_quantity;
+    const nextReservedQuantity = input.reserved_quantity ?? item.reserved_quantity;
+
+    if (nextReservedQuantity > nextStockedQuantity) {
+      throw new ValidationError("Reserved quantity cannot exceed stocked quantity", [{
+        type: "invalid",
+        message: "Reserved quantity cannot exceed stocked quantity",
+        path: "reserved_quantity",
+      }]);
+    }
+
     return this.db
       .updateTable("inventory_levels")
       .set({
         ...input,
+        available_quantity: nextStockedQuantity - nextReservedQuantity,
         updated_at: new Date(),
       })
       .where("id", "=", input.id)

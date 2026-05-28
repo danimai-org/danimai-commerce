@@ -9,10 +9,10 @@ const MetadataSchema = Type.Optional(
 );
 
 export const CreateReservationItemSchema = Type.Object({
-  inventory_item_id: Type.String(),
-  location_id: Type.String(),
-  quantity: Type.Number(),
-  line_item_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  inventory_item_id: Type.String({ format: "uuid" }),
+  location_id: Type.String({ format: "uuid" }),
+  quantity: Type.Number({ minimum: 1 }),
+  line_item_id: Type.Optional(Type.Union([Type.String({ format: "uuid" }), Type.Null()])),
   description: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   metadata: MetadataSchema,
 });

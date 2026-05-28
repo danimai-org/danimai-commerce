@@ -52,16 +52,50 @@ export class UpdateProductVariantsProcess
   ) {
     const { input } = context;
 
-    await this.validateVariant(input);
+    const currentVariant = await this.validateVariant(input);
     const product = await this.validateProduct(input);
 
     await this.updateProductVariant(this.db, input, product);
+    await this.ensureManagedVariantInventoryItem(this.db as any, currentVariant, input);
 
     if (input.prices !== undefined) {
       await this.upsertVariantPrices(this.db, input.id, input.prices);
     }
 
     return undefined;
+  }
+
+  async ensureManagedVariantInventoryItem(
+    trx: any,
+    currentVariant: { sku: string | null; manage_inventory: boolean },
+    input: UpdateProductVariantProcessInput
+  ) {
+    const nextManageInventory = input.manage_inventory ?? currentVariant.manage_inventory;
+    const nextSku = (input.sku ?? currentVariant.sku)?.trim() ?? null;
+    if (!nextManageInventory || !nextSku) {
+      return;
+    }
+
+    const existingInventory = await trx
+      .selectFrom("inventory_items")
+      .where("sku", "=", nextSku)
+      .where("deleted_at", "is", null)
+      .select(["id"])
+      .executeTakeFirst();
+
+    if (existingInventory) {
+      return;
+    }
+
+    await trx
+      .insertInto("inventory_items")
+      .values({
+        id: randomUUID(),
+        sku: nextSku,
+        requires_shipping: true,
+        metadata: null,
+      })
+      .execute();
   }
 
   async validateVariant(input: UpdateProductVariantProcessInput) {

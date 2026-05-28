@@ -45,7 +45,7 @@
 		loading: boolean;
 		adding?: boolean;
 		products: Product[];
-		selectedProductIds: Set<string>;
+		selectedProductIds: Set<string> | string[];
 		pagination: Pagination;
 		rangeStart: number;
 		rangeEnd: number;
@@ -56,6 +56,11 @@
 
 	const showSkeleton = $derived(loading && products.length === 0);
 	const isRefreshing = $derived(loading && products.length > 0);
+	const selectedProductIdSet = $derived.by(() => {
+		if (selectedProductIds instanceof Set) return selectedProductIds;
+		if (Array.isArray(selectedProductIds)) return new Set(selectedProductIds);
+		return new Set<string>();
+	});
 </script>
 
 <Dialog.Root bind:open>
@@ -145,7 +150,7 @@
 									<td class="px-3 py-3 sm:px-4" onclick={(e) => e.stopPropagation()}>
 										<input
 											type="checkbox"
-											checked={selectedProductIds.has(product.id)}
+											checked={selectedProductIdSet.has(product.id)}
 											class="size-4 rounded border-input"
 											tabindex="-1"
 											onclick={(e) => e.stopPropagation()}
@@ -222,7 +227,7 @@
 						if (adding) return;
 						void onAddSelected();
 					}}
-					disabled={adding || selectedProductIds.size === 0}
+					disabled={adding || selectedProductIdSet.size === 0}
 					aria-busy={adding}
 				>
 					{#if adding}
@@ -231,7 +236,7 @@
 						></span>
 						Adding…
 					{:else}
-						Add {selectedProductIds.size > 0 ? `(${selectedProductIds.size})` : ''}
+						Add {selectedProductIdSet.size > 0 ? `(${selectedProductIdSet.size})` : ''}
 					{/if}
 				</Button>
 			</div>

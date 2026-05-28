@@ -64,10 +64,49 @@ export class RetrieveInventoryItemProcess
       .selectAll()
       .execute();
 
+    const associatedVariants =
+      item.sku && item.sku.trim().length > 0
+        ? await (this.db as any)
+            .selectFrom("product_variants")
+            .where("sku", "=", item.sku)
+            .where("deleted_at", "is", null)
+            .select(["id", "title", "sku", "product_id", "thumbnail"])
+            .execute()
+        : [];
+
+    const productIds = [
+      ...new Set(
+        (associatedVariants as Array<{ product_id: string | null }>)
+          .map((variant) => variant.product_id)
+          .filter((id): id is string => typeof id === "string" && id.length > 0)
+      ),
+    ];
+    const productRows =
+      productIds.length > 0
+        ? await (this.db as any)
+            .selectFrom("products")
+            .where("id", "in", productIds)
+            .where("deleted_at", "is", null)
+            .select(["id", "title", "thumbnail"])
+            .execute()
+        : [];
+    const productSummaries = Object.fromEntries(
+      (productRows as Array<{ id: string; title: string | null; thumbnail: string | null }>).map((product) => [
+        product.id,
+        {
+          id: product.id,
+          title: product.title,
+          thumbnail: product.thumbnail,
+        },
+      ])
+    );
+
     return {
       ...item,
       inventory_levels: inventoryLevels,
       reservation_items: reservationItems,
+      associated_variants: associatedVariants,
+      product_summaries: productSummaries,
     };
   }
 }

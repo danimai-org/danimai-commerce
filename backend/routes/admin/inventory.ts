@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { StaticDecode, Type } from "@sinclair/typebox";
+import { Type, type StaticDecode } from "@sinclair/typebox";
 import { getService } from "@danimai/core";
 import {
   PAGINATED_INVENTORY_ITEMS_PROCESS,
@@ -8,6 +8,7 @@ import {
   RETRIEVE_INVENTORY_ITEM_PROCESS,
   UPDATE_INVENTORY_ITEM_PROCESS,
   CREATE_INVENTORY_LEVEL_PROCESS,
+  UPDATE_INVENTORY_LEVEL_PROCESS,
   DELETE_INVENTORY_LEVELS_PROCESS,
   DELETE_INVENTORY_ITEMS_PROCESS,
   PaginatedInventoryItemsProcess,
@@ -16,6 +17,7 @@ import {
   RetrieveInventoryItemProcess,
   UpdateInventoryItemProcess,
   CreateInventoryLevelProcess,
+  UpdateInventoryLevelProcess,
   DeleteInventoryLevelsProcess,
   DeleteInventoryItemsProcess,
   CREATE_RESERVATION_ITEM_PROCESS,
@@ -33,6 +35,9 @@ import {
   PaginatedInventoryLevelsSchema,
   PaginatedInventoryLevelsResponseSchema,
   CreateInventoryLevelSchema,
+  UpdateInventoryLevelBodySchema,
+  UpdateInventoryLevelSchema,
+  UpdateInventoryLevelResponseSchema,
   CreateInventoryLevelResponseSchema,
   DeleteInventoryLevelsSchema,
   DeleteInventoryItemsSchema,
@@ -207,6 +212,34 @@ export const inventoryRoutes = new Elysia({ prefix: "/inventory" })
         tags: ["Inventory"],
         summary: "Delete inventory level",
         description: "Deletes an inventory level by ID",
+      },
+    }
+  )
+  .put(
+    "/levels/:id",
+    async ({ params, body }) => {
+      const process = getService<UpdateInventoryLevelProcess>(
+        UPDATE_INVENTORY_LEVEL_PROCESS
+      );
+      return process.runOperations({
+        input: {
+          ...(body as Record<string, unknown>),
+          id: params.id,
+        },
+      });
+    },
+    {
+      params: Type.Object({ id: UpdateInventoryLevelSchema.properties.id }),
+      body: UpdateInventoryLevelBodySchema,
+      response: {
+        200: UpdateInventoryLevelResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Inventory"],
+        summary: "Update inventory level",
+        description: "Updates an inventory level by ID",
       },
     }
   )

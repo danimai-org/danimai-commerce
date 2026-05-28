@@ -52,6 +52,9 @@
 								<option value={prod.id}>{prod.title}</option>
 							{/each}
 						</select>
+						{#if productsList.length === 0}
+							<p class="text-xs text-muted-foreground">No products available.</p>
+						{/if}
 					</div>
 					<div class="flex flex-col gap-2">
 						<label for="add-variant-title" class="text-sm font-medium">Variant title</label>
