@@ -5,15 +5,16 @@ import {
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
+  type PaginationResponseType,
+  paginationResponse,
+  SortOrder,
 } from "@danimai/core";
-import { Kysely } from "kysely";
+import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
   ListCustomerAddressesSchema,
-  type ListCustomerAddressesProcessInput,
-  type ListCustomerAddressesProcessOutput,
 } from "./list-customer-addresses.schema";
-import type { Database } from "../../../db/type";
+import type { Database, CustomerAddress } from "../../../db/type";
 
 /**
  * Handles the list customer addresses process.
@@ -24,10 +25,7 @@ export const LIST_CUSTOMER_ADDRESSES_PROCESS = Symbol("ListCustomerAddresses");
 
 @Process(LIST_CUSTOMER_ADDRESSES_PROCESS)
 export class ListCustomerAddressesProcess
-  implements ProcessContract<
-    typeof ListCustomerAddressesSchema,
-    ListCustomerAddressesProcessOutput
-  >
+  implements ProcessContract<PaginationResponseType<CustomerAddress>>
 {
   constructor(
     @InjectDB()
@@ -48,16 +46,51 @@ export class ListCustomerAddressesProcess
     context: ProcessContextType<typeof ListCustomerAddressesSchema>
   ) {
     const { input } = context;
-    return this.listAddresses(input);
-  }
+    const {
+      customer_id,
+      page = 1,
+      limit = 10,
+      sorting_field = "created_at",
+      sorting_direction = SortOrder.DESC,
+    } = input;
 
-  async listAddresses(input: ListCustomerAddressesProcessInput) {
-    return this.db
+    let query = this.db
       .selectFrom("customer_addresses")
-      .where("customer_id", "=", input.customer_id)
-      .where("deleted_at", "is", null)
+      .where("customer_id", "=", customer_id)
+      .where("deleted_at", "is", null);
+
+    const countResult = await query
+      .select(({ fn }) => fn.count<number>("id").as("count"))
+      .executeTakeFirst();
+
+    const total = Number(countResult?.count ?? 0);
+
+    const sortOrder =
+      sorting_direction === SortOrder.ASC ? "asc" : "desc";
+    const allowedSortFields = [
+      "id",
+      "first_name",
+      "last_name",
+      "city",
+      "country_code",
+      "created_at",
+      "updated_at",
+    ];
+    const safeSortField = allowedSortFields.includes(sorting_field)
+      ? sorting_field
+      : "created_at";
+    query = query.orderBy(
+      sql.ref(`customer_addresses.${safeSortField}`),
+      sortOrder
+    );
+
+    const offset = (page - 1) * limit;
+    const data = await query
       .selectAll()
-      .orderBy("created_at", "asc")
+      .limit(limit)
+      .offset(offset)
       .execute();
+
+    return paginationResponse<CustomerAddress>(data, total, input);
   }
 }

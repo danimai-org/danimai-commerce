@@ -20,8 +20,11 @@ export type CustomerSignupProcessInput = Static<typeof CustomerSignupSchema>;
 
 export const CustomerSignupResponseSchema = Type.Object({
   message: Type.String({
-    description: "Confirmation that signup succeeded; verify email using the link sent to the address.",
+    description:
+      "Confirmation that signup succeeded; verify email using the link sent to the address.",
   }),
 });
 
-export type CustomerSignupResponse = Static<typeof CustomerSignupResponseSchema>;
+export type CustomerSignupResponse = Static<
+  typeof CustomerSignupResponseSchema
+>;

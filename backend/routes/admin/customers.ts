@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { Type } from "@sinclair/typebox";
-import { getService } from "@danimai/core";
+import { getService, PaginationSchema } from "@danimai/core";
 import {
   PAGINATED_CUSTOMERS_PROCESS,
   CREATE_CUSTOMERS_PROCESS,
@@ -33,7 +33,6 @@ import {
   CreateCustomersSchema,
   CreateCustomersResponseSchema,
   CreateCustomerAddressSchema,
-  ListCustomerAddressesSchema,
   UpdateCustomerAddressBodySchema,
   DeleteCustomerAddressSchema,
   AddCustomerToGroupSchema,
@@ -80,16 +79,17 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
   )
   .get(
     "/:id/addresses",
-    async ({ params }) => {
+    async ({ params, query }) => {
       const process = getService<ListCustomerAddressesProcess>(
         LIST_CUSTOMER_ADDRESSES_PROCESS
       );
       return process.runOperations({
-        input: { customer_id: params.id },
+        input: { ...query, customer_id: params.id },
       });
     },
     {
       params: Type.Object({ id: Type.String() }),
+      query: PaginationSchema,
       response: {
         200: ListCustomerAddressesResponseSchema,
         400: ValidationErrorResponseSchema,
@@ -98,7 +98,7 @@ export const customerRoutes = new Elysia({ prefix: "/customers" })
       detail: {
         tags: ["Customers"],
         summary: "List customer addresses",
-        description: "Lists addresses for a customer",
+        description: "Gets a paginated list of addresses for a customer",
       },
     }
   )

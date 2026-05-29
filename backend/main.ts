@@ -6,7 +6,7 @@ import { initialize } from "@danimai/core";
 import { getLogger } from "./logger";
 import { routes as adminRoutes } from "./routes/admin";
 import { storefrontRoutes } from "./routes/storefront";
-import { lambda } from 'danimai-elysia-lambda'
+import { lambda } from "danimai-elysia-lambda";
 
 const logger = getLogger();
 
@@ -113,7 +113,7 @@ const app = new Elysia()
     }),
   )
   .use(adminRoutes)
-  .use(storefrontRoutes)
+  .use(storefrontRoutes);
 
 const server = (
   app as { server?: { stop?: (force?: boolean) => Promise<void> } }
@@ -133,10 +133,11 @@ process.on("SIGTERM", shutdown);
 
 export type App = typeof app;
 
-app
-  .listen(8000, () => {
-    logger.info(`🦊 Elysia is running locally at http://${app.server?.hostname}:${app.server?.port}`);
-    logger.info(
-      "Swagger documentation available at http://localhost:8000/swagger",
-    );
-  });
+app.listen(8000, () => {
+  logger.info(
+    `🦊 Elysia is running locally at http://${app.server?.hostname}:${app.server?.port}`,
+  );
+  logger.info(
+    "Swagger documentation available at http://localhost:8000/swagger",
+  );
+});

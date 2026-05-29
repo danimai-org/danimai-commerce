@@ -48,11 +48,7 @@ import { requireCustomerFromBearer } from "./customer-from-bearer";
 
 const loginRoute = new Elysia().use(loginRateLimitMacro).post(
   "/login",
-  async ({
-    body,
-  }: {
-    body: StaticDecode<typeof CustomerLoginSchema>;
-  }) => {
+  async ({ body }: { body: StaticDecode<typeof CustomerLoginSchema> }) => {
     const process = getService<CustomerLoginProcess>(CUSTOMER_LOGIN_PROCESS);
     return process.runOperations({ input: body });
   },
@@ -67,9 +63,10 @@ const loginRoute = new Elysia().use(loginRateLimitMacro).post(
     detail: {
       tags: ["Storefront Auth"],
       summary: "Customer login",
-      description: "Email/password login for storefront customers; returns JWT access and refresh tokens.",
+      description:
+        "Email/password login for storefront customers; returns JWT access and refresh tokens.",
     },
-  }
+  },
 );
 
 const refreshTokenRoute = new Elysia().post(
@@ -80,7 +77,7 @@ const refreshTokenRoute = new Elysia().post(
     body: StaticDecode<typeof RefreshCustomerTokenSchema>;
   }) => {
     const process = getService<CustomerRefreshTokenProcess>(
-      CUSTOMER_REFRESH_TOKEN_PROCESS
+      CUSTOMER_REFRESH_TOKEN_PROCESS,
     );
     return process.runOperations({ input: body });
   },
@@ -97,7 +94,7 @@ const refreshTokenRoute = new Elysia().post(
       description:
         "Exchange a valid refresh JWT for new access and refresh tokens (rotates refresh token).",
     },
-  }
+  },
 );
 
 export const storefrontAuthRoutes = new Elysia({ prefix: "/auth" })
@@ -107,12 +104,10 @@ export const storefrontAuthRoutes = new Elysia({ prefix: "/auth" })
   .use(refreshTokenRoute)
   .post(
     "/signup",
-    async ({
-      body,
-    }: {
-      body: StaticDecode<typeof CustomerSignupSchema>;
-    }) => {
-      const process = getService<CustomerSignupProcess>(CUSTOMER_SIGNUP_PROCESS);
+    async ({ body }: { body: StaticDecode<typeof CustomerSignupSchema> }) => {
+      const process = getService<CustomerSignupProcess>(
+        CUSTOMER_SIGNUP_PROCESS,
+      );
       return process.runOperations({ input: body });
     },
     {
@@ -128,7 +123,7 @@ export const storefrontAuthRoutes = new Elysia({ prefix: "/auth" })
         description:
           "Register an email/password customer account. Sends a verification link to the email (no token in the JSON body).",
       },
-    }
+    },
   )
   .post(
     "/forgot-password",
@@ -138,7 +133,7 @@ export const storefrontAuthRoutes = new Elysia({ prefix: "/auth" })
       body: StaticDecode<typeof CustomerForgotPasswordSchema>;
     }) => {
       const process = getService<CustomerForgotPasswordProcess>(
-        CUSTOMER_FORGOT_PASSWORD_PROCESS
+        CUSTOMER_FORGOT_PASSWORD_PROCESS,
       );
       return process.runOperations({ input: body });
     },
@@ -154,7 +149,7 @@ export const storefrontAuthRoutes = new Elysia({ prefix: "/auth" })
         summary: "Forgot password",
         description: "Request a password reset token for the given email.",
       },
-    }
+    },
   )
   .post(
     "/reset-password",
@@ -164,7 +159,7 @@ export const storefrontAuthRoutes = new Elysia({ prefix: "/auth" })
       body: StaticDecode<typeof CustomerResetPasswordSchema>;
     }) => {
       const process = getService<CustomerResetPasswordProcess>(
-        CUSTOMER_RESET_PASSWORD_PROCESS
+        CUSTOMER_RESET_PASSWORD_PROCESS,
       );
       return process.runOperations({ input: body });
     },
@@ -178,18 +173,17 @@ export const storefrontAuthRoutes = new Elysia({ prefix: "/auth" })
       detail: {
         tags: ["Storefront Auth"],
         summary: "Reset password",
-        description: "Set a new password using the reset token from forgot-password.",
+        description:
+          "Set a new password using the reset token from forgot-password.",
       },
-    }
+    },
   )
   .post(
     "/verify-email",
-    async ({
-      body,
-    }: {
-      body: StaticDecode<typeof VerifyCustomerSchema>;
-    }) => {
-      const process = getService<VerifyCustomerProcess>(VERIFY_CUSTOMER_PROCESS);
+    async ({ body }: { body: StaticDecode<typeof VerifyCustomerSchema> }) => {
+      const process = getService<VerifyCustomerProcess>(
+        VERIFY_CUSTOMER_PROCESS,
+      );
       return process.runOperations({ input: body });
     },
     {
@@ -202,9 +196,10 @@ export const storefrontAuthRoutes = new Elysia({ prefix: "/auth" })
       detail: {
         tags: ["Storefront Auth"],
         summary: "Verify email",
-        description: "Activate account using the verification token from signup.",
+        description:
+          "Activate account using the verification token from signup.",
       },
-    }
+    },
   )
   .post(
     "/sessions",
@@ -216,7 +211,7 @@ export const storefrontAuthRoutes = new Elysia({ prefix: "/auth" })
       request: Request;
     }) => {
       const process = getService<CreateCustomerSessionProcess>(
-        CREATE_CUSTOMER_SESSION_PROCESS
+        CREATE_CUSTOMER_SESSION_PROCESS,
       );
       return process.runOperations({
         input: {
@@ -239,7 +234,7 @@ export const storefrontAuthRoutes = new Elysia({ prefix: "/auth" })
         description:
           "Create a customer_sessions row for anonymous storefront use (e.g. cart).",
       },
-    }
+    },
   )
   .post(
     "/logout",
@@ -250,7 +245,7 @@ export const storefrontAuthRoutes = new Elysia({ prefix: "/auth" })
         return r.body;
       }
       const process = getService<ExpireCustomerSessionProcess>(
-        EXPIRE_CUSTOMER_SESSION_PROCESS
+        EXPIRE_CUSTOMER_SESSION_PROCESS,
       );
       await process.runOperations({ input: { id: r.sessionId } });
       set.status = 204;
@@ -269,7 +264,7 @@ export const storefrontAuthRoutes = new Elysia({ prefix: "/auth" })
         description:
           "Expire the current customer session (Bearer access token required).",
       },
-    }
+    },
   )
   .get(
     "/me",
@@ -280,7 +275,7 @@ export const storefrontAuthRoutes = new Elysia({ prefix: "/auth" })
         return r.body;
       }
       const process = getService<RetrieveCustomerProcess>(
-        RETRIEVE_CUSTOMER_PROCESS
+        RETRIEVE_CUSTOMER_PROCESS,
       );
       return process.runOperations({ input: { id: r.customerId } });
     },
@@ -297,5 +292,5 @@ export const storefrontAuthRoutes = new Elysia({ prefix: "/auth" })
         description:
           "Return the authenticated storefront customer (Bearer access token required).",
       },
-    }
+    },
   );
