@@ -283,10 +283,13 @@
     async function changeLineQuantity(lineId: string, delta: number) {
         const item = cartState.cart?.line_items.find((li) => li.id === lineId);
         if (!item) return;
-        await changeLineItemQuantity(lineId, (item.quantity ?? 0) + delta);
+        const current = Math.max(1, item.quantity ?? 1);
+        if (delta < 0 && current <= 1) return;
+        await changeLineItemQuantity(lineId, current + delta);
     }
 
     async function removeLine(lineId: string) {
+        if (!confirm("Remove this item from your cart?")) return;
         await removeLineItem(lineId);
     }
 

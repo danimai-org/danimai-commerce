@@ -4,6 +4,7 @@
         cartState,
         changeLineItemQuantity,
         closeCartSheet,
+        removeLineItem,
     } from "$lib/cart/cart-state.svelte";
     import {
         fetchVariantDisplayMap,
@@ -76,9 +77,20 @@
         closeCartSheet();
     }
 
-    async function setQuantity(item: any, quantity: number) {
-        const nextQuantity = quantity <= 0 ? 0 : Math.max(1, quantity);
-        await changeLineItemQuantity(item.id, nextQuantity, item.variant_id);
+    async function increaseQuantity(item: any) {
+        const current = Math.max(1, item.quantity ?? 1);
+        await changeLineItemQuantity(item.id, current + 1, item.variant_id);
+    }
+
+    async function decreaseQuantity(item: any) {
+        const current = Math.max(1, item.quantity ?? 1);
+        if (current <= 1) return;
+        await changeLineItemQuantity(item.id, current - 1, item.variant_id);
+    }
+
+    async function removeItem(item: any) {
+        if (!confirm("Remove this item from your cart?")) return;
+        await removeLineItem(item.id);
     }
 </script>
 
@@ -125,11 +137,8 @@
                                         <button
                                             type="button"
                                             class="qty-btn"
-                                            onclick={() =>
-                                                void setQuantity(
-                                                    item,
-                                                    item.quantity - 1,
-                                                )}
+                                            disabled={(item.quantity ?? 1) <= 1}
+                                            onclick={() => void decreaseQuantity(item)}
                                             aria-label="Decrease quantity"
                                             >−</button
                                         >
@@ -139,11 +148,7 @@
                                         <button
                                             type="button"
                                             class="qty-btn"
-                                            onclick={() =>
-                                                void setQuantity(
-                                                    item,
-                                                    item.quantity + 1,
-                                                )}
+                                            onclick={() => void increaseQuantity(item)}
                                             aria-label="Increase quantity"
                                             >+</button
                                         >
@@ -156,7 +161,7 @@
                             <button
                                 type="button"
                                 class="remove-btn"
-                                onclick={() => void setQuantity(item, 0)}
+                                onclick={() => void removeItem(item)}
                                 aria-label="Remove item"
                             >
                                 <svg

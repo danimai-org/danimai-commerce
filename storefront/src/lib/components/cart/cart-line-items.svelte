@@ -45,6 +45,7 @@
                         <button
                             type="button"
                             class="qty-btn"
+                            disabled={item.quantity <= 1}
                             onclick={() => onChangeQuantity(item.lineId, -1)}
                             aria-label="Decrease quantity">−</button
                         >
