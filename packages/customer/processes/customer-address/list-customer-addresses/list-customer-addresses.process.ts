@@ -73,6 +73,7 @@ export class ListCustomerAddressesProcess
       "last_name",
       "city",
       "country_code",
+      "is_default",
       "created_at",
       "updated_at",
     ];

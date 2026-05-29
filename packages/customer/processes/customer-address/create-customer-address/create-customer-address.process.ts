@@ -71,32 +71,54 @@ export class CreateCustomerAddressProcess
       ]);
     }
 
-    const row = await this.db
-      .insertInto("customer_addresses")
-      .values({
-        customer_id: input.customer_id,
-        first_name: input.first_name ?? null,
-        last_name: input.last_name ?? null,
-        phone: input.phone ?? null,
-        company: input.company ?? null,
-        address_1: input.address_1,
-        address_2: input.address_2 ?? null,
-        city: input.city,
-        country_code: input.country_code,
-        province: input.province ?? null,
-        postal_code: input.postal_code ?? null,
-      })
-      .returningAll()
-      .executeTakeFirst();
-    if (!row) {
-      throw new ValidationError("Failed to create address", [
-        {
-          type: "internal",
-          message: "Failed to create address",
-          path: "customer_id",
-        },
-      ]);
-    }
-    return row;
+    return this.db.transaction().execute(async (trx) => {
+      const existingCount = await trx
+        .selectFrom("customer_addresses")
+        .where("customer_id", "=", input.customer_id)
+        .where("deleted_at", "is", null)
+        .select(({ fn }) => fn.count<number>("id").as("count"))
+        .executeTakeFirst();
+      const addressCount = Number(existingCount?.count ?? 0);
+      const isDefault = input.is_default ?? addressCount === 0;
+
+      if (isDefault) {
+        await trx
+          .updateTable("customer_addresses")
+          .set({ is_default: false, updated_at: new Date() })
+          .where("customer_id", "=", input.customer_id)
+          .where("deleted_at", "is", null)
+          .where("is_default", "=", true)
+          .execute();
+      }
+
+      const row = await trx
+        .insertInto("customer_addresses")
+        .values({
+          customer_id: input.customer_id,
+          first_name: input.first_name ?? null,
+          last_name: input.last_name ?? null,
+          phone: input.phone ?? null,
+          company: input.company ?? null,
+          address_1: input.address_1,
+          address_2: input.address_2 ?? null,
+          city: input.city,
+          country_code: input.country_code,
+          province: input.province ?? null,
+          postal_code: input.postal_code ?? null,
+          is_default: isDefault,
+        })
+        .returningAll()
+        .executeTakeFirst();
+      if (!row) {
+        throw new ValidationError("Failed to create address", [
+          {
+            type: "internal",
+            message: "Failed to create address",
+            path: "customer_id",
+          },
+        ]);
+      }
+      return row;
+    });
   }
 }

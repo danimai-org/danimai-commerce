@@ -103,6 +103,7 @@ export interface CustomerAddressTable {
   country_code: string;
   province: string | null;
   postal_code: string | null;
+  is_default: boolean;
   metadata: unknown | null;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;

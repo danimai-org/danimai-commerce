@@ -35,6 +35,7 @@
 	let province = $state('');
 	let postalCode = $state('');
 	let countryCode = $state('');
+	let isDefault = $state(false);
 	let error = $state<string | null>(null);
 	let submitting = $state(false);
 
@@ -52,6 +53,7 @@
 				province = address.province ?? '';
 				postalCode = address.postal_code ?? '';
 				countryCode = address.country_code ?? '';
+				isDefault = address.is_default;
 			} else {
 				firstName = customer?.first_name ?? '';
 				lastName = customer?.last_name ?? '';
@@ -63,6 +65,7 @@
 				province = '';
 				postalCode = '';
 				countryCode = '';
+				isDefault = false;
 			}
 		}
 	});
@@ -98,7 +101,8 @@
 				city: city.trim(),
 				province: province.trim() || null,
 				postal_code: postalCode.trim() || null,
-				country_code: countryCode.trim()
+				country_code: countryCode.trim(),
+				is_default: isDefault
 			};
 			if (mode === 'edit' && address) {
 				await updateCustomerAddress(customerId, address.id, body);
@@ -239,6 +243,15 @@
 							/>
 						</div>
 					</div>
+					<label class="flex cursor-pointer items-center gap-2 text-sm">
+						<input
+							type="checkbox"
+							bind:checked={isDefault}
+							disabled={submitting}
+							class="size-4 rounded border-input"
+						/>
+						Set as default address
+					</label>
 					<div class="grid grid-cols-2 gap-4">
 						<div class="flex flex-col gap-2">
 							<label for="caf-phone" class="text-sm font-medium">

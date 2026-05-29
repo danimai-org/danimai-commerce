@@ -12,6 +12,7 @@ const UpdateCustomerAddressFields = {
   country_code: Type.String(),
   province: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   postal_code: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  is_default: Type.Optional(Type.Boolean()),
 } as const;
 
 export const UpdateCustomerAddressBodySchema = Type.Object(UpdateCustomerAddressFields);

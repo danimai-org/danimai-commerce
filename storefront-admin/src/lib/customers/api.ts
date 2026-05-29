@@ -132,6 +132,7 @@ export type CustomerAddress = {
 	country_code: string;
 	province: string | null;
 	postal_code: string | null;
+	is_default: boolean;
 	created_at: string;
 	updated_at: string;
 	deleted_at: string | null;
@@ -150,8 +151,9 @@ export async function getCustomer(id: string): Promise<Customer> {
 export async function listCustomerAddresses(customerId: string): Promise<CustomerAddress[]> {
 	const res = await fetch(`${getApiBase()}/customers/${customerId}/addresses`, { cache: 'no-store' });
 	if (!res.ok) return [];
-	const data = await res.json();
-	return Array.isArray(data) ? (data as CustomerAddress[]) : [];
+	const data = (await res.json()) as { rows?: CustomerAddress[] } | CustomerAddress[];
+	if (Array.isArray(data)) return data;
+	return data.rows ?? [];
 }
 
 export async function addCustomerToGroup(customerId: string, customerGroupId: string): Promise<void> {
@@ -192,6 +194,7 @@ export type CreateCustomerAddressPayload = {
 	province?: string | null;
 	postal_code?: string | null;
 	country_code: string;
+	is_default?: boolean;
 };
 
 export async function createCustomerAddress(

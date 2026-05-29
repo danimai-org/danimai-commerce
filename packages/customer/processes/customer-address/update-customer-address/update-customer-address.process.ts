@@ -73,30 +73,46 @@ export class UpdateCustomerAddressProcess
       ]);
     }
 
-    const row = await this.db
-      .updateTable("customer_addresses")
-      .set({
-        first_name: input.first_name ?? null,
-        last_name: input.last_name ?? null,
-        phone: input.phone ?? null,
-        company: input.company ?? null,
-        address_1: input.address_1,
-        address_2: input.address_2 ?? null,
-        city: input.city,
-        country_code: input.country_code,
-        province: input.province ?? null,
-        postal_code: input.postal_code ?? null,
-        updated_at: new Date(),
-      })
-      .where("id", "=", input.id)
-      .where("customer_id", "=", input.customer_id)
-      .returningAll()
-      .executeTakeFirst();
-    if (!row) {
-      throw new ValidationError("Address not found", [
-        { type: "not_found", message: "Address not found", path: "id" },
-      ]);
-    }
-    return row;
+    return this.db.transaction().execute(async (trx) => {
+      if (input.is_default === true) {
+        await trx
+          .updateTable("customer_addresses")
+          .set({ is_default: false, updated_at: new Date() })
+          .where("customer_id", "=", input.customer_id)
+          .where("deleted_at", "is", null)
+          .where("is_default", "=", true)
+          .where("id", "!=", input.id)
+          .execute();
+      }
+
+      const row = await trx
+        .updateTable("customer_addresses")
+        .set({
+          first_name: input.first_name ?? null,
+          last_name: input.last_name ?? null,
+          phone: input.phone ?? null,
+          company: input.company ?? null,
+          address_1: input.address_1,
+          address_2: input.address_2 ?? null,
+          city: input.city,
+          country_code: input.country_code,
+          province: input.province ?? null,
+          postal_code: input.postal_code ?? null,
+          ...(input.is_default !== undefined
+            ? { is_default: input.is_default }
+            : {}),
+          updated_at: new Date(),
+        })
+        .where("id", "=", input.id)
+        .where("customer_id", "=", input.customer_id)
+        .returningAll()
+        .executeTakeFirst();
+      if (!row) {
+        throw new ValidationError("Address not found", [
+          { type: "not_found", message: "Address not found", path: "id" },
+        ]);
+      }
+      return row;
+    });
   }
 }

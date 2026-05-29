@@ -65,7 +65,7 @@ export class DeleteCustomerAddressProcess
       .where("id", "=", input.id)
       .where("customer_id", "=", input.customer_id)
       .where("deleted_at", "is", null)
-      .select("id")
+      .select(["id", "is_default"])
       .executeTakeFirst();
     if (!existing) {
       throw new ValidationError("Address not found", [
@@ -73,21 +73,42 @@ export class DeleteCustomerAddressProcess
       ]);
     }
 
-    const row = await this.db
-      .updateTable("customer_addresses")
-      .set({
-        deleted_at: new Date(),
-        updated_at: new Date(),
-      })
-      .where("id", "=", input.id)
-      .where("customer_id", "=", input.customer_id)
-      .returningAll()
-      .executeTakeFirst();
-    if (!row) {
-      throw new ValidationError("Address not found", [
-        { type: "not_found", message: "Address not found", path: "id" },
-      ]);
-    }
-    return row;
+    return this.db.transaction().execute(async (trx) => {
+      const row = await trx
+        .updateTable("customer_addresses")
+        .set({
+          deleted_at: new Date(),
+          is_default: false,
+          updated_at: new Date(),
+        })
+        .where("id", "=", input.id)
+        .where("customer_id", "=", input.customer_id)
+        .returningAll()
+        .executeTakeFirst();
+      if (!row) {
+        throw new ValidationError("Address not found", [
+          { type: "not_found", message: "Address not found", path: "id" },
+        ]);
+      }
+
+      if (existing.is_default) {
+        const nextDefault = await trx
+          .selectFrom("customer_addresses")
+          .where("customer_id", "=", input.customer_id)
+          .where("deleted_at", "is", null)
+          .orderBy("created_at", "asc")
+          .select("id")
+          .executeTakeFirst();
+        if (nextDefault) {
+          await trx
+            .updateTable("customer_addresses")
+            .set({ is_default: true, updated_at: new Date() })
+            .where("id", "=", nextDefault.id)
+            .execute();
+        }
+      }
+
+      return row;
+    });
   }
 }

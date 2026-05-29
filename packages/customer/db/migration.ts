@@ -61,6 +61,9 @@ export async function up(db: Kysely<any>) {
     .addColumn("country_code", "text", (col) => col.notNull())
     .addColumn("province", "text")
     .addColumn("postal_code", "text")
+    .addColumn("is_default", "boolean", (col) =>
+      col.notNull().defaultTo(false),
+    )
     .addColumn("metadata", "jsonb")
     .addColumn("created_at", "timestamptz", (col) =>
       col.notNull().defaultTo(sql`now()`),

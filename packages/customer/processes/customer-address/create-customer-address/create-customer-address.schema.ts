@@ -12,6 +12,7 @@ export const CreateCustomerAddressSchema = Type.Object({
   country_code: Type.String(),
   province: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   postal_code: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  is_default: Type.Optional(Type.Boolean()),
 });
 
 export type CreateCustomerAddressProcessInput = Static<
@@ -31,9 +32,11 @@ export const CustomerAddressResponseSchema = Type.Object({
   country_code: Type.String(),
   province: Type.Union([Type.String(), Type.Null()]),
   postal_code: Type.Union([Type.String(), Type.Null()]),
+  is_default: Type.Boolean(),
   metadata: Type.Union([Type.Unknown(), Type.Null()]),
   created_at: Type.Date(),
-  updated_at: Type.Date(),   deleted_at: Type.Union([Type.Date(), Type.Null()]),
+  updated_at: Type.Date(),
+  deleted_at: Type.Union([Type.Date(), Type.Null()]),
 });
 
 export const CreateCustomerAddressResponseSchema = Type.Union([
