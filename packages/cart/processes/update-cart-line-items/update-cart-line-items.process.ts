@@ -4,9 +4,11 @@ import {
   Process,
   ProcessContext,
   ValidationError,
+  jsonb,
   type ProcessContextType,
   type ProcessContract,
 } from "@danimai/core";
+import { randomUUID } from "node:crypto";
 import { Kysely, sql } from "kysely";
 import type { Database } from "@danimai/cart/db";
 import { loadCartWithRelations } from "../retrieve-cart/retrieve-cart.process";
@@ -45,7 +47,7 @@ function lineItemPatch(row: LineItemIn): Record<string, unknown> {
   if (row.product_id !== undefined) patch.product_id = row.product_id;
   if (row.quantity !== undefined) patch.quantity = row.quantity;
   if (row.unit_price !== undefined) patch.unit_price = row.unit_price;
-  if (row.metadata !== undefined) patch.metadata = row.metadata;
+  if (row.metadata !== undefined) patch.metadata = jsonb(row.metadata);
   return patch;
 }
 
@@ -94,6 +96,27 @@ export class UpdateCartLineItemsProcess
 
     // Neon serverless: no Kysely interactive transactions.
     const db = this.db;
+
+    for (const item of input.line_items) {
+      if (!item.id) continue;
+      const existing = await db
+        .selectFrom("cart_line_items")
+        .where("id", "=", item.id)
+        .where("cart_id", "=", input.id)
+        .where("deleted_at", "is", null)
+        .select("id")
+        .executeTakeFirst();
+      if (!existing) {
+        throw new ValidationError("Line item not found on this cart", [
+          {
+            type: "not_found",
+            message: "Line item not found on this cart",
+            path: "line_items",
+          },
+        ]);
+      }
+    }
+
     if (keptIds.size === 0) {
       await db
         .updateTable("cart_line_items")
@@ -113,22 +136,6 @@ export class UpdateCartLineItemsProcess
 
     for (const item of input.line_items) {
       if (item.id) {
-        const existing = await db
-          .selectFrom("cart_line_items")
-          .where("id", "=", item.id)
-          .where("cart_id", "=", input.id)
-          .where("deleted_at", "is", null)
-          .select("id")
-          .executeTakeFirst();
-        if (!existing) {
-          throw new ValidationError("Line item not found on this cart", [
-            {
-              type: "not_found",
-              message: "Line item not found on this cart",
-              path: "line_items",
-            },
-          ]);
-        }
         const patch = lineItemPatch(item);
         if (Object.keys(patch).length > 0) {
           await db
@@ -166,7 +173,7 @@ export class UpdateCartLineItemsProcess
             product_id: item.product_id ?? null,
             quantity: item.quantity ?? null,
             unit_price: item.unit_price ?? null,
-            metadata: item.metadata ?? null,
+            metadata: jsonb(item.metadata),
           })
           .execute();
       }
@@ -226,22 +233,7 @@ export class UpdateCartLineItemsProcess
         continue;
       }
 
-      const inventoryItem = await rawDb
-        .selectFrom("inventory_items")
-        .where("sku", "=", variant.sku)
-        .where("deleted_at", "is", null)
-        .select(["id"])
-        .executeTakeFirst();
-
-      if (!inventoryItem) {
-        throw new ValidationError("Inventory item not found for variant SKU", [
-          {
-            type: "not_found",
-            message: "Inventory item not found for managed variant",
-            path: "line_items",
-          },
-        ]);
-      }
+      const inventoryItem = await this.ensureInventoryItemForSku(rawDb, variant.sku);
 
       const levels = await rawDb
         .selectFrom("inventory_levels")
@@ -250,6 +242,14 @@ export class UpdateCartLineItemsProcess
         .select(["id", "location_id", "available_quantity", "reserved_quantity"])
         .orderBy("available_quantity", "desc")
         .execute();
+
+      if (levels.length === 0) {
+        const existingForLine = staleReservations.filter(
+          (row: { line_item_id: string | null }) => row.line_item_id === line.id
+        );
+        await this.releaseReservations(rawDb, existingForLine);
+        continue;
+      }
 
       const totalAvailable = levels.reduce(
         (sum: number, level: { available_quantity: number }) => sum + Math.max(0, level.available_quantity),
@@ -295,6 +295,36 @@ export class UpdateCartLineItemsProcess
     }
   }
 
+  private async ensureInventoryItemForSku(
+    rawDb: any,
+    sku: string
+  ): Promise<{ id: string }> {
+    const normalizedSku = sku.trim();
+    const existing = await rawDb
+      .selectFrom("inventory_items")
+      .where("sku", "=", normalizedSku)
+      .where("deleted_at", "is", null)
+      .select(["id"])
+      .executeTakeFirst();
+
+    if (existing) {
+      return existing;
+    }
+
+    const id = randomUUID();
+    await rawDb
+      .insertInto("inventory_items")
+      .values({
+        id,
+        sku: normalizedSku,
+        requires_shipping: true,
+        metadata: null,
+      })
+      .execute();
+
+    return { id };
+  }
+
   private async getVariantInventoryInfo(rawDb: any, variantId: string): Promise<VariantInventoryInfo | null> {
     return rawDb
       .selectFrom("product_variants")
@@ -326,7 +356,7 @@ export class UpdateCartLineItemsProcess
           quantity: canReserve,
           line_item_id: lineItemId,
           description: "cart_reservation",
-          metadata: { source: "cart", cart_id: cartId },
+          metadata: jsonb({ source: "cart", cart_id: cartId }),
         })
         .execute();
 

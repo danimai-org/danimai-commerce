@@ -5,6 +5,8 @@ import {
   Process,
   ProcessContext,
   ValidationError,
+  jsonb,
+  metadataRecord,
   type ProcessContextType,
   type ProcessContract,
 } from "@danimai/core";
@@ -175,18 +177,14 @@ export class CreateOrderFromCartProcess implements ProcessContract<
     const mergedMetadata =
       input.metadata != null
         ? {
-            ...(typeof cart.metadata === "object" && cart.metadata !== null
-              ? (cart.metadata as Record<string, unknown>)
-              : {}),
+            ...metadataRecord(cart.metadata),
             ...input.metadata,
             ...(appliedPromoCodes.length > 0
               ? { applied_promo_codes: appliedPromoCodes }
               : {}),
           }
         : {
-            ...(typeof cart.metadata === "object" && cart.metadata !== null
-              ? (cart.metadata as Record<string, unknown>)
-              : {}),
+            ...metadataRecord(cart.metadata),
             ...(appliedPromoCodes.length > 0
               ? { applied_promo_codes: appliedPromoCodes }
               : {}),
@@ -219,7 +217,7 @@ export class CreateOrderFromCartProcess implements ProcessContract<
             country_code: ca.country_code ?? "-",
             province: ca.province ?? null,
             postal_code: ca.postal_code ?? null,
-            metadata: ca.metadata ?? null,
+            metadata: jsonb(ca.metadata),
           })
           .returning("id")
           .executeTakeFirstOrThrow();
@@ -251,7 +249,7 @@ export class CreateOrderFromCartProcess implements ProcessContract<
         ...(hasCartIdColumn ? ({ cart_id: input.cart_id } as const) : {}),
         billing_address_id: shippingAddrId ?? undefined,
         shipping_address_id: shippingAddrId ?? undefined,
-        metadata: mergedMetadata ?? null,
+        metadata: jsonb(mergedMetadata),
       })
       .returningAll()
       .executeTakeFirstOrThrow();
@@ -278,14 +276,14 @@ export class CreateOrderFromCartProcess implements ProcessContract<
             variant_sku: snapshot.variantSku,
             variant_barcode: null,
             variant_title: snapshot.variantTitle,
-            variant_option_values: snapshot.variantOptionValues,
+            variant_option_values: jsonb(snapshot.variantOptionValues),
             requires_shipping: true,
             is_discountable: true,
             is_tax_inclusive: false,
             compare_at_unit_price: null,
             unit_price: li.unit_price ?? "0",
             quantity: li.quantity ?? 1,
-            metadata: li.metadata ?? null,
+            metadata: jsonb(li.metadata),
           };
         }),
       )
@@ -312,7 +310,7 @@ export class CreateOrderFromCartProcess implements ProcessContract<
         code: tl.code ?? null,
         rate: tl.rate ?? "0",
         provider_id: tl.provider_id ?? null,
-        metadata: tl.metadata ?? null,
+        metadata: jsonb(tl.metadata),
       }));
     });
 
@@ -342,7 +340,7 @@ export class CreateOrderFromCartProcess implements ProcessContract<
           description: adj.description ?? null,
           promotion_id: promotionId,
           provider_id: null,
-          metadata: adj.metadata ?? null,
+          metadata: jsonb(adj.metadata),
         };
       });
     });
@@ -390,9 +388,10 @@ export class CreateOrderFromCartProcess implements ProcessContract<
 
       if (!variant || !variant.manage_inventory || !variant.sku) continue;
 
+      const sku = String(variant.sku).trim();
       const inventoryItem = await db
         .selectFrom("inventory_items")
-        .where("sku", "=", variant.sku)
+        .where("sku", "=", sku)
         .where("deleted_at", "is", null)
         .select(["id"])
         .executeTakeFirst();
@@ -407,6 +406,21 @@ export class CreateOrderFromCartProcess implements ProcessContract<
         ]);
       }
 
+      const levels = await db
+        .selectFrom("inventory_levels")
+        .where("inventory_item_id", "=", inventoryItem.id)
+        .where("deleted_at", "is", null)
+        .select(["available_quantity"])
+        .execute();
+
+      if (levels.length === 0) continue;
+
+      const totalAvailable = levels.reduce(
+        (sum: number, level: { available_quantity: number }) =>
+          sum + Math.max(0, level.available_quantity),
+        0
+      );
+
       const reservedRows = await db
         .selectFrom("reservation_items")
         .where("line_item_id", "=", lineItem.id)
@@ -420,15 +434,17 @@ export class CreateOrderFromCartProcess implements ProcessContract<
         0
       );
 
-      if (!variant.allow_backorder && reservedQuantity < quantity) {
-        throw new ValidationError("Insufficient reserved inventory for order placement", [
-          {
-            type: "invalid",
-            message: "Not enough inventory is reserved for one or more line items",
-            path: "cart_id",
-          },
-        ]);
-      }
+      if (variant.allow_backorder) continue;
+      if (reservedQuantity >= quantity) continue;
+      if (totalAvailable >= quantity) continue;
+
+      throw new ValidationError("Insufficient inventory for order placement", [
+        {
+          type: "invalid",
+          message: "Not enough inventory is available for one or more line items",
+          path: "cart_id",
+        },
+      ]);
     }
   }
 
@@ -449,9 +465,10 @@ export class CreateOrderFromCartProcess implements ProcessContract<
 
       if (!variant || !variant.manage_inventory || !variant.sku) continue;
 
+      const sku = String(variant.sku).trim();
       const inventoryItem = await db
         .selectFrom("inventory_items")
-        .where("sku", "=", variant.sku)
+        .where("sku", "=", sku)
         .where("deleted_at", "is", null)
         .select(["id"])
         .executeTakeFirst();
@@ -466,6 +483,8 @@ export class CreateOrderFromCartProcess implements ProcessContract<
         .select(["id", "location_id", "quantity"])
         .execute();
 
+      let remainingToFulfill = quantity;
+
       for (const reservation of reservations as Array<{ id: string; location_id: string; quantity: number }>) {
         const level = await db
           .selectFrom("inventory_levels")
@@ -477,12 +496,15 @@ export class CreateOrderFromCartProcess implements ProcessContract<
 
         if (!level) continue;
 
+        const nextStocked = Math.max(0, level.stocked_quantity - reservation.quantity);
+        const nextReserved = Math.max(0, level.reserved_quantity - reservation.quantity);
+
         await db
           .updateTable("inventory_levels")
           .set({
-            stocked_quantity: Math.max(0, level.stocked_quantity - reservation.quantity),
-            reserved_quantity: Math.max(0, level.reserved_quantity - reservation.quantity),
-            available_quantity: Math.max(0, level.stocked_quantity - reservation.quantity - (level.reserved_quantity - reservation.quantity)),
+            stocked_quantity: nextStocked,
+            reserved_quantity: nextReserved,
+            available_quantity: Math.max(0, nextStocked - nextReserved),
             updated_at: new Date(),
           })
           .where("id", "=", level.id)
@@ -494,6 +516,47 @@ export class CreateOrderFromCartProcess implements ProcessContract<
           .where("id", "=", reservation.id)
           .where("deleted_at", "is", null)
           .execute();
+
+        remainingToFulfill -= reservation.quantity;
+      }
+
+      if (remainingToFulfill <= 0) continue;
+
+      const levels = await db
+        .selectFrom("inventory_levels")
+        .where("inventory_item_id", "=", inventoryItem.id)
+        .where("deleted_at", "is", null)
+        .select(["id", "stocked_quantity", "reserved_quantity", "available_quantity"])
+        .orderBy("available_quantity", "desc")
+        .execute();
+
+      for (const level of levels as Array<{
+        id: string;
+        stocked_quantity: number;
+        reserved_quantity: number;
+        available_quantity: number;
+      }>) {
+        if (remainingToFulfill <= 0) break;
+
+        const available = Math.max(0, level.available_quantity);
+        if (available <= 0) continue;
+
+        const deduct = Math.min(remainingToFulfill, available);
+        const nextStocked = Math.max(0, level.stocked_quantity - deduct);
+        const nextReserved = level.reserved_quantity;
+
+        await db
+          .updateTable("inventory_levels")
+          .set({
+            stocked_quantity: nextStocked,
+            reserved_quantity: nextReserved,
+            available_quantity: Math.max(0, nextStocked - nextReserved),
+            updated_at: new Date(),
+          })
+          .where("id", "=", level.id)
+          .execute();
+
+        remainingToFulfill -= deduct;
       }
     }
   }

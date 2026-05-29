@@ -22,6 +22,7 @@ export const cartState = $state({
 });
 
 let initPromise: Promise<Cart | null> | null = null;
+let lineItemsSyncChain: Promise<unknown> = Promise.resolve();
 
 function normalizeLineItemPayload(item: Record<string, unknown>) {
   const metadata =
@@ -138,21 +139,32 @@ export async function ensureCartId(): Promise<string> {
   return cart.id;
 }
 
+function runExclusiveLineItemsSync<T>(fn: () => Promise<T>): Promise<T> {
+  const run = lineItemsSyncChain.then(fn, fn);
+  lineItemsSyncChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 export async function syncLineItems(
   lineItems: Array<LineItemPayload>,
   id?: string,
 ): Promise<Cart> {
-  const cartId = id ?? (await ensureCartId());
-  const res = await client.storefront.carts({ id: cartId })["line-items"].put({
-    line_items: lineItems.map((item) => normalizeLineItemPayload(item)),
+  return runExclusiveLineItemsSync(async () => {
+    const cartId = id ?? (await ensureCartId());
+    const res = await client.storefront.carts({ id: cartId })["line-items"].put({
+      line_items: lineItems.map((item) => normalizeLineItemPayload(item)),
+    });
+    if (res.error || !res.data) {
+      throw new Error(res.error?.value?.message ?? "Unknown error");
+    }
+    const cart = res.data as Cart;
+    cartState.cart = cart;
+    setCartId(cart.id);
+    return cart;
   });
-  if (res.error || !res.data) {
-    throw new Error(res.error?.value?.message ?? "Unknown error");
-  }
-  const cart = res.data as Cart;
-  cartState.cart = cart;
-  setCartId(cart.id);
-  return cart;
 }
 
 export async function applyPromoCode(code: string, id?: string): Promise<Cart> {
@@ -262,12 +274,32 @@ export async function changeQuantity(variantId: string, quantity: number) {
   return syncLineItems(next as Array<LineItemPayload>, cart.id);
 }
 
-export async function changeLineItemQuantity(lineId: string, quantity: number) {
-  const cart = (await initCartState()) ?? null;
+export async function changeLineItemQuantity(
+  lineId: string | undefined,
+  quantity: number,
+  variantId?: string | null,
+) {
+  let cart = (await initCartState()) ?? null;
   if (!cart) return null;
+
+  const lineMatches = (li: CartLineItem) =>
+    lineId != null && lineId !== ""
+      ? li.id === lineId
+      : variantId != null && variantId !== ""
+        ? li.variant_id === variantId
+        : false;
+
+  if (!cart.line_items.some(lineMatches)) {
+    const refreshed = await retrieveCart(cart.id);
+    if (refreshed) {
+      cart = refreshed;
+      cartState.cart = refreshed;
+    }
+  }
+
   const normalized = Math.max(0, quantity);
   const next = cart.line_items
-    .map((li) => (li.id === lineId ? { ...li, quantity: normalized } : li))
+    .map((li) => (lineMatches(li) ? { ...li, quantity: normalized } : li))
     .filter((li) => (li.quantity ?? 0) > 0);
   return syncLineItems(next as Array<LineItemPayload>, cart.id);
 }
