@@ -2,6 +2,7 @@ import {
   InjectDB,
   Process,
   ProcessContext,
+  jsonb,
   type ProcessContextType,
   type ProcessContract,
 } from "@danimai/core";
@@ -49,7 +50,7 @@ export class CreateCartProcess implements ProcessContract<
         customer_id: input.customer_id ?? null,
         session_id: input.session_id,
         type: null,
-        metadata: input.metadata ?? null,
+        metadata: jsonb(input.metadata),
       })
       .returningAll()
       .executeTakeFirst();

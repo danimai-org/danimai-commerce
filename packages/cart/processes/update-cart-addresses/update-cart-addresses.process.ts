@@ -4,6 +4,7 @@ import {
   Process,
   ProcessContext,
   ValidationError,
+  jsonb,
   type ProcessContextType,
   type ProcessContract,
 } from "@danimai/core";
@@ -71,7 +72,7 @@ export class UpdateCartAddressesProcess
       postal_code: sa.postal_code,
       country_code: sa.country_code,
       phone: sa.phone,
-      metadata: sa.metadata,
+      metadata: sa.metadata !== undefined ? jsonb(sa.metadata) : undefined,
     };
 
     await this.db.transaction().execute(async (trx) => {
@@ -116,7 +117,7 @@ export class UpdateCartAddressesProcess
             postal_code: sa.postal_code ?? null,
             country_code: sa.country_code ?? null,
             phone: sa.phone ?? null,
-            metadata: sa.metadata ?? null,
+            metadata: jsonb(sa.metadata),
           })
           .returning("id")
           .executeTakeFirstOrThrow();
