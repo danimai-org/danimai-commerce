@@ -5,14 +5,15 @@ import {
   ProcessContext,
   type ProcessContextType,
   type ProcessContract,
-  type PaginationResponseType,
   paginationResponse,
   SortOrder,
 } from "@danimai/core";
 import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
+  CUSTOMER_ADDRESS_SORT_FIELDS,
   ListCustomerAddressesSchema,
+  type ListCustomerAddressesProcessOutput,
 } from "./list-customer-addresses.schema";
 import type { Database, CustomerAddress } from "../../../db/type";
 
@@ -25,7 +26,10 @@ export const LIST_CUSTOMER_ADDRESSES_PROCESS = Symbol("ListCustomerAddresses");
 
 @Process(LIST_CUSTOMER_ADDRESSES_PROCESS)
 export class ListCustomerAddressesProcess
-  implements ProcessContract<PaginationResponseType<CustomerAddress>>
+  implements ProcessContract<
+    typeof ListCustomerAddressesSchema,
+    ListCustomerAddressesProcessOutput
+  >
 {
   constructor(
     @InjectDB()
@@ -50,7 +54,7 @@ export class ListCustomerAddressesProcess
       customer_id,
       page = 1,
       limit = 10,
-      sorting_field = "created_at",
+      sorting_field = "is_default",
       sorting_direction = SortOrder.DESC,
     } = input;
 
@@ -67,19 +71,11 @@ export class ListCustomerAddressesProcess
 
     const sortOrder =
       sorting_direction === SortOrder.ASC ? "asc" : "desc";
-    const allowedSortFields = [
-      "id",
-      "first_name",
-      "last_name",
-      "city",
-      "country_code",
-      "is_default",
-      "created_at",
-      "updated_at",
-    ];
-    const safeSortField = allowedSortFields.includes(sorting_field)
+    const safeSortField = (
+      CUSTOMER_ADDRESS_SORT_FIELDS as readonly string[]
+    ).includes(sorting_field)
       ? sorting_field
-      : "created_at";
+      : "is_default";
     query = query.orderBy(
       sql.ref(`customer_addresses.${safeSortField}`),
       sortOrder
