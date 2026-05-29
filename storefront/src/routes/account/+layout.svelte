@@ -6,6 +6,8 @@
     import {
         ACCOUNT_STORAGE_KEY,
         ACCOUNT_UPDATED_EVENT,
+        logoutCustomerSession,
+        notifyAccountUpdated,
         parseStoredAccount,
         type StoredAccount,
     } from "$lib/account/storage";
@@ -63,7 +65,9 @@
 
     const logout = async () => {
         if (!browser) return;
+        await logoutCustomerSession();
         localStorage.removeItem(ACCOUNT_STORAGE_KEY);
+        notifyAccountUpdated();
         await goto("/login");
     };
 </script>

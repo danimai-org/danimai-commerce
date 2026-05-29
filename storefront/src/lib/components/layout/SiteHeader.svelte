@@ -29,6 +29,7 @@
     import {
         ACCOUNT_STORAGE_KEY,
         ACCOUNT_UPDATED_EVENT,
+        logoutCustomerSession,
         notifyAccountUpdated,
     } from "$lib/account/storage";
 
@@ -222,6 +223,7 @@
 
     async function logout() {
         if (!browser) return;
+        await logoutCustomerSession();
         localStorage.removeItem(ACCOUNT_STORAGE_KEY);
         notifyAccountUpdated();
         syncAccountState();

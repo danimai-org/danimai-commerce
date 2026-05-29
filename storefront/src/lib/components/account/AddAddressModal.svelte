@@ -17,6 +17,7 @@
         title?: string;
         seed?: string;
         initial?: Partial<AddressFormValues>;
+        saving?: boolean;
         onClose?: () => void;
         onSave?: (values: AddressFormValues) => void;
     };
@@ -26,6 +27,7 @@
         title = "Add Address",
         seed = "new",
         initial = {},
+        saving = false,
         onClose,
         onSave,
     }: Props = $props();
@@ -81,7 +83,7 @@
 
     const handleSubmit = (event: SubmitEvent) => {
         event.preventDefault();
-        if (!isValid) return;
+        if (!isValid || saving) return;
         onSave?.({
             name: name.trim(),
             line1: line1.trim(),
@@ -187,7 +189,7 @@
                 </div>
 
                 <div class="address-field-row">
-                    <label class="address-field address-field--select">
+                    <label class="address-field">
                         <input
                             type="text"
                             bind:value={stateValue}
@@ -195,19 +197,6 @@
                             required
                             autocomplete="address-level1"
                         />
-
-                        <svg
-                            class="address-field__chevron"
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            aria-hidden="true"
-                        >
-                            <path d="m6 9 6 6 6-6" />
-                        </svg>
                     </label>
                     <label class="address-field">
                         <input
@@ -246,7 +235,8 @@
                 <button
                     type="submit"
                     class="address-modal__submit"
-                    disabled={!isValid}>Save Address</button
+                    disabled={!isValid || saving}
+                    >{saving ? "Saving…" : "Save Address"}</button
                 >
             </form>
         </div>
