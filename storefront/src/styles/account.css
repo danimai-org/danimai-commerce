@@ -173,30 +173,13 @@
         @apply border-[#7a8c5f] bg-[#fafbf8];
     }
 
+    .account-address-title-row {
+        @apply flex items-center justify-between gap-3;
+    }
+
     .account-address-badge {
-        @apply inline-flex self-start items-center rounded px-2.5 py-1 text-xs font-semibold tracking-wide text-white;
+        @apply inline-flex shrink-0 items-center rounded px-2.5 py-1 text-xs font-semibold tracking-wide text-white;
         background-color: #7a8c5f;
-    }
-
-    .account-address-select {
-        @apply flex gap-3 items-start cursor-pointer;
-    }
-
-    .account-address-select input {
-        @apply sr-only;
-    }
-
-    .account-address-radio {
-        @apply mt-1 w-4 h-4 rounded-full border border-[#9a9a94] shrink-0 relative;
-    }
-
-    .account-address-select input:checked + .account-address-radio {
-        @apply border-[#6b7355];
-    }
-
-    .account-address-select input:checked + .account-address-radio::after {
-        content: "";
-        @apply absolute inset-[3px] rounded-full bg-[#6b7355];
     }
 
     .account-address-copy {
@@ -212,7 +195,7 @@
     }
 
     .account-address-actions {
-        @apply flex flex-wrap items-center gap-1 pt-3 mt-auto border-t border-[#ecece8] text-sm text-[#6b7355];
+        @apply flex flex-wrap items-center gap-1 pt-3 shrink-0 w-full border-t border-[#ecece8] text-sm text-[#6b7355];
     }
 
     .account-text-link {

@@ -29,6 +29,7 @@
 
     let showPassword = $state(false);
     let loggingIn = $state(false);
+    let submitting = $state(false);
 
     onMount(() => {
         clearCustomerAuth();
@@ -56,7 +57,14 @@
     };
     // `data` comes from page load; superForm owns state after init.
     // svelte-ignore state_referenced_locally
-    const { form, errors, constraints, message, enhance } = superForm<LoginFormData>(
+    const {
+        form,
+        errors,
+        constraints,
+        message,
+        enhance,
+        submitting: submittingStore,
+    } = superForm<LoginFormData>(
         (data as { loginForm: SuperValidated<LoginFormData> }).loginForm,
         {
             SPA: true,
@@ -110,6 +118,13 @@
             },
         },
     );
+
+    $effect(() => {
+        const unsub = submittingStore.subscribe((value) => {
+            submitting = value;
+        });
+        return unsub;
+    });
 </script>
 
 <svelte:head>
@@ -218,8 +233,12 @@
             {#if $message}
                 <p class="login-error">{$message}</p>
             {/if}
-            <button type="submit" class="auth-submit" disabled={$delayed}>
-                {$delayed ? "Logging in..." : "LOGIN"}
+            <button
+                type="submit"
+                class="auth-submit"
+                disabled={submitting || loggingIn}
+            >
+                {submitting || loggingIn ? "Logging in..." : "LOGIN"}
             </button>
         </form>
 

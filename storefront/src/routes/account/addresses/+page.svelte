@@ -6,8 +6,11 @@
         CustomerAuthError,
         createCustomerAddress,
         deleteCustomerAddress,
-        getCustomerAccessToken,
+        ensureCustomerDefaultAddress,
+        hasCustomerAuthSession,
         listCustomerAddresses,
+        notifyAccountUpdated,
+        savedAddressToFormInput,
         setDefaultCustomerAddress,
         updateCustomerAddress,
         type CustomerSavedAddress,
@@ -18,29 +21,32 @@
     } from "$lib/components/account";
 
     let addresses = $state<CustomerSavedAddress[]>([]);
-    let selectedId = $state("");
     let addressModalOpen = $state(false);
     let editingId = $state<string | null>(null);
     let loading = $state(false);
     let error = $state("");
     let actionPending = $state(false);
 
-    const sortDefaultFirst = (items: CustomerSavedAddress[]): CustomerSavedAddress[] =>
+    const sortDefaultFirst = (
+        items: CustomerSavedAddress[],
+    ): CustomerSavedAddress[] =>
         [...items].sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
 
     const applyLoadedAddresses = (items: CustomerSavedAddress[]) => {
         addresses = sortDefaultFirst(items);
-        const defaultEntry =
-            items.find((entry) => entry.isDefault) ?? items[0];
-        selectedId = defaultEntry?.id ?? "";
+    };
+
+    const redirectToLoginIfUnauthenticated = async () => {
+        if (!hasCustomerAuthSession()) {
+            await goto("/login");
+        }
     };
 
     const loadAddresses = async () => {
         if (!browser) return;
-        if (!getCustomerAccessToken()) {
+        if (!hasCustomerAuthSession()) {
             error = "Please log in to view your addresses.";
             addresses = [];
-            selectedId = "";
             await goto("/login");
             return;
         }
@@ -48,17 +54,18 @@
         loading = true;
         error = "";
         try {
-            const rows = await listCustomerAddresses();
+            const rows = await ensureCustomerDefaultAddress(
+                await listCustomerAddresses(),
+            );
             applyLoadedAddresses(rows);
         } catch (e) {
             if (e instanceof CustomerAuthError) {
                 error = e.message;
-                addresses = [];
-                await goto("/login");
+                await redirectToLoginIfUnauthenticated();
                 return;
             }
-            error = e instanceof Error ? e.message : "Failed to load addresses.";
-            addresses = [];
+            error =
+                e instanceof Error ? e.message : "Failed to load addresses.";
         } finally {
             loading = false;
         }
@@ -124,10 +131,11 @@
                 await createCustomerAddress(values);
             }
             await loadAddresses();
+            notifyAccountUpdated();
             closeModal();
         } catch (e) {
             if (e instanceof CustomerAuthError) {
-                await goto("/login");
+                await redirectToLoginIfUnauthenticated();
                 return;
             }
             error = e instanceof Error ? e.message : "Failed to save address.";
@@ -137,17 +145,31 @@
     };
 
     const removeAddress = async (id: string) => {
+        const target = addresses.find((item) => item.id === id);
+        if (!target) return;
+
         actionPending = true;
         error = "";
         try {
+            const remaining = addresses.filter((item) => item.id !== id);
+            if (target.isDefault && remaining.length > 0) {
+                const nextDefault = remaining[0];
+                await setDefaultCustomerAddress(
+                    nextDefault.id,
+                    savedAddressToFormInput(nextDefault, true),
+                );
+            }
+
             await deleteCustomerAddress(id);
             await loadAddresses();
+            notifyAccountUpdated();
         } catch (e) {
             if (e instanceof CustomerAuthError) {
-                await goto("/login");
+                await redirectToLoginIfUnauthenticated();
                 return;
             }
-            error = e instanceof Error ? e.message : "Failed to remove address.";
+            error =
+                e instanceof Error ? e.message : "Failed to remove address.";
         } finally {
             actionPending = false;
         }
@@ -160,24 +182,21 @@
         actionPending = true;
         error = "";
         try {
-            await setDefaultCustomerAddress(id, {
-                name: entry.name,
-                line1: entry.line1,
-                line2: entry.line2,
-                city: entry.city,
-                state: entry.state,
-                postal: entry.postal,
-                phone: entry.phone,
-                isDefault: true,
-            });
+            await setDefaultCustomerAddress(
+                id,
+                savedAddressToFormInput(entry, true),
+            );
             await loadAddresses();
+            notifyAccountUpdated();
         } catch (e) {
             if (e instanceof CustomerAuthError) {
-                await goto("/login");
+                await redirectToLoginIfUnauthenticated();
                 return;
             }
             error =
-                e instanceof Error ? e.message : "Failed to set default address.";
+                e instanceof Error
+                    ? e.message
+                    : "Failed to set default address.";
         } finally {
             actionPending = false;
         }
@@ -199,8 +218,7 @@
             type="button"
             class="account-add-link"
             onclick={openAddModal}
-            disabled={loading || actionPending}
-            >Add New Address</button
+            disabled={loading || actionPending}>Add New Address</button
         >
     </div>
 
@@ -218,11 +236,15 @@
                         class="account-address-card"
                         class:account-address-card--selected={entry.isDefault}
                     >
-                        {#if entry.isDefault}
-                            <span class="account-address-badge">Default</span>
-                        {/if}
                         <div class="account-address-copy">
-                            <strong>{entry.name}</strong>
+                            <div class="account-address-title-row">
+                                <strong>{entry.name}</strong>
+                                {#if entry.isDefault}
+                                    <span class="account-address-badge"
+                                        >Default</span
+                                    >
+                                {/if}
+                            </div>
                             <span>{entry.line1}</span>
                             {#if entry.line2}
                                 <span>{entry.line2}</span>

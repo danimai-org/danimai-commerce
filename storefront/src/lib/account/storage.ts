@@ -125,6 +125,11 @@ export const getCustomerAccessToken = (): string | null => {
 	return stored.access_token;
 };
 
+export const hasCustomerAuthSession = (): boolean => {
+	const stored = readStoredAuth();
+	return Boolean(stored?.access_token && stored?.refresh_token);
+};
+
 export const setCustomerAuthTokens = (tokens: CustomerAuthTokens): void => {
 	if (!browser) return;
 	const expires_at =
@@ -212,6 +217,20 @@ export const apiAddressToSaved = (row: ApiCustomerAddress): CustomerSavedAddress
 	isDefault: row.is_default
 });
 
+export const savedAddressToFormInput = (
+	entry: CustomerSavedAddress,
+	isDefault = entry.isDefault
+): CustomerAddressFormInput => ({
+	name: entry.name,
+	line1: entry.line1,
+	line2: entry.line2,
+	city: entry.city,
+	state: entry.state,
+	postal: entry.postal,
+	phone: entry.phone,
+	isDefault
+});
+
 export const formInputToApiBody = (values: CustomerAddressFormInput) => {
 	const { first_name, last_name } = splitFullName(values.name);
 	return {
@@ -288,7 +307,6 @@ export async function listCustomerAddresses(
 					return listCustomerAddresses(true);
 				}
 			}
-			clearCustomerAuth();
 			throw new CustomerAuthError('Please log in to manage your addresses.');
 		}
 
@@ -309,16 +327,34 @@ export async function listCustomerAddresses(
 	return rows.map(apiAddressToSaved).sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
 }
 
+export async function ensureCustomerDefaultAddress(
+	items: CustomerSavedAddress[]
+): Promise<CustomerSavedAddress[]> {
+	if (items.length === 0 || items.some((entry) => entry.isDefault)) {
+		return items;
+	}
+	const next = items[0];
+	await setDefaultCustomerAddress(next.id, savedAddressToFormInput(next, true));
+	return listCustomerAddresses();
+}
+
 export async function createCustomerAddress(
-	values: CustomerAddressFormInput
+	values: CustomerAddressFormInput,
+	retried = false
 ): Promise<CustomerSavedAddress> {
-	const headers = await resolveAuthHeaders(false);
+	const headers = await resolveAuthHeaders();
 	const res = await client.storefront.customers.me.addresses.post(formInputToApiBody(values), {
 		headers
 	});
 
-	if (isUnauthorized((res.error as { status?: number } | undefined)?.status)) {
-		clearCustomerAuth();
+	const errorStatus = (res.error as { status?: number } | undefined)?.status;
+	if (isUnauthorized(errorStatus)) {
+		if (!retried) {
+			const refreshed = await refreshCustomerAccessToken();
+			if (refreshed) {
+				return createCustomerAddress(values, true);
+			}
+		}
 		throw new CustomerAuthError('Please log in to manage your addresses.');
 	}
 	if (res.error || !res.data) {
@@ -330,15 +366,22 @@ export async function createCustomerAddress(
 
 export async function updateCustomerAddress(
 	addressId: string,
-	values: CustomerAddressFormInput
+	values: CustomerAddressFormInput,
+	retried = false
 ): Promise<CustomerSavedAddress> {
-	const headers = await resolveAuthHeaders(false);
+	const headers = await resolveAuthHeaders();
 	const res = await client.storefront.customers.me
 		.addresses({ addressId })
 		.put(formInputToApiBody(values), { headers });
 
-	if (isUnauthorized((res.error as { status?: number } | undefined)?.status)) {
-		clearCustomerAuth();
+	const errorStatus = (res.error as { status?: number } | undefined)?.status;
+	if (isUnauthorized(errorStatus)) {
+		if (!retried) {
+			const refreshed = await refreshCustomerAccessToken();
+			if (refreshed) {
+				return updateCustomerAddress(addressId, values, true);
+			}
+		}
 		throw new CustomerAuthError('Please log in to manage your addresses.');
 	}
 	if (res.error || !res.data) {
@@ -348,14 +391,23 @@ export async function updateCustomerAddress(
 	return apiAddressToSaved(res.data as ApiCustomerAddress);
 }
 
-export async function deleteCustomerAddress(addressId: string): Promise<void> {
-	const headers = await resolveAuthHeaders(false);
+export async function deleteCustomerAddress(
+	addressId: string,
+	retried = false
+): Promise<void> {
+	const headers = await resolveAuthHeaders();
 	const res = await client.storefront.customers.me
 		.addresses({ addressId })
-		.delete({ headers });
+		.delete({}, { headers });
 
-	if (isUnauthorized((res.error as { status?: number } | undefined)?.status)) {
-		clearCustomerAuth();
+	const errorStatus = (res.error as { status?: number } | undefined)?.status;
+	if (isUnauthorized(errorStatus)) {
+		if (!retried) {
+			const refreshed = await refreshCustomerAccessToken();
+			if (refreshed) {
+				return deleteCustomerAddress(addressId, true);
+			}
+		}
 		throw new CustomerAuthError('Please log in to manage your addresses.');
 	}
 	if (res.error) {
