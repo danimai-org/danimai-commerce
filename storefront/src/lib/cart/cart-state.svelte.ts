@@ -1,11 +1,7 @@
 import { client } from "$lib/api/client";
+import type { Cart, CartLineItem, CartShippingAddress } from "$lib/types/cart";
 
-export type Cart = NonNullable<
-  Awaited<ReturnType<ReturnType<(typeof client)["storefront"]["carts"]>["get"]>>["data"]
->;
-
-export type CartLineItem = Cart["line_items"][number];
-export type CartShippingAddress = Cart["shipping_address"];
+export type { Cart, CartLineItem, CartShippingAddress };
 
 type LineItemPayload = Partial<CartLineItem> & Record<string, unknown>;
 

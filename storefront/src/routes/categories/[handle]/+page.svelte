@@ -17,29 +17,12 @@
         isBottomCategory,
         isChildCategory,
     } from "$lib/category-nav";
+    import type { StorefrontProductListRow } from "$lib/types/product";
+    import {
+        type ProductGridItem,
+        toProductGridItem,
+    } from "$lib/types/product-grid";
 
-    type StorefrontProductRow = {
-        title: string;
-        handle: string;
-        thumbnail: string | null;
-        variant: {
-            id: string;
-            title: string;
-            thumbnail: string | null;
-            price: { amount: string; currency_code: string } | null;
-        } | null;
-    };
-
-    type ProductGridItem = {
-        name: string;
-        price: { amount: number; currency_code: string };
-        href: string;
-        bg: string;
-        image: string | null;
-        variantId?: string | null;
-        variantTitle?: string | null;
-        variant_id?: string | null;
-    };
     type CategoryPageData = {
         rows: ProductGridItem[];
         pagination: PaginationMeta;
@@ -97,11 +80,6 @@
             for (const x of descendantCategoryIds(id, all)) seen.add(x);
         }
         return [...seen];
-    }
-
-    const FALLBACK_BGS = ["#e8e0d5", "#4a4a4a", "#f5f0eb", "#6b7c5c"];
-    function pickBg(i: number) {
-        return FALLBACK_BGS[i % FALLBACK_BGS.length];
     }
 
     function productsListQuery(url: URL) {
@@ -245,32 +223,15 @@
             }
             const raw = (await pres.json()) as unknown;
             const { rows: productRows } =
-                rowsFromPaginated<StorefrontProductRow>(raw);
+                rowsFromPaginated<StorefrontProductListRow>(raw);
             const pagination =
                 (raw as { pagination?: PaginationMeta }).pagination ??
                 emptyPagination();
-            const grid = productRows.map((p, i) => {
-                const pr = p.variant?.price;
-                const amount =
-                    pr?.amount != null
-                        ? parseInt(pr.amount, 10) / 100
-                        : Number.NaN;
-                const currency_code = pr?.currency_code ?? "EUR";
-                return {
-                    name: p.title,
-                    price: {
-                        amount: Number.isFinite(amount) ? amount : Number.NaN,
-                        currency_code,
-                    },
-                    href: `/products/${p.handle}`,
-                    bg: pickBg(i),
-                    image: p.thumbnail ?? p.variant?.thumbnail ?? null,
-                    variantId: p.variant?.id ?? null,
-                    variantTitle: p.variant?.title ?? null,
-                };
-            });
+            const grid = productRows.map((p, i) =>
+                toProductGridItem(p, i, { preferProductThumbnail: true }),
+            );
             return {
-                rows: grid as unknown as unknown as ProductGridItem[],
+                rows: grid,
                 pagination,
                 categoryTitle: resolvedTitle,
                 categoryNotFound: false,

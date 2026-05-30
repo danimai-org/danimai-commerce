@@ -1,13 +1,11 @@
-export type PaginatedCategories = Awaited<
-  ReturnType<(typeof client)["storefront"]["categories"]["get"]>
->["data"];
+import { client, type PaginatedRow } from './helpers';
 
+export type AdminCategoryRow = PaginatedRow<
+	(typeof client)['admin']['product-categories']['get']
+>;
 
-export type RetrieveCategory = Awaited<
-  ReturnType<(typeof client)["storefront"]["categories"]["get"]>
->["data"];
+/** @deprecated Use AdminCategoryRow */
+export type PaginatedCategories = AdminCategoryRow;
 
-
-export type DeleteCategory = Awaited<
-  ReturnType<(typeof client)["storefront"]["categories"]["delete"]>
->["data"];
+/** @deprecated Use AdminCategoryRow */
+export type RetrieveCategory = AdminCategoryRow;

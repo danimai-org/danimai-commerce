@@ -17,14 +17,7 @@
         isBottomCategory,
         isChildCategory,
     } from "$lib/category-nav";
-
-    type CategoryRow = CategoryNavRow;
-
-    type CollectionRow = {
-        id: string;
-        title: string;
-        handle: string;
-    };
+    import type { AdminCollectionRow } from "$lib/types/collection";
 
     import {
         ACCOUNT_STORAGE_KEY,
@@ -114,13 +107,13 @@
             });
             if (res.error) {
                 return {
-                    rows: [] as CategoryRow[],
+                    rows: [] as CategoryNavRow[],
                     pagination: emptyPagination(),
                 };
             }
             const body = res.data as unknown;
             return {
-                rows: unwrapRows<CategoryRow>(body),
+                rows: unwrapRows<CategoryNavRow>(body),
                 pagination: unwrapPagination(body) ?? emptyPagination(),
             };
         },
@@ -136,13 +129,13 @@
             });
             if (res.error) {
                 return {
-                    rows: [] as CollectionRow[],
+                    rows: [] as AdminCollectionRow[],
                     pagination: emptyPagination(),
                 };
             }
             const body = res.data as unknown;
             return {
-                rows: unwrapRows<CollectionRow>(body),
+                rows: unwrapRows<AdminCollectionRow>(body),
                 pagination: unwrapPagination(body) ?? emptyPagination(),
             };
         },
@@ -155,10 +148,10 @@
     const { query: collectionsQuery } = collectionsState;
 
     const productCategories = $derived(
-        (productCategoriesQuery.data?.rows ?? []) as CategoryRow[],
+        (productCategoriesQuery.data?.rows ?? []) as CategoryNavRow[],
     );
     const navCollections = $derived(
-        (collectionsQuery.data?.rows ?? []) as CollectionRow[],
+        (collectionsQuery.data?.rows ?? []) as AdminCollectionRow[],
     );
 
     const navCategoryPool = $derived(

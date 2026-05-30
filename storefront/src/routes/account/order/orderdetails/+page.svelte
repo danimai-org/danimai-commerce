@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { browser } from '$app/environment';
 	import {
 		displayOrderNumber,
@@ -12,7 +12,7 @@
 	let notFound = $state(false);
 	let loading = $state(true);
 
-	const orderRef = $derived($page.url.searchParams.get('order')?.trim() ?? '');
+	const orderRef = $derived(page.url.searchParams.get('order')?.trim() ?? '');
 
 	const summaryForOrder = $derived.by(() => {
 		if (!orderRef) return null;

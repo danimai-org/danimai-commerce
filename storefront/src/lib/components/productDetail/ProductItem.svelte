@@ -3,21 +3,9 @@
     import { addItemAndOpenSheet } from "$lib/cart/cart-state.svelte";
     import { formatStoreMoney } from "$lib/money";
     import { AddToCart, CartImage, CartTitle } from "../productCart";
+    import type { ProductGridItem } from "$lib/types/product-grid";
 
-    type ProductGridItem = {
-        name: string;
-        price: { amount: number; currency_code: string };
-        href: string;
-        bg: string;
-        image: string | null;
-        variantId?: string | null;
-        variant_id?: string | null;
-        variantTitle?: string | null;
-        variants?: Array<{ id?: string | null; title?: string | null }>;
-        variant?: { id?: string | null; title?: string | null } | null;
-    };
-
-    const { product } = $props();
+    const { product } = $props<{ product: ProductGridItem }>();
 
     function parsePrice(price: string | number | null | undefined): number {
         if (typeof price === "number") {

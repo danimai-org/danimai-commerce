@@ -1,12 +1,7 @@
 <script lang="ts">
     import CartProductCard from "./cart-product-card.svelte";
+    import type { AdminProductRow } from "$lib/types/admin";
 
-    type ProductItem = {
-        id: string;
-        title: string;
-        handle: string;
-        thumbnail?: string | null;
-    };
     type LookExtra = { image: string | null; priceDisplay: string };
 
     let {
@@ -14,7 +9,7 @@
         lookExtrasByProductId,
         onQuickAdd,
     }: {
-        products: ProductItem[];
+        products: AdminProductRow[];
         lookExtrasByProductId: Map<string, LookExtra>;
         onQuickAdd: (
             e: MouseEvent,

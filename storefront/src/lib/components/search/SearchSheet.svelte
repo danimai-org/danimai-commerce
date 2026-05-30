@@ -4,6 +4,7 @@
 	import { client } from '$lib/api/client.js';
 	import { search } from '$lib/stores/search';
 	import { formatStoreMoney } from '$lib/money';
+	import type { AdminProductRow, AdminProductVariantPrice } from '$lib/types/admin';
 	type SearchResult = {
 		name: string;
 		price: string;
@@ -83,25 +84,18 @@
 				return;
 			}
 			const raw = res.data as unknown;
-			const { rows: list } = rowsFromPaginated<{
-				id: string;
-				title: string;
-				handle: string;
-				thumbnail?: string | null;
-				variants?: Array<{ id: string }>;
-			}>(raw);
+			const { rows: list } = rowsFromPaginated<AdminProductRow>(raw);
 			const variantMap = await firstVariantIdByProductIds(
 				API_BASE,
 				list.map((p) => p.id)
 			);
 			const variantIds = list
-				.map((p) => p.variants?.[0]?.id ?? variantMap.get(p.id))
+				.map((p) => variantMap.get(p.id))
 				.filter((id): id is string => !!id);
-			type PriceObj = { amount: string; currency_code: string } | null;
-			const prices: PriceObj[] = await Promise.all(
+			const prices: (AdminProductVariantPrice | null)[] = await Promise.all(
 				variantIds.map((id) =>
-					client.admin['product-variants']({ id }).get().then((r: any) => (r.error ? null : r.data))
-						.then((variant: any) => variant?.prices?.[0] ?? null)
+					client.admin['product-variants']({ id }).get()
+						.then((r) => (r.error ? null : r.data?.prices?.[0] ?? null))
 						.catch(() => null)
 				)
 			);

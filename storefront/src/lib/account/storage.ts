@@ -1,6 +1,11 @@
 import { browser } from '$app/environment';
 import { client } from '$lib/api/client';
 import { rowsFromPaginated } from '$lib/api/storefront-api';
+import type {
+	CustomerAddressRow,
+	CustomerAuthTokens,
+	CustomerMe,
+} from '$lib/types/customer';
 
 export const ACCOUNT_STORAGE_KEY = 'dm_sf_account';
 export const ACCOUNT_UPDATED_EVENT = 'dm_sf_account_updated';
@@ -15,11 +20,7 @@ export type StoredAccount = {
 	gender?: string;
 };
 
-export type CustomerAuthTokens = {
-	access_token: string;
-	refresh_token: string;
-	expires_in?: number;
-};
+export type { CustomerAuthTokens };
 
 export type CustomerSavedAddress = {
 	id: string;
@@ -42,20 +43,6 @@ export type CustomerAddressFormInput = {
 	postal: string;
 	phone: string;
 	isDefault: boolean;
-};
-
-type ApiCustomerAddress = {
-	id: string;
-	first_name: string | null;
-	last_name: string | null;
-	phone: string | null;
-	address_1: string;
-	address_2: string | null;
-	city: string;
-	province: string | null;
-	postal_code: string | null;
-	country_code: string;
-	is_default: boolean;
 };
 
 type StoredAuth = CustomerAuthTokens & { expires_at?: number };
@@ -164,7 +151,7 @@ export const refreshCustomerAccessToken = async (): Promise<string | null> => {
 		return null;
 	}
 
-	const data = res.data as CustomerAuthTokens;
+	const data = res.data;
 	setCustomerAuthTokens(data);
 	return data.access_token;
 };
@@ -205,7 +192,7 @@ export const displayNameFromApi = (
 	last_name: string | null | undefined
 ): string => [first_name, last_name].filter(Boolean).join(' ').trim();
 
-export const apiAddressToSaved = (row: ApiCustomerAddress): CustomerSavedAddress => ({
+export const apiAddressToSaved = (row: CustomerAddressRow): CustomerSavedAddress => ({
 	id: row.id,
 	name: displayNameFromApi(row.first_name, row.last_name) || row.address_1,
 	line1: row.address_1,
@@ -255,12 +242,7 @@ export async function syncAccountFromApi(): Promise<StoredAccount | null> {
 	const res = await client.storefront.auth.me.get({ headers });
 	if (res.error || !res.data) return null;
 
-	const customer = res.data as {
-		email: string;
-		first_name: string | null;
-		last_name: string | null;
-		phone: string | null;
-	};
+	const customer = res.data as CustomerMe;
 	const name =
 		displayNameFromApi(customer.first_name, customer.last_name) || 'Customer';
 	const account: StoredAccount = {
@@ -289,7 +271,7 @@ export async function listCustomerAddresses(
 	retried = false
 ): Promise<CustomerSavedAddress[]> {
 	const headers = await resolveAuthHeaders();
-	const rows: ApiCustomerAddress[] = [];
+	const rows: CustomerAddressRow[] = [];
 	let page = 1;
 	const limit = 100;
 
@@ -314,7 +296,7 @@ export async function listCustomerAddresses(
 			throw new Error(treatyErrorMessage(res.error, 'Failed to load addresses'));
 		}
 
-		const { rows: pageRows } = rowsFromPaginated<ApiCustomerAddress>(res.data);
+		const { rows: pageRows } = rowsFromPaginated<CustomerAddressRow>(res.data);
 		rows.push(...pageRows);
 
 		const pagination = (res.data as { pagination?: { has_next_page?: boolean } })
@@ -361,7 +343,7 @@ export async function createCustomerAddress(
 		throw new Error(treatyErrorMessage(res.error, 'Failed to save address'));
 	}
 
-	return apiAddressToSaved(res.data as ApiCustomerAddress);
+	return apiAddressToSaved(res.data as CustomerAddressRow);
 }
 
 export async function updateCustomerAddress(
@@ -388,7 +370,7 @@ export async function updateCustomerAddress(
 		throw new Error(treatyErrorMessage(res.error, 'Failed to update address'));
 	}
 
-	return apiAddressToSaved(res.data as ApiCustomerAddress);
+	return apiAddressToSaved(res.data as CustomerAddressRow);
 }
 
 export async function deleteCustomerAddress(

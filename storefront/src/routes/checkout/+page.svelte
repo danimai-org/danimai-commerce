@@ -29,6 +29,18 @@
     import { formatStoreMoney } from "$lib/money";
     import { useCart } from "$lib/hooks/use-cart.hook";
     import { cacheOrderDetail } from "$lib/account/order-data";
+    import type { Cart, CartLineItem } from "$lib/types/cart";
+
+    type LineItemPut = Pick<
+        CartLineItem,
+        | "title"
+        | "description"
+        | "thumbnail"
+        | "variant_id"
+        | "product_id"
+        | "quantity"
+        | "unit_price"
+    >;
 
     let { data }: PageProps = $props();
 
@@ -38,30 +50,6 @@
     const ACCOUNT_STORAGE_KEY = "dm_sf_account";
     const ORDERS_STORAGE_KEY_PREFIX = "dm_sf_orders_";
     const DEFAULT_CART_CURRENCY_CODE = "eur";
-    type ApiCartLineItem = {
-        id: string;
-        title?: string | null;
-        description?: string | null;
-        thumbnail?: string | null;
-        variant_id?: string | null;
-        product_id?: string | null;
-        quantity?: number | null;
-        unit_price?: string | null;
-    };
-    type ApiCart = {
-        id: string;
-        currency_code?: string | null;
-        line_items?: ApiCartLineItem[];
-    };
-    type LineItemPut = {
-        title?: string | null;
-        description?: string | null;
-        thumbnail?: string | null;
-        variant_id?: string | null;
-        product_id?: string | null;
-        quantity?: number | null;
-        unit_price?: string | null;
-    };
 
     type CheckoutCartItem = {
         key: string;
@@ -263,10 +251,11 @@
         return o?.value?.message ?? String(err);
     }
 
-    async function fetchCartJson(cartId: string): Promise<ApiCart> {
+    async function fetchCartJson(cartId: string): Promise<Cart> {
         const res = await client.storefront.carts({ id: cartId }).get();
         if (res.error) throw new Error(treatyErrorMessage(res.error));
-        return res.data as ApiCart;
+        if (!res.data) throw new Error("Cart not found");
+        return res.data;
     }
 
     async function putLineItems(cartId: string, line_items: LineItemPut[]) {
@@ -285,7 +274,7 @@
         return (res.data as { id: string }).id;
     }
 
-    function lineItemsFromApiCart(apiCart: ApiCart): LineItemPut[] {
+    function lineItemsFromApiCart(apiCart: Cart): LineItemPut[] {
         return (apiCart.line_items ?? []).map((item) => ({
             title: item.title ?? null,
             description: item.description ?? null,
