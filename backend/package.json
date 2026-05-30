@@ -28,6 +28,7 @@
     "@danimai/inventory": "../packages/inventory",
     "@danimai/media": "../packages/media",
     "@danimai/order": "../packages/order",
+    "@danimai/payment": "../packages/payment",
     "@danimai/pricing": "../packages/pricing",
     "@danimai/product": "../packages/product",
     "@danimai/region": "../packages/region",

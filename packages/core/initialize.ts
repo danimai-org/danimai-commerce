@@ -8,6 +8,7 @@ import {
   DANIMAI_JWT,
   DANIMAI_PASSWORD,
   DANIMAI_S3,
+  DANIMAI_STRIPE,
 } from "./injection-keys";
 import type { DanimaiInitialize, ProcessContract } from "./type";
 import { Kysely, ParseJSONResultsPlugin, type LogEvent } from "kysely";
@@ -18,6 +19,7 @@ import { Jwt, Password } from "./security";
 import { S3Client } from "@aws-sdk/client-s3";
 import { neon, neonConfig, Pool } from "@neondatabase/serverless";
 import { PostgresDialect } from "kysely";
+import Stripe from "stripe";
 
 neonConfig.webSocketConstructor = WebSocket;
 
@@ -188,6 +190,7 @@ export const initialize = ({ db, logger, config }: DanimaiInitialize) => {
         ),
       );
   }
+
   if (!container.isBound(DANIMAI_S3)) {
     container.bind(DANIMAI_S3).toConstantValue(
       new S3Client({
@@ -201,6 +204,13 @@ export const initialize = ({ db, logger, config }: DanimaiInitialize) => {
       }),
     );
   }
+
+  if (!container.isBound(DANIMAI_STRIPE)) {
+    container
+      .bind(DANIMAI_STRIPE)
+      .toConstantValue(new Stripe(config.stripeKey));
+  }
+
   // Auto-bind all registered process classes (may be empty if processes not imported yet)
   bindAllProcesses(container);
 };

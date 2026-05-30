@@ -7,3 +7,4 @@ export * from "./email";
 export * from "./jwt";
 export * from "./password";
 export * from "./s3";
+export * from "./stripe";

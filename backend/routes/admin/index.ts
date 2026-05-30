@@ -24,6 +24,10 @@ import { priceListRoutes } from "./price-lists";
 import { mediaRoutes } from "./media";
 import { promotionRoutes } from "./promotions";
 import { campaignRoutes } from "./campaigns";
+import { paymentProviderRoutes } from "./payment-providers";
+import { paymentRoutes } from "./payments";
+import { paymentTransactionRoutes } from "./payment-transactions";
+import { refundRoutes } from "./refunds";
 
 export const routes = new Elysia()
     .group('/admin', (app) => {
@@ -52,4 +56,8 @@ export const routes = new Elysia()
             .use(priceListRoutes)
             .use(promotionRoutes)
             .use(campaignRoutes)
+            .use(paymentProviderRoutes)
+            .use(paymentRoutes)
+            .use(paymentTransactionRoutes)
+            .use(refundRoutes)
     });

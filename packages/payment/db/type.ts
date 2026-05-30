@@ -1,40 +1,40 @@
-import type { Generated, Selectable, Insertable, Updateable } from "kysely";
+import type {
+  ColumnType,
+  Generated,
+  Selectable,
+  Insertable,
+  Updateable,
+} from "kysely";
+import type { OrderLineItemTable, OrderTable } from "@danimai/order";
+
+/** PostgreSQL numeric; string at runtime for precision. */
+export type Decimal = ColumnType<string, string | number, string>;
 
 /**
  * Payment module data types based on Danimai Payment Module.
  */
 
+export type PaymentStatus = "pending" | "failed" | "succeeded" | "cancelled";
+
+export type PaymentCustomerStatus = "active" | "cancelled";
+
 export interface Database {
-  account_holders: AccountHolderTable;
+  orders: OrderTable;
+  order_line_items: OrderLineItemTable;
   payment_providers: PaymentProviderTable;
   refund_reasons: RefundReasonTable;
-  payment_collections: PaymentCollectionTable;
-  payment_collection_providers: PaymentCollectionProviderTable;
-  payment_sessions: PaymentSessionTable;
+  payment_customers: PaymentCustomerTable;
   payments: PaymentTable;
-  captures: CaptureTable;
+  payment_transactions: PaymentTransactionTable;
   refunds: RefundTable;
 }
 
-// table account_holders (customer/account context for payment)
-export interface AccountHolderTable {
-  id: Generated<string>;
-  type: string | null; // e.g. "customer"
-  account_id: string | null; // e.g. customer id
-  metadata: unknown | null;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
-  deleted_at: Date | null;
-}
-export type AccountHolder = Selectable<AccountHolderTable>;
-export type NewAccountHolder = Insertable<AccountHolderTable>;
-export type AccountHolderUpdate = Updateable<AccountHolderTable>;
-
-// table payment_providers (e.g. stripe, manual)
+// table payment_providers (e.g. stripe, razorpay, paypal)
 export interface PaymentProviderTable {
   id: Generated<string>;
-  name: string | null;
-  metadata: unknown | null;
+  name: string;
+  metadata: Record<string, any> | null;
+  active: boolean;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
   deleted_at: Date | null;
@@ -46,8 +46,8 @@ export type PaymentProviderUpdate = Updateable<PaymentProviderTable>;
 // table refund_reasons (e.g. duplicate, fraud, requested)
 export interface RefundReasonTable {
   id: Generated<string>;
-  label: string | null;
-  value: string | null; // code
+  label: string;
+  value: string; // code
   metadata: unknown | null;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
@@ -57,56 +57,33 @@ export type RefundReason = Selectable<RefundReasonTable>;
 export type NewRefundReason = Insertable<RefundReasonTable>;
 export type RefundReasonUpdate = Updateable<RefundReasonTable>;
 
-// table payment_collections (groups payment sessions and payments)
-export interface PaymentCollectionTable {
+// table payment_customers (third-party customer sync per provider)
+export interface PaymentCustomerTable {
   id: Generated<string>;
-  amount: string | null; // total as decimal string
-  currency_code: string | null;
+  customer_id: string;
+  stripe_customer_id: string; // e.g. Stripe customer id
+  provider_id: string;
   metadata: unknown | null;
+  status: Generated<PaymentCustomerStatus>; // defaults to active
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
   deleted_at: Date | null;
 }
-export type PaymentCollection = Selectable<PaymentCollectionTable>;
-export type NewPaymentCollection = Insertable<PaymentCollectionTable>;
-export type PaymentCollectionUpdate = Updateable<PaymentCollectionTable>;
+export type PaymentCustomer = Selectable<PaymentCustomerTable>;
+export type NewPaymentCustomer = Insertable<PaymentCustomerTable>;
+export type PaymentCustomerUpdate = Updateable<PaymentCustomerTable>;
 
-// M:N join: payment_collections <-> payment_providers
-export interface PaymentCollectionProviderTable {
-  payment_collection_id: string;
-  payment_provider_id: string;
-  created_at: Generated<string>;
-}
-export type PaymentCollectionProvider = Selectable<PaymentCollectionProviderTable>;
-export type NewPaymentCollectionProvider = Insertable<PaymentCollectionProviderTable>;
-export type PaymentCollectionProviderUpdate = Updateable<PaymentCollectionProviderTable>;
-
-// table payment_sessions (amount to authorize, provider-specific data)
-export interface PaymentSessionTable {
-  id: Generated<string>;
-  payment_collection_id: string | null;
-  provider_id: string | null;
-  amount: string | null; // decimal as string
-  currency_code: string | null;
-  data: unknown | null; // provider-specific payload
-  metadata: unknown | null;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
-  deleted_at: Date | null;
-}
-export type PaymentSession = Selectable<PaymentSessionTable>;
-export type NewPaymentSession = Insertable<PaymentSessionTable>;
-export type PaymentSessionUpdate = Updateable<PaymentSessionTable>;
-
-// table payments (created when session authorized; has captures, refunds)
+// table payments
 export interface PaymentTable {
   id: Generated<string>;
-  payment_collection_id: string | null;
-  payment_session_id: string | null;
-  provider_id: string | null;
-  amount: string | null; // decimal as string
-  currency_code: string | null;
-  data: unknown | null; // from session, for provider processing
+  order_id: string;
+  customer_id: string;
+  provider_id: string;
+  amount: Decimal;
+  currency_code: string;
+  last_status: Generated<PaymentStatus>; // defaults to pending
+  last_transaction_id: string | null;
+  success_transaction_id: string | null;
   metadata: unknown | null;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
@@ -116,27 +93,36 @@ export type Payment = Selectable<PaymentTable>;
 export type NewPayment = Insertable<PaymentTable>;
 export type PaymentUpdate = Updateable<PaymentTable>;
 
-// table captures (incremental capture of authorized payment)
-export interface CaptureTable {
+// table payment_transactions (provider attempt/charge per payment)
+export interface PaymentTransactionTable {
   id: Generated<string>;
-  payment_id: string | null;
-  amount: string | null; // decimal as string
-  created_by: string | null; // e.g. user id
-  metadata: unknown | null;
+  payment_id: string;
+  provider_id: string;
+  amount: Decimal;
+  currency_code: string;
+  last_status: Generated<PaymentStatus>; // defaults to pending
+  metadata: unknown | null; // from stripe, razorpay, paypal
+  payment_intent_id: string | null; // e.g. payment intent  from stripe
+  checkout_id: string | null; // e.g. checkout id  from stripe
+  customer_id: string;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
   deleted_at: Date | null;
 }
-export type Capture = Selectable<CaptureTable>;
-export type NewCapture = Insertable<CaptureTable>;
-export type CaptureUpdate = Updateable<CaptureTable>;
+export type PaymentTransaction = Selectable<PaymentTransactionTable>;
+export type NewPaymentTransaction = Insertable<PaymentTransactionTable>;
+export type PaymentTransactionUpdate = Updateable<PaymentTransactionTable>;
 
-// table refunds (refund of captured amount)
+// table refunds
 export interface RefundTable {
   id: Generated<string>;
-  payment_id: string | null;
-  amount: string | null; // decimal as string
+  customer_id: string;
+  payment_id: string;
+  payment_transaction_id: string;
+  amount: Decimal;
   refund_reason_id: string | null;
+  last_status: Generated<PaymentStatus>; // defaults to pending
+  stripe_refund_id: string | null; // e.g from stripe
   created_by: string | null;
   metadata: unknown | null;
   created_at: Generated<Date>;
