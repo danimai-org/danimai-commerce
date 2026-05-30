@@ -1,94 +1,86 @@
 <script lang="ts">
-    import { page } from "$app/stores";
     import { browser } from "$app/environment";
+    import { goto } from "$app/navigation";
     import {
-        ACCOUNT_STORAGE_KEY,
-        ADDRESSES_STORAGE_KEY_PREFIX,
-        parseStoredAccount,
-        storageKeyForEmail,
+        ACCOUNT_UPDATED_EVENT,
+        CustomerAuthError,
+        createCustomerAddress,
+        deleteCustomerAddress,
+        ensureCustomerDefaultAddress,
+        hasCustomerAuthSession,
+        listCustomerAddresses,
+        notifyAccountUpdated,
+        savedAddressToFormInput,
+        setDefaultCustomerAddress,
+        updateCustomerAddress,
+        type CustomerSavedAddress,
     } from "$lib/account/storage";
     import {
         AddAddressModal,
         type AddressFormValues,
     } from "$lib/components/account";
 
-    type SavedAddress = {
-        id: string;
-        name: string;
-        line1: string;
-        line2: string;
-        city: string;
-        state: string;
-        postal: string;
-        phone: string;
-        isDefault: boolean;
-    };
-
-    const defaultEmail = "guest@denimai.com";
-
-    let addresses = $state<SavedAddress[]>([]);
-    let selectedId = $state("");
+    let addresses = $state<CustomerSavedAddress[]>([]);
     let addressModalOpen = $state(false);
     let editingId = $state<string | null>(null);
+    let loading = $state(false);
+    let error = $state("");
+    let actionPending = $state(false);
 
-    const emailForAddresses = $derived.by(() => {
-        const fromUrl = $page.url.searchParams.get("email")?.trim();
-        if (fromUrl) return fromUrl;
-        if (!browser) return defaultEmail;
-        return (
-            parseStoredAccount(localStorage.getItem(ACCOUNT_STORAGE_KEY))
-                ?.email ?? defaultEmail
-        );
-    });
+    const sortDefaultFirst = (
+        items: CustomerSavedAddress[],
+    ): CustomerSavedAddress[] =>
+        [...items].sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
 
-    const addressesStorageKey = $derived(
-        storageKeyForEmail(
-            ADDRESSES_STORAGE_KEY_PREFIX,
-            emailForAddresses,
-            defaultEmail,
-        ),
-    );
+    const applyLoadedAddresses = (items: CustomerSavedAddress[]) => {
+        addresses = sortDefaultFirst(items);
+    };
 
-    const parseAddresses = (raw: string | null): SavedAddress[] => {
-        if (!raw) return [];
-        try {
-            const parsed = JSON.parse(raw);
-            if (!Array.isArray(parsed)) return [];
-            return parsed
-                .map((item) => ({
-                    id: String(item?.id ?? ""),
-                    name: String(item?.name ?? ""),
-                    line1: String(item?.line1 ?? ""),
-                    line2: String(item?.line2 ?? ""),
-                    city: String(item?.city ?? ""),
-                    state: String(item?.state ?? ""),
-                    postal: String(item?.postal ?? ""),
-                    phone: String(item?.phone ?? ""),
-                    isDefault: Boolean(item?.isDefault),
-                }))
-                .filter((entry) => entry.id && entry.name && entry.line1);
-        } catch {
-            return [];
+    const redirectToLoginIfUnauthenticated = async () => {
+        if (!hasCustomerAuthSession()) {
+            await goto("/login");
         }
     };
 
-    const persistAddresses = () => {
+    const loadAddresses = async () => {
         if (!browser) return;
-        localStorage.setItem(addressesStorageKey, JSON.stringify(addresses));
-    };
+        if (!hasCustomerAuthSession()) {
+            error = "Please log in to view your addresses.";
+            addresses = [];
+            await goto("/login");
+            return;
+        }
 
-    const sortDefaultFirst = (items: SavedAddress[]): SavedAddress[] =>
-        [...items].sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
+        loading = true;
+        error = "";
+        try {
+            const rows = await ensureCustomerDefaultAddress(
+                await listCustomerAddresses(),
+            );
+            applyLoadedAddresses(rows);
+        } catch (e) {
+            if (e instanceof CustomerAuthError) {
+                error = e.message;
+                await redirectToLoginIfUnauthenticated();
+                return;
+            }
+            error =
+                e instanceof Error ? e.message : "Failed to load addresses.";
+        } finally {
+            loading = false;
+        }
+    };
 
     $effect(() => {
         if (!browser) return;
-        const parsed = parseAddresses(
-            localStorage.getItem(addressesStorageKey),
-        );
-        const defaultEntry =
-            parsed.find((entry) => entry.isDefault) ?? parsed[0];
-        addresses = sortDefaultFirst(parsed);
-        selectedId = defaultEntry?.id ?? "";
+        void loadAddresses();
+
+        const onAccountUpdated = () => {
+            void loadAddresses();
+        };
+        window.addEventListener(ACCOUNT_UPDATED_EVENT, onAccountUpdated);
+        return () =>
+            window.removeEventListener(ACCOUNT_UPDATED_EVENT, onAccountUpdated);
     });
 
     const modalTitle = $derived(editingId ? "Edit Address" : "Add Address");
@@ -116,7 +108,7 @@
         addressModalOpen = true;
     };
 
-    const openEditModal = (entry: SavedAddress) => {
+    const openEditModal = (entry: CustomerSavedAddress) => {
         editingId = entry.id;
         addressModalOpen = true;
     };
@@ -126,73 +118,88 @@
         editingId = null;
     };
 
-    const formatCityStatePostal = (entry: SavedAddress): string =>
+    const formatCityStatePostal = (entry: CustomerSavedAddress): string =>
         [entry.city, entry.state, entry.postal].filter(Boolean).join(", ");
 
-    const saveAddress = (values: AddressFormValues) => {
-        const payload: SavedAddress = {
-            id: editingId ?? crypto.randomUUID(),
-            name: values.name,
-            line1: values.line1,
-            line2: values.line2,
-            city: values.city,
-            state: values.state,
-            postal: values.postal,
-            phone: values.phone,
-            isDefault: values.isDefault,
-        };
-
-        if (editingId) {
-            addresses = addresses.map((entry) => {
-                if (entry.id === editingId) return payload;
-                if (values.isDefault) return { ...entry, isDefault: false };
-                return entry;
-            });
-        } else {
-            addresses = values.isDefault
-                ? [
-                      ...addresses.map((entry) => ({
-                          ...entry,
-                          isDefault: false,
-                      })),
-                      payload,
-                  ]
-                : [...addresses, payload];
+    const saveAddress = async (values: AddressFormValues) => {
+        actionPending = true;
+        error = "";
+        try {
+            if (editingId) {
+                await updateCustomerAddress(editingId, values);
+            } else {
+                await createCustomerAddress(values);
+            }
+            await loadAddresses();
+            notifyAccountUpdated();
+            closeModal();
+        } catch (e) {
+            if (e instanceof CustomerAuthError) {
+                await redirectToLoginIfUnauthenticated();
+                return;
+            }
+            error = e instanceof Error ? e.message : "Failed to save address.";
+        } finally {
+            actionPending = false;
         }
-
-        addresses = sortDefaultFirst(addresses);
-        if (payload.isDefault) selectedId = payload.id;
-        persistAddresses();
-        closeModal();
     };
 
-    const removeAddress = (id: string) => {
-        const removed = addresses.find((entry) => entry.id === id);
-        addresses = addresses.filter((entry) => entry.id !== id);
-        if (removed?.isDefault && addresses.length > 0) {
-            addresses = addresses.map((entry, index) => ({
-                ...entry,
-                isDefault: index === 0,
-            }));
+    const removeAddress = async (id: string) => {
+        const target = addresses.find((item) => item.id === id);
+        if (!target) return;
+
+        actionPending = true;
+        error = "";
+        try {
+            const remaining = addresses.filter((item) => item.id !== id);
+            if (target.isDefault && remaining.length > 0) {
+                const nextDefault = remaining[0];
+                await setDefaultCustomerAddress(
+                    nextDefault.id,
+                    savedAddressToFormInput(nextDefault, true),
+                );
+            }
+
+            await deleteCustomerAddress(id);
+            await loadAddresses();
+            notifyAccountUpdated();
+        } catch (e) {
+            if (e instanceof CustomerAuthError) {
+                await redirectToLoginIfUnauthenticated();
+                return;
+            }
+            error =
+                e instanceof Error ? e.message : "Failed to remove address.";
+        } finally {
+            actionPending = false;
         }
-        if (selectedId === id) {
-            selectedId =
-                addresses.find((entry) => entry.isDefault)?.id ??
-                addresses[0]?.id ??
-                "";
-        }
-        addresses = sortDefaultFirst(addresses);
-        persistAddresses();
     };
 
-    const setDefault = (id: string) => {
-        addresses = addresses.map((entry) => ({
-            ...entry,
-            isDefault: entry.id === id,
-        }));
-        addresses = sortDefaultFirst(addresses);
-        selectedId = id;
-        persistAddresses();
+    const setDefault = async (id: string) => {
+        const entry = addresses.find((item) => item.id === id);
+        if (!entry) return;
+
+        actionPending = true;
+        error = "";
+        try {
+            await setDefaultCustomerAddress(
+                id,
+                savedAddressToFormInput(entry, true),
+            );
+            await loadAddresses();
+            notifyAccountUpdated();
+        } catch (e) {
+            if (e instanceof CustomerAuthError) {
+                await redirectToLoginIfUnauthenticated();
+                return;
+            }
+            error =
+                e instanceof Error
+                    ? e.message
+                    : "Failed to set default address.";
+        } finally {
+            actionPending = false;
+        }
     };
 </script>
 
@@ -207,13 +214,20 @@
 
     <div class="account-panel-toolbar">
         <h3 class="account-panel-subtitle">All Addresses</h3>
-        <button type="button" class="account-add-link" onclick={openAddModal}
-            >Add New Address</button
+        <button
+            type="button"
+            class="account-add-link"
+            onclick={openAddModal}
+            disabled={loading || actionPending}>Add New Address</button
         >
     </div>
 
     <div class="account-panel-body">
-        {#if addresses.length === 0}
+        {#if loading}
+            <p class="account-empty">Loading addresses…</p>
+        {:else if error}
+            <p class="account-empty">{error}</p>
+        {:else if addresses.length === 0}
             <p class="account-empty">No saved addresses yet.</p>
         {:else}
             <ul class="account-address-list">
@@ -222,16 +236,15 @@
                         class="account-address-card"
                         class:account-address-card--selected={entry.isDefault}
                     >
-                        {#if entry.isDefault}
-                            <div
-                                class="account-address-default-bar"
-                                style="background-color: #7A8C5F; padding: 6px; border-radius: 4px; width: 80px"
-                            >
-                                <strong>Default</strong>
-                            </div>
-                        {/if}
                         <div class="account-address-copy">
-                            <strong>{entry.name}</strong>
+                            <div class="account-address-title-row">
+                                <strong>{entry.name}</strong>
+                                {#if entry.isDefault}
+                                    <span class="account-address-badge"
+                                        >Default</span
+                                    >
+                                {/if}
+                            </div>
                             <span>{entry.line1}</span>
                             {#if entry.line2}
                                 <span>{entry.line2}</span>
@@ -249,7 +262,8 @@
                                 <button
                                     type="button"
                                     class="account-text-link"
-                                    onclick={() => setDefault(entry.id)}
+                                    disabled={actionPending}
+                                    onclick={() => void setDefault(entry.id)}
                                 >
                                     Set as Default
                                 </button>
@@ -258,6 +272,7 @@
                             <button
                                 type="button"
                                 class="account-text-link"
+                                disabled={actionPending}
                                 onclick={() => openEditModal(entry)}
                                 >Edit</button
                             >
@@ -265,7 +280,8 @@
                             <button
                                 type="button"
                                 class="account-text-link"
-                                onclick={() => removeAddress(entry.id)}
+                                disabled={actionPending}
+                                onclick={() => void removeAddress(entry.id)}
                                 >Remove</button
                             >
                         </div>
@@ -281,6 +297,7 @@
     title={modalTitle}
     seed={editingId ?? "new"}
     initial={modalInitial}
+    saving={actionPending}
     onClose={closeModal}
-    onSave={saveAddress}
+    onSave={(values) => void saveAddress(values)}
 />

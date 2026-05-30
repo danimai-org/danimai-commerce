@@ -1,3 +1,5 @@
+import type { AdminProductVariantRow } from "$lib/types/admin";
+
 const base =
   typeof import.meta.env.VITE_PUBLIC_API_URL === "string" &&
   import.meta.env.VITE_PUBLIC_API_URL
@@ -42,11 +44,9 @@ export async function firstVariantIdByProductIds(
     });
     if (!res.ok) break;
     const raw = await res.json();
-    const { rows } = rowsFromPaginated<{
-      id: string;
-      product_id: string | null;
-      variant_rank: number | null;
-    }>(raw);
+    const { rows } = rowsFromPaginated<
+      Pick<AdminProductVariantRow, "id" | "product_id" | "variant_rank">
+    >(raw);
     for (const v of rows) {
       const pid = v.product_id;
       if (!pid || !wanted.has(pid)) continue;

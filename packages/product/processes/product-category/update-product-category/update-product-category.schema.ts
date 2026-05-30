@@ -7,6 +7,7 @@ import {
 
 export const UpdateProductCategoryBodySchema = Type.Object({
   value: Type.Optional(Type.String({ examples: ["Electronics"] })),
+  handle: Type.Optional(Type.String({ examples: ["electronics"] })),
   parent_id: Type.Optional(
     Type.String({
       format: "uuid",

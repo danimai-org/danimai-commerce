@@ -1,4 +1,9 @@
 import { client } from "$lib/api/client.js";
+import type { CartLineVariantRef } from "$lib/types/cart";
+import type {
+	AdminProductVariantDetail,
+	AdminProductVariantRow,
+} from "$lib/types/admin";
 
 export type VariantDisplayRow = {
     title: string;
@@ -7,10 +12,7 @@ export type VariantDisplayRow = {
     unitPrice: number | null;
 };
 
-export type CartLineVariantRef = {
-    variant_id?: string | null;
-    product_id?: string | null;
-};
+export type { CartLineVariantRef };
 
 /**
  * Loads variant title/thumbnail/SKU for cart line items. Prefers list fetch by
@@ -42,17 +44,7 @@ export async function fetchVariantDisplayMap(
                 query: { page: 1, limit: 100, filters: { product_id: productId } },
             });
             if (res.error || !res.data) return;
-            const rows =
-                (
-                    res.data as {
-                        rows?: Array<{
-                            id: string;
-                            title: string;
-                            sku?: string | null;
-                            thumbnail?: string | null;
-                        }>;
-                    }
-                ).rows ?? [];
+            const rows = (res.data.rows ?? []) as AdminProductVariantRow[];
             for (const row of rows) {
                 if (!variantIds.has(row.id)) continue;
                 next.set(row.id, {
@@ -70,12 +62,7 @@ export async function fetchVariantDisplayMap(
             if (next.has(id)) return;
             const res = await client.admin["product-variants"]({ id }).get();
             if (res.error || !res.data) return;
-            const d = res.data as {
-                title: string;
-                sku?: string | null;
-                thumbnail?: string | null;
-                prices?: Array<{ amount: string }>;
-            };
+            const d = res.data as AdminProductVariantDetail;
             const raw = d.prices?.[0]?.amount;
             let unitPrice: number | null = null;
             if (raw != null && raw !== "") {

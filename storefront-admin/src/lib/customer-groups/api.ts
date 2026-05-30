@@ -1,20 +1,14 @@
 import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 import type { Customer } from '$lib/customers/api.js';
+import { client, type DetailById, type PaginatedRow } from '$lib/client.js';
 
 const getApiBase = () => import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
-export type CustomerGroup = {
-	id: string;
-	name: string;
-	metadata: unknown | null;
-	created_at: string;
-	updated_at: string;
-	deleted_at: string | null;
-};
+type CustomerGroupsClient = (typeof client)['customer-groups'];
 
-export type CustomerGroupDetail = CustomerGroup & {
-	customer_count: number;
-};
+export type CustomerGroup = PaginatedRow<CustomerGroupsClient['get']>;
+
+export type CustomerGroupDetail = DetailById<CustomerGroupsClient>;
 
 export type ListCustomersInGroupParams = {
 	page?: number;

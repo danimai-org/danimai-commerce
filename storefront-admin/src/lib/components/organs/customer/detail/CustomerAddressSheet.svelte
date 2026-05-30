@@ -13,8 +13,8 @@
 		open = $bindable(false),
 		mode = 'create',
 		customerId = '',
-		customer = null as Customer | null,
-		address = null as CustomerAddress | null,
+		customer = null,
+		address = null,
 		onSuccess = () => {}
 	}: {
 		open?: boolean;

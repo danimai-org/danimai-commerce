@@ -17,16 +17,14 @@
         isBottomCategory,
         isChildCategory,
     } from "$lib/category-nav";
+    import type { AdminCollectionRow } from "$lib/types/collection";
 
-    type CategoryRow = CategoryNavRow;
-
-    type CollectionRow = {
-        id: string;
-        title: string;
-        handle: string;
-    };
-
-    const ACCOUNT_STORAGE_KEY = "dm_sf_account";
+    import {
+        ACCOUNT_STORAGE_KEY,
+        ACCOUNT_UPDATED_EVENT,
+        logoutCustomerSession,
+        notifyAccountUpdated,
+    } from "$lib/account/storage";
 
     let cartCount = $state(0);
     let searchOpen = $state(false);
@@ -34,14 +32,12 @@
     let topsOpen = $state(false);
     let bottomsOpen = $state(false);
     let collectionsOpen = $state(false);
-    let accountMenuOpen = $state(false);
     let navWide = $state(false);
     let isLoggedIn = $state(false);
     let accountEmail = $state("");
 
     afterNavigate(() => {
         menuOpen = false;
-        accountMenuOpen = false;
     });
 
     $effect(() => {
@@ -111,13 +107,13 @@
             });
             if (res.error) {
                 return {
-                    rows: [] as CategoryRow[],
+                    rows: [] as CategoryNavRow[],
                     pagination: emptyPagination(),
                 };
             }
             const body = res.data as unknown;
             return {
-                rows: unwrapRows<CategoryRow>(body),
+                rows: unwrapRows<CategoryNavRow>(body),
                 pagination: unwrapPagination(body) ?? emptyPagination(),
             };
         },
@@ -133,13 +129,13 @@
             });
             if (res.error) {
                 return {
-                    rows: [] as CollectionRow[],
+                    rows: [] as AdminCollectionRow[],
                     pagination: emptyPagination(),
                 };
             }
             const body = res.data as unknown;
             return {
-                rows: unwrapRows<CollectionRow>(body),
+                rows: unwrapRows<AdminCollectionRow>(body),
                 pagination: unwrapPagination(body) ?? emptyPagination(),
             };
         },
@@ -152,10 +148,10 @@
     const { query: collectionsQuery } = collectionsState;
 
     const productCategories = $derived(
-        (productCategoriesQuery.data?.rows ?? []) as CategoryRow[],
+        (productCategoriesQuery.data?.rows ?? []) as CategoryNavRow[],
     );
     const navCollections = $derived(
-        (collectionsQuery.data?.rows ?? []) as CollectionRow[],
+        (collectionsQuery.data?.rows ?? []) as AdminCollectionRow[],
     );
 
     const navCategoryPool = $derived(
@@ -187,22 +183,6 @@
         };
     });
 
-    $effect(() => {
-        if (!accountMenuOpen) return;
-        const onDocClick = () => {
-            accountMenuOpen = false;
-        };
-        const onKey = (e: KeyboardEvent) => {
-            if (e.key === "Escape") accountMenuOpen = false;
-        };
-        document.addEventListener("click", onDocClick);
-        document.addEventListener("keydown", onKey);
-        return () => {
-            document.removeEventListener("click", onDocClick);
-            document.removeEventListener("keydown", onKey);
-        };
-    });
-
     function syncAccountState() {
         if (!browser) return;
         const raw = localStorage.getItem(ACCOUNT_STORAGE_KEY);
@@ -225,15 +205,20 @@
     $effect(() => {
         if (!browser) return;
         syncAccountState();
-        const onStorage = () => syncAccountState();
-        window.addEventListener("storage", onStorage);
-        return () => window.removeEventListener("storage", onStorage);
+        const onAccountChange = () => syncAccountState();
+        window.addEventListener("storage", onAccountChange);
+        window.addEventListener(ACCOUNT_UPDATED_EVENT, onAccountChange);
+        return () => {
+            window.removeEventListener("storage", onAccountChange);
+            window.removeEventListener(ACCOUNT_UPDATED_EVENT, onAccountChange);
+        };
     });
 
     async function logout() {
         if (!browser) return;
+        await logoutCustomerSession();
         localStorage.removeItem(ACCOUNT_STORAGE_KEY);
-        accountMenuOpen = false;
+        notifyAccountUpdated();
         syncAccountState();
         await goto("/login");
     }
@@ -332,7 +317,6 @@
                     aria-label="Search"
                     onclick={() => {
                         menuOpen = false;
-                        accountMenuOpen = false;
                         search.open();
                     }}
                 >
@@ -358,12 +342,7 @@
                         type="button"
                         class="icon-btn icon-btn--account"
                         aria-label="Account"
-                        aria-expanded={accountMenuOpen}
                         aria-haspopup="true"
-                        onclick={(e) => {
-                            e.stopPropagation();
-                            accountMenuOpen = !accountMenuOpen;
-                        }}
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -380,27 +359,40 @@
                             /><circle cx="12" cy="7" r="4" /></svg
                         >
                     </button>
-                    {#if accountMenuOpen}
-                        <div
-                            class="account-dropdown"
-                            role="menu"
-                            aria-label="Account"
-                        >
-                            {#if isLoggedIn}
-                                <span
-                                    class="account-dropdown-link"
-                                    role="menuitem">{accountEmail}</span
-                                >
-                                <a
-                                    href="/account"
-                                    class="account-dropdown-link"
-                                    role="menuitem"
-                                    onclick={() => (accountMenuOpen = false)}
-                                    >My Account</a
-                                >
-                            {/if}
-                        </div>
-                    {/if}
+                    <div
+                        class="account-dropdown"
+                        role="menu"
+                        aria-label="Account"
+                    >
+                        {#if isLoggedIn}
+                            <span
+                                class="account-dropdown-email"
+                                role="menuitem">{accountEmail}</span
+                            >
+                            <a
+                                href="/account"
+                                class="account-dropdown-link"
+                                role="menuitem">My Account</a
+                            >
+                            <button
+                                type="button"
+                                class="account-dropdown-link account-dropdown-logout"
+                                role="menuitem"
+                                onclick={() => void logout()}>Logout</button
+                            >
+                        {:else}
+                            <a
+                                href="/login"
+                                class="account-dropdown-link"
+                                role="menuitem">Login</a
+                            >
+                            <a
+                                href="/register"
+                                class="account-dropdown-link"
+                                role="menuitem">Register</a
+                            >
+                        {/if}
+                    </div>
                 </div>
                 <button
                     type="button"
@@ -408,7 +400,6 @@
                     aria-label="Cart"
                     onclick={() => {
                         menuOpen = false;
-                        accountMenuOpen = false;
                         openCartSheet();
                     }}
                 >

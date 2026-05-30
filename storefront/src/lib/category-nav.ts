@@ -1,13 +1,9 @@
-export type CategoryNavRow = {
-	id: string;
-	value: string;
-	handle: string;
-	parent_id?: string | null;
-	parentId?: string | null;
-};
+import type { AdminCategoryRow } from '$lib/types/categories';
+
+export type CategoryNavRow = AdminCategoryRow;
 
 export function categoryParentId(c: CategoryNavRow): string | null {
-	const p = c.parent_id ?? c.parentId;
+	const p = c.parent_id;
 	return p == null || String(p).trim() === '' ? null : String(p);
 }
 

@@ -105,7 +105,7 @@
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto">
 			<div class="flex flex-col gap-6 p-6">
 				<TaxRegionHeroCard {taxRegion} onUpdated={loadTaxRegion} />
-				<TaxRegionRatesCard rates={taxRegion.tax_rates ?? []} />
+				<TaxRegionRatesCard rates={(taxRegion.tax_rates ?? []) as Record<string, unknown>[]} />
 				<TaxRegionOverridesCard overrides={taxRegion.tax_overrides ?? []} />
 				<TaxRegionProviderCard providerId={taxRegion.tax_provider_id ?? null} />
 				<JSONComponent product={taxRegion as Record<string, unknown>} options={[]} variants={[]} category={null} />

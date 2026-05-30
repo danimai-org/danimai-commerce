@@ -10,45 +10,18 @@
 	import MapPin from '@lucide/svelte/icons/map-pin';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import { resolve } from '$app/paths';
-
-	const API_BASE = 'http://localhost:8000/admin';
-
-	type Order = {
-		id: string;
-		status: string;
-		fulfillment_status: string;
-		payment_status: string;
-		display_id: number;
-		currency_code: string;
-		email: string | null;
-		customer_id: string | null;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-	};
-
-	type OrderItem = {
-		id: string;
-		title: string;
-		price: number;
-		quantity: number;
-		currency: string;
-		thumbnail?: string | null;
-		sku?: string | null;
-	};
-
-	type OrderMetadata = {
-		items?: OrderItem[];
-		subtotal?: number;
-		discount_amount?: number;
-		shipping_amount?: number;
-		tax_amount?: number;
-		total?: number;
-	};
+	import { fetchOrder } from '$lib/components/organs/order/detail/load-order.js';
+	import {
+		getOrderItems,
+		getOrderMetadata,
+		type OrderDetailOrder,
+		type OrderItem,
+		type OrderMetadata
+	} from '$lib/components/organs/order/detail/types.js';
 
 	const orderId = $derived($page.params.id);
 
-	let order = $state<Order | null>(null);
+	let order = $state<OrderDetailOrder | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let refundQuantities = $state<Record<string, number>>({});
@@ -62,16 +35,10 @@
 		loading = true;
 		error = null;
 		try {
-			const res = await fetch(`${API_BASE}/orders/${orderId}`, { cache: 'no-store' });
-			if (!res.ok) {
-				const body = await res.json().catch(() => ({}));
-				error = body?.message ?? (res.status === 404 ? 'Order not found' : await res.text());
-				order = null;
-				return;
-			}
-			order = (await res.json()) as Order;
-			const meta = (order?.metadata ?? {}) as OrderMetadata;
-			const items = meta.items ?? [];
+			const result = await fetchOrder(orderId);
+			order = result.order;
+			error = result.error;
+			const items = order ? getOrderItems(order) : [];
 			refundQuantities = Object.fromEntries(items.map((it) => [it.id, 0]));
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -85,13 +52,11 @@
 		loadOrder();
 	});
 
-	const orderMetadata = $derived((): OrderMetadata => {
-		const meta = order?.metadata;
-		if (!meta || typeof meta !== 'object' || meta === null) return {};
-		return meta as OrderMetadata;
-	});
+	const orderMetadata = $derived((): OrderMetadata =>
+		order ? getOrderMetadata(order) : {}
+	);
 
-	const orderItems = $derived(orderMetadata().items ?? []);
+	const orderItems = $derived(order ? getOrderItems(order) : []);
 	const total = $derived(
 		orderMetadata().total ??
 			(orderMetadata().subtotal ?? 0) +

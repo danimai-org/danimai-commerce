@@ -24,7 +24,10 @@
 
 	const SEARCH_DEBOUNCE_MS = 300;
 
-	const paginateState = createPagination(
+	const paginateState = createPagination<
+		Awaited<ReturnType<typeof client.products.get>>,
+		Product
+	>(
 		async ({ queryKey }) => {
 			const qs = String(queryKey[2] ?? '');
 			const res = await client.products.get({
@@ -51,9 +54,9 @@
 	const rows = $derived(
 		rawRows.map((p: Product) => ({
 			...p,
-			category_display: p.category?.name ?? p.category?.value ?? '—',
+			category_display: p.category?.value ?? '—',
 			sales_channels_display: p.sales_channels?.map((sc) => sc.name).join(', ') ?? '—',
-			variants_count: p.variant_count ?? p.variants?.length ?? 0
+			variants_count: p.variant_count ?? 0
 		}))
 	) as Record<string, unknown>[];
 	const pagination = $derived(
@@ -133,8 +136,7 @@
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) =>
-						(openDeleteConfirm as unknown as (item: Product) => void)(item as Product)
+					onClick: (item) => openDeleteConfirm(item as Product)
 				}
 			]
 		}
@@ -196,12 +198,8 @@
 <DeleteConfirmationModal
 	bind:open={paginateState.deleteConfirmOpen}
 	entityName="product"
-	entityTitle={(deleteItem as unknown as Product | null)?.title ??
-		(deleteItem as unknown as Product | null)?.handle ??
-		(deleteItem as unknown as Product | null)?.id ??
-		''}
-	onConfirm={() =>
-		paginateState.confirmDelete((p) => deleteProducts([(p as unknown as Product).id]))}
+	entityTitle={deleteItem?.title ?? deleteItem?.handle ?? deleteItem?.id ?? ''}
+	onConfirm={() => paginateState.confirmDelete((p) => deleteProducts([p.id]))}
 	onCancel={paginateState.closeDeleteConfirm}
 	submitting={paginateState.deleteSubmitting}
 />

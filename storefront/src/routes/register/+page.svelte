@@ -4,10 +4,17 @@
 
     let { data } = $props();
     let showPassword = $state(false);
+    let submitting = $state(false);
 
-    const { form, errors, constraints, message, enhance, delayed } = superForm(
-        data.registerForm,
-    );
+    const { form, errors, constraints, message, enhance, submitting: submittingStore } =
+        superForm(data.registerForm);
+
+    $effect(() => {
+        const unsub = submittingStore.subscribe((value) => {
+            submitting = value;
+        });
+        return unsub;
+    });
 </script>
 
 <svelte:head>
@@ -166,8 +173,8 @@
                     <span class="field-error">{$errors.password}</span>
                 {/if}
             </div>
-            <button type="submit" class="auth-submit" disabled={$delayed}>
-                {$delayed ? "Creating Account..." : "Create Account"}
+            <button type="submit" class="auth-submit" disabled={submitting}>
+                {submitting ? "Creating Account..." : "Create Account"}
             </button>
         </form>
 

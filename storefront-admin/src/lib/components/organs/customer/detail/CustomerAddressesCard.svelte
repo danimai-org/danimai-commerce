@@ -68,7 +68,12 @@
 			: ''
 	);
 
-	const addressTableColumns: TableColumn[] = [
+	type AddressTableRow = CustomerAddress & {
+		address_line: string;
+		is_default_label: string;
+	};
+
+	const addressTableColumns: TableColumn<AddressTableRow>[] = [
 		{ label: 'Address', key: 'address_line', type: 'text' },
 		{ label: 'Default', key: 'is_default_label', type: 'text' },
 		{ label: 'City', key: 'city', type: 'text' },
@@ -82,13 +87,13 @@
 					label: 'Edit',
 					key: 'edit',
 					type: 'button',
-					onClick: (item) => openEditAddress(item as CustomerAddress)
+					onClick: (item) => openEditAddress(item)
 				},
 				{
 					label: 'Delete',
 					key: 'delete',
 					type: 'button',
-					onClick: (item) => openDeleteAddressModal(item as CustomerAddress)
+					onClick: (item) => openDeleteAddressModal(item)
 				}
 			]
 		}
@@ -131,10 +136,10 @@
 	<PaginationTable showToolbar={false}>
 		<div class="min-h-0 flex-1 overflow-auto">
 			<table class="w-full text-sm">
-				<TableHead columns={addressTableColumns} />
+				<TableHead columns={addressTableColumns as TableColumn[]} />
 				<TableBody
 					rows={addressesWithDisplay}
-					columns={addressTableColumns}
+					columns={addressTableColumns as TableColumn[]}
 					emptyMessage="No addresses yet."
 				/>
 			</table>

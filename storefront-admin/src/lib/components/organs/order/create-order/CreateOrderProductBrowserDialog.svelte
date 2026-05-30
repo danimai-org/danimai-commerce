@@ -17,9 +17,9 @@
 	} from '../dialog-classes.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { cn } from '$lib/utils.js';
+	import { statusBadgeClass } from '../detail/types.js';
 	import {
 		PRODUCT_BROWSER_SKELETON_ROWS,
-		statusBadgeClass,
 		type Pagination,
 		type Product
 	} from './types.js';

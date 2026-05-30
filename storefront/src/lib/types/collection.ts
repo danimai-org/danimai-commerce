@@ -1,13 +1,11 @@
-export type PaginatedCollection = Awaited<
-  ReturnType<(typeof client)["storefront"]["collections"]["get"]>
->["data"];
+import { client, type PaginatedRow } from './helpers';
 
+export type AdminCollectionRow = PaginatedRow<
+	(typeof client)['admin']['collections']['get']
+>;
 
-export type RetrieveCollection = Awaited<
-  ReturnType<(typeof client)["storefront"]["collections"]["get"]>
->["data"];
+/** @deprecated Use AdminCollectionRow */
+export type PaginatedCollection = AdminCollectionRow;
 
-
-export type DeleteCollection = Awaited<
-  ReturnType<(typeof client)["storefront"]["collections"]["delete"]>
->["data"];
+/** @deprecated Use AdminCollectionRow */
+export type RetrieveCollection = AdminCollectionRow;

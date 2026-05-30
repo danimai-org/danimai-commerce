@@ -1,22 +1,10 @@
-import type { client } from '$lib/client';
+import { client, type DetailById } from '$lib/client';
 
-export type Category =
-	| Awaited<ReturnType<ReturnType<(typeof client)['product-categories']>['get']>>['data']
-	| null;
+export type Category = DetailById<(typeof client)['product-categories']> | null;
 
 export type CategoryAttribute = { id: string; title: string; type: string; required: boolean };
 
-export type CategoryDetail = {
-	id: string;
-	value: string;
-	handle: string;
-	metadata: unknown | null;
-	parent_id: string | null;
-	status: 'active' | 'inactive';
-	visibility: 'public' | 'private';
-	created_at: Date | string;
-	updated_at: Date | string;
-	deleted_at: Date | null;
+export type CategoryDetail = NonNullable<Category> & {
 	attributes: CategoryAttribute[];
 };
 
@@ -61,9 +49,9 @@ function parseDateOrNull(raw: unknown): Date | null {
 	return null;
 }
 
-function parseDate(raw: unknown): Date | string {
+function parseDate(raw: unknown): Date {
 	if (raw instanceof Date) return raw;
-	if (typeof raw === 'string' && raw.length > 0) return raw;
+	if (typeof raw === 'string' && raw.length > 0) return new Date(raw);
 	return new Date();
 }
 

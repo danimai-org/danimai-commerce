@@ -1,15 +1,6 @@
 <script lang="ts">
     import ProductItem from "./productDetail/ProductItem.svelte";
-    type ProductGridItem = {
-        name: string;
-        price: { amount: number; currency_code: string };
-        href: string;
-        bg: string;
-        image: string | null;
-        variantId?: string | null;
-        variantTitle?: string | null;
-        variant_id?: string | null;
-    };
+    import type { ProductGridItem } from "$lib/types/product-grid";
 
     let {
         products = [] as ProductGridItem[] | undefined,

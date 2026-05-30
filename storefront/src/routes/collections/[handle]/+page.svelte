@@ -13,32 +13,12 @@
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { SvelteURLSearchParams } from "svelte/reactivity";
-    type CollectionRow = {
-        id: string;
-        title: string;
-        handle?: string;
-        slug?: string;
-    };
-    type StorefrontProductRow = {
-        title: string;
-        handle: string;
-        thumbnail: string | null;
-        variant: {
-            id: string;
-            title: string;
-            thumbnail: string | null;
-            price: { amount: string; currency_code: string } | null;
-        } | null;
-    };
-    type GridProduct = {
-        name: string;
-        price: { amount: number; currency_code: string };
-        href: string;
-        bg: string;
-        image: string | null;
-        variantId: string | null;
-        variantTitle: string | null;
-    };
+    import type { AdminCollectionRow } from "$lib/types/collection";
+    import type { StorefrontProductListRow } from "$lib/types/product";
+    import {
+        type ProductGridItem,
+        toProductGridItem,
+    } from "$lib/types/product-grid";
 
     const STOREFRONT_SORT: Record<
         string,
@@ -49,10 +29,6 @@
         "title-asc": { field: "products.title", dir: "asc" },
         "title-desc": { field: "products.title", dir: "desc" },
     };
-    const FALLBACK_BGS = ["#e8e0d5", "#4a4a4a", "#f5f0eb", "#6b7c5c"];
-    function pickBg(index: number) {
-        return FALLBACK_BGS[index % FALLBACK_BGS.length];
-    }
     function slugify(value: string): string {
         return value
             .toLowerCase()
@@ -98,17 +74,15 @@
                 );
             }
             const collectionPayload = collectionRes.data as
-                | { rows?: CollectionRow[] }
+                | { rows?: AdminCollectionRow[] }
                 | undefined;
             const collectionRows = collectionPayload?.rows ?? [];
             const collection =
                 collectionRows.find((row) => {
                     const byHandle = (row.handle ?? "").trim().toLowerCase();
-                    const bySlug = (row.slug ?? "").trim().toLowerCase();
                     const byTitle = slugify(row.title ?? "");
                     return (
                         requestedHandle === byHandle ||
-                        requestedHandle === bySlug ||
                         requestedHandle === byTitle
                     );
                 }) ?? null;
@@ -155,30 +129,13 @@
             }
             const raw = (await productsRes.json()) as unknown;
             const { rows: productRows } =
-                rowsFromPaginated<StorefrontProductRow>(raw);
+                rowsFromPaginated<StorefrontProductListRow>(raw);
             const pagination =
                 (raw as { pagination?: PaginationMeta }).pagination ??
                 emptyPagination();
-            const gridProducts: GridProduct[] = productRows.map((p, i) => {
-                const pr = p.variant?.price;
-                const amount =
-                    pr?.amount != null
-                        ? parseInt(pr.amount, 10) / 100
-                        : Number.NaN;
-                const currency_code = pr?.currency_code ?? "EUR";
-                return {
-                    name: p.title,
-                    price: {
-                        amount: Number.isFinite(amount) ? amount : Number.NaN,
-                        currency_code,
-                    },
-                    href: `/products/${p.handle}`,
-                    bg: pickBg(i),
-                    image: p.thumbnail ?? p.variant?.thumbnail ?? null,
-                    variantId: p.variant?.id ?? null,
-                    variantTitle: p.variant?.title ?? null,
-                };
-            });
+            const gridProducts: ProductGridItem[] = productRows.map((p, i) =>
+                toProductGridItem(p, i, { preferProductThumbnail: true }),
+            );
             return {
                 rows: gridProducts,
                 pagination,
@@ -196,7 +153,7 @@
 
     const loading = $derived(paginateState.loading);
     const fetchError = $derived(paginateState.error);
-    const rows = $derived((query.data?.rows ?? []) as GridProduct[]);
+    const rows = $derived((query.data?.rows ?? []) as ProductGridItem[]);
     const pagination = $derived(paginateState.pagination);
     const start = $derived(paginateState.start);
     const end = $derived(paginateState.end);

@@ -25,6 +25,10 @@
 		triggerClass?: string;
 		listboxClass?: string;
 		filterFn?: (options: ComboboxOption[], query: string) => ComboboxOption[];
+		/** When true, options are supplied by the parent (e.g. after a debounced API search). */
+		remoteOptions?: boolean;
+		/** Debounce ms before calling onSearchChange (default 300 when onSearchChange is set). */
+		searchDebounceMs?: number;
 	};
 
 	let {
@@ -43,7 +47,29 @@
 		triggerClass = '',
 		listboxClass = '',
 		filterFn,
+		remoteOptions = false,
+		searchDebounceMs,
 	}: Props = $props();
+
+	const resolvedSearchDebounceMs = $derived(
+		searchDebounceMs ?? (onSearchChange ? 300 : 0)
+	);
+
+	let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function emitSearchChange(query: string) {
+		if (!onSearchChange) return;
+		const delay = resolvedSearchDebounceMs;
+		if (delay <= 0) {
+			onSearchChange(query);
+			return;
+		}
+		clearTimeout(searchDebounceTimer);
+		searchDebounceTimer = setTimeout(() => {
+			searchDebounceTimer = undefined;
+			onSearchChange(query);
+		}, delay);
+	}
 
 	const listboxId = $derived(propId ? `${propId}-listbox` : `combobox-listbox-${Math.random().toString(36).slice(2, 9)}`);
 	const comboboxId = $derived(propId ?? listboxId.replace('-listbox', ''));
@@ -68,7 +94,9 @@
 	const defaultFilter = (opts: ComboboxOption[], query: string) =>
 		opts.filter((o) => !query.trim() || o.value.toLowerCase().includes(query.trim().toLowerCase()));
 
-	const filteredOptions = $derived((filterFn ?? defaultFilter)(options, input));
+	const filteredOptions = $derived(
+		remoteOptions ? options : (filterFn ?? defaultFilter)(options, input)
+	);
 
 	const selectedLabel = $derived(value ? options.find((o) => o.id === value)?.value ?? '' : '');
 
@@ -81,7 +109,7 @@
 
 	function resetSearchQuery() {
 		input = '';
-		onSearchChange?.('');
+		emitSearchChange('');
 	}
 
 	function select(optionId: string) {
@@ -168,7 +196,7 @@
 			notifyFirstOpen();
 			setDropdownOpen(true);
 			input = (e.currentTarget as HTMLInputElement).value;
-			onSearchChange?.(input);
+			emitSearchChange(input);
 		}}
 		onkeydown={(e) => {
 			if (e.key === 'Escape') {

@@ -1,19 +1,17 @@
 import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
+import { client, type DetailById, type PaginatedRow } from '$lib/client.js';
 
 const getApiBase = () => import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
-export type Customer = {
-	id: string;
-	email: string;
-	first_name: string | null;
-	last_name: string | null;
-	phone: string | null;
-	has_account: boolean;
-	metadata: unknown | null;
-	created_at: string;
-	updated_at: string;
-	deleted_at: string | null;
-};
+export type Customer = PaginatedRow<typeof client.customers.get>;
+
+export type CustomerDetail = DetailById<typeof client.customers>;
+
+export type CustomerAddress = NonNullable<
+	NonNullable<
+		Awaited<ReturnType<ReturnType<typeof client.customers>['addresses']['get']>>['data']
+	>['rows']
+>[number];
 
 export type ListCustomersParams = {
 	page?: number;
@@ -60,13 +58,13 @@ export async function listCustomers(
 	};
 }
 
-export type CreateCustomerPayload = {
-	email: string;
-	first_name?: string | null;
-	last_name?: string | null;
-	phone?: string | null;
-	metadata?: Record<string, unknown> | null;
-};
+type CustomersPostBody = Parameters<typeof client.customers.post>[0];
+
+export type CreateCustomerPayload = CustomersPostBody extends {
+	customers: (infer Row)[];
+}
+	? Row
+	: never;
 
 export async function createCustomers(
 	customers: CreateCustomerPayload[]
@@ -83,11 +81,10 @@ export async function createCustomers(
 	return res.json() as Promise<Customer[]>;
 }
 
-export type UpdateCustomerPayload = {
-	email: string;
-	first_name?: string | null;
-	last_name?: string | null;
-	phone?: string | null;
+export type UpdateCustomerPayload = Pick<
+	CustomerDetail,
+	'email' | 'first_name' | 'last_name' | 'phone'
+> & {
 	metadata?: Record<string, unknown> | null;
 };
 
@@ -119,33 +116,14 @@ export async function deleteCustomers(ids: string[]): Promise<void> {
 	}
 }
 
-export type CustomerAddress = {
-	id: string;
-	customer_id: string;
-	first_name: string | null;
-	last_name: string | null;
-	phone: string | null;
-	company: string | null;
-	address_1: string;
-	address_2: string | null;
-	city: string;
-	country_code: string;
-	province: string | null;
-	postal_code: string | null;
-	is_default: boolean;
-	created_at: string;
-	updated_at: string;
-	deleted_at: string | null;
-};
-
-export async function getCustomer(id: string): Promise<Customer> {
+export async function getCustomer(id: string): Promise<CustomerDetail> {
 	const res = await fetch(`${getApiBase()}/customers/${id}`, { cache: 'no-store' });
 	if (!res.ok) {
 		const body = await res.json().catch(() => ({}));
 		const msg = (body as { message?: string })?.message ?? (res.status === 404 ? 'Customer not found' : await res.text());
 		throw new Error(msg);
 	}
-	return res.json() as Promise<Customer>;
+	return res.json() as Promise<CustomerDetail>;
 }
 
 export async function listCustomerAddresses(customerId: string): Promise<CustomerAddress[]> {
@@ -183,19 +161,9 @@ export async function removeCustomerFromGroup(
 	}
 }
 
-export type CreateCustomerAddressPayload = {
-	first_name?: string | null;
-	last_name?: string | null;
-	phone?: string | null;
-	company?: string | null;
-	address_1: string;
-	address_2?: string | null;
-	city: string;
-	province?: string | null;
-	postal_code?: string | null;
-	country_code: string;
-	is_default?: boolean;
-};
+export type CreateCustomerAddressPayload = Parameters<
+	ReturnType<typeof client.customers>['addresses']['post']
+>[0];
 
 export async function createCustomerAddress(
 	customerId: string,
@@ -220,7 +188,9 @@ export async function createCustomerAddress(
 	return res.json() as Promise<CustomerAddress>;
 }
 
-export type UpdateCustomerAddressPayload = CreateCustomerAddressPayload;
+export type UpdateCustomerAddressPayload = Parameters<
+	ReturnType<ReturnType<typeof client.customers>['addresses']>['put']
+>[0];
 
 export async function updateCustomerAddress(
 	customerId: string,

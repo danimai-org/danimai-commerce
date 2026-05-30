@@ -1,23 +1,13 @@
 <script lang="ts">
     import { formatStoreMoney } from "$lib/money";
-
-    type CartRowView = {
-        key: string;
-        lineId: string;
-        href: string;
-        name: string;
-        priceValue: number;
-        image: string | null;
-        quantity: number;
-        variant: string;
-    };
+    import type { CartRowViewBase } from "$lib/types/cart-view";
 
     let {
         items,
         onChangeQuantity,
         onRemove,
     }: {
-        items: CartRowView[];
+        items: CartRowViewBase[];
         onChangeQuantity: (lineId: string, delta: number) => void;
         onRemove: (lineId: string) => void;
     } = $props();
@@ -45,6 +35,7 @@
                         <button
                             type="button"
                             class="qty-btn"
+                            disabled={item.quantity <= 1}
                             onclick={() => onChangeQuantity(item.lineId, -1)}
                             aria-label="Decrease quantity">−</button
                         >

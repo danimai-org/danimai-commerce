@@ -9,7 +9,12 @@ export function customersWithDisplayFields<T extends Customer>(rows: T[]) {
 	}));
 }
 
-export const customerTableColumns: TableColumn[] = [
+export type CustomerTableRow = Customer & {
+	display_name: string;
+	account_display: string;
+};
+
+export const customerTableColumns: TableColumn<CustomerTableRow>[] = [
 	{ label: 'Email', key: 'email', type: 'text' },
 	{ label: 'Name', key: 'display_name', type: 'text' },
 	{ label: 'Account', key: 'account_display', type: 'text' },

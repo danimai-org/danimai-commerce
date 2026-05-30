@@ -24,19 +24,8 @@
         variantDisplayLabel,
         type VariantDisplayRow,
     } from "$lib/cart/variant-display-map";
-
-    type CartRowView = {
-        key: string;
-        lineId: string;
-        source: "api" | "local";
-        href: string;
-        name: string;
-        priceDisplay: string;
-        priceValue: number;
-        image: string | null;
-        quantity: number;
-        variant: string;
-    };
+    import type { CartRowView } from "$lib/types/cart-view";
+    import type { AdminProductRow } from "$lib/types/admin";
 
     let {} = $props();
 
@@ -46,30 +35,24 @@
         queryFn: () => client.admin["products"].get({ query: listQuery }),
     }));
 
-    type ProductRow = {
-        id: string;
-        title: string;
-        handle: string;
-        thumbnail?: string | null;
-    };
-    const products = $derived.by((): ProductRow[] => {
+    const products = $derived.by((): AdminProductRow[] => {
         const root = productsQuery.data as unknown;
         const direct = (
-            root as { data?: { rows?: ProductRow[] } } | null | undefined
+            root as { data?: { rows?: AdminProductRow[] } } | null | undefined
         )?.data?.rows;
         if (Array.isArray(direct) && direct.length > 0)
-            return direct as ProductRow[];
+            return direct as AdminProductRow[];
         const qd = root as { data?: unknown } | null | undefined;
         const raw = qd?.data;
         if (raw == null) return [];
-        let { rows } = rowsFromPaginated<ProductRow>(raw);
+        let { rows } = rowsFromPaginated<AdminProductRow>(raw);
         if (
             rows.length === 0 &&
             raw &&
             typeof raw === "object" &&
             "data" in raw
         ) {
-            rows = rowsFromPaginated<ProductRow>(
+            rows = rowsFromPaginated<AdminProductRow>(
                 (raw as { data: unknown }).data,
             ).rows;
         }
@@ -283,10 +266,13 @@
     async function changeLineQuantity(lineId: string, delta: number) {
         const item = cartState.cart?.line_items.find((li) => li.id === lineId);
         if (!item) return;
-        await changeLineItemQuantity(lineId, (item.quantity ?? 0) + delta);
+        const current = Math.max(1, item.quantity ?? 1);
+        if (delta < 0 && current <= 1) return;
+        await changeLineItemQuantity(lineId, current + delta);
     }
 
     async function removeLine(lineId: string) {
+        if (!confirm("Remove this item from your cart?")) return;
         await removeLineItem(lineId);
     }
 

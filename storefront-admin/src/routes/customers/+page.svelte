@@ -13,11 +13,7 @@
 		type TableColumn
 	} from '$lib/components/organs/index.js';
 	import Users from '@lucide/svelte/icons/users';
-	import {
-		createPaginationQuery,
-		createPagination,
-		type PaginationMeta
-	} from '$lib/api/pagination.svelte.js';
+	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import {
 		createCustomers,
 		updateCustomer,
@@ -30,7 +26,10 @@
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
-	const paginateState = createPagination(async () => {
+	const paginateState = createPagination<
+		Awaited<ReturnType<typeof client['customers']['get']>>,
+		Customer
+	>(async () => {
 		return client['customers'].get({ query: paginationQuery });
 	}, ['customers']);
 
@@ -40,12 +39,7 @@
 		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
-	const queryData = $derived(
-		paginateState.query.data as
-			| { data?: { rows?: Customer[]; pagination?: unknown }; pagination?: unknown }
-			| undefined
-	);
-	const rows = $derived((queryData?.data?.rows ?? []) as Customer[]);
+	const rows = $derived(paginateState.query.data?.data?.rows ?? []);
 	const rowsWithDisplay = $derived(
 		rows.map((r: Customer) => ({
 			...r,
@@ -53,18 +47,16 @@
 			account_type: r.has_account ? 'Account' : 'Guest'
 		}))
 	);
-	const pagination = $derived(
-		(queryData?.data?.pagination ?? queryData?.pagination ?? null) as PaginationMeta | null
-	);
+	const pagination = $derived(paginateState.pagination);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
 	const openCreate = $derived(paginateState.openCreate);
 	const closeForm = $derived(paginateState.closeForm);
 	const formSheetOpen = $derived(paginateState.formSheetOpen);
 	const formMode = $derived(paginateState.formMode);
-	const formItem = $derived(paginateState.formItem) as Customer | null;
+	const formItem = $derived(paginateState.formItem);
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);
-	const deleteItem = $derived(paginateState.deleteItem) as Customer | null;
+	const deleteItem = $derived(paginateState.deleteItem);
 	const deleteError = $derived(paginateState.deleteError);
 	const closeDeleteConfirm = $derived(paginateState.closeDeleteConfirm);
 	const confirmDelete = $derived(paginateState.confirmDelete);

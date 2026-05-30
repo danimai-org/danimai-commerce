@@ -16,6 +16,21 @@ export class Client {
 
 export const client = new Client(serverUrl).client;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type TreatyData<M extends (...args: any[]) => Promise<any>> = NonNullable<
+	Awaited<ReturnType<M>>['data']
+>;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type PaginatedRow<M extends (...args: any[]) => Promise<any>> = NonNullable<
+	NonNullable<TreatyData<M>>['rows']
+>[number];
+
+export type DetailById<
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	Segment extends (params: { id: string }) => { get: (...args: any[]) => Promise<any> },
+> = NonNullable<Awaited<ReturnType<ReturnType<Segment>['get']>>['data']>;
+
 export type ReplaceProductVariantsPayload = {
 	product_id: string;
 	options: Array<{ title: string; values: string[] }>;

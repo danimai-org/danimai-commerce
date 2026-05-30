@@ -1,12 +1,18 @@
 import { browser } from '$app/environment';
 import { client } from '$lib/api/client';
 import { formatStoreMoney } from '$lib/money';
+import type {
+	StorefrontOrder,
+	StorefrontOrderDetailMetadata,
+} from '$lib/types/order';
+import { parseStorefrontOrderMetadata } from '$lib/types/order';
 import {
 	ACCOUNT_STORAGE_KEY,
 	ORDERS_STORAGE_KEY_PREFIX,
 	parseStoredAccount,
 	storageKeyForEmail
 } from '$lib/account/storage';
+
 
 export const ORDER_CACHE_KEY_PREFIX = 'dm_sf_order_';
 const ORDER_DETAIL_CACHE_PREFIX = 'dm_sf_order_detail_';
@@ -50,32 +56,17 @@ export type OrderDetail = {
 
 const defaultEmail = 'guest@denimai.com';
 
-type ApiOrder = {
-	id: string;
-	display_id?: number;
-	status?: string;
-	email?: string | null;
-	currency_code?: string;
-	metadata?: Record<string, unknown> | null;
-	created_at?: string | Date;
-};
-
-type ApiOrderItem = {
-	title?: string;
-	productName?: string;
-	thumbnail?: string | null;
-	productImage?: string | null;
-	variant?: string | null;
-	selectedVariant?: string | null;
-	quantity?: number;
-	price?: number;
-	productHandle?: string | null;
-};
-
 function readString(value: unknown): string | null {
 	if (typeof value !== 'string') return null;
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : null;
+}
+
+function parseDate(value: string | Date | undefined | null): Date {
+	if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+	if (value == null || value === '') return new Date();
+	const parsed = new Date(value);
+	return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
 function addressLinesFromSnapshot(value: unknown): string[] {
@@ -97,27 +88,22 @@ function addressLinesFromSnapshot(value: unknown): string[] {
 	return parts.length > 0 ? parts : [];
 }
 
-export function orderDetailFromApi(order: ApiOrder): OrderDetail {
-	const meta =
-		typeof order.metadata === 'object' && order.metadata !== null
-			? order.metadata
-			: {};
-	const items = Array.isArray(meta.items) ? (meta.items as ApiOrderItem[]) : [];
-	const totals =
-		typeof meta.totals === 'object' && meta.totals !== null
-			? (meta.totals as Record<string, unknown>)
-			: {};
-	const customer =
-		typeof meta.customer === 'object' && meta.customer !== null
-			? (meta.customer as Record<string, unknown>)
-			: {};
+function cacheKeysForDetail(detail: OrderDetail): string[] {
+	return [...new Set([detail.id, detail.number].filter(Boolean))];
+}
 
-	const subtotalNum = Number(totals.subtotal) || 0;
-	const shippingNum = Number(totals.shipping) || 0;
-	const discountNum = Number(totals.discount) || 0;
-	const taxNum = Number(totals.tax) || 0;
+export function orderDetailFromApi(order: StorefrontOrder): OrderDetail {
+	const meta: StorefrontOrderDetailMetadata = parseStorefrontOrderMetadata(
+		order.metadata,
+	);
+	const items = meta.items ?? [];
+
+	const subtotalNum = Number(meta.totals?.subtotal) || 0;
+	const shippingNum = Number(meta.totals?.shipping) || 0;
+	const discountNum = Number(meta.totals?.discount) || 0;
+	const taxNum = Number(meta.totals?.tax) || 0;
 	const totalNum =
-		Number(totals.total) || subtotalNum + shippingNum + taxNum - discountNum;
+		Number(meta.totals?.total) || subtotalNum + shippingNum + taxNum - discountNum;
 
 	return {
 		id: order.id,
@@ -125,10 +111,10 @@ export function orderDetailFromApi(order: ApiOrder): OrderDetail {
 			typeof order.display_id === 'number'
 				? String(order.display_id)
 				: order.id,
-		date: order.created_at ? new Date(order.created_at) : new Date(),
-		status: order.status ?? 'pending',
+		date: parseDate(order.created_at),
+		status: String(order.status ?? 'pending'),
 		email:
-			readString(customer.email) ??
+			readString(meta.customer?.email) ??
 			readString(order.email) ??
 			readString(meta.email) ??
 			'—',
@@ -193,7 +179,7 @@ export const loadOrdersForAccount = (): OrderSummary[] => {
 const placeholderFromSummary = (summary: OrderSummary): OrderDetail => ({
 	id: summary.orderId || summary.id,
 	number: summary.id,
-	date: new Date(summary.date),
+	date: parseDate(summary.date),
 	status: summary.status || 'pending',
 	email: '—',
 	items: [],
@@ -214,8 +200,10 @@ const persistOrderDetail = (detail: OrderDetail): void => {
 	if (!browser) return;
 	const payload = { ...detail, date: detail.date.toISOString() };
 	const serialized = JSON.stringify(payload);
-	localStorage.setItem(`${ORDER_DETAIL_CACHE_PREFIX}${detail.id}`, serialized);
-	sessionStorage.setItem(`${ORDER_CACHE_KEY_PREFIX}${detail.id}`, serialized);
+	for (const key of cacheKeysForDetail(detail)) {
+		localStorage.setItem(`${ORDER_DETAIL_CACHE_PREFIX}${key}`, serialized);
+		sessionStorage.setItem(`${ORDER_CACHE_KEY_PREFIX}${key}`, serialized);
+	}
 };
 
 const loadFromPersistentCache = (cacheId: string): OrderDetail | null => {
@@ -226,7 +214,7 @@ const loadFromPersistentCache = (cacheId: string): OrderDetail | null => {
 				const raw = storage.getItem(`${prefix}${cacheId}`);
 				if (!raw) continue;
 				const parsed = JSON.parse(raw) as Omit<OrderDetail, 'date'> & { date: string };
-				return { ...parsed, date: new Date(parsed.date) };
+				return { ...parsed, date: parseDate(parsed.date) };
 			} catch {
 				// try next storage key
 			}
@@ -236,11 +224,12 @@ const loadFromPersistentCache = (cacheId: string): OrderDetail | null => {
 };
 
 export async function fetchOrderDetailFromApi(orderId: string): Promise<OrderDetail | null> {
-	if (!orderId.trim()) return null;
+	const id = orderId.trim();
+	if (!id) return null;
 	try {
-		const res = await client.storefront.orders({ id: orderId }).get();
-		if (res.error || !res.data) return null;
-		const detail = orderDetailFromApi(res.data as ApiOrder);
+		const res = await client.storefront.orders({ id }).get();
+		if (res.error || !res.data?.id) return null;
+		const detail = orderDetailFromApi(res.data);
 		persistOrderDetail(detail);
 		return detail;
 	} catch {
@@ -272,7 +261,7 @@ export const resolveOrderDetail = async (orderRef: string): Promise<OrderDetail 
 
 	if (!summary) return null;
 
-	if (summary.orderId) {
+	if (summary.orderId && summary.orderId !== ref) {
 		const cachedByOrderId = loadFromPersistentCache(summary.orderId);
 		if (cachedByOrderId) return cachedByOrderId;
 		const apiByOrderId = await fetchOrderDetailFromApi(summary.orderId);

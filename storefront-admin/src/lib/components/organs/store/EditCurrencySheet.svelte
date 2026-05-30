@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import { client } from '$lib/client.js';
-	import type { Currency } from '$lib/currencies/types.js';
+	import { client, type PaginatedRow } from '$lib/client.js';
+
+	type Currency = PaginatedRow<typeof client.currencies.get>;
 
 	let {
 		open = $bindable(false),

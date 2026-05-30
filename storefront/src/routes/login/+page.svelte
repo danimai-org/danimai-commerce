@@ -1,10 +1,21 @@
 <script lang="ts">
+    import { onMount } from "svelte";
     import { SiteHeader, SiteFooter } from "$lib/components/layout";
     import { goto } from "$app/navigation";
     import { superForm } from "sveltekit-superforms/client";
+    import { setMessage } from "sveltekit-superforms/client";
     import { zod4Client } from "sveltekit-superforms/adapters";
     import type { SuperValidated } from "sveltekit-superforms";
     import { z } from "zod";
+    import { client } from "$lib/api/client";
+    import {
+        clearCustomerAuth,
+        setCustomerAuthTokens,
+        syncAccountFromApi,
+        notifyAccountUpdated,
+        treatyErrorMessage,
+        type CustomerAuthTokens,
+    } from "$lib/account/storage";
     let { data } = $props();
 
     const LoginSchema = z.object({
@@ -12,15 +23,17 @@
             .string()
             .trim()
             .email("Please enter a valid email address."),
-        password: z
-            .string()
-            .trim()
-            .min(1, "Please enter your password."),
+        password: z.string().min(1, "Please enter your password."),
     });
     type LoginFormData = z.infer<typeof LoginSchema>;
 
-    const ACCOUNT_STORAGE_KEY = "dm_sf_account";
     let showPassword = $state(false);
+    let loggingIn = $state(false);
+    let submitting = $state(false);
+
+    onMount(() => {
+        clearCustomerAuth();
+    });
     const firstError = (value: unknown): string => {
         if (typeof value === "string") return value;
         if (
@@ -44,38 +57,78 @@
     };
     // `data` comes from page load; superForm owns state after init.
     // svelte-ignore state_referenced_locally
-    const { form, errors, constraints, message, enhance, delayed } = superForm<LoginFormData>(
+    const {
+        form,
+        errors,
+        constraints,
+        message,
+        enhance,
+        submitting: submittingStore,
+    } = superForm<LoginFormData>(
         (data as { loginForm: SuperValidated<LoginFormData> }).loginForm,
         {
+            SPA: true,
             validators: zod4Client(LoginSchema),
-            onUpdated({ form: validated }) {
+            resetForm: false,
+            onUpdated: async ({ form: validated }) => {
                 if (!validated.valid || !validated.posted) return;
-                const email = validated.data.email.trim();
-                const name = email.includes("@")
-                    ? email.split("@")[0]
-                    : "Customer";
 
-                const params = new URLSearchParams({
-                    email,
-                    name,
-                });
+                clearCustomerAuth();
+                loggingIn = true;
 
-                localStorage.setItem(
-                    ACCOUNT_STORAGE_KEY,
-                    JSON.stringify({
-                        name,
+                try {
+                    const email = validated.data.email.trim().toLowerCase();
+                    const password = validated.data.password;
+
+                    const res = await client.storefront.auth.login.post({
                         email,
-                    }),
-                );
+                        password,
+                    });
 
-                void goto(`/account?${params.toString()}`);
+                    if (res.error) {
+                        setMessage(
+                            validated,
+                            treatyErrorMessage(res.error, "Login failed"),
+                            { status: 400 },
+                        );
+                        return;
+                    }
+
+                    const authTokens = res.data as CustomerAuthTokens;
+                    if (!authTokens?.access_token) {
+                        setMessage(validated, "Login failed", { status: 400 });
+                        return;
+                    }
+
+                    setCustomerAuthTokens(authTokens);
+                    const account = (await syncAccountFromApi()) ?? {
+                        name: "Customer",
+                        email,
+                    };
+                    notifyAccountUpdated();
+
+                    const params = new URLSearchParams({
+                        email: account.email,
+                        name: account.name,
+                    });
+                    await goto(`/account?${params.toString()}`);
+                } finally {
+                    loggingIn = false;
+                }
             },
         },
     );
+
+    $effect(() => {
+        const unsub = submittingStore.subscribe((value) => {
+            submitting = value;
+        });
+        return unsub;
+    });
 </script>
 
 <svelte:head>
-    <title>Login — Denimai</title>
+    <title>Login — Danimai</title>
 </svelte:head>
 
 <div class="page-login">
@@ -84,7 +137,7 @@
     <main class="auth-main">
         <header class="auth-header">
             <h1 class="auth-title">Login to Your Account</h1>
-            <p class="auth-subtitle">Welcome back to Denimai.</p>
+            <p class="auth-subtitle">Welcome back to Danimai.</p>
         </header>
 
         <form
@@ -180,8 +233,12 @@
             {#if $message}
                 <p class="login-error">{$message}</p>
             {/if}
-            <button type="submit" class="auth-submit" disabled={$delayed}>
-                {$delayed ? "Logging in..." : "LOGIN"}
+            <button
+                type="submit"
+                class="auth-submit"
+                disabled={submitting || loggingIn}
+            >
+                {submitting || loggingIn ? "Logging in..." : "LOGIN"}
             </button>
         </form>
 
