@@ -17,7 +17,11 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import { createPaginationQuery } from '$lib/api/pagination.svelte.js';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
-	import { customerTableColumns, customersWithDisplayFields } from './types.js';
+	import {
+		customerTableColumns,
+		customersWithDisplayFields,
+		type CustomerTableRow
+	} from './types.js';
 	import CustomerGroupAddCustomersDialog from './CustomerGroupAddCustomersDialog.svelte';
 
 	let {
@@ -30,7 +34,7 @@
 
 	const emptyCustomersResponse = {
 		data: {
-			rows: [] as Customer[],
+			rows: [],
 			pagination: {
 				total: 0,
 				page: 1,
@@ -106,7 +110,7 @@
 	let removeCustomerError = $state<string | null>(null);
 	let removeCustomerTarget = $state<Customer | null>(null);
 
-	const customerTableColumnsWithActions = $derived<TableColumn[]>([
+	const customerTableColumnsWithActions = $derived<TableColumn<CustomerTableRow>[]>([
 		...customerTableColumns,
 		{
 			label: 'Actions',
@@ -117,7 +121,7 @@
 					label: 'Remove',
 					key: 'remove',
 					type: 'button',
-					onClick: (item) => openRemoveCustomerModal(item as Customer)
+					onClick: (item) => openRemoveCustomerModal(item)
 				}
 			]
 		}
@@ -196,10 +200,10 @@
 		{:else}
 			<div class="min-h-0 flex-1 overflow-auto">
 				<table class="w-full text-sm">
-					<TableHead columns={customerTableColumnsWithActions} />
+					<TableHead columns={customerTableColumnsWithActions as TableColumn[]} />
 					<TableBody
 						rows={customersRowsWithDisplay}
-						columns={customerTableColumnsWithActions}
+						columns={customerTableColumnsWithActions as TableColumn[]}
 						emptyMessage="No customers found."
 					/>
 				</table>

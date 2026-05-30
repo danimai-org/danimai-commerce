@@ -213,7 +213,7 @@
 				const candidate = item as Product & {
 					category?: { id?: string | null } | null;
 				};
-				return candidate.category_id === categoryId || candidate.category?.id === categoryId;
+				return candidate.category?.id === categoryId;
 			});
 		}
 
@@ -411,7 +411,7 @@
 									: '—'}
 							</td>
 							<td class="px-4 py-3 text-muted-foreground">
-								{row.variant_count ?? row.variants?.length ?? 0}
+								{row.variant_count ?? 0}
 							</td>
 							<td class="px-4 py-3">
 								<span

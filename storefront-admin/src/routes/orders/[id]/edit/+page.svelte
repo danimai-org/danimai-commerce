@@ -12,61 +12,22 @@
 	import X from '@lucide/svelte/icons/x';
 	import { resolve } from '$app/paths';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
+	import { fetchOrder } from '$lib/components/organs/order/detail/load-order.js';
+	import {
+		getOrderItems,
+		normalizeMetaItem,
+		type OrderDetailOrder,
+		type OrderItem,
+		type OrderMetadata
+	} from '$lib/components/organs/order/detail/types.js';
 
-	const API_BASE = 'http://localhost:8000/admin';
+	import type { Product } from '$lib/components/organs/product/create/types.js';
 
-	type Order = {
-		id: string;
-		status: string;
-		fulfillment_status: string;
-		payment_status: string;
-		display_id: number;
-		currency_code: string;
-		email: string | null;
-		customer_id: string | null;
-		metadata: unknown | null;
-		created_at: string;
-		updated_at: string;
-	};
-
-	type OrderItem = {
-		id: string;
-		title: string;
-		price: number;
-		quantity: number;
-		currency: string;
-		thumbnail?: string | null;
-		sku?: string | null;
-	};
-
-	type OrderMetadata = {
-		items?: unknown[];
-		subtotal?: number;
-		discount_amount?: number;
-		shipping_amount?: number;
-		tax_amount?: number;
-		total?: number;
-	};
-
-	function normalizeMetaItem(raw: unknown, index: number): OrderItem | null {
-		if (!raw || typeof raw !== 'object') return null;
-		const o = raw as Record<string, unknown>;
-		const id = (o.id as string) ?? (o.variant_id as string) ?? `item-${index}`;
-		const title = (o.title as string) ?? (o.product_title as string) ?? 'Unknown';
-		let price = 0;
-		if (typeof o.price === 'number' && !Number.isNaN(o.price)) price = o.price;
-		else if (typeof o.unit_price === 'string') price = parseFloat(o.unit_price) || 0;
-		else if (typeof o.unit_price === 'number') price = o.unit_price;
-		const quantity = Math.max(0, Math.floor(Number(o.quantity) || 0));
-		const currency = (o.currency as string) ?? 'INR';
-		const thumbnail = (o.thumbnail as string | null) ?? null;
-		const sku = (o.sku as string | null) ?? (o.variant_sku as string | null) ?? null;
-		return { id: String(id), title, price, quantity, currency, thumbnail, sku };
-	}
+	const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/admin';
 
 	const orderId = $derived($page.params.id);
 
-	let order = $state<Order | null>(null);
+	let order = $state<OrderDetailOrder | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let editItems = $state<OrderItem[]>([]);
@@ -77,19 +38,10 @@
 		loading = true;
 		error = null;
 		try {
-			const res = await fetch(`${API_BASE}/orders/${orderId}`, { cache: 'no-store' });
-			if (!res.ok) {
-				const body = await res.json().catch(() => ({}));
-				error = body?.message ?? (res.status === 404 ? 'Order not found' : await res.text());
-				order = null;
-				return;
-			}
-			order = (await res.json()) as Order;
-			const meta = (order?.metadata ?? {}) as OrderMetadata;
-			const rawItems = Array.isArray(meta.items) ? meta.items : [];
-			editItems = rawItems
-				.map((raw, i) => normalizeMetaItem(raw, i))
-				.filter((it): it is OrderItem => it !== null && it.quantity > 0);
+			const result = await fetchOrder(orderId);
+			order = result.order;
+			error = result.error;
+			editItems = order ? getOrderItems(order) : [];
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
 			error =
@@ -135,7 +87,7 @@
 		const raw = meta.items;
 		if (!Array.isArray(raw)) return [];
 		return raw
-			.map((r, i) => normalizeMetaItem(r, i))
+			.map((r, i) => normalizeMetaItem(r, i, order?.currency_code ?? 'USD'))
 			.filter((it): it is OrderItem => it !== null && it.quantity > 0);
 	});
 	const hasChanges = $derived.by(() => {
@@ -151,9 +103,9 @@
 		return `₹${amount.toFixed(2)}`;
 	}
 
-	function formatDate(iso: string) {
+	function formatDate(value: string | Date) {
 		try {
-			return new Date(iso).toLocaleDateString('en-US', {
+			return new Date(value).toLocaleDateString('en-US', {
 				year: 'numeric',
 				month: 'long',
 				day: 'numeric',
@@ -161,7 +113,7 @@
 				minute: '2-digit'
 			});
 		} catch {
-			return iso;
+			return String(value);
 		}
 	}
 
@@ -228,19 +180,6 @@
 	}
 
 	// Add product browser
-	type Product = {
-		id: string;
-		title: string;
-		handle: string;
-		status: string;
-		thumbnail: string | null;
-		variants?: Array<{
-			id: string;
-			title: string;
-			product_id: string | null;
-			thumbnail: string | null;
-		}>;
-	};
 	let addProductOpen = $state(false);
 	let productBrowserPage = $state(1);
 	let productBrowserSearch = $state('');
@@ -478,7 +417,7 @@
 								<span>Total</span>
 								<span></span>
 							</div>
-						
+
 							{#each editItems as item (item.id)}
 								<div class="border-b bg-background px-3 py-3 last:border-b-0">
 									<!-- Mobile -->

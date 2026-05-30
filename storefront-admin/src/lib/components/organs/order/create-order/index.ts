@@ -6,4 +6,20 @@ export { default as CreateOrderNotesSection } from './CreateOrderNotesSection.sv
 export { default as CreateOrderCustomerSection } from './CreateOrderCustomerSection.svelte';
 export { default as CreateOrderMarketsSection } from './CreateOrderMarketsSection.svelte';
 export { default as CreateOrderTagsSection } from './CreateOrderTagsSection.svelte';
-export * from './types.js';
+export type {
+	CreateOrderItem,
+	CustomerListItem,
+	CurrencyRow,
+	Pagination,
+	Product,
+	RegionRow,
+	SelectedCustomer
+} from './types.js';
+export {
+	AVAILABLE_TAGS,
+	CUSTOMER_MENU_ITEM_CLASS,
+	CUSTOMER_SEARCH_DEBOUNCE_MS,
+	PRODUCT_BROWSER_PAGE_SIZE,
+	PRODUCT_BROWSER_SKELETON_ROWS,
+	PRODUCT_SEARCH_DEBOUNCE_MS
+} from './types.js';

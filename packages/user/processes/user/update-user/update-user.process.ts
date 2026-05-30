@@ -14,6 +14,7 @@ import {
   UpdateUserSchema,
 } from "./update-user.schema";
 import type { Database } from "../../../db/type";
+import { toUserApiRow } from "../user-response.util";
 
 /**
  * Handles the update user process.
@@ -57,9 +58,10 @@ export class UpdateUserProcess
     const result = await this.db
       .updateTable("users")
       .set({
-        ...input,
-        updated_at: sql`now()`,
-        id: undefined
+        ...(input.first_name !== undefined ? { first_name: input.first_name } : {}),
+        ...(input.last_name !== undefined ? { last_name: input.last_name } : {}),
+        ...(input.role_id !== undefined ? { role_id: input.role_id } : {}),
+        updated_at: sql<Date>`now()`,
       })
       .where("id", "=", input.id)
       .where("deleted_at", "is", null)
@@ -70,6 +72,6 @@ export class UpdateUserProcess
       return undefined;
     }
 
-    return result;
+    return toUserApiRow(result);
   }
 }

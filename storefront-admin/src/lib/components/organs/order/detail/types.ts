@@ -1,33 +1,9 @@
+import { client, type DetailById, type PaginatedRow } from '$lib/client';
 import type { ShippingAddressValue } from '../shipping-address.js';
 
-export type OrderFulfillmentStatus =
-	| 'not_fulfilled'
-	| 'partially_fulfilled'
-	| 'fulfilled'
-	| 'partially_shipped'
-	| 'shipped'
-	| 'partially_returned'
-	| 'returned'
-	| 'canceled'
-	| 'requires_action';
+export type OrderFulfillmentStatus = DetailById<typeof client.orders>['fulfillment_status'];
 
-export type OrderDetailOrder = {
-	id: string;
-	status: string;
-	fulfillment_status: OrderFulfillmentStatus;
-	payment_status: string;
-	display_id: number;
-	currency_code: string;
-	email: string | null;
-	customer_id: string | null;
-	sales_channel_id: string | null;
-	region_id: string | null;
-	billing_address_id: string | null;
-	shipping_address_id: string | null;
-	metadata: unknown | null;
-	created_at: Date;
-	updated_at: Date;
-};
+export type OrderDetailOrder = DetailById<typeof client.orders>;
 
 export type OrderItem = {
 	id: string;
@@ -72,7 +48,7 @@ export function getOrderMetadata(order: OrderDetailOrder | null): OrderMetadata 
 	return meta as OrderMetadata;
 }
 
-function normalizeMetaItem(raw: unknown, index: number, currencyCode: string): OrderItem | null {
+export function normalizeMetaItem(raw: unknown, index: number, currencyCode: string): OrderItem | null {
 	if (!raw || typeof raw !== 'object') return null;
 	const o = raw as Record<string, unknown>;
 	const id = (o.id as string) ?? (o.variant_id as string) ?? `item-${index}`;
@@ -196,3 +172,5 @@ export function statusBadgeClass(status: string): string {
 			return `${base} bg-muted text-muted-foreground`;
 	}
 }
+
+export type OrderListRow = PaginatedRow<typeof client.orders.get>;

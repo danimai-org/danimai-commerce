@@ -14,23 +14,9 @@
 	import { createPaginationQuery, createPagination } from '$lib/api/pagination.svelte.js';
 	import ShoppingCart from '@lucide/svelte/icons/shopping-cart';
 	import { client } from '$lib/client.js';
+	import type { OrderListRow } from '$lib/components/organs/order/detail/types.js';
 	import { resolve } from '$app/paths';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
-
-	type Order = {
-		id: string;
-		status: string;
-		fulfillment_status: string;
-		payment_status: string;
-		display_id: number;
-		currency_code: string;
-		email: string | null;
-		customer_id: string | null;
-		sales_channel_id: string | null;
-		region_id: string | null;
-		created_at: string;
-		updated_at: string;
-	};
 
 	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
 
@@ -49,7 +35,7 @@
 		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
-	const rawRows = $derived((paginateState.query.data?.data?.rows ?? []) as unknown as Order[]);
+	const rawRows = $derived((paginateState.query.data?.data?.rows ?? []) as OrderListRow[]);
 	const rows = $derived(
 		rawRows.map((r) => ({ ...r, order_label: `#${r.display_id}` })) as Record<string, unknown>[]
 	);

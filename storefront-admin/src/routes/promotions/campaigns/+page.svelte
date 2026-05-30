@@ -22,18 +22,7 @@
 	import Clock from '@lucide/svelte/icons/clock';
 	import Info from '@lucide/svelte/icons/info';
 	import { cn } from '$lib/utils.js';
-
-	type Campaign = {
-		id: string;
-		name: string;
-		description: string | null;
-		identifier: string;
-		start_date: string | null;
-		end_date: string | null;
-		budget_type?: 'usage' | 'spend' | null;
-		budget_limit?: number | null;
-		budget_limit_per?: number | null;
-	};
+	import type { Campaign } from '$lib/components/organs/promotion/types.js';
 
 	let searchQuery = $state('');
 

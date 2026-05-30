@@ -1,8 +1,3 @@
-export type PromotionDetail = {
-	id: string;
-	code: string;
-	method: 'Automatic' | 'Manual';
-	status: 'Active' | 'Inactive' | 'Draft';
-	campaign_id: string | null;
-	campaign_name?: string | null;
-};
+import { client, type DetailById } from '$lib/client';
+
+export type PromotionDetail = DetailById<typeof client.promotions>;

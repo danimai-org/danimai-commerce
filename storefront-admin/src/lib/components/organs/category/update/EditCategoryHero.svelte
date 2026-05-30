@@ -5,7 +5,18 @@
 	import { cn } from '$lib/utils.js';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { Toaster, toast } from 'svelte-sonner';
+	import { Combobox, type ComboboxOption } from '$lib/components/organs/index.js';
 	import type { CategoryDetail } from '../type';
+
+	const VISIBILITY_ALL: ComboboxOption[] = [
+		{ id: 'public', value: 'Public' },
+		{ id: 'private', value: 'Private' }
+	];
+
+	const SEARCH_DEBOUNCE_MS = 300;
+
+	let visibilityOptions = $state<ComboboxOption[]>([...VISIBILITY_ALL]);
+	let visibilitySearchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 
 	type CategoryData = CategoryDetail;
 
@@ -53,20 +64,55 @@
 		initializedForId = nextId;
 
 		message.set('');
+		const visibility = category!.visibility ?? 'public';
 		reset({
 			data: {
 				id: category!.id,
 				title: category!.value ?? '',
 				handle: (category!.handle ?? '').replace(/^\//, ''),
 				description: (category!.metadata as { description?: string })?.description ?? '',
-				visibility: category!.visibility
+				visibility
 			}
 		});
+		visibilityOptions = visibilityOptionsWithSelection([...VISIBILITY_ALL], visibility);
 	});
 
 	function close() {
 		open = false;
 	}
+
+	function visibilityOptionsWithSelection(
+		options: ComboboxOption[],
+		selectedId: string
+	): ComboboxOption[] {
+		if (!selectedId || options.some((o) => o.id === selectedId)) return options;
+		const selected = VISIBILITY_ALL.find((o) => o.id === selectedId);
+		return selected ? [selected, ...options] : options;
+	}
+
+	function filterVisibilityOptions(search: string, selectedId: string): ComboboxOption[] {
+		const q = search.trim().toLowerCase();
+		const filtered = !q
+			? [...VISIBILITY_ALL]
+			: VISIBILITY_ALL.filter(
+					(o) => o.value.toLowerCase().includes(q) || o.id.includes(q)
+				);
+		return visibilityOptionsWithSelection(filtered, selectedId);
+	}
+
+	function scheduleVisibilitySearch(query: string) {
+		clearTimeout(visibilitySearchDebounceTimer);
+		visibilitySearchDebounceTimer = setTimeout(() => {
+			visibilityOptions = filterVisibilityOptions(query, $form.visibility);
+		}, SEARCH_DEBOUNCE_MS);
+	}
+
+	$effect(() => {
+		if (open) return;
+		clearTimeout(visibilitySearchDebounceTimer);
+		visibilitySearchDebounceTimer = undefined;
+		visibilityOptions = [...VISIBILITY_ALL];
+	});
 </script>
 
 <Toaster richColors position="top-center" />
@@ -116,15 +162,17 @@
 
 					<div class="flex flex-col gap-2">
 						<label for="edit-visibility" class="text-sm font-medium">Visibility</label>
-						<select
+						<input type="hidden" name="visibility" value={$form.visibility} />
+						<Combobox
 							id="edit-visibility"
-							name="visibility"
+							remoteOptions
+							options={visibilityOptions}
 							bind:value={$form.visibility}
-							class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-						>
-							<option value="public">Public</option>
-							<option value="private">Private</option>
-						</select>
+							placeholder="Select visibility"
+							searchDebounceMs={0}
+							onSearchChange={scheduleVisibilitySearch}
+							triggerClass="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+						/>
 					</div>
 				</div>
 			</div>

@@ -40,9 +40,8 @@
 		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
-	const queryData = $derived(paginateState.query.data as ListCustomerGroupsResponse | undefined);
-	const rows = $derived((queryData?.data?.rows ?? []) as CustomerGroup[]);
-	const pagination = $derived(queryData?.data?.pagination ?? queryData?.pagination ?? null);
+	const rows = $derived(paginateState.query.data?.data?.rows ?? []);
+	const pagination = $derived(paginateState.pagination);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
 	const openCreate = $derived(paginateState.openCreate);

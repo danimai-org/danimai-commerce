@@ -74,6 +74,26 @@ export class UpdateProductCategoryProcess
       }
     }
 
+    let handleUpdate: string | undefined;
+    if (input.handle !== undefined) {
+      handleUpdate = this.normalizeHandle(input.handle);
+      const existingHandle = await this.db
+        .selectFrom("product_categories")
+        .where("handle", "=", handleUpdate)
+        .where("deleted_at", "is", null)
+        .where("id", "!=", input.id)
+        .select("id")
+        .executeTakeFirst();
+
+      if (existingHandle) {
+        throw new ValidationError("Product category handle already exists", [{
+          type: "already_exists",
+          message: "Product category handle already exists",
+          path: "handle",
+        }]);
+      }
+    }
+
     if (input.parent_id !== undefined) {
       if (input.parent_id === input.id) {
         throw new ValidationError("Category cannot be its own parent", [{
@@ -131,12 +151,16 @@ export class UpdateProductCategoryProcess
       }
     }
 
-    const { attributes, id: _categoryId, ...updateFields } = input;
+    const { attributes, id: _categoryId, metadata, handle: _handle, ...updateFields } = input;
 
     return this.db.transaction().execute(async (trx) => {
       const updated = await trx.updateTable("product_categories")
         .set({
           ...updateFields,
+          ...(handleUpdate !== undefined && { handle: handleUpdate }),
+          ...(metadata !== undefined && {
+            metadata: JSON.stringify(metadata),
+          }),
           updated_at: new Date(),
         })
         .where("id", "=", input.id)
@@ -192,5 +216,13 @@ export class UpdateProductCategoryProcess
     }
 
     return descendants;
+  }
+
+  private normalizeHandle(raw: string): string {
+    return raw
+      .replace(/^\//, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "category";
   }
 }

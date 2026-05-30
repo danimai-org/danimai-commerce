@@ -5,12 +5,37 @@
 	import { Combobox } from '$lib/components/organs/index.js';
 	import { MultiSelectCombobox } from '$lib/components/organs/index.js';
 
+	type Props = {
+		createDiscountable?: boolean;
+		createCollectionIds?: string[];
+		createCategoryId?: string;
+		createTagIds?: string[];
+		categoryError?: string | null;
+		createSalesChannelIds?: string[];
+		collectionsList?: Array<{ id: string; title: string }>;
+		categoriesList?: Array<{ id: string; value: string }>;
+		tagsList?: Array<{ id: string; value: string }>;
+		salesChannelsList?: Array<{ id: string; name: string }>;
+		collectionsLoading?: boolean;
+		categoriesLoading?: boolean;
+		tagsLoading?: boolean;
+		salesChannelsLoading?: boolean;
+		onCollectionSearchChange?: (query: string) => void;
+		onCollectionOpenChange?: (open: boolean) => void;
+		onCategorySearchChange?: (query: string) => void;
+		onCategoryOpenChange?: (open: boolean) => void;
+		onTagSearchChange?: (query: string) => void;
+		onTagOpenChange?: (open: boolean) => void;
+		onSalesChannelSearchChange?: (query: string) => void;
+		onSalesChannelOpenChange?: (open: boolean) => void;
+	};
+
 	let {
 		createDiscountable = $bindable(true),
 		createCollectionIds = $bindable([]),
 		createCategoryId = $bindable(''),
 		createTagIds = $bindable([] as string[]),
-		categoryError = null as string | null,
+		categoryError = null,
 		createSalesChannelIds = $bindable([]),
 		collectionsList = $bindable([]),
 		categoriesList = $bindable([]),
@@ -28,7 +53,7 @@
 		onTagOpenChange = (_open: boolean) => {},
 		onSalesChannelSearchChange = (_query: string) => {},
 		onSalesChannelOpenChange = (_open: boolean) => {}
-	} = $props();
+	}: Props = $props();
 </script>
 
 <div class="flex-1 overflow-auto p-4 pt-4 sm:p-6 sm:pt-4">

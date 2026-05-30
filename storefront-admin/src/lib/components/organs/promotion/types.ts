@@ -1,10 +1,6 @@
-export type Promotion = {
-	id: string;
-	code: string;
-	method: 'Automatic' | 'Manual';
-	status: 'Active' | 'Inactive' | 'Draft';
-	campaign_id?: string | null;
-};
+import { client, type PaginatedRow } from '$lib/client';
+
+export type Promotion = PaginatedRow<typeof client.promotions.get>;
 
 export type PromotionTypeId =
 	| 'amount_off_products'
@@ -14,14 +10,7 @@ export type PromotionTypeId =
 	| 'buy_x_get_y'
 	| 'free_shipping';
 
-export type Campaign = {
-	id: string;
-	name: string;
-	description: string | null;
-	identifier: string;
-	start_date: string | null;
-	end_date: string | null;
-};
+export type Campaign = PaginatedRow<typeof client.campaigns.get>;
 
 export type CodeCondition = { id: string; field: string; op: string; value: string };
 
