@@ -15,7 +15,6 @@
 		getOrderItems,
 		getOrderMetadata,
 		type OrderDetailOrder,
-		type OrderItem,
 		type OrderMetadata
 	} from '$lib/components/organs/order/detail/types.js';
 
@@ -52,9 +51,7 @@
 		loadOrder();
 	});
 
-	const orderMetadata = $derived((): OrderMetadata =>
-		order ? getOrderMetadata(order) : {}
-	);
+	const orderMetadata = $derived((): OrderMetadata => (order ? getOrderMetadata(order) : {}));
 
 	const orderItems = $derived(order ? getOrderItems(order) : []);
 	const total = $derived(

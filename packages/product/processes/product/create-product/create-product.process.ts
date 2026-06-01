@@ -294,16 +294,23 @@ export class CreateProductProcess implements ProcessContract<
         await this.ensureManagedVariantInventoryItems(trx as any, createdVariants);
 
         const variantOptionsRelations: NewProductVariantOptionRelation[] =
-          input.variants.flatMap((variant, index) =>
-            variant.option_values.map((option, index) => ({
-              variant_id: createdVariants[index]?.id!,
-              option_value_id: optionValues.find(
-                (ov) =>
-                  ov.value === option.value &&
-                  ov.option_id ===
-                    options.find((o) => o.title === option.title)?.id,
-              )?.id!,
-            })),
+          input.variants.flatMap((variant, variantIndex) =>
+            variant.option_values
+              .map((option) => {
+                const optionId = options.find((o) => o.title === option.title)?.id;
+                const optionValueId = optionValues.find(
+                  (ov) => ov.value === option.value && ov.option_id === optionId,
+                )?.id;
+                const variantId = createdVariants[variantIndex]?.id;
+                if (!variantId || !optionValueId) {
+                  return null;
+                }
+                return {
+                  variant_id: variantId,
+                  option_value_id: optionValueId,
+                } satisfies NewProductVariantOptionRelation;
+              })
+              .filter((r): r is NewProductVariantOptionRelation => r !== null),
           );
 
         if (variantOptionsRelations.length > 0) {
