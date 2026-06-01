@@ -12,6 +12,7 @@ export const PaginatedPaymentProvidersSchema = createPaginationSchema(
   [
     "payment_providers.id",
     "payment_providers.name",
+    "payment_providers.metadata",
     "payment_providers.active",
     "payment_providers.created_at",
     "payment_providers.updated_at",

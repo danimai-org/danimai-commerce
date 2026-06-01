@@ -18,7 +18,8 @@
 		| 'sales-channel'
 		| 'store'
 		| 'customer'
-		| 'customer-group';
+		| 'customer-group'
+		| 'payment-provider';
 
 	interface Props {
 		open: boolean;
@@ -99,6 +100,8 @@
 				return c.regions({ id }).put({ metadata: meta });
 			case 'sales-channel':
 				return c['sales-channels']({ id }).put({ metadata: meta });
+			case 'payment-provider':
+				return c['payment-providers']({ id }).put({ metadata: meta });
 			case 'store': {
 				const res = await client.stores.get();
 				const s = res.data;
@@ -194,7 +197,7 @@
 								</tr>
 							</thead>
 							<tbody>
-								{#each metadataRows as row, i (row.key)}
+								{#each metadataRows as row, i (i)}
 									<tr class="border-b last:border-0">
 										<td class="px-4 py-2">
 											<Input
