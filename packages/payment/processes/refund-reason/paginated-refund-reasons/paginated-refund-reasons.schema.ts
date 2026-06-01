@@ -3,16 +3,9 @@ import {
   createPaginationSchema,
   createPaginatedResponseSchema,
 } from "@danimai/core";
+import { RefundReasonResponseSchema } from "../update-refund-reason/update-refund-reason.schema";
 
-export const RefundReasonResponseSchema = Type.Object({
-  id: Type.String({ format: "uuid" }),
-  label: Type.String(),
-  value: Type.String(),
-  metadata: Type.Union([Type.Unknown(), Type.Null()]),
-  created_at: Type.Date(),
-  updated_at: Type.Date(),
-  deleted_at: Type.Union([Type.Date(), Type.Null()]),
-});
+export { RefundReasonResponseSchema };
 
 export const PaginatedRefundReasonsSchema = createPaginationSchema(
   Type.Object({}),
