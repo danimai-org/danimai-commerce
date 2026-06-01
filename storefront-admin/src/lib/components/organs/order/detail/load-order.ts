@@ -2,6 +2,12 @@ import { client } from '$lib/client';
 import type { DetailById } from '$lib/client';
 import type { OrderDetailOrder } from './types.js';
 
+export type OrderPaymentForRefund = {
+	paymentId: string;
+	paymentTransactionId: string;
+	amount: string;
+};
+
 export type OrderLoadResult = {
 	order: OrderDetailOrder | null;
 	error: string | null;
@@ -32,6 +38,22 @@ export type CustomerInfo = Pick<
 	firstName: string | null;
 	lastName: string | null;
 };
+
+export async function fetchOrderPaymentForRefund(
+	orderId: string
+): Promise<OrderPaymentForRefund | null> {
+	const res = await client.payments.get({
+		query: { page: 1, limit: 1, filters: { order_id: orderId } }
+	});
+	if (res.error || !res.data) return null;
+	const payment = res.data.rows[0];
+	if (!payment?.success_transaction_id) return null;
+	return {
+		paymentId: payment.id,
+		paymentTransactionId: payment.success_transaction_id,
+		amount: String(payment.amount)
+	};
+}
 
 export async function fetchCustomerInfo(customerId: string | null | undefined): Promise<CustomerInfo> {
 	if (!customerId) {

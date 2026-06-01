@@ -59,34 +59,50 @@ export class PaginatedPaymentsProcess
       amount_less_than,
     } = input.filters ?? {};
 
+    // Join orders/customers once so list rows show display_id and email instead of raw UUIDs.
     let query = this.db
       .selectFrom("payments")
-      .where("deleted_at", "is", null);
+      .leftJoin("orders", (join) =>
+        join
+          .onRef("orders.id", "=", "payments.order_id")
+          .on("orders.deleted_at", "is", null),
+      )
+      .leftJoin("customers", (join) =>
+        join
+          .onRef("customers.id", "=", "payments.customer_id")
+          .on("customers.deleted_at", "is", null),
+      )
+      .leftJoin("payment_providers", (join) =>
+        join
+          .onRef("payment_providers.id", "=", "payments.provider_id")
+          .on("payment_providers.deleted_at", "is", null),
+      )
+      .where("payments.deleted_at", "is", null);
 
     if (order_id !== undefined) {
-      query = query.where("order_id", "=", order_id);
+      query = query.where("payments.order_id", "=", order_id);
     }
     if (provider_id !== undefined) {
-      query = query.where("provider_id", "=", provider_id);
+      query = query.where("payments.provider_id", "=", provider_id);
     }
     if (customer_id !== undefined) {
-      query = query.where("customer_id", "=", customer_id);
+      query = query.where("payments.customer_id", "=", customer_id);
     }
     if (currency_code !== undefined) {
-      query = query.where("currency_code", "=", currency_code);
+      query = query.where("payments.currency_code", "=", currency_code);
     }
     if (last_status !== undefined) {
-      query = query.where("last_status", "=", last_status);
+      query = query.where("payments.last_status", "=", last_status);
     }
     if (amount_greater_than !== undefined) {
-      query = query.where("amount", ">", String(amount_greater_than));
+      query = query.where("payments.amount", ">", String(amount_greater_than));
     }
     if (amount_less_than !== undefined) {
-      query = query.where("amount", "<", String(amount_less_than));
+      query = query.where("payments.amount", "<", String(amount_less_than));
     }
 
     const countResult = await query
-      .select(({ fn }) => fn.count<number>("id").as("count"))
+      .select(({ fn }) => fn.count<number>("payments.id").as("count"))
       .executeTakeFirst();
     const total = Number(countResult?.count ?? 0);
 
@@ -95,19 +111,24 @@ export class PaginatedPaymentsProcess
     const offset = (page - 1) * limit;
     const data = await query
       .select([
-        "id",
-        "order_id",
-        "customer_id",
-        "provider_id",
-        "amount",
-        "currency_code",
-        "last_status",
-        "last_transaction_id",
-        "success_transaction_id",
-        "metadata",
-        "created_at",
-        "updated_at",
-        "deleted_at",
+        "payments.id",
+        "payments.order_id",
+        "payments.customer_id",
+        "payments.provider_id",
+        "payments.amount",
+        "payments.currency_code",
+        "payments.last_status",
+        "payments.last_transaction_id",
+        "payments.success_transaction_id",
+        "payments.metadata",
+        "payments.created_at",
+        "payments.updated_at",
+        "payments.deleted_at",
+        "orders.display_id as order_display_id",
+        "customers.email as customer_email",
+        "customers.first_name as customer_first_name",
+        "customers.last_name as customer_last_name",
+        "payment_providers.name as provider_name",
       ])
       .limit(limit)
       .offset(offset)

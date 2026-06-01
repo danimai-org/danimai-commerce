@@ -6,6 +6,9 @@
       "name": "@danimai/cli",
       "dependencies": {
         "@danimai/core": "../core",
+        "@danimai/customer": "../customer",
+        "@danimai/order": "../order",
+        "@danimai/payment": "../payment",
         "@danimai/product": "../product",
         "@danimai/user": "../user",
         "@sinclair/typebox": "^0.34.48",
@@ -21,6 +24,12 @@
   },
   "packages": {
     "@danimai/core": ["@danimai/core@file:../core", { "dependencies": { "@logtape/logtape": "^1.3.5", "inversify": "^7.11.0", "kysely": "^0.28.9", "kysely-bun-sql": "^0.2.0", "reflect-metadata": "^0.2.2", "typebox": "^1.0.79" } }],
+
+    "@danimai/customer": ["@danimai/customer@file:../customer", { "dependencies": { "@danimai/core": "../core", "@medusajs/js-sdk": "^2.12.3", "@medusajs/types": "^2.12.3", "@sinclair/typebox": "^0.34.48", "kysely": "^0.28.9" }, "devDependencies": { "@types/bun": "^1.3.4" }, "peerDependencies": { "typescript": "^5" } }],
+
+    "@danimai/order": ["@danimai/order@file:../order", { "dependencies": { "@danimai/cart": "../cart", "@danimai/core": "../core", "@medusajs/js-sdk": "^2.12.3", "@medusajs/types": "^2.12.3", "@sinclair/typebox": "^0.34.48", "kysely": "^0.28.9" }, "devDependencies": { "@types/bun": "^1.3.4" }, "peerDependencies": { "typescript": "^5" } }],
+
+    "@danimai/payment": ["@danimai/payment@file:../payment", { "dependencies": { "@danimai/core": "../core", "@danimai/order": "../order", "@sinclair/typebox": "^0.34.48", "kysely": "^0.28.9", "stripe": "^22.2.0" }, "devDependencies": { "@types/bun": "^1.3.4" }, "peerDependencies": { "typescript": "^5" } }],
 
     "@danimai/product": ["@danimai/product@file:../product", { "dependencies": { "@danimai/core": "../core", "@medusajs/js-sdk": "^2.12.3", "@medusajs/types": "^2.12.3", "kysely": "^0.28.9", "typebox": "^1.0.79" }, "devDependencies": { "@types/bun": "^1.3.4" }, "peerDependencies": { "typescript": "^5" } }],
 
@@ -102,11 +111,23 @@
 
     "side-channel-weakmap": ["side-channel-weakmap@1.0.2", "", { "dependencies": { "call-bound": "^1.0.2", "es-errors": "^1.3.0", "get-intrinsic": "^1.2.5", "object-inspect": "^1.13.3", "side-channel-map": "^1.0.1" } }, "sha512-WPS/HvHQTYnHisLo9McqBHOJk2FkHO/tlpvldyrnem4aeQp4hai3gythswg6p01oSoTl58rcpiFAjF2br2Ak2A=="],
 
+    "stripe": ["stripe@22.2.0", "", { "peerDependencies": { "@types/node": ">=18" }, "optionalPeers": ["@types/node"] }, "sha512-WFGpMOom9QZqso1kcnSwJsCdC1QHDlMoCOxBZRf3JraMzhkfw7dgSdD2a1CFZrqC+mzAfqeEtYILrZhWKIDruA=="],
+
     "typebox": ["typebox@1.0.79", "", {}, "sha512-luG4ORaG70S8mK00kCQR3Ow2xXaqzHv03/PHJJGs9Mjg1Q+0k3Kwz6Z5ORjoqSwWl3ixDUKgJajZ2vvBGs3ECA=="],
 
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
+
+    "@danimai/customer/@danimai/core": ["@danimai/core@file:../core", {}],
+
+    "@danimai/order/@danimai/cart": ["@danimai/cart@file:../cart", {}],
+
+    "@danimai/order/@danimai/core": ["@danimai/core@file:../core", {}],
+
+    "@danimai/payment/@danimai/core": ["@danimai/core@file:../core", {}],
+
+    "@danimai/payment/@danimai/order": ["@danimai/order@file:../order", {}],
 
     "@danimai/product/@danimai/core": ["@danimai/core@file:../core", { "dependencies": { "@logtape/logtape": "^1.3.5", "inversify": "^7.11.0", "kysely": "^0.28.9", "kysely-bun-sql": "^0.2.0", "reflect-metadata": "^0.2.2", "typebox": "^1.0.79" } }],
 

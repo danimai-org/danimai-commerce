@@ -26,18 +26,63 @@
 		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
-	const rows = $derived(paginateState.query.data?.data?.rows ?? []);
+	type PaymentRow = {
+		id: string;
+		order_id: string;
+		customer_id: string;
+		order_display_id?: number | null;
+		customer_email?: string | null;
+		customer_first_name?: string | null;
+		customer_last_name?: string | null;
+		amount: string;
+		currency_code: string;
+		last_status: string;
+		provider_name?: string | null;
+		created_at: string | Date;
+	};
+
+	const rawRows = $derived((paginateState.query.data?.data?.rows ?? []) as PaymentRow[]);
+	const rows = $derived(
+		rawRows.map((r) => {
+			const customerName = [r.customer_first_name, r.customer_last_name]
+				.filter(Boolean)
+				.join(' ')
+				.trim();
+			return {
+				...r,
+				order_label: r.order_display_id != null ? `#${r.order_display_id}` : r.order_id.slice(0, 8),
+				customer_label: r.customer_email || customerName || r.customer_id.slice(0, 8)
+			};
+		}) as Record<string, unknown>[]
+	);
 	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);
 
 	const tableColumns: TableColumn[] = [
-		{ label: 'Order', key: 'order_id', type: 'text' },
-		{ label: 'Customer', key: 'customer_id', type: 'text' },
+		{
+			label: 'Order',
+			key: 'order_label',
+			type: 'link',
+			cellHref: (row) => resolve(`/orders/${row.order_id}`, {}),
+			textKey: 'order_label'
+		},
+		{ label: 'Customer', key: 'customer_label', type: 'text' },
 		{ label: 'Amount', key: 'amount', type: 'text' },
 		{ label: 'Currency', key: 'currency_code', type: 'text' },
+		{ label: 'Payment provider', key: 'provider_name', type: 'text' },
 		{ label: 'Status', key: 'last_status', type: 'text' },
-		{ label: 'Created', key: 'created_at', type: 'date' }
+		{ label: 'Created', key: 'created_at', type: 'date' },
+		{
+			label: 'View Transaction',
+			key: 'view_transaction',
+			type: 'link',
+			linkLabel: 'View Transaction',
+			cellHref: (row) => {
+				const params = new URLSearchParams({ payment_id: String(row.id) });
+				return `/payments/transactions?${params.toString()}`;
+			}
+		}
 	];
 </script>
 

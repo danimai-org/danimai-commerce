@@ -5,6 +5,7 @@ import type {
   Insertable,
   Updateable,
 } from "kysely";
+import type { CustomerTable } from "@danimai/customer";
 import type { OrderLineItemTable, OrderTable } from "@danimai/order";
 
 /** PostgreSQL numeric; string at runtime for precision. */
@@ -19,6 +20,7 @@ export type PaymentStatus = "pending" | "failed" | "succeeded" | "cancelled";
 export type PaymentCustomerStatus = "active" | "cancelled";
 
 export interface Database {
+  customers: CustomerTable;
   orders: OrderTable;
   order_line_items: OrderLineItemTable;
   payment_providers: PaymentProviderTable;

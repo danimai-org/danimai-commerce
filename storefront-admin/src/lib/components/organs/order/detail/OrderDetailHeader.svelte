@@ -5,7 +5,6 @@
 	import { DropdownMenu } from 'bits-ui';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
-	import FileText from '@lucide/svelte/icons/file-text';
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
 	import ArrowDown from '@lucide/svelte/icons/arrow-down';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
@@ -20,7 +19,8 @@
 		orderId: string;
 	} = $props();
 
-	const menuItemClass = 'cursor-pointer rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent';
+	const menuItemClass =
+		'cursor-pointer rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent';
 </script>
 
 <div class="shrink-0 border-b bg-background px-4 py-3 sm:px-6 sm:py-4">
@@ -36,8 +36,6 @@
 					<ArrowLeft class="size-4" />
 				</Button>
 				<div class="flex min-w-0 items-center gap-2">
-					<FileText class="size-4 shrink-0 text-muted-foreground" />
-					<span class="shrink-0 text-sm text-muted-foreground">></span>
 					<h1 class="truncate text-lg font-semibold">#{order.display_id}</h1>
 				</div>
 			</div>

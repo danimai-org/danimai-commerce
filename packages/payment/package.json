@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@danimai/core": "../core",
+    "@danimai/customer": "../customer",
     "@danimai/order": "../order",
     "@sinclair/typebox": "^0.34.48",
     "kysely": "^0.28.9",

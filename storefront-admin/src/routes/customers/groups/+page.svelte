@@ -41,9 +41,13 @@
 	}
 
 	const rows = $derived(paginateState.query.data?.data?.rows ?? []);
-	const pagination = $derived(paginateState.pagination);
-	const start = $derived(paginateState.start);
-	const end = $derived(paginateState.end);
+	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
+	const start = $derived(
+		pagination && pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0
+	);
+	const end = $derived(
+		pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : 0
+	);
 	const openCreate = $derived(paginateState.openCreate);
 	const closeForm = $derived(paginateState.closeForm);
 	const deleteSubmitting = $derived(paginateState.deleteSubmitting);

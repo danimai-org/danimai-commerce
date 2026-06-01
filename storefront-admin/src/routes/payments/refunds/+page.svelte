@@ -32,7 +32,20 @@
 		updated_at: string | Date;
 	};
 
-	const paginationQuery = $derived.by(() => createPaginationQuery(page.url.searchParams));
+	const paginationQuery = $derived.by(() => {
+		const query = createPaginationQuery(page.url.searchParams);
+		const paymentId = page.url.searchParams.get('payment_id');
+		const paymentTransactionId = page.url.searchParams.get('payment_transaction_id');
+		if (!paymentId && !paymentTransactionId) return query;
+		return {
+			...query,
+			filters: {
+				...(typeof query.filters === 'object' && query.filters !== null ? query.filters : {}),
+				...(paymentId ? { payment_id: paymentId } : {}),
+				...(paymentTransactionId ? { payment_transaction_id: paymentTransactionId } : {})
+			}
+		};
+	});
 
 	const paginateState = createPagination<
 		Awaited<ReturnType<typeof client.refunds.get>>,

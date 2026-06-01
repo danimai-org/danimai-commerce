@@ -10,13 +10,17 @@
 	import MapPin from '@lucide/svelte/icons/map-pin';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import { resolve } from '$app/paths';
-	import { fetchOrder } from '$lib/components/organs/order/detail/load-order.js';
 	import {
+		fetchOrder,
+		fetchOrderPaymentForRefund
+	} from '$lib/components/organs/order/detail/load-order.js';
+	import {
+		formatOrderCurrency,
 		getOrderItems,
-		getOrderMetadata,
-		type OrderDetailOrder,
-		type OrderMetadata
+		getRefundableAmount,
+		type OrderDetailOrder
 	} from '$lib/components/organs/order/detail/types.js';
+	import { createRefund } from '$lib/refunds/api.js';
 
 	const orderId = $derived($page.params.id);
 
@@ -28,6 +32,8 @@
 	let refundMethod = $state('original_payment');
 	let manualRefundAmount = $state('');
 	let sendNotification = $state(true);
+	let submitting = $state(false);
+	let submitError = $state<string | null>(null);
 
 	async function loadOrder() {
 		if (!orderId) return;
@@ -51,17 +57,8 @@
 		loadOrder();
 	});
 
-	const orderMetadata = $derived((): OrderMetadata => (order ? getOrderMetadata(order) : {}));
-
 	const orderItems = $derived(order ? getOrderItems(order) : []);
-	const total = $derived(
-		orderMetadata().total ??
-			(orderMetadata().subtotal ?? 0) +
-				(orderMetadata().discount_amount ?? 0) +
-				(orderMetadata().shipping_amount ?? 0) +
-				(orderMetadata().tax_amount ?? 0)
-	);
-	const availableForRefund = $derived(order?.payment_status === 'captured' ? total : 0);
+	const availableForRefund = $derived(getRefundableAmount(order, orderItems));
 
 	const refundFromItems = $derived(
 		orderItems.reduce((sum, item) => {
@@ -84,13 +81,32 @@
 		effectiveRefundAmount > 0 && effectiveRefundAmount <= availableForRefund
 	);
 
-	function formatCurrency(amount: number): string {
-		const symbol = '₹';
-		return `${symbol}${amount.toFixed(2)}`;
-	}
-
 	function setRefundQty(itemId: string, qty: number) {
 		refundQuantities = { ...refundQuantities, [itemId]: Math.max(0, qty) };
+	}
+
+	async function submitRefund() {
+		if (!orderId || !canSubmit) return;
+		submitting = true;
+		submitError = null;
+		try {
+			const payment = await fetchOrderPaymentForRefund(orderId);
+			if (!payment) {
+				throw new Error('No successful payment transaction found for this order.');
+			}
+			await createRefund({
+				payment_transaction_id: payment.paymentTransactionId,
+				amount: effectiveRefundAmount,
+				metadata: reasonForRefund.trim()
+					? { note: reasonForRefund.trim(), send_notification: sendNotification }
+					: { send_notification: sendNotification }
+			});
+			await goto(resolve(`/orders/${orderId}`, {}));
+		} catch (e) {
+			submitError = e instanceof Error ? e.message : String(e);
+		} finally {
+			submitting = false;
+		}
 	}
 </script>
 
@@ -179,7 +195,7 @@
 												</div>
 											{/if}
 											<div class="mt-1 text-sm text-muted-foreground">
-												{formatCurrency(item.price)} × {item.quantity}
+												{formatOrderCurrency(item.price)} × {item.quantity}
 											</div>
 										</div>
 										<div
@@ -201,7 +217,7 @@
 												{qtyRefund} / {item.quantity}
 											</span>
 											<span class="w-20 text-right text-sm font-medium">
-												{formatCurrency(item.price * qtyRefund)}
+												{formatOrderCurrency(item.price * qtyRefund)}
 											</span>
 										</div>
 									</div>
@@ -235,7 +251,7 @@
 							<p class="text-sm text-muted-foreground">No items selected</p>
 						{:else}
 							<p class="text-sm text-muted-foreground">
-								Refund total: {formatCurrency(effectiveRefundAmount)}
+								Refund total: {formatOrderCurrency(effectiveRefundAmount)}
 							</p>
 						{/if}
 					</div>
@@ -264,9 +280,17 @@
 						<p class="mb-2 text-xs text-muted-foreground">Manual</p>
 						<Input type="text" bind:value={manualRefundAmount} placeholder="₹0.00" class="h-9" />
 						<p class="mt-2 text-xs text-muted-foreground">
-							{formatCurrency(availableForRefund)} available for refund
+							{formatOrderCurrency(availableForRefund)} available for refund
 						</p>
 					</div>
+
+					{#if submitError}
+						<div
+							class="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+						>
+							{submitError}
+						</div>
+					{/if}
 
 					<div class="rounded-lg border bg-card p-4">
 						<label class="flex cursor-pointer items-center gap-2">
@@ -279,8 +303,8 @@
 						</label>
 					</div>
 
-					<Button class="w-full" disabled={!canSubmit} onclick={() => {}}>
-						Refund {formatCurrency(effectiveRefundAmount)}
+					<Button class="w-full" disabled={!canSubmit || submitting} onclick={submitRefund}>
+						{submitting ? 'Processing…' : `Refund ${formatOrderCurrency(effectiveRefundAmount)}`}
 					</Button>
 				</div>
 			</div>

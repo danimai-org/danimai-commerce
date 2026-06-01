@@ -29,10 +29,20 @@ export type OrderAddress = {
 	phone?: string | null;
 };
 
+export type OrderMetadataTotals = {
+	subtotal?: number;
+	shipping?: number;
+	discount?: number;
+	tax?: number;
+	total?: number;
+	currency_code?: string;
+};
+
 export type OrderMetadata = {
 	notes?: string | null;
 	tags?: string | null;
 	items?: unknown;
+	totals?: OrderMetadataTotals;
 	subtotal?: number;
 	discount_amount?: number;
 	shipping_amount?: number;
@@ -41,6 +51,46 @@ export type OrderMetadata = {
 	billing_address?: string | OrderAddress | null;
 	shipping_address?: string | OrderAddress | null;
 };
+
+export type OrderAmounts = {
+	subtotal: number;
+	discountAmount: number;
+	shippingAmount: number;
+	taxAmount: number;
+	total: number;
+};
+
+/** Resolves order amounts from metadata.totals, flat metadata fields, or line items. */
+export function getOrderAmounts(
+	order: OrderDetailOrder | null,
+	items: OrderItem[]
+): OrderAmounts {
+	const meta = getOrderMetadata(order);
+	const nested = meta.totals;
+
+	const itemsSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+	const subtotal = nested?.subtotal ?? meta.subtotal ?? itemsSubtotal;
+	const discountAmount = nested?.discount ?? meta.discount_amount ?? 0;
+	const shippingAmount = nested?.shipping ?? meta.shipping_amount ?? 0;
+	const taxAmount = nested?.tax ?? meta.tax_amount ?? 0;
+	const total =
+		nested?.total ?? meta.total ?? subtotal + discountAmount + shippingAmount + taxAmount;
+
+	return { subtotal, discountAmount, shippingAmount, taxAmount, total };
+}
+
+const REFUNDABLE_PAYMENT_STATUSES = new Set(['captured', 'partially_refunded']);
+
+export function getRefundableAmount(
+	order: OrderDetailOrder | null,
+	items: OrderItem[]
+): number {
+	if (!order || !REFUNDABLE_PAYMENT_STATUSES.has(order.payment_status)) {
+		return 0;
+	}
+	return getOrderAmounts(order, items).total;
+}
 
 export function getOrderMetadata(order: OrderDetailOrder | null): OrderMetadata {
 	const meta = order?.metadata;
