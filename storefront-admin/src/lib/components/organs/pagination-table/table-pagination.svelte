@@ -11,8 +11,8 @@
 	let { pagination, start, end, onPageChange }: Props = $props();
 </script>
 
-<div class="border-t py-4">
-	<div class="flex flex-row flex-nowrap items-center justify-between gap-2 px-4 sm:px-6">
+<div class="min-w-0 border-t py-4">
+	<div class="flex min-w-0 flex-wrap items-center justify-between gap-2 px-4 sm:flex-nowrap sm:px-6">
 		<p class="min-w-0 shrink truncate text-xs text-muted-foreground sm:text-sm">
 			{#if pagination && pagination.total > 0}
 				{start} – {end} of {pagination.total} results
@@ -21,7 +21,7 @@
 			{/if}
 		</p>
 		{#if pagination && pagination.total > 0}
-			<div class="flex shrink-0 flex-row flex-nowrap items-center gap-1.5 sm:gap-2">
+			<div class="flex w-full min-w-0 flex-wrap items-center justify-end gap-1.5 sm:w-auto sm:flex-nowrap sm:gap-2">
 				<Button
 					variant="outline"
 					size="sm"

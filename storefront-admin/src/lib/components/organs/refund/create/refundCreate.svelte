@@ -7,6 +7,7 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import { client } from '$lib/client.js';
 	import { createRefund } from '$lib/refunds/api.js';
+	import { Combobox, type ComboboxOption } from '$lib/components/organs/index.js';
 	import {
 		parseMetadataFormValue,
 		type PaymentProviderMetadata
@@ -27,27 +28,58 @@
 	let metadata = $state('');
 	let submitting = $state(false);
 	let fieldErrors = $state<Record<string, string>>({});
+	let refundReasonSearch = $state('');
 
 	const refundReasonsQuery = createQuery(() => ({
-		queryKey: ['refund-reasons', 'options'],
-		queryFn: () => client['refund-reasons'].get({ query: { page: 1, limit: 100 } }),
+		queryKey: ['refund-reasons', 'options', refundReasonSearch],
+		queryFn: () =>
+			client['refund-reasons'].get({
+				query: {
+					page: 1,
+					limit: 100,
+					...(refundReasonSearch.trim() ? { search: refundReasonSearch.trim() } : {})
+				}
+			}),
 		enabled: open,
 		refetchOnWindowFocus: false
 	}));
 
-	const refundReasons = $derived(
-		(refundReasonsQuery.data?.data?.rows ?? []) as Array<{
+	const refundReasonComboboxOptions = $derived.by((): ComboboxOption[] => {
+		const rows = (refundReasonsQuery.data?.data?.rows ?? []) as Array<{
 			id: string;
 			label: string;
-			value: string;
-		}>
+		}>;
+		const options = rows.map((reason) => ({ id: reason.id, value: reason.label }));
+		if (refundReasonSearch.trim()) return options;
+		return optionsWithSelection(options, refundReasonId.trim(), '');
+	});
+
+	const refundReasonsLoading = $derived(
+		refundReasonsQuery.isFetching && refundReasonComboboxOptions.length === 0
 	);
+
+	function optionsWithSelection(
+		options: ComboboxOption[],
+		selectedId: string,
+		selectedLabel: string
+	): ComboboxOption[] {
+		if (!selectedId || options.some((option) => option.id === selectedId)) {
+			return options;
+		}
+		const label = selectedLabel.trim() || selectedId;
+		return [{ id: selectedId, value: label }, ...options];
+	}
+
+	function scheduleRefundReasonSearch(query: string) {
+		refundReasonSearch = query;
+	}
 
 	let initialized = $state(false);
 
 	$effect(() => {
 		if (!open) {
 			initialized = false;
+			refundReasonSearch = '';
 			return;
 		}
 		if (initialized) return;
@@ -55,6 +87,7 @@
 		paymentTransactionId = '';
 		amount = '';
 		refundReasonId = '';
+		refundReasonSearch = '';
 		metadata = '';
 		fieldErrors = {};
 	});
@@ -126,15 +159,12 @@
 </script>
 
 <Toaster richColors position="top-center" duration={3000} />
-
 <Sheet.Root bind:open>
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-lg">
 		<form class="flex h-full flex-col" onsubmit={handleSubmit}>
 			<div class="flex-1 overflow-auto p-6 pt-12">
 				<h2 class="text-lg font-semibold">Create Refund</h2>
-				<p class="mt-1 text-sm text-muted-foreground">
-					Create a refund for a payment transaction.
-				</p>
+				<p class="mt-1 text-sm text-muted-foreground">Create a refund for a payment transaction.</p>
 
 				<div class="mt-6 flex flex-col gap-4">
 					<div class="flex flex-col gap-2">
@@ -167,16 +197,16 @@
 
 					<div class="flex flex-col gap-2">
 						<label for="refund-reason" class="text-sm font-medium">Refund reason (optional)</label>
-						<select
+						<Combobox
 							id="refund-reason"
 							bind:value={refundReasonId}
-							class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-						>
-							<option value="">None</option>
-							{#each refundReasons as reason (reason.id)}
-								<option value={reason.id}>{reason.label}</option>
-							{/each}
-						</select>
+							options={refundReasonComboboxOptions}
+							placeholder="Select refund reason"
+							remoteOptions
+							onSearchChange={scheduleRefundReasonSearch}
+							loading={refundReasonsLoading}
+							emptyMessage="No refund reasons found."
+						/>
 					</div>
 
 					<PaymentProviderMetadataField

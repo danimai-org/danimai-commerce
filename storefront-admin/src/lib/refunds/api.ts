@@ -43,6 +43,27 @@ export async function createRefund(payload: CreateRefundPayload) {
 	return res.json();
 }
 
+export async function deleteRefunds(refundIds: string[]) {
+	const token = await getValidAccessToken();
+	if (!token) {
+		throw new Error('You must be logged in to delete refunds');
+	}
+
+	const res = await fetch(`${getApiBase()}/refunds`, {
+		method: 'DELETE',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${token}`
+		},
+		body: JSON.stringify({ refund_ids: refundIds })
+	});
+
+	if (!res.ok) {
+		const err = (await res.json().catch(() => null)) as { message?: string } | null;
+		throw new Error(err?.message ?? 'Failed to delete refund');
+	}
+}
+
 export function parseRefundMetadata(
 	value: string | null | undefined,
 	empty: 'omit'

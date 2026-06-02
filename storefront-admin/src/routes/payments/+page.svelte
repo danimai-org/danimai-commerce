@@ -41,6 +41,13 @@
 		created_at: string | Date;
 	};
 
+function formatAmount(value: string | number | null | undefined) {
+	if (value === null || value === undefined || value === '') return '-';
+	const amount = Number(value);
+	if (Number.isNaN(amount)) return String(value);
+	return amount.toFixed(2);
+}
+
 	const rawRows = $derived((paginateState.query.data?.data?.rows ?? []) as PaymentRow[]);
 	const rows = $derived(
 		rawRows.map((r) => {
@@ -50,6 +57,8 @@
 				.trim();
 			return {
 				...r,
+				amount: formatAmount(r.amount),
+				payment_label: r.id.slice(0, 8),
 				order_label: r.order_display_id != null ? `#${r.order_display_id}` : r.order_id.slice(0, 8),
 				customer_label: r.customer_email || customerName || r.customer_id.slice(0, 8)
 			};
@@ -67,22 +76,19 @@
 			cellHref: (row) => resolve(`/orders/${row.order_id}`, {}),
 			textKey: 'order_label'
 		},
+		{
+			label: 'Payment',
+			key: 'payment_label',
+			type: 'link',
+			cellHref: (row) => resolve(`/payments/${row.id}`, {}),
+			textKey: 'payment_label'
+		},
 		{ label: 'Customer', key: 'customer_label', type: 'text' },
 		{ label: 'Amount', key: 'amount', type: 'text' },
 		{ label: 'Currency', key: 'currency_code', type: 'text' },
 		{ label: 'Payment provider', key: 'provider_name', type: 'text' },
 		{ label: 'Status', key: 'last_status', type: 'text' },
-		{ label: 'Created', key: 'created_at', type: 'date' },
-		{
-			label: 'View Transaction',
-			key: 'view_transaction',
-			type: 'link',
-			linkLabel: 'View Transaction',
-			cellHref: (row) => {
-				const params = new URLSearchParams({ payment_id: String(row.id) });
-				return `/payments/transactions?${params.toString()}`;
-			}
-		}
+		{ label: 'Created', key: 'created_at', type: 'date' }
 	];
 </script>
 
@@ -91,9 +97,9 @@
 	<meta name="description" content="Manage payments." />
 </svelte:head>
 
-<div class="flex h-full flex-col">
-	<div class="flex min-h-0 flex-1 flex-col p-6">
-		<div class="mb-4 flex items-center justify-between border-b pb-4 pl-10">
+<div class="flex h-full min-w-0 flex-col overflow-x-hidden">
+	<div class="flex min-h-0 min-w-0 flex-1 flex-col p-4 sm:p-6">
+		<div class="mb-4 flex min-w-0 items-center justify-between border-b pb-4 pl-0 sm:pl-10">
 			<div class="flex items-center gap-2">
 				<Wallet class="size-4" />
 				<span class="font-semibold">Payment</span>
@@ -111,8 +117,8 @@
 					<p class="text-muted-foreground">Loading…</p>
 				</div>
 			{:else}
-				<div class="min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
-					<table class="w-full text-sm">
+				<div class="min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto rounded-lg border bg-card">
+					<table class="min-w-full text-sm">
 						<TableHead columns={tableColumns} />
 						<TableBody {rows} columns={tableColumns} emptyMessage="No payments yet." />
 					</table>

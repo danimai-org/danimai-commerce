@@ -7,6 +7,8 @@
 	import { client } from '$lib/client.js';
 	import { metadataToString } from '$lib/payment-providers/metadata.js';
 	import PaymentProviderMetadataField from '$lib/components/organs/payment-provider/PaymentProviderMetadataField.svelte';
+import { Combobox, type ComboboxOption } from '$lib/components/organs/index.js';
+import { cn } from '$lib/utils.js';
 
 	type RefundStatus = 'pending' | 'failed' | 'succeeded' | 'cancelled';
 
@@ -18,15 +20,12 @@
 		amount: string;
 		last_status: RefundStatus;
 		refund_reason_id: string | null;
+		refund_reason_label?: string | null;
 		metadata?: unknown;
 	};
 
-	const statusOptions: { value: RefundStatus; label: string }[] = [
-		{ value: 'pending', label: 'Pending' },
-		{ value: 'succeeded', label: 'Succeeded' },
-		{ value: 'failed', label: 'Failed' },
-		{ value: 'cancelled', label: 'Cancelled' }
-	];
+	let statusSearch = $state('');
+	let refundReasonSearch = $state('');
 
 	let {
 		open = $bindable(false),
@@ -57,25 +56,91 @@
 		}
 	);
 
-	const refundReasonsQuery = createQuery(() => ({
-		queryKey: ['refund-reasons', 'options'],
-		queryFn: () => client['refund-reasons'].get({ query: { page: 1, limit: 100 } }),
+	const statusOptionsQuery = createQuery(() => ({
+		queryKey: ['refund-statuses', statusSearch],
+		queryFn: () =>
+			client.refunds.statuses.get({
+				query: {
+					...(statusSearch.trim() ? { search: statusSearch.trim() } : {})
+				}
+			}),
 		enabled: open,
 		refetchOnWindowFocus: false
 	}));
 
-	const refundReasons = $derived(
-		(refundReasonsQuery.data?.data?.rows ?? []) as Array<{
+	const refundReasonsQuery = createQuery(() => ({
+		queryKey: ['refund-reasons', 'options', refundReasonSearch],
+		queryFn: () =>
+			client['refund-reasons'].get({
+				query: {
+					page: 1,
+					limit: 100,
+					...(refundReasonSearch.trim() ? { search: refundReasonSearch.trim() } : {})
+				}
+			}),
+		enabled: open,
+		refetchOnWindowFocus: false
+	}));
+
+	const statusComboboxOptions = $derived.by((): ComboboxOption[] => {
+		const rows = (statusOptionsQuery.data?.data ?? []) as Array<{
 			id: string;
 			label: string;
-		}>
+		}>;
+		const options = rows.map((status) => ({ id: status.id, value: status.label }));
+		if (statusSearch.trim()) return options;
+		return optionsWithSelection(options, $form.last_status?.trim() ?? '', '');
+	});
+
+	const statusLoading = $derived(
+		statusOptionsQuery.isFetching && statusComboboxOptions.length === 0
 	);
+
+	const refundReasonComboboxOptions = $derived.by((): ComboboxOption[] => {
+		const rows = (refundReasonsQuery.data?.data?.rows ?? []) as Array<{
+			id: string;
+			label: string;
+		}>;
+		const options = rows.map((reason) => ({ id: reason.id, value: reason.label }));
+		if (refundReasonSearch.trim()) return options;
+		return optionsWithSelection(
+			options,
+			$form.refund_reason_id?.trim() ?? '',
+			refund?.refund_reason_label ?? ''
+		);
+	});
+
+	const refundReasonsLoading = $derived(
+		refundReasonsQuery.isFetching && refundReasonComboboxOptions.length === 0
+	);
+
+	function optionsWithSelection(
+		options: ComboboxOption[],
+		selectedId: string,
+		selectedLabel: string
+	): ComboboxOption[] {
+		if (!selectedId || options.some((option) => option.id === selectedId)) {
+			return options;
+		}
+		const label = selectedLabel.trim() || selectedId;
+		return [{ id: selectedId, value: label }, ...options];
+	}
+
+	function scheduleStatusSearch(query: string) {
+		statusSearch = query;
+	}
+
+	function scheduleRefundReasonSearch(query: string) {
+		refundReasonSearch = query;
+	}
 
 	let initializedForId = $state<string | null>(null);
 
 	$effect(() => {
 		if (!open) {
 			initializedForId = null;
+			statusSearch = '';
+			refundReasonSearch = '';
 			return;
 		}
 
@@ -89,6 +154,8 @@
 			refund_reason_id: refund.refund_reason_id ?? '',
 			metadata: metadataToString(refund.metadata) || ''
 		};
+		statusSearch = '';
+		refundReasonSearch = '';
 	});
 
 	function close() {
@@ -102,6 +169,8 @@
 	<Sheet.Content side="right" class="w-full max-w-md sm:max-w-lg">
 		<form action="?/update" method="POST" use:enhance class="flex h-full flex-col">
 			<input type="hidden" name="id" bind:value={$form.id} />
+			<input type="hidden" name="last_status" bind:value={$form.last_status} />
+			<input type="hidden" name="refund_reason_id" bind:value={$form.refund_reason_id} />
 
 			<div class="flex-1 overflow-auto p-6 pt-12">
 				<h2 class="text-lg font-semibold">Edit Refund</h2>
@@ -127,16 +196,20 @@
 				<div class="mt-6 flex flex-col gap-4">
 					<div class="flex flex-col gap-2">
 						<label for="refund-status" class="text-sm font-medium">Status</label>
-						<select
+						<Combobox
 							id="refund-status"
-							name="last_status"
 							bind:value={$form.last_status}
-							class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-						>
-							{#each statusOptions as opt (opt.value)}
-								<option value={opt.value}>{opt.label}</option>
-							{/each}
-						</select>
+							options={statusComboboxOptions}
+							placeholder="Select status"
+							remoteOptions
+							onSearchChange={scheduleStatusSearch}
+							loading={statusLoading}
+							class={cn(
+								'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm',
+								$errors.last_status && 'border-destructive'
+							)}
+							emptyMessage="No status found."
+						/>
 						{#if $errors.last_status}
 							<span class="text-xs text-destructive">{$errors.last_status}</span>
 						{/if}
@@ -144,17 +217,16 @@
 
 					<div class="flex flex-col gap-2">
 						<label for="refund-edit-reason" class="text-sm font-medium">Refund reason</label>
-						<select
+						<Combobox
 							id="refund-edit-reason"
-							name="refund_reason_id"
 							bind:value={$form.refund_reason_id}
-							class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-						>
-							<option value="">None</option>
-							{#each refundReasons as reason (reason.id)}
-								<option value={reason.id}>{reason.label}</option>
-							{/each}
-						</select>
+							options={refundReasonComboboxOptions}
+							placeholder="Select refund reason"
+							remoteOptions
+							onSearchChange={scheduleRefundReasonSearch}
+							loading={refundReasonsLoading}
+							emptyMessage="No refund reasons found."
+						/>
 					</div>
 
 					<PaymentProviderMetadataField

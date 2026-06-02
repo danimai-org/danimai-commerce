@@ -60,35 +60,43 @@ export class PaginatedRefundsProcess
       created_by,
     } = input.filters ?? {};
 
-    let query = this.db.selectFrom("refunds").where("deleted_at", "is", null);
+    let query = this.db
+      .selectFrom("refunds")
+      .leftJoin("refund_reasons", "refund_reasons.id", "refunds.refund_reason_id")
+      .leftJoin("customers", "customers.id", "refunds.customer_id")
+      .where("refunds.deleted_at", "is", null);
 
     if (payment_id !== undefined) {
-      query = query.where("payment_id", "=", payment_id);
+      query = query.where("refunds.payment_id", "=", payment_id);
     }
     if (customer_id !== undefined) {
-      query = query.where("customer_id", "=", customer_id);
+      query = query.where("refunds.customer_id", "=", customer_id);
     }
     if (payment_transaction_id !== undefined) {
-      query = query.where("payment_transaction_id", "=", payment_transaction_id);
+      query = query.where(
+        "refunds.payment_transaction_id",
+        "=",
+        payment_transaction_id
+      );
     }
     if (refund_reason_id !== undefined) {
-      query = query.where("refund_reason_id", "=", refund_reason_id);
+      query = query.where("refunds.refund_reason_id", "=", refund_reason_id);
     }
     if (last_status !== undefined) {
-      query = query.where("last_status", "=", last_status);
+      query = query.where("refunds.last_status", "=", last_status);
     }
     if (amount_greater_than !== undefined) {
-      query = query.where("amount", ">", String(amount_greater_than));
+      query = query.where("refunds.amount", ">", String(amount_greater_than));
     }
     if (amount_less_than !== undefined) {
-      query = query.where("amount", "<", String(amount_less_than));
+      query = query.where("refunds.amount", "<", String(amount_less_than));
     }
     if (created_by !== undefined) {
-      query = query.where("created_by", "=", created_by);
+      query = query.where("refunds.created_by", "=", created_by);
     }
 
     const countResult = await query
-      .select(({ fn }) => fn.count<number>("id").as("count"))
+      .select(({ fn }) => fn.count<number>("refunds.id").as("count"))
       .executeTakeFirst();
     const total = Number(countResult?.count ?? 0);
 
@@ -97,19 +105,23 @@ export class PaginatedRefundsProcess
     const offset = (page - 1) * limit;
     const data = await query
       .select([
-        "id",
-        "customer_id",
-        "payment_id",
-        "payment_transaction_id",
-        "amount",
-        "refund_reason_id",
-        "last_status",
-        "stripe_refund_id",
-        "created_by",
-        "metadata",
-        "created_at",
-        "updated_at",
-        "deleted_at",
+        "refunds.id",
+        "refunds.customer_id",
+        sql<string>`coalesce(nullif(trim(concat_ws(' ', customers.first_name, customers.last_name)), ''), customers.email, refunds.customer_id::text)`.as(
+          "customer_display"
+        ),
+        "refunds.payment_id",
+        "refunds.payment_transaction_id",
+        "refunds.amount",
+        "refunds.refund_reason_id",
+        "refund_reasons.label as refund_reason_label",
+        "refunds.last_status",
+        "refunds.stripe_refund_id",
+        "refunds.created_by",
+        "refunds.metadata",
+        "refunds.created_at",
+        "refunds.updated_at",
+        "refunds.deleted_at",
       ])
       .limit(limit)
       .offset(offset)
