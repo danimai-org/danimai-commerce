@@ -1,6 +1,7 @@
 import {
   InjectDB,
   InjectLogger,
+  InjectStripe,
   NotFoundError,
   Process,
   ProcessContext,
@@ -10,6 +11,8 @@ import {
 } from "@danimai/core";
 import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
+import type Stripe from "stripe";
+import { ensurePaymentCustomer } from "../../payment-customer/ensure-payment-customer";
 import {
   type CreatePaymentProcessOutput,
   CreatePaymentSchema,
@@ -32,7 +35,9 @@ export class CreatePaymentProcess
     @InjectDB()
     private readonly db: Kysely<Database>,
     @InjectLogger()
-    private readonly logger: Logger
+    private readonly logger: Logger,
+    @InjectStripe()
+    private readonly stripe: Stripe
   ) {}
 
   async runOperations(
@@ -50,7 +55,7 @@ export class CreatePaymentProcess
       .selectFrom("payment_providers")
       .where("id", "=", input.provider_id)
       .where("deleted_at", "is", null)
-      .select(["id", "active"])
+      .select(["id", "active", "name"])
       .executeTakeFirst();
 
     if (!provider) {
@@ -121,7 +126,7 @@ export class CreatePaymentProcess
       ]);
     }
 
-    return this.db
+    const payment = await this.db
       .insertInto("payments")
       .values({
         order_id: input.order_id,
@@ -132,5 +137,16 @@ export class CreatePaymentProcess
       })
       .returningAll()
       .executeTakeFirstOrThrow();
+
+    if (provider.name === "stripe") {
+      await ensurePaymentCustomer(
+        this.db,
+        this.stripe,
+        input.customer_id,
+        input.provider_id
+      );
+    }
+
+    return payment;
   }
 }

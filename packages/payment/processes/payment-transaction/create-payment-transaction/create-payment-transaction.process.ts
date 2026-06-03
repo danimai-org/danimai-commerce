@@ -12,6 +12,7 @@ import {
 import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import type Stripe from "stripe";
+import { ensurePaymentCustomer } from "../../payment-customer/ensure-payment-customer";
 import {
   type CreatePaymentTransactionProcessOutput,
   CreatePaymentTransactionSchema,
@@ -38,9 +39,9 @@ function toStripeMetadata(
 }
 
 /**
- * Creates a payment transaction from a payment and initiates Stripe Checkout.
- * Input: payment_id, optional metadata, success_url, cancel_url.
- * Output: created payment_transactions row with checkout_url.
+ * Creates a payment transaction from a payment and initiates a Stripe PaymentIntent.
+ * Input: payment_id and optional metadata.
+ * Output: payment_transactions row with Stripe customer-linked PaymentIntent secrets for Elements.
  */
 export const CREATE_PAYMENT_TRANSACTION_PROCESS = Symbol(
   "CreatePaymentTransaction"
@@ -120,23 +121,12 @@ export class CreatePaymentTransactionProcess
       ]);
     }
 
-    const paymentCustomer = await this.db
-      .selectFrom("payment_customers")
-      .where("customer_id", "=", payment.customer_id)
-      .where("provider_id", "=", payment.provider_id)
-      .where("deleted_at", "is", null)
-      .select(["stripe_customer_id"])
-      .executeTakeFirst();
-
-    if (!paymentCustomer) {
-      throw new ValidationError("Payment customer not found for provider", [
-        {
-          type: "not_found",
-          message: "Payment customer not found for provider",
-          path: "payment_id",
-        },
-      ]);
-    }
+    const paymentCustomer = await ensurePaymentCustomer(
+      this.db,
+      this.stripe,
+      payment.customer_id,
+      payment.provider_id
+    );
 
     const transaction = await this.db
       .insertInto("payment_transactions")
@@ -154,41 +144,41 @@ export class CreatePaymentTransactionProcess
     const stripeMetadata = toStripeMetadata({
       payment_transaction_id: transaction.id,
       payment_id: payment.id,
+      customer_id: payment.customer_id,
       ...(input.metadata ?? {}),
     });
 
-    const session = await this.stripe.checkout.sessions.create({
-      mode: "payment",
+    const paymentIntent = await this.stripe.paymentIntents.create({
+      amount: toStripeUnitAmount(String(payment.amount)),
+      currency: payment.currency_code.toLowerCase(),
       customer: paymentCustomer.stripe_customer_id,
-      success_url: input.success_url,
-      cancel_url: input.cancel_url,
-      line_items: [
-        {
-          price_data: {
-            currency: payment.currency_code.toLowerCase(),
-            unit_amount: toStripeUnitAmount(String(payment.amount)),
-            product_data: {
-              name: "Payment",
-            },
-          },
-          quantity: 1,
-        },
-      ],
+      setup_future_usage: "on_session",
       metadata: stripeMetadata,
-      payment_intent_data: {
-        metadata: stripeMetadata,
+      automatic_payment_methods: { enabled: true },
+    });
+
+    const customerSession = await this.stripe.customerSessions.create({
+      customer: paymentCustomer.stripe_customer_id,
+      components: {
+        payment_element: {
+          enabled: true,
+          features: {
+            payment_method_save: "enabled",
+            payment_method_redisplay: "enabled",
+          },
+        },
       },
     });
 
     const updatedTransaction = await this.db
       .updateTable("payment_transactions")
       .set({
-        checkout_id: session.id,
+        payment_intent_id: paymentIntent.id,
         metadata: {
           ...(input.metadata && typeof input.metadata === "object"
             ? input.metadata
             : {}),
-          stripe_checkout_session: session,
+          stripe_payment_intent: paymentIntent,
         },
         updated_at: sql`now()`,
       })
@@ -198,7 +188,9 @@ export class CreatePaymentTransactionProcess
 
     return {
       ...updatedTransaction,
-      checkout_url: session.url ?? "",
+      stripe_customer_id: paymentCustomer.stripe_customer_id,
+      payment_intent_client_secret: paymentIntent.client_secret,
+      customer_session_client_secret: customerSession.client_secret,
     };
   }
 }

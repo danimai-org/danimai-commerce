@@ -33,8 +33,13 @@ function mapPaymentIntentStatus(status: Stripe.PaymentIntent.Status): PaymentSta
 }
 
 /**
+<<<<<<< HEAD
  * Updates a payment transaction after validating payment intent against checkout.
  * Input: transaction id and payment_intent_id or session_id (Stripe Checkout return).
+=======
+ * Updates a payment transaction after validating the Stripe PaymentIntent.
+ * Input: transaction id and payment_intent_id.
+>>>>>>> 24ebd44f1c24f2703227681e2a3b3525b195366e
  * Output: updated payment_transactions row; syncs parent payment on success.
  */
 export const UPDATE_PAYMENT_TRANSACTION_PROCESS = Symbol(
@@ -76,16 +81,17 @@ export class UpdatePaymentTransactionProcess
       throw new NotFoundError("Payment transaction not found");
     }
 
-    if (!transaction.checkout_id) {
-      throw new ValidationError("Checkout not created for transaction", [
+    if (!transaction.payment_intent_id) {
+      throw new ValidationError("Payment intent not created for transaction", [
         {
           type: "invalid",
-          message: "Checkout not created for transaction",
+          message: "Payment intent not created for transaction",
           path: "id",
         },
       ]);
     }
 
+<<<<<<< HEAD
     if (!input.payment_intent_id && !input.session_id) {
       throw new ValidationError(
         "payment_intent_id or session_id is required",
@@ -138,12 +144,15 @@ export class UpdatePaymentTransactionProcess
       input.payment_intent_id &&
       input.payment_intent_id !== sessionPaymentIntentId
     ) {
+=======
+    if (input.payment_intent_id !== transaction.payment_intent_id) {
+>>>>>>> 24ebd44f1c24f2703227681e2a3b3525b195366e
       throw new ValidationError(
-        "Payment intent does not match checkout session",
+        "Payment intent does not match transaction",
         [
           {
             type: "invalid",
-            message: "Payment intent does not match checkout session",
+            message: "Payment intent does not match transaction",
             path: "payment_intent_id",
           },
         ]
