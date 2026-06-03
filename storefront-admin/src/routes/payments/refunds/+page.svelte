@@ -64,7 +64,19 @@
 		goto(resolve(`${page.url.pathname}?${params.toString()}`, {}), { replaceState: true });
 	}
 
-	const rows = $derived(paginateState.query.data?.data?.rows ?? []);
+	function formatAmount(value: string | number | null | undefined) {
+		if (value === null || value === undefined || value === '') return '-';
+		const amount = Number(value);
+		if (Number.isNaN(amount)) return String(value);
+		return amount.toFixed(2);
+	}
+
+	const rows = $derived(
+		(paginateState.query.data?.data?.rows ?? []).map((r) => ({
+			...r,
+			amount: formatAmount(r.amount)
+		}))
+	);
 	const pagination = $derived(paginateState.query.data?.data?.pagination ?? null);
 	const start = $derived(paginateState.start);
 	const end = $derived(paginateState.end);

@@ -119,8 +119,17 @@
     }
 
     .checkout-address .field input,
-    .checkout-address .field select {
+    .checkout-address .field select,
+    .checkout-address .saved-address-field .combobox-trigger {
         @apply w-full py-[0.65rem] px-3 text-[0.9375rem] border border-[#ddd] rounded-md bg-white text-[#1a1a1a] font-[inherit] box-border;
+    }
+
+    .checkout-address .saved-address-field .combobox-trigger {
+        @apply cursor-pointer;
+    }
+
+    .checkout-address .saved-address-field .combobox-chevron {
+        @apply ml-1;
     }
 
     .checkout-address .field input::placeholder {

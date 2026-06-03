@@ -12,6 +12,9 @@
         confirmStripePayment,
         loadPendingStripePayment,
     } from "$lib/checkout/payment-api";
+    import { cartState, initCartState } from "$lib/cart/cart-state.svelte";
+
+    const CART_STORAGE_KEY = "dm_sf_cart_id";
 
     let order = $state<OrderDetail | null>(null);
     let isLoading = $state(true);
@@ -50,6 +53,13 @@
                 try {
                     await confirmStripePayment(transactionId, sessionId);
                     clearPendingStripePayment(ref);
+                    localStorage.removeItem(CART_STORAGE_KEY);
+                    cartState.cart = null;
+                    cartState.initialized = false;
+                    cartState.loading = false;
+                    cartState.error = null;
+                    cartState.sheetOpen = false;
+                    void initCartState(true);
                 } catch (error) {
                     paymentConfirmError =
                         error instanceof Error

@@ -11,6 +11,7 @@
         providers: PaymentProviderOption[];
         isLoggedIn: boolean;
         paymentStepError?: string;
+        paymentCanceledMessage?: string;
         onBack: () => void;
     }
 
@@ -19,6 +20,7 @@
         providers,
         isLoggedIn,
         paymentStepError = "",
+        paymentCanceledMessage = "",
         onBack,
     }: Props = $props();
 
@@ -69,6 +71,11 @@
     {#if needsLogin}
         <p class="payment-login-hint">
             <a href="/login?redirectTo=/checkout">Log in</a> to pay with this method.
+        </p>
+    {/if}
+    {#if paymentCanceledMessage}
+        <p class="payment-canceled-message" role="status">
+            {paymentCanceledMessage}
         </p>
     {/if}
     {#if paymentStepError}

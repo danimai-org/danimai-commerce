@@ -14,6 +14,8 @@ const Metadata = Type.Optional(
 export const CreatePaymentTransactionSchema = Type.Object({
   payment_id: Type.String({ format: "uuid" }),
   metadata: Metadata,
+  success_url: Type.Optional(Type.String()),
+  cancel_url: Type.Optional(Type.String()),
 });
 
 export type CreatePaymentTransactionProcessInput = Static<
@@ -23,9 +25,14 @@ export type CreatePaymentTransactionProcessInput = Static<
 export const CreatePaymentTransactionResponseSchema = Type.Intersect([
   PaymentTransactionResponseSchema,
   Type.Object({
-    stripe_customer_id: Type.String(),
-    payment_intent_client_secret: Type.Union([Type.String(), Type.Null()]),
-    customer_session_client_secret: Type.Union([Type.String(), Type.Null()]),
+    stripe_customer_id: Type.Optional(Type.String()),
+    payment_intent_client_secret: Type.Optional(
+      Type.Union([Type.String(), Type.Null()])
+    ),
+    customer_session_client_secret: Type.Optional(
+      Type.Union([Type.String(), Type.Null()])
+    ),
+    checkout_url: Type.Optional(Type.String()),
   }),
 ]);
 export type CreatePaymentTransactionProcessOutput = Static<

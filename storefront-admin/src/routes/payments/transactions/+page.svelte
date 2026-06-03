@@ -52,6 +52,13 @@
 		created_at: string | Date;
 	};
 
+	function formatAmount(value: string | number | null | undefined) {
+		if (value === null || value === undefined || value === '') return '-';
+		const amount = Number(value);
+		if (Number.isNaN(amount)) return String(value);
+		return amount.toFixed(2);
+	}
+
 	const rawRows = $derived((paginateState.query.data?.data?.rows ?? []) as TransactionRow[]);
 	const rows = $derived(
 		rawRows.map((r) => {
@@ -61,6 +68,7 @@
 				.trim();
 			return {
 				...r,
+				amount: formatAmount(r.amount),
 				order_label:
 					r.order_display_id != null ? `#${r.order_display_id}` : r.payment_id.slice(0, 8),
 				customer_label: r.customer_email || customerName || r.customer_id.slice(0, 8)

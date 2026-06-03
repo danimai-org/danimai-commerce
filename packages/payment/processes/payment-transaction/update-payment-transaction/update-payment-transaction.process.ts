@@ -33,13 +33,8 @@ function mapPaymentIntentStatus(status: Stripe.PaymentIntent.Status): PaymentSta
 }
 
 /**
-<<<<<<< HEAD
- * Updates a payment transaction after validating payment intent against checkout.
- * Input: transaction id and payment_intent_id or session_id (Stripe Checkout return).
-=======
- * Updates a payment transaction after validating the Stripe PaymentIntent.
- * Input: transaction id and payment_intent_id.
->>>>>>> 24ebd44f1c24f2703227681e2a3b3525b195366e
+ * Updates a payment transaction after Stripe payment collection.
+ * Input: transaction id and payment_intent_id or session_id (Checkout return).
  * Output: updated payment_transactions row; syncs parent payment on success.
  */
 export const UPDATE_PAYMENT_TRANSACTION_PROCESS = Symbol(
@@ -81,17 +76,6 @@ export class UpdatePaymentTransactionProcess
       throw new NotFoundError("Payment transaction not found");
     }
 
-    if (!transaction.payment_intent_id) {
-      throw new ValidationError("Payment intent not created for transaction", [
-        {
-          type: "invalid",
-          message: "Payment intent not created for transaction",
-          path: "id",
-        },
-      ]);
-    }
-
-<<<<<<< HEAD
     if (!input.payment_intent_id && !input.session_id) {
       throw new ValidationError(
         "payment_intent_id or session_id is required",
@@ -105,58 +89,93 @@ export class UpdatePaymentTransactionProcess
       );
     }
 
-    if (input.session_id && input.session_id !== transaction.checkout_id) {
-      throw new ValidationError(
-        "Checkout session does not match transaction",
-        [
-          {
-            type: "invalid",
-            message: "Checkout session does not match transaction",
-            path: "session_id",
-          },
-        ]
+    let paymentIntentId: string;
+
+    if (transaction.checkout_id) {
+      if (input.session_id && input.session_id !== transaction.checkout_id) {
+        throw new ValidationError(
+          "Checkout session does not match transaction",
+          [
+            {
+              type: "invalid",
+              message: "Checkout session does not match transaction",
+              path: "session_id",
+            },
+          ]
+        );
+      }
+
+      const session = await this.stripe.checkout.sessions.retrieve(
+        input.session_id ?? transaction.checkout_id
       );
-    }
 
-    const session = await this.stripe.checkout.sessions.retrieve(
-      input.session_id ?? transaction.checkout_id
-    );
+      const sessionPaymentIntentId =
+        typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : session.payment_intent?.id;
 
-    const sessionPaymentIntentId =
-      typeof session.payment_intent === "string"
-        ? session.payment_intent
-        : session.payment_intent?.id;
-
-    if (!sessionPaymentIntentId) {
-      throw new ValidationError("Checkout session has no payment intent", [
-        {
-          type: "invalid",
-          message: "Checkout session has no payment intent",
-          path: "payment_intent_id",
-        },
-      ]);
-    }
-
-    const paymentIntentId =
-      input.payment_intent_id ?? sessionPaymentIntentId;
-
-    if (
-      input.payment_intent_id &&
-      input.payment_intent_id !== sessionPaymentIntentId
-    ) {
-=======
-    if (input.payment_intent_id !== transaction.payment_intent_id) {
->>>>>>> 24ebd44f1c24f2703227681e2a3b3525b195366e
-      throw new ValidationError(
-        "Payment intent does not match transaction",
-        [
+      if (!sessionPaymentIntentId) {
+        throw new ValidationError("Checkout session has no payment intent", [
           {
             type: "invalid",
-            message: "Payment intent does not match transaction",
+            message: "Checkout session has no payment intent",
             path: "payment_intent_id",
           },
-        ]
-      );
+        ]);
+      }
+
+      paymentIntentId = input.payment_intent_id ?? sessionPaymentIntentId;
+
+      if (
+        input.payment_intent_id &&
+        input.payment_intent_id !== sessionPaymentIntentId
+      ) {
+        throw new ValidationError(
+          "Payment intent does not match checkout session",
+          [
+            {
+              type: "invalid",
+              message: "Payment intent does not match checkout session",
+              path: "payment_intent_id",
+            },
+          ]
+        );
+      }
+    } else {
+      if (!input.payment_intent_id) {
+        throw new ValidationError("payment_intent_id is required", [
+          {
+            type: "invalid",
+            message: "payment_intent_id is required",
+            path: "payment_intent_id",
+          },
+        ]);
+      }
+
+      if (!transaction.payment_intent_id) {
+        throw new ValidationError("Payment intent not created for transaction", [
+          {
+            type: "invalid",
+            message: "Payment intent not created for transaction",
+            path: "id",
+          },
+        ]);
+      }
+
+      if (input.payment_intent_id !== transaction.payment_intent_id) {
+        throw new ValidationError(
+          "Payment intent does not match transaction",
+          [
+            {
+              type: "invalid",
+              message: "Payment intent does not match transaction",
+              path: "payment_intent_id",
+            },
+          ]
+        );
+      }
+
+      paymentIntentId = input.payment_intent_id;
     }
 
     const paymentIntent = await this.stripe.paymentIntents.retrieve(

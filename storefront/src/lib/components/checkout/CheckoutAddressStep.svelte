@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { browser } from "$app/environment";
     import type {
         SuperFormData,
         SuperFormErrors,
@@ -9,7 +10,20 @@
     } from "sveltekit-superforms";
     import type { Writable } from "svelte/store";
     import type { CheckoutFormData } from "$lib/checkout/checkout-form-schema";
-    import type { CheckoutCountryOption } from "$lib/checkout/countries-api";
+    import {
+        checkoutCountryLabel,
+        type CheckoutCountryOption,
+    } from "$lib/checkout/countries-api";
+    import {
+        ACCOUNT_STORAGE_KEY,
+        ensureCustomerDefaultAddress,
+        hasCustomerAuthSession,
+        listCustomerAddresses,
+        parseStoredAccount,
+        splitFullName,
+        type CustomerSavedAddress,
+    } from "$lib/account/storage";
+    import { Combobox, type ComboboxOption } from "$lib/components/ui/combobox";
 
     interface Props {
         form: SuperFormData<CheckoutFormData>;
@@ -21,6 +35,10 @@
     let { form, errors, constraints, countries = [] }: Props = $props();
 
     let err = $state<Record<string, unknown>>({});
+    let savedAddresses = $state<CustomerSavedAddress[]>([]);
+    let loadingSavedAddress = $state(false);
+    let selectedSavedAddressId = $state("");
+
     $effect(() => {
         const es = errors;
         const unsub = es.subscribe((v: ValidationErrors<CheckoutFormData>) => {
@@ -29,13 +47,111 @@
         return unsub;
     });
 
+    $effect(() => {
+        if (!browser || !hasCustomerAuthSession()) {
+            savedAddresses = [];
+            selectedSavedAddressId = "";
+            return;
+        }
+
+        let cancelled = false;
+        loadingSavedAddress = true;
+
+        void (async () => {
+            try {
+                const rows = await ensureCustomerDefaultAddress(
+                    await listCustomerAddresses(),
+                );
+                if (cancelled) return;
+                savedAddresses = rows;
+            } catch {
+                if (!cancelled) savedAddresses = [];
+            } finally {
+                if (!cancelled) loadingSavedAddress = false;
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    });
+
     function fieldErr(v: unknown): string {
         if (v == null) return "";
         return Array.isArray(v) ? String(v[0] ?? "") : String(v);
     }
+
+    function formatCityStatePostal(entry: CustomerSavedAddress): string {
+        return [entry.city, entry.state, entry.postal].filter(Boolean).join(", ");
+    }
+
+    function savedAddressOptionLabel(entry: CustomerSavedAddress): string {
+        const summary = [
+            entry.line1,
+            entry.line2,
+            formatCityStatePostal(entry),
+            checkoutCountryLabel(entry.countryCode, countries),
+        ]
+            .filter(Boolean)
+            .join(", ");
+        const defaultTag = entry.isDefault ? " (Default)" : "";
+        return `${entry.name}${defaultTag} — ${summary}`;
+    }
+
+    const savedAddressComboboxOptions = $derived.by((): ComboboxOption[] =>
+        savedAddresses.map((entry) => ({
+            id: entry.id,
+            value: savedAddressOptionLabel(entry),
+        })),
+    );
+
+    function onSavedAddressSelect(addressId: string) {
+        selectedSavedAddressId = addressId;
+        if (!addressId) return;
+        const entry = savedAddresses.find((item) => item.id === addressId);
+        if (entry) applySavedAddress(entry);
+    }
+
+    function applySavedAddress(entry: CustomerSavedAddress) {
+        const { first_name, last_name } = splitFullName(entry.name);
+        $form.firstName = first_name;
+        $form.lastName = last_name ?? "";
+        $form.company = "";
+        $form.address1 = entry.line1;
+        $form.address2 = entry.line2;
+        $form.city = entry.city;
+        $form.state = entry.state;
+        $form.postalCode = entry.postal;
+        $form.country = entry.countryCode.trim().toUpperCase() || $form.country;
+        $form.phone = entry.phone;
+
+        const account = parseStoredAccount(
+            localStorage.getItem(ACCOUNT_STORAGE_KEY),
+        );
+        if (account?.email) {
+            $form.email = account.email;
+        }
+    }
 </script>
 
 <div class="checkout-address addresses-form">
+    {#if hasCustomerAuthSession() && (loadingSavedAddress || savedAddresses.length > 0)}
+        <div class="field saved-address-field">
+            <label for="saved-address-combobox">Saved address</label>
+            <Combobox
+                id="saved-address-combobox"
+                placeholder="Select a saved address"
+                options={savedAddressComboboxOptions}
+                bind:value={selectedSavedAddressId}
+                onValueChange={onSavedAddressSelect}
+                loading={loadingSavedAddress}
+                disabled={loadingSavedAddress}
+                emptyMessage="No saved addresses found"
+            />
+            <p class="field-hint">Choose an address to fill the form below.</p>
+        </div>
+    {/if}
+
     <fieldset class="fieldset-shipping">
         <legend class="visually-hidden">Shipping address</legend>
         <div class="form-row form-row-two">

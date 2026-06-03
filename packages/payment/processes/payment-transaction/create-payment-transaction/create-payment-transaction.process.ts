@@ -39,9 +39,9 @@ function toStripeMetadata(
 }
 
 /**
- * Creates a payment transaction from a payment and initiates a Stripe PaymentIntent.
- * Input: payment_id and optional metadata.
- * Output: payment_transactions row with Stripe customer-linked PaymentIntent secrets for Elements.
+ * Creates a payment transaction from a payment and initiates Stripe collection.
+ * Input: payment_id, optional metadata; with success_url and cancel_url uses Checkout redirect.
+ * Output: payment_transactions row plus checkout_url or PaymentIntent secrets for Elements.
  */
 export const CREATE_PAYMENT_TRANSACTION_PROCESS = Symbol(
   "CreatePaymentTransaction"
@@ -72,6 +72,23 @@ export class CreatePaymentTransactionProcess
     this.logger.info("Creating payment transaction", {
       payment_id: input.payment_id,
     });
+
+    const useCheckout = Boolean(input.success_url && input.cancel_url);
+    if (
+      (input.success_url && !input.cancel_url) ||
+      (!input.success_url && input.cancel_url)
+    ) {
+      throw new ValidationError(
+        "success_url and cancel_url must both be provided for Checkout",
+        [
+          {
+            type: "invalid",
+            message: "success_url and cancel_url must both be provided",
+            path: "success_url",
+          },
+        ]
+      );
+    }
 
     const payment = await this.db
       .selectFrom("payments")
@@ -147,6 +164,63 @@ export class CreatePaymentTransactionProcess
       customer_id: payment.customer_id,
       ...(input.metadata ?? {}),
     });
+
+    if (useCheckout) {
+      const session = await this.stripe.checkout.sessions.create({
+        mode: "payment",
+        customer: paymentCustomer.stripe_customer_id,
+        success_url: input.success_url!,
+        cancel_url: input.cancel_url!,
+        line_items: [
+          {
+            price_data: {
+              currency: payment.currency_code.toLowerCase(),
+              unit_amount: toStripeUnitAmount(String(payment.amount)),
+              product_data: {
+                name: "Order payment",
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        metadata: stripeMetadata,
+        payment_intent_data: {
+          metadata: stripeMetadata,
+        },
+      });
+
+      const updatedTransaction = await this.db
+        .updateTable("payment_transactions")
+        .set({
+          checkout_id: session.id,
+          metadata: {
+            ...(input.metadata && typeof input.metadata === "object"
+              ? input.metadata
+              : {}),
+            stripe_checkout_session: session,
+          },
+          updated_at: sql`now()`,
+        })
+        .where("id", "=", transaction.id)
+        .returningAll()
+        .executeTakeFirstOrThrow();
+
+      if (!session.url) {
+        throw new ValidationError("Stripe Checkout URL was not returned", [
+          {
+            type: "invalid",
+            message: "Stripe Checkout URL was not returned",
+            path: "success_url",
+          },
+        ]);
+      }
+
+      return {
+        ...updatedTransaction,
+        stripe_customer_id: paymentCustomer.stripe_customer_id,
+        checkout_url: session.url,
+      };
+    }
 
     const paymentIntent = await this.stripe.paymentIntents.create({
       amount: toStripeUnitAmount(String(payment.amount)),

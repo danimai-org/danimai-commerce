@@ -112,8 +112,14 @@ export async function ensureStripePaymentCustomer(
 	);
 	if (!res.error) return;
 
-	const message = treatyErrorMessage(res.error);
-	if (message.toLowerCase().includes('already exists')) return;
+	const err = res.error as {
+		value?: { message?: string; errors?: Array<{ type?: string }> };
+	};
+	const message = treatyErrorMessage(err);
+	const alreadyExists =
+		message.toLowerCase().includes('already exists') ||
+		err.value?.errors?.some((e) => e.type === 'already_exists');
+	if (alreadyExists) return;
 	throw new Error(message);
 }
 

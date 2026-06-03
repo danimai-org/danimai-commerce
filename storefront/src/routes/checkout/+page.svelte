@@ -34,7 +34,6 @@
     import { CustomerAuthError, hasCustomerAuthSession } from "$lib/account/storage";
     import {
         createOrderPayment,
-        ensureStripePaymentCustomer,
         findPaymentProvider,
         isApiPaymentMethod,
         paymentMethodLabel,
@@ -131,12 +130,6 @@
         });
     });
 
-    $effect(() => {
-        if (cartItems.length === 0 && typeof window !== "undefined") {
-            goto("/cart");
-        }
-    });
-
     const subtotal = $derived(
         cartItems.reduce((sum, i) => sum + i.priceValue * i.quantity, 0),
     );
@@ -156,6 +149,17 @@
     let paymentStepError = $state("");
     let isPlacingOrder = $state(false);
     let isLoggedIn = $state(false);
+
+    $effect(() => {
+        if (
+            cartItems.length === 0 &&
+            typeof window !== "undefined" &&
+            !isPlacingOrder &&
+            currentStep !== "review"
+        ) {
+            goto("/cart");
+        }
+    });
 
     $effect(() => {
         if (!browser) return;
@@ -382,6 +386,8 @@
             await ensureCartHasLineItems(replacementCartId);
         }
         localStorage.setItem(CART_STORAGE_KEY, replacementCartId);
+        const replacementCart = await fetchCartJson(replacementCartId);
+        cartState.cart = replacementCart;
         return replacementCartId;
     }
 
@@ -496,23 +502,8 @@
             ];
             localStorage.setItem(ordersStorageKey, JSON.stringify(nextOrders));
 
-            localStorage.removeItem(CART_STORAGE_KEY);
-            cartState.cart = null;
-            cartState.initialized = false;
-            cartState.loading = false;
-            cartState.error = null;
-            cartState.sheetOpen = false;
-            await initCartState(true);
-
             if (useStripeCheckout && selectedProvider) {
                 const headers = await resolvePaymentAuthHeaders();
-                const customerName =
-                    `${f.firstName} ${f.lastName}`.trim() || "Customer";
-                await ensureStripePaymentCustomer(
-                    selectedProvider.id,
-                    { email: f.email, name: customerName },
-                    headers,
-                );
                 const payment = await createOrderPayment(
                     orderId,
                     selectedProvider.id,
@@ -523,9 +514,17 @@
                     orderId,
                 );
                 savePendingStripePayment(orderId, transactionId);
-                window.location.assign(checkoutUrl);
+                window.location.replace(checkoutUrl);
                 return;
             }
+
+            localStorage.removeItem(CART_STORAGE_KEY);
+            cartState.cart = null;
+            cartState.initialized = false;
+            cartState.loading = false;
+            cartState.error = null;
+            cartState.sheetOpen = false;
+            await initCartState(true);
 
             if (
                 isApiPaymentMethod(f.paymentMethod, paymentProviders) &&

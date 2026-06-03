@@ -30,6 +30,7 @@ export type CustomerSavedAddress = {
 	city: string;
 	state: string;
 	postal: string;
+	countryCode: string;
 	phone: string;
 	isDefault: boolean;
 };
@@ -200,6 +201,7 @@ export const apiAddressToSaved = (row: CustomerAddressRow): CustomerSavedAddress
 	city: row.city,
 	state: row.province ?? '',
 	postal: row.postal_code ?? '',
+	countryCode: row.country_code ?? DEFAULT_COUNTRY_CODE,
 	phone: row.phone ?? '',
 	isDefault: row.is_default
 });

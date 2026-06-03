@@ -43,14 +43,16 @@ export async function fetchAllCheckoutCountries(): Promise<CheckoutCountryOption
 }
 
 export function checkoutCountryLabel(
-	code: string,
+	code: string | null | undefined,
 	countries: CheckoutCountryOption[]
 ): string {
-	const normalized = code.trim().toUpperCase();
+	const raw = String(code ?? '').trim();
+	if (!raw) return '';
+	const normalized = raw.toUpperCase();
 	const match = countries.find(
 		(country) =>
 			country.code === normalized ||
-			country.name.toLowerCase() === code.trim().toLowerCase()
+			country.name.toLowerCase() === raw.toLowerCase()
 	);
-	return match?.name ?? code;
+	return match?.name ?? raw;
 }
