@@ -9,16 +9,17 @@
     } from "sveltekit-superforms";
     import type { Writable } from "svelte/store";
     import type { CheckoutFormData } from "$lib/checkout/checkout-form-schema";
+    import type { CheckoutCountryOption } from "$lib/checkout/countries-api";
 
     interface Props {
         form: SuperFormData<CheckoutFormData>;
         errors: SuperFormErrors<CheckoutFormData>;
         constraints: Writable<InputConstraints<CheckoutFormData>>;
+        countries?: CheckoutCountryOption[];
     }
 
-    let { form, errors, constraints }: Props = $props();
+    let { form, errors, constraints, countries = [] }: Props = $props();
 
-    // Svelte 5: `$errors` from props is not reliably reactive; mirror the store into state.
     let err = $state<Record<string, unknown>>({});
     $effect(() => {
         const es = errors;
@@ -169,9 +170,9 @@
                 data-invalid={err.country ? "" : undefined}
                 {...$constraints.country}
             >
-                <option>United States</option>
-                <option>Canada</option>
-                <option>United Kingdom</option>
+                {#each countries as country (country.code)}
+                    <option value={country.code}>{country.name}</option>
+                {/each}
             </select>
             {#if err.country}
                 <p class="field-error">{fieldErr(err.country)}</p>

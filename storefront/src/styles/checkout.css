@@ -248,6 +248,28 @@
         background: #858555;
     }
 
+    .payment-fields .payment-login-hint {
+        margin: 0.75rem 0 0;
+        font-size: 0.875rem;
+        color: var(--color-muted, #666);
+    }
+
+    .payment-fields .payment-login-hint a {
+        color: inherit;
+        text-decoration: underline;
+    }
+
+    .payment-fields .payment-step-error {
+        margin: 0.75rem 0 0;
+        font-size: 0.875rem;
+        color: #b42318;
+    }
+
+    .payment-fields .next-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
     .payment-fields .next-btn:hover {
         background: #666;
     }

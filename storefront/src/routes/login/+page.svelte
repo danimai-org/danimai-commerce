@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { SiteHeader, SiteFooter } from "$lib/components/layout";
+    import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { superForm } from "sveltekit-superforms/client";
     import { setMessage } from "sveltekit-superforms/client";
@@ -26,6 +27,13 @@
         password: z.string().min(1, "Please enter your password."),
     });
     type LoginFormData = z.infer<typeof LoginSchema>;
+
+    function safeRedirectPath(raw: string | null): string {
+        if (!raw || !raw.startsWith("/") || raw.startsWith("//")) {
+            return "/account";
+        }
+        return raw;
+    }
 
     let showPassword = $state(false);
     let loggingIn = $state(false);
@@ -107,11 +115,18 @@
                     };
                     notifyAccountUpdated();
 
-                    const params = new URLSearchParams({
-                        email: account.email,
-                        name: account.name,
-                    });
-                    await goto(`/account?${params.toString()}`);
+                    const redirectTo = safeRedirectPath(
+                        page.url.searchParams.get("redirectTo"),
+                    );
+                    if (redirectTo === "/account") {
+                        const params = new URLSearchParams({
+                            email: account.email,
+                            name: account.name,
+                        });
+                        await goto(`/account?${params.toString()}`);
+                    } else {
+                        await goto(redirectTo);
+                    }
                 } finally {
                     loggingIn = false;
                 }

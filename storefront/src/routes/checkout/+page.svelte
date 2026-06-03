@@ -1,5 +1,7 @@
 <script lang="ts">
+    import { browser } from "$app/environment";
     import { goto } from "$app/navigation";
+    import { page } from "$app/state";
     import { get } from "svelte/store";
     import { superForm } from "sveltekit-superforms/client";
     import { zod4Client } from "sveltekit-superforms/adapters";
@@ -29,6 +31,22 @@
     import { formatStoreMoney } from "$lib/money";
     import { useCart } from "$lib/hooks/use-cart.hook";
     import { cacheOrderDetail } from "$lib/account/order-data";
+    import { CustomerAuthError, hasCustomerAuthSession } from "$lib/account/storage";
+    import {
+        createOrderPayment,
+        ensureStripePaymentCustomer,
+        findPaymentProvider,
+        isApiPaymentMethod,
+        paymentMethodLabel,
+        resolvePaymentAuthHeaders,
+        savePendingStripePayment,
+        startStripeCheckout,
+        type PaymentProviderOption,
+    } from "$lib/checkout/payment-api";
+    import {
+        checkoutCountryLabel,
+        type CheckoutCountryOption,
+    } from "$lib/checkout/countries-api";
     import type { Cart, CartLineItem } from "$lib/types/cart";
 
     type LineItemPut = Pick<
@@ -43,6 +61,13 @@
     >;
 
     let { data }: PageProps = $props();
+
+    const paymentProviders = $derived(
+        (data.paymentProviders ?? []) as PaymentProviderOption[],
+    );
+    const countries = $derived(
+        (data.countries ?? []) as CheckoutCountryOption[],
+    );
 
     type CheckoutStep = "addresses" | "delivery" | "payment" | "review";
     const CART_STORAGE_KEY = "dm_sf_cart_id";
@@ -128,7 +153,16 @@
 
     let currentStep = $state<CheckoutStep>("addresses");
     let placeOrderError = $state("");
+    let paymentStepError = $state("");
     let isPlacingOrder = $state(false);
+    let isLoggedIn = $state(false);
+
+    $effect(() => {
+        if (!browser) return;
+        isLoggedIn = hasCustomerAuthSession();
+        const step = page.url.searchParams.get("step");
+        if (step === "payment") currentStep = "payment";
+    });
 
     const { updateCartAddresses } = useCart();
 
@@ -182,8 +216,24 @@
                     return;
                 }
 
-                if (currentStep === "delivery") currentStep = "payment";
-                else if (currentStep === "payment") currentStep = "review";
+                if (currentStep === "delivery") {
+                    paymentStepError = "";
+                    currentStep = "payment";
+                    return;
+                }
+                if (currentStep === "payment") {
+                    const f = get(form);
+                    if (
+                        isApiPaymentMethod(f.paymentMethod, paymentProviders) &&
+                        !hasCustomerAuthSession()
+                    ) {
+                        paymentStepError =
+                            "Please log in to use this payment method.";
+                        return;
+                    }
+                    paymentStepError = "";
+                    currentStep = "review";
+                }
             },
         },
     );
@@ -195,8 +245,8 @@
             ? "Standard Worldwide Shipping"
             : method;
     }
-    function paymentMethodLabelFrom(method: string): "Manual Payment" | string {
-        return method === "manual" ? "Manual Payment" : method;
+    function paymentMethodLabelFrom(method: string): string {
+        return paymentMethodLabel(method, paymentProviders);
     }
 
     function ordersStorageKeyForEmail(email: string): string {
@@ -231,7 +281,7 @@
             name,
             f.address1 || f.address2 || "—",
             [f.city, f.state, f.postalCode].filter(Boolean).join(", ") || "—",
-            f.country || "—",
+            checkoutCountryLabel(f.country, countries) || "—",
         ];
     }
 
@@ -351,14 +401,32 @@
             const f = get(form);
             const shipLabel = shippingMethodLabelFrom(f.shippingMethod);
             const payLabel = paymentMethodLabelFrom(f.paymentMethod);
+            const selectedProvider = findPaymentProvider(
+                f.paymentMethod,
+                paymentProviders,
+            );
+            const useStripeCheckout =
+                selectedProvider?.name === "stripe" &&
+                isApiPaymentMethod(f.paymentMethod, paymentProviders);
+
+            if (useStripeCheckout && !hasCustomerAuthSession()) {
+                throw new CustomerAuthError(
+                    "Please log in to pay with this method.",
+                );
+            }
+
             const readyCartId = await ensureCheckoutCartReady(cartId);
+            const orderMetadata: Record<string, string> = {
+                shipping_method: shipLabel,
+                payment_method: payLabel,
+                checkout_email: f.email,
+            };
+            if (selectedProvider) {
+                orderMetadata.provider_id = selectedProvider.id;
+            }
             const res = await client.storefront.orders["from-cart"].post({
                 cart_id: readyCartId,
-                metadata: {
-                    shipping_method: shipLabel,
-                    payment_method: payLabel,
-                    checkout_email: f.email,
-                },
+                metadata: orderMetadata,
             });
             if (res.error) throw new Error(treatyErrorMessage(res.error));
             const created = res.data as {
@@ -436,12 +504,46 @@
             cartState.sheetOpen = false;
             await initCartState(true);
 
-            goto(`/order/confirmation?order=${orderId}`);
+            if (useStripeCheckout && selectedProvider) {
+                const headers = await resolvePaymentAuthHeaders();
+                const customerName =
+                    `${f.firstName} ${f.lastName}`.trim() || "Customer";
+                await ensureStripePaymentCustomer(
+                    selectedProvider.id,
+                    { email: f.email, name: customerName },
+                    headers,
+                );
+                const payment = await createOrderPayment(
+                    orderId,
+                    selectedProvider.id,
+                    headers,
+                );
+                const { checkoutUrl, transactionId } = await startStripeCheckout(
+                    payment.id,
+                    orderId,
+                );
+                savePendingStripePayment(orderId, transactionId);
+                window.location.assign(checkoutUrl);
+                return;
+            }
+
+            if (
+                isApiPaymentMethod(f.paymentMethod, paymentProviders) &&
+                selectedProvider?.name !== "stripe"
+            ) {
+                throw new Error(
+                    "Online payment is not available for this provider.",
+                );
+            }
+
+            await goto(`/order/confirmation?order=${orderId}`);
         } catch (error) {
             placeOrderError =
-                error instanceof Error
+                error instanceof CustomerAuthError
                     ? error.message
-                    : "Failed to place order.";
+                    : error instanceof Error
+                      ? error.message
+                      : "Failed to place order.";
         } finally {
             isPlacingOrder = false;
         }
@@ -506,11 +608,18 @@
                                 {form}
                                 {errors}
                                 {constraints}
+                                {countries}
                             />
                         {:else if currentStep === "delivery"}
                             <CheckoutDeliveryStep {form} onBack={goBack} />
                         {:else if currentStep === "payment"}
-                            <CheckoutPaymentStep {form} onBack={goBack} />
+                            <CheckoutPaymentStep
+                                {form}
+                                providers={paymentProviders}
+                                {isLoggedIn}
+                                {paymentStepError}
+                                onBack={goBack}
+                            />
                         {/if}
                     </form>
                 {:else}
@@ -533,7 +642,8 @@
                                     .join(", ") || "—"}
                             </p>
                             <p class="review-line">
-                                {$form.country || "—"}
+                                {checkoutCountryLabel($form.country, countries) ||
+                                    "—"}
                             </p>
                         </section>
                         <section class="review-block">
@@ -561,7 +671,8 @@
                                     .join(", ") || "—"}
                             </p>
                             <p class="review-line">
-                                {$form.country || "—"}
+                                {checkoutCountryLabel($form.country, countries) ||
+                                    "—"}
                             </p>
                         </section>
                         <section class="review-block">

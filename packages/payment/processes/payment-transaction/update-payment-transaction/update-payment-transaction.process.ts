@@ -34,7 +34,7 @@ function mapPaymentIntentStatus(status: Stripe.PaymentIntent.Status): PaymentSta
 
 /**
  * Updates a payment transaction after validating payment intent against checkout.
- * Input: transaction id and payment_intent_id.
+ * Input: transaction id and payment_intent_id or session_id (Stripe Checkout return).
  * Output: updated payment_transactions row; syncs parent payment on success.
  */
 export const UPDATE_PAYMENT_TRANSACTION_PROCESS = Symbol(
@@ -86,8 +86,34 @@ export class UpdatePaymentTransactionProcess
       ]);
     }
 
+    if (!input.payment_intent_id && !input.session_id) {
+      throw new ValidationError(
+        "payment_intent_id or session_id is required",
+        [
+          {
+            type: "invalid",
+            message: "payment_intent_id or session_id is required",
+            path: "payment_intent_id",
+          },
+        ]
+      );
+    }
+
+    if (input.session_id && input.session_id !== transaction.checkout_id) {
+      throw new ValidationError(
+        "Checkout session does not match transaction",
+        [
+          {
+            type: "invalid",
+            message: "Checkout session does not match transaction",
+            path: "session_id",
+          },
+        ]
+      );
+    }
+
     const session = await this.stripe.checkout.sessions.retrieve(
-      transaction.checkout_id
+      input.session_id ?? transaction.checkout_id
     );
 
     const sessionPaymentIntentId =
@@ -105,7 +131,13 @@ export class UpdatePaymentTransactionProcess
       ]);
     }
 
-    if (input.payment_intent_id !== sessionPaymentIntentId) {
+    const paymentIntentId =
+      input.payment_intent_id ?? sessionPaymentIntentId;
+
+    if (
+      input.payment_intent_id &&
+      input.payment_intent_id !== sessionPaymentIntentId
+    ) {
       throw new ValidationError(
         "Payment intent does not match checkout session",
         [
@@ -119,7 +151,7 @@ export class UpdatePaymentTransactionProcess
     }
 
     const paymentIntent = await this.stripe.paymentIntents.retrieve(
-      input.payment_intent_id
+      paymentIntentId
     );
 
     if (
@@ -142,7 +174,7 @@ export class UpdatePaymentTransactionProcess
     const updatedTransaction = await this.db
       .updateTable("payment_transactions")
       .set({
-        payment_intent_id: input.payment_intent_id,
+        payment_intent_id: paymentIntentId,
         last_status: lastStatus,
         metadata: {
           ...(transaction.metadata &&

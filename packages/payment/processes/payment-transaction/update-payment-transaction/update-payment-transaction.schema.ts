@@ -32,7 +32,8 @@ export const PaymentTransactionResponseSchema = Type.Object({
 
 export const UpdatePaymentTransactionSchema = Type.Object({
   id: Type.String({ format: "uuid" }),
-  payment_intent_id: Type.String(),
+  payment_intent_id: Type.Optional(Type.String()),
+  session_id: Type.Optional(Type.String()),
 });
 
 export type UpdatePaymentTransactionProcessInput = Static<

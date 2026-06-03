@@ -13,7 +13,7 @@ export const checkoutFormSchema = z.object({
 		.string()
 		.trim()
 		.min(1, "Country is required")
-		.default("United States"),
+		.default("US"),
 	phone: z.string().default(""),
 	billingSameAsShipping: z.boolean().default(true),
 	email: z

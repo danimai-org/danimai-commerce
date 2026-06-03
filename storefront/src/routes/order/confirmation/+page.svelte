@@ -1,89 +1,85 @@
 <script lang="ts">
+    import { browser } from "$app/environment";
+    import { page } from "$app/state";
     import { SiteHeader, SiteFooter } from "$lib/components/layout";
-    import { page } from "$app/stores";
-    import { onMount } from "svelte";
+    import {
+        fetchOrderDetailFromApi,
+        resolveOrderDetail,
+        type OrderDetail,
+    } from "$lib/account/order-data";
+    import {
+        clearPendingStripePayment,
+        confirmStripePayment,
+        loadPendingStripePayment,
+    } from "$lib/checkout/payment-api";
 
-    type Order = {
-        id: string;
-        number: string;
-        date: Date;
-        status: string;
-        email: string;
-        items: Array<{
-            image: string;
-            imageAlt: string;
-            title: string;
-            variant: string;
-            quantity: number;
-            price: string;
-        }>;
-        shippingAddress: string[];
-        shippingMethod: string;
-        billingAddress: string[];
-        paymentMethod: string;
-        totals: {
-            subtotal: string;
-            shipping: string;
-            discount: string;
-            tax: string;
-            total: string;
-        };
-    };
-    const orderId = $derived($page.url.searchParams.get("order") ?? "");
-    const ORDER_CACHE_KEY_PREFIX = "dm_sf_order_";
-    let order = $state<Order | null>(null);
-    let isLoading = $state(false);
+    let order = $state<OrderDetail | null>(null);
+    let isLoading = $state(true);
+    let confirmingPayment = $state(false);
     let errorMessage = $state("");
+    let paymentConfirmError = $state("");
 
-    function createPlaceholderOrder(id: string): Order {
-        return {
-            id,
-            number: "Pending",
-            date: new Date(),
-            status: "pending",
-            email: "—",
-            items: [],
-            shippingAddress: [],
-            shippingMethod: "—",
-            billingAddress: [],
-            paymentMethod: "—",
-            totals: {
-                subtotal: "—",
-                shipping: "—",
-                discount: "—",
-                tax: "—",
-                total: "—",
-            },
-        };
-    }
+    const orderId = $derived(page.url.searchParams.get("order")?.trim() ?? "");
+    const stripeSessionId = $derived(
+        page.url.searchParams.get("session_id")?.trim() ?? "",
+    );
 
-    onMount(() => {
-        if (!orderId) {
+    $effect(() => {
+        if (!browser) return;
+
+        const ref = orderId;
+        if (!ref) {
             order = null;
             errorMessage = "Missing order id in URL.";
+            isLoading = false;
             return;
         }
-        try {
-            const raw = sessionStorage.getItem(
-                `${ORDER_CACHE_KEY_PREFIX}${orderId}`,
-            );
-            if (!raw) {
-                errorMessage = "";
-                order = createPlaceholderOrder(orderId);
-                return;
+
+        let cancelled = false;
+        isLoading = true;
+        errorMessage = "";
+        paymentConfirmError = "";
+
+        void (async () => {
+            const pending = loadPendingStripePayment(ref);
+            const sessionId = stripeSessionId;
+            const transactionId = pending?.transactionId;
+
+            if (sessionId && transactionId) {
+                confirmingPayment = true;
+                try {
+                    await confirmStripePayment(transactionId, sessionId);
+                    clearPendingStripePayment(ref);
+                } catch (error) {
+                    paymentConfirmError =
+                        error instanceof Error
+                            ? error.message
+                            : "Payment confirmation failed.";
+                } finally {
+                    if (!cancelled) confirmingPayment = false;
+                }
             }
-            const parsed = JSON.parse(raw) as Omit<Order, "date"> & {
-                date: string;
-            };
-            order = {
-                ...parsed,
-                date: new Date(parsed.date),
-            };
-            errorMessage = "";
-        } catch {
-            errorMessage = "";
-            order = createPlaceholderOrder(orderId);
-        }
+
+            const detail =
+                sessionId && transactionId
+                    ? ((await fetchOrderDetailFromApi(ref)) ??
+                      (await resolveOrderDetail(ref)))
+                    : await resolveOrderDetail(ref);
+            if (cancelled) return;
+
+            if (!detail) {
+                order = null;
+                errorMessage = "Unable to display this order right now.";
+            } else {
+                order = detail;
+                errorMessage = "";
+            }
+            isLoading = false;
+        })();
+
+        return () => {
+            cancelled = true;
+        };
     });
 </script>
 
@@ -91,10 +87,14 @@
 
 <main class="order-confirmation-page">
     <div class="confirmation-container">
-        {#if isLoading}
+        {#if isLoading || confirmingPayment}
             <section class="order-overview">
                 <h1>Thank you for your order</h1>
-                <p class="order-number">Loading order...</p>
+                <p class="order-number">
+                    {confirmingPayment
+                        ? "Confirming payment..."
+                        : "Loading order..."}
+                </p>
             </section>
         {:else if errorMessage || !order}
             <section class="order-overview">
@@ -107,6 +107,9 @@
             <section class="order-overview">
                 <h1>Thank you for your order</h1>
                 <p class="order-number">Order #{order.number}</p>
+                {#if paymentConfirmError}
+                    <p class="payment-confirm-error">{paymentConfirmError}</p>
+                {/if}
 
                 <div class="order-details">
                     <h2>Order Details</h2>

@@ -15,6 +15,10 @@
         @apply mt-[0.45rem] mb-[1.65rem] mx-0 text-[0.95rem] text-[#222];
     }
 
+    .payment-confirm-error {
+        @apply mt-0 mb-4 text-[#b42318] text-sm;
+    }
+
     .order-details h2 {
         @apply text-base font-semibold m-0 mb-[0.85rem];
     }
