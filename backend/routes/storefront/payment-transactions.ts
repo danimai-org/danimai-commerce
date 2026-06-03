@@ -45,7 +45,7 @@ export const storefrontPaymentTransactionRoutes = new Elysia({
         tags: ["Storefront Payment Transactions"],
         summary: "Create a payment transaction",
         description:
-          "Creates a payment transaction and returns a checkout URL",
+          "Creates a payment transaction and returns PaymentIntent details for Stripe Elements",
       },
     },
   )

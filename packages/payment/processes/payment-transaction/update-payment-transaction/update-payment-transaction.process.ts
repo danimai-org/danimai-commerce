@@ -33,7 +33,7 @@ function mapPaymentIntentStatus(status: Stripe.PaymentIntent.Status): PaymentSta
 }
 
 /**
- * Updates a payment transaction after validating payment intent against checkout.
+ * Updates a payment transaction after validating the Stripe PaymentIntent.
  * Input: transaction id and payment_intent_id.
  * Output: updated payment_transactions row; syncs parent payment on success.
  */
@@ -76,42 +76,23 @@ export class UpdatePaymentTransactionProcess
       throw new NotFoundError("Payment transaction not found");
     }
 
-    if (!transaction.checkout_id) {
-      throw new ValidationError("Checkout not created for transaction", [
+    if (!transaction.payment_intent_id) {
+      throw new ValidationError("Payment intent not created for transaction", [
         {
           type: "invalid",
-          message: "Checkout not created for transaction",
+          message: "Payment intent not created for transaction",
           path: "id",
         },
       ]);
     }
 
-    const session = await this.stripe.checkout.sessions.retrieve(
-      transaction.checkout_id
-    );
-
-    const sessionPaymentIntentId =
-      typeof session.payment_intent === "string"
-        ? session.payment_intent
-        : session.payment_intent?.id;
-
-    if (!sessionPaymentIntentId) {
-      throw new ValidationError("Checkout session has no payment intent", [
-        {
-          type: "invalid",
-          message: "Checkout session has no payment intent",
-          path: "payment_intent_id",
-        },
-      ]);
-    }
-
-    if (input.payment_intent_id !== sessionPaymentIntentId) {
+    if (input.payment_intent_id !== transaction.payment_intent_id) {
       throw new ValidationError(
-        "Payment intent does not match checkout session",
+        "Payment intent does not match transaction",
         [
           {
             type: "invalid",
-            message: "Payment intent does not match checkout session",
+            message: "Payment intent does not match transaction",
             path: "payment_intent_id",
           },
         ]
