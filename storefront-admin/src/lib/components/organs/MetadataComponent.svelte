@@ -13,7 +13,8 @@
 		| 'sales-channel'
 		| 'store'
 		| 'customer'
-		| 'customer-group';
+		| 'customer-group'
+		| 'payment-provider';
 
 	interface Props {
 		productId: string | null | undefined;

@@ -35,6 +35,7 @@
 	import Building2 from '@lucide/svelte/icons/building-2';
 	import Settings from '@lucide/svelte/icons/settings';
 	import ShieldCheck from '@lucide/svelte/icons/shield-check';
+	import CreditCard from '@lucide/svelte/icons/credit-card';
 	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import { TooltipProvider } from '$lib/components/ui/tooltip/index.js';
@@ -64,6 +65,7 @@
 	let rolesPermissionsOpen = $state(false);
 	let inventoryOpen = $state(false);
 	let customersOpen = $state(false);
+	let paymentsOpen = $state(false);
 
 	$effect(() => {
 		if (path.startsWith('/products')) productsOpen = true;
@@ -83,6 +85,9 @@
 	});
 	$effect(() => {
 		if (path.startsWith('/customers')) customersOpen = true;
+	});
+	$effect(() => {
+		if (path.startsWith('/payments')) paymentsOpen = true;
 	});
 
 	onMount(() => {
@@ -394,6 +399,71 @@
 															isActive={path.startsWith('/promotions/campaigns')}
 														>
 															Campaigns
+														</SidebarMenuSubButton>
+													</SidebarMenuSubItem>
+												</SidebarMenuSub>
+											</Collapsible.Content>
+										</Collapsible.Root>
+									</SidebarMenuItem>
+									<SidebarMenuItem>
+										<Collapsible.Root bind:open={paymentsOpen} class="group/collapsible">
+											<Collapsible.Trigger>
+												{#snippet child({ props: triggerProps })}
+													<SidebarMenuButton
+														{...triggerProps}
+														isActive={path.startsWith('/payments')}
+														tooltipContent="Manage Payment"
+													>
+														<CreditCard />
+														<span>Manage Payment</span>
+														<ChevronDown
+															class={cn(
+																'ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-180'
+															)}
+														/>
+													</SidebarMenuButton>
+												{/snippet}
+											</Collapsible.Trigger>
+											<Collapsible.Content>
+												<SidebarMenuSub>
+													<SidebarMenuSubItem>
+														<SidebarMenuSubButton
+															href="/payments/providers"
+															isActive={path.startsWith('/payments/providers')}
+														>
+															Payment Provider
+														</SidebarMenuSubButton>
+													</SidebarMenuSubItem>
+													<SidebarMenuSubItem>
+														<SidebarMenuSubButton
+															href="/payments"
+															isActive={path === '/payments' || path === '/payments/'}
+														>
+															Payment
+														</SidebarMenuSubButton>
+													</SidebarMenuSubItem>
+													<SidebarMenuSubItem>
+														<SidebarMenuSubButton
+															href="/payments/transactions"
+															isActive={path.startsWith('/payments/transactions')}
+														>
+															Payment Transaction
+														</SidebarMenuSubButton>
+													</SidebarMenuSubItem>
+													<SidebarMenuSubItem>
+														<SidebarMenuSubButton
+															href="/payments/refunds"
+															isActive={path.startsWith('/payments/refunds')}
+														>
+															Refund
+														</SidebarMenuSubButton>
+													</SidebarMenuSubItem>
+													<SidebarMenuSubItem>
+														<SidebarMenuSubButton
+															href="/payments/refunded-reason"
+															isActive={path.startsWith('/payments/refunded-reason')}
+														>
+															Refunded Reason
 														</SidebarMenuSubButton>
 													</SidebarMenuSubItem>
 												</SidebarMenuSub>

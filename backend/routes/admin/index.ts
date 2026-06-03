@@ -28,6 +28,7 @@ import { paymentProviderRoutes } from "./payment-providers";
 import { paymentRoutes } from "./payments";
 import { paymentTransactionRoutes } from "./payment-transactions";
 import { refundRoutes } from "./refunds";
+import { refundReasonRoutes } from "./refund-reasons";
 
 export const routes = new Elysia()
     .group('/admin', (app) => {
@@ -60,4 +61,5 @@ export const routes = new Elysia()
             .use(paymentRoutes)
             .use(paymentTransactionRoutes)
             .use(refundRoutes)
+            .use(refundReasonRoutes)
     });

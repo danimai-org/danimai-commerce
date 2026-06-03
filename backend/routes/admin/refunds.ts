@@ -5,16 +5,23 @@ import { getService } from "@danimai/core";
 import {
   CREATE_REFUND_PROCESS,
   UPDATE_REFUND_PROCESS,
+  DELETE_REFUNDS_PROCESS,
   PAGINATED_REFUNDS_PROCESS,
+  LIST_REFUND_STATUSES_PROCESS,
   CreateRefundProcess,
   UpdateRefundProcess,
+  DeleteRefundsProcess,
   PaginatedRefundsProcess,
+  ListRefundStatusesProcess,
   CreateRefundSchema,
   CreateRefundResponseSchema,
   UpdateRefundSchema,
   UpdateRefundResponseSchema,
+  DeleteRefundsSchema,
   PaginatedRefundsSchema,
   PaginatedRefundsResponseSchema,
+  ListRefundStatusesSchema,
+  ListRefundStatusesResponseSchema,
 } from "@danimai/payment";
 import {
   VERIFY_ACCESS_TOKEN_PROCESS,
@@ -23,6 +30,7 @@ import {
 import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
+  NoContentResponseSchema,
   UnauthorizedResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
@@ -54,6 +62,31 @@ export const refundRoutes = new Elysia({ prefix: "/refunds" })
         tags: ["Refunds"],
         summary: "Get paginated refunds",
         description: "Gets a paginated list of refunds with optional filters",
+      },
+    },
+  )
+  .get(
+    "/statuses",
+    async ({ query }) => {
+      const process = getService<ListRefundStatusesProcess>(
+        LIST_REFUND_STATUSES_PROCESS,
+      );
+      return process.runOperations({
+        input: query as StaticDecode<typeof ListRefundStatusesSchema>,
+      });
+    },
+    {
+      query: ListRefundStatusesSchema,
+      response: {
+        200: ListRefundStatusesResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Refunds"],
+        summary: "List refund status options",
+        description:
+          "Returns refund status options with optional search on id or label",
       },
     },
   )
@@ -120,6 +153,28 @@ export const refundRoutes = new Elysia({ prefix: "/refunds" })
         tags: ["Refunds"],
         summary: "Update a refund",
         description: "Updates a refund status or metadata",
+      },
+    },
+  )
+  .delete(
+    "/",
+    async ({ body: input, set }) => {
+      const process = getService<DeleteRefundsProcess>(DELETE_REFUNDS_PROCESS);
+      await process.runOperations({ input });
+      set.status = 204;
+      return undefined;
+    },
+    {
+      body: DeleteRefundsSchema,
+      response: {
+        204: NoContentResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Refunds"],
+        summary: "Delete refunds",
+        description: "Soft-deletes refunds by their IDs",
       },
     },
   );

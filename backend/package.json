@@ -11,6 +11,7 @@
     "migrate": "bun node_modules/@danimai/cli/migrate.ts",
     "superadmin": "bun node_modules/@danimai/cli/create-superadmin.ts",
     "seed-products": "bun node_modules/@danimai/cli/seed-products.ts",
+    "seed-orders-payments": "bun node_modules/@danimai/cli/seed-orders-payments.ts",
     "deploy": "bun scripts/deploy-lambda.ts"
   },
   "devDependencies": {

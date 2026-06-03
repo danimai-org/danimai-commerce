@@ -5,7 +5,7 @@ import type {
   Insertable,
   Updateable,
 } from "kysely";
-import type { CustomerTable } from "../../customer/db/type";
+import type { CustomerTable } from "@danimai/customer";
 import type { OrderLineItemTable, OrderTable } from "@danimai/order";
 
 /** PostgreSQL numeric; string at runtime for precision. */

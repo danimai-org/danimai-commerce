@@ -4,20 +4,24 @@ import { getService } from "@danimai/core";
 import {
   CREATE_PAYMENT_PROVIDER_PROCESS,
   UPDATE_PAYMENT_PROVIDER_PROCESS,
+  DELETE_PAYMENT_PROVIDERS_PROCESS,
   PAGINATED_PAYMENT_PROVIDERS_PROCESS,
   CreatePaymentProviderProcess,
   UpdatePaymentProviderProcess,
+  DeletePaymentProvidersProcess,
   PaginatedPaymentProvidersProcess,
   CreatePaymentProviderSchema,
   CreatePaymentProviderResponseSchema,
   UpdatePaymentProviderSchema,
   UpdatePaymentProviderResponseSchema,
+  DeletePaymentProvidersSchema,
   PaginatedPaymentProvidersSchema,
   PaginatedPaymentProvidersResponseSchema,
 } from "@danimai/payment";
 import { handleProcessError } from "../../utils/error-handler";
 import {
   InternalErrorResponseSchema,
+  NoContentResponseSchema,
   ValidationErrorResponseSchema,
 } from "../../utils/response-schemas";
 
@@ -102,6 +106,30 @@ export const paymentProviderRoutes = new Elysia({
         summary: "Update a payment provider",
         description:
           "Updates a payment provider including active/inactive toggling",
+      },
+    },
+  )
+  .delete(
+    "/",
+    async ({ body: input, set }) => {
+      const process = getService<DeletePaymentProvidersProcess>(
+        DELETE_PAYMENT_PROVIDERS_PROCESS,
+      );
+      await process.runOperations({ input });
+      set.status = 204;
+      return undefined;
+    },
+    {
+      body: DeletePaymentProvidersSchema,
+      response: {
+        204: NoContentResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Payment Providers"],
+        summary: "Delete payment providers",
+        description: "Soft-deletes payment providers by their IDs",
       },
     },
   );

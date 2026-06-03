@@ -8,7 +8,12 @@
 	import OrderConversionSummary from './OrderConversionSummary.svelte';
 	import OrderRiskSection from './OrderRiskSection.svelte';
 	import type { CustomerInfo } from './load-order.js';
-	import { getOrderItems, getOrderMetadata, type OrderDetailOrder } from './types.js';
+	import {
+		getOrderAmounts,
+		getOrderItems,
+		getOrderMetadata,
+		type OrderDetailOrder
+	} from './types.js';
 
 	let {
 		order,
@@ -24,14 +29,15 @@
 
 	const metadata = $derived(getOrderMetadata(order));
 	const orderItems = $derived(getOrderItems(order));
-	const subtotal = $derived(metadata.subtotal ?? 0);
-	const discountAmount = $derived(metadata.discount_amount ?? 0);
-	const shippingAmount = $derived(metadata.shipping_amount ?? 0);
-	const taxAmount = $derived(metadata.tax_amount ?? 0);
-	const total = $derived(
-		metadata.total ?? subtotal + discountAmount + shippingAmount + taxAmount
+	const amounts = $derived(getOrderAmounts(order, orderItems));
+	const subtotal = $derived(amounts.subtotal);
+	const taxAmount = $derived(amounts.taxAmount);
+	const total = $derived(amounts.total);
+	const paidAmount = $derived(
+		order.payment_status === 'captured' || order.payment_status === 'partially_refunded'
+			? total
+			: 0
 	);
-	const paidAmount = $derived(order.payment_status === 'captured' ? total : 0);
 	const itemCount = $derived(orderItems.reduce((sum, item) => sum + item.quantity, 0));
 </script>
 

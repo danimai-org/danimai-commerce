@@ -70,12 +70,11 @@
 
 	type AddressTableRow = CustomerAddress & {
 		address_line: string;
-		is_default_label: string;
 	};
 
 	const addressTableColumns: TableColumn<AddressTableRow>[] = [
 		{ label: 'Address', key: 'address_line', type: 'text' },
-		{ label: 'Default', key: 'is_default_label', type: 'text' },
+		{ label: 'Default', key: 'is_default', type: 'boolean' },
 		{ label: 'City', key: 'city', type: 'text' },
 		{ label: 'Country', key: 'country_code', type: 'text' },
 		{
@@ -102,8 +101,7 @@
 	const addressesWithDisplay = $derived(
 		addresses.map((addr) => ({
 			...addr,
-			address_line: [addr.address_1, addr.address_2].filter(Boolean).join(', '),
-			is_default_label: addr.is_default ? 'Yes' : '—'
+			address_line: [addr.address_1, addr.address_2].filter(Boolean).join(', ')
 		}))
 	);
 

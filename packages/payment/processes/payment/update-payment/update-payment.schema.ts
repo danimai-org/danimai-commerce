@@ -45,6 +45,13 @@ export const PaymentResponseSchema = Type.Object({
     Type.Null(),
   ]),
   metadata: Type.Union([Type.Unknown(), Type.Null()]),
+  order_display_id: Type.Optional(
+    Type.Union([Type.Integer(), Type.Null()]),
+  ),
+  customer_email: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  customer_first_name: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  customer_last_name: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  provider_name: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   created_at: Type.Date(),
   updated_at: Type.Date(),
   deleted_at: Type.Union([Type.Date(), Type.Null()]),

@@ -31,10 +31,12 @@ export type UpdateRefundProcessInput = Static<typeof UpdateRefundSchema>;
 export const RefundResponseSchema = Type.Object({
   id: Type.String({ format: "uuid" }),
   customer_id: Type.String(),
+  customer_display: Type.Optional(Type.String()),
   payment_id: Type.String({ format: "uuid" }),
   payment_transaction_id: Type.String({ format: "uuid" }),
   amount: Type.String(),
   refund_reason_id: Type.Union([Type.String({ format: "uuid" }), Type.Null()]),
+  refund_reason_label: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   last_status: PaymentStatusSchema,
   stripe_refund_id: Type.Union([Type.String(), Type.Null()]),
   created_by: Type.Union([Type.String(), Type.Null()]),

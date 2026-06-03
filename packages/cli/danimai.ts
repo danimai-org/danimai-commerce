@@ -9,6 +9,7 @@
  *   danimai seed-products [count]
  *   danimai create-attributes
  *   danimai seed-clothing
+ *   danimai seed-orders-payments [count]
  *
  * Examples:
  *   danimai migrate user up
@@ -16,6 +17,7 @@
  *   danimai seed-products 10000
  *   danimai create-attributes
  *   danimai seed-clothing
+ *   danimai seed-orders-payments 100
  */
 
 import "reflect-metadata";
@@ -33,6 +35,7 @@ if (!command) {
   console.error("  seed-products [count]  Seed sample products (default 10000) with categories and tags");
   console.error("  create-attributes  Create clothing-shop product attributes");
   console.error("  seed-clothing  Seed categories, collections, tags & attributes (clothing shop)");
+  console.error("  seed-orders-payments [count]  Seed orders, payments, transactions, refunds (default 100)");
   process.exit(1);
 }
 
@@ -97,6 +100,18 @@ if (command === "migrate") {
   proc.on("exit", (code) => process.exit(code ?? 0));
   proc.on("error", (err) => {
     console.error("Failed to spawn seed-clothing script:", err);
+    process.exit(1);
+  });
+} else if (command === "seed-orders-payments") {
+  const seedOrdersPaymentsScript = join(__dirname, "seed-orders-payments.ts");
+  const args = process.argv.slice(3);
+  const proc = spawn("bun", [seedOrdersPaymentsScript, ...args], {
+    stdio: "inherit",
+    cwd: process.cwd(),
+  });
+  proc.on("exit", (code) => process.exit(code ?? 0));
+  proc.on("error", (err) => {
+    console.error("Failed to spawn seed-orders-payments script:", err);
     process.exit(1);
   });
 } else {

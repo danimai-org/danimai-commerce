@@ -18,6 +18,13 @@ export const PaymentTransactionResponseSchema = Type.Object({
   payment_intent_id: Type.Union([Type.String(), Type.Null()]),
   checkout_id: Type.Union([Type.String(), Type.Null()]),
   customer_id: Type.String(),
+  order_id: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  order_display_id: Type.Optional(
+    Type.Union([Type.Integer(), Type.Null()]),
+  ),
+  customer_email: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  customer_first_name: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  customer_last_name: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   created_at: Type.Date(),
   updated_at: Type.Date(),
   deleted_at: Type.Union([Type.Date(), Type.Null()]),

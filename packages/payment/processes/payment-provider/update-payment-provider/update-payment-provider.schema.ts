@@ -1,10 +1,13 @@
 import { Type, type Static } from "@sinclair/typebox";
 
 const Metadata = Type.Optional(
-  Type.Record(
-    Type.String(),
-    Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()])
-  )
+  Type.Union([
+    Type.Record(
+      Type.String(),
+      Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()])
+    ),
+    Type.Null(),
+  ])
 );
 
 export const UpdatePaymentProviderSchema = Type.Object({

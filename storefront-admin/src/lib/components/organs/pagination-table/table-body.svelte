@@ -17,9 +17,8 @@
 		selectedIds,
 		onToggleSelect,
 		disabledIds,
-		disabledRowLabel = 'Already selected',
 		rowIdKey = 'id',
-		onRowClick,
+		onRowClick
 	}: {
 		rows: Record<string, unknown>[];
 		columns: TableColumn[];
@@ -29,7 +28,6 @@
 		selectedIds?: Set<string>;
 		onToggleSelect?: (id: string) => void;
 		disabledIds?: Set<string>;
-		disabledRowLabel?: string;
 		rowIdKey?: string;
 		onRowClick?: (item: Record<string, unknown>) => void;
 	} = $props();
@@ -37,8 +35,13 @@
 	const showSelection = $derived(selectedIds != null && onToggleSelect != null);
 	const totalCols = $derived(columns.length + (showSelection ? 1 : 0));
 
-	function isActionsColumn(column: TableColumn): column is TableColumn & { actions: TableColumnAction[] } {
-		return column.key === 'actions' && Array.isArray((column as { actions?: TableColumnAction[] }).actions);
+	function isActionsColumn(
+		column: TableColumn
+	): column is TableColumn & { actions: TableColumnAction[] } {
+		return (
+			column.key === 'actions' &&
+			Array.isArray((column as { actions?: TableColumnAction[] }).actions)
+		);
 	}
 
 	function hasLegacyActions(column: TableColumn): boolean {
@@ -46,7 +49,10 @@
 	}
 
 	function isLinkColumn(column: TableColumn): boolean {
-		return column.type === 'link' && (typeof column.cellHref === 'function' || typeof column.cellHref === 'string');
+		return (
+			column.type === 'link' &&
+			(typeof column.cellHref === 'function' || typeof column.cellHref === 'string')
+		);
 	}
 
 	function linkHref(column: TableColumn, row: Record<string, unknown>): string {
@@ -80,7 +86,7 @@
 			return date.toLocaleDateString('en-US', {
 				month: 'short',
 				day: 'numeric',
-				year: 'numeric',
+				year: 'numeric'
 			});
 		} catch {
 			return '—';
@@ -107,7 +113,10 @@
 
 	function renderCell(column: TableColumn, row: Record<string, unknown>): string {
 		const value = cellValue(column, row);
-		if (column.type === 'date' || (column.type !== 'boolean' && value != null && isDateKey(column.key)))
+		if (
+			column.type === 'date' ||
+			(column.type !== 'boolean' && value != null && isDateKey(column.key))
+		)
 			return formatDate(value);
 		if (column.type === 'boolean' || (value != null && isBooleanKey(column.key)))
 			return formatBoolean(value);
@@ -118,8 +127,17 @@
 	function statusBadgeClasses(status: unknown): string {
 		const s = String(status ?? '').toLowerCase();
 		switch (s) {
+			case 'succeeded':
+			case 'success':
 			case 'fulfilled':
 				return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400';
+			case 'pending':
+			case 'processing':
+				return 'bg-amber-500/15 text-amber-700 dark:text-amber-400';
+			case 'failed':
+			case 'cancelled':
+			case 'canceled':
+				return 'bg-destructive/15 text-destructive';
 			case 'partially_fulfilled':
 				return 'bg-blue-500/15 text-blue-700 dark:text-blue-400';
 			case 'not_fulfilled':
@@ -169,10 +187,10 @@
 				{/if}
 				{#each columns as column, colIndex (column.key)}
 					{#if isLinkColumn(column)}
-						<td class="px-4 py-3" >
+						<td class="px-4 py-3">
 							<a
 								href={resolve(linkHref(column, row), {})}
-								class="flex items-center gap-3 hover:opacity-80 font-medium"
+								class="flex items-center gap-3 font-medium hover:opacity-80"
 							>
 								{#if getThumbUrl(column, row)}
 									<img
@@ -222,7 +240,10 @@
 											{#each column.actions as action (action.key)}
 												<DropdownMenu.Item
 													textValue={action.label}
-													class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 {action.key === 'delete' ? 'text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive' : ''}"
+													class="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 {action.key ===
+													'delete'
+														? 'text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive'
+														: ''}"
 													onclick={() => action.onClick(row)}
 												>
 													{action.label}
@@ -272,29 +293,29 @@
 							</DropdownMenu.Root>
 						</td>
 					{:else}
-						<td
-							class="px-4 py-3 {colIndex === 0 ? 'font-medium' : 'text-muted-foreground'}"
-						>
+						<td class="px-4 py-3 {colIndex === 0 ? 'font-medium' : 'text-muted-foreground'}">
 							{#if column.type === 'statusBadge'}
 								{@const raw = cellValue(column, row)}
 								{#if raw == null || raw === ''}
 									<span class="text-muted-foreground">—</span>
 								{:else}
 									<span
-										class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize {statusBadgeClasses(raw)}"
-									>{String(raw)}</span>
+										class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize {statusBadgeClasses(
+											raw
+										)}">{String(raw)}</span
+									>
 								{/if}
 							{:else if column.type === 'boolean' || (cellValue(column, row) != null && isBooleanKey(column.key))}
 								{@const val = cellValue(column, row)}
 								{#if val === true}
 									<span
-										class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-green-500/10 text-green-700 dark:text-green-400"
+										class="inline-flex items-center rounded-md bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400"
 									>
 										Yes
 									</span>
 								{:else}
 									<span
-										class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-red-500/10 text-red-700 dark:text-red-400"
+										class="inline-flex items-center rounded-md bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400"
 									>
 										No
 									</span>

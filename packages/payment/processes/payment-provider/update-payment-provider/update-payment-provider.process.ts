@@ -62,10 +62,17 @@ export class UpdatePaymentProviderProcess
       }
     }
 
+    const { id, name, metadata, active } = input;
+    const updates: Record<string, unknown> = { updated_at: sql`now()` };
+
+    if (name !== undefined) updates.name = name;
+    if (metadata !== undefined) updates.metadata = metadata;
+    if (active !== undefined) updates.active = active;
+
     return this.db
       .updateTable("payment_providers")
-      .set({ ...input, updated_at: sql`now()`, id: undefined })
-      .where("id", "=", input.id)
+      .set(updates)
+      .where("id", "=", id)
       .where("deleted_at", "is", null)
       .returningAll()
       .executeTakeFirstOrThrow();
