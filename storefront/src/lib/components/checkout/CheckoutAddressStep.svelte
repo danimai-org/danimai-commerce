@@ -16,6 +16,7 @@
     } from "$lib/checkout/countries-api";
     import {
         ACCOUNT_STORAGE_KEY,
+        ACCOUNT_UPDATED_EVENT,
         ensureCustomerDefaultAddress,
         hasCustomerAuthSession,
         listCustomerAddresses,
@@ -38,6 +39,9 @@
     let savedAddresses = $state<CustomerSavedAddress[]>([]);
     let loadingSavedAddress = $state(false);
     let selectedSavedAddressId = $state("");
+    let hasAutoFilledDefault = $state(false);
+    let customerAuthenticated = $state(false);
+    let savedAddressLoadToken = 0;
 
     $effect(() => {
         const es = errors;
@@ -47,33 +51,121 @@
         return unsub;
     });
 
-    $effect(() => {
-        if (!browser || !hasCustomerAuthSession()) {
+    async function loadSavedAddresses() {
+        if (!browser) return;
+
+        customerAuthenticated = hasCustomerAuthSession();
+        if (!customerAuthenticated) {
             savedAddresses = [];
             selectedSavedAddressId = "";
+            hasAutoFilledDefault = false;
+            loadingSavedAddress = false;
             return;
         }
 
-        let cancelled = false;
+        const token = ++savedAddressLoadToken;
         loadingSavedAddress = true;
 
-        void (async () => {
-            try {
-                const rows = await ensureCustomerDefaultAddress(
-                    await listCustomerAddresses(),
-                );
-                if (cancelled) return;
-                savedAddresses = rows;
-            } catch {
-                if (!cancelled) savedAddresses = [];
-            } finally {
-                if (!cancelled) loadingSavedAddress = false;
+        try {
+            const rows = await ensureCustomerDefaultAddress(
+                await listCustomerAddresses(),
+            );
+            if (token !== savedAddressLoadToken) return;
+            savedAddresses = rows;
+            syncSelectedAddressFromForm();
+        } catch {
+            if (token !== savedAddressLoadToken) return;
+            savedAddresses = [];
+        } finally {
+            if (token === savedAddressLoadToken) {
+                loadingSavedAddress = false;
             }
-        })();
+        }
+    }
 
-        return () => {
-            cancelled = true;
+    $effect(() => {
+        if (!browser) {
+            customerAuthenticated = false;
+            return;
+        }
+
+        void loadSavedAddresses();
+
+        const onAuthChange = () => {
+            void loadSavedAddresses();
         };
+        window.addEventListener("storage", onAuthChange);
+        window.addEventListener(ACCOUNT_UPDATED_EVENT, onAuthChange);
+        return () => {
+            savedAddressLoadToken += 1;
+            window.removeEventListener("storage", onAuthChange);
+            window.removeEventListener(ACCOUNT_UPDATED_EVENT, onAuthChange);
+        };
+    });
+
+    function isAddressFormEmpty(): boolean {
+        return (
+            !$form.firstName?.trim() &&
+            !$form.lastName?.trim() &&
+            !$form.address1?.trim() &&
+            !$form.city?.trim()
+        );
+    }
+
+    function addressMatchesForm(entry: CustomerSavedAddress): boolean {
+        const { first_name, last_name } = splitFullName(entry.name);
+        return (
+            $form.firstName?.trim() === first_name &&
+            $form.lastName?.trim() === (last_name ?? "") &&
+            $form.address1?.trim() === entry.line1.trim() &&
+            $form.city?.trim() === entry.city.trim() &&
+            $form.postalCode?.trim() === entry.postal.trim()
+        );
+    }
+
+    function syncSelectedAddressFromForm() {
+        if (savedAddresses.length === 0) return;
+        const match = savedAddresses.find((entry) => addressMatchesForm(entry));
+        if (match) {
+            selectedSavedAddressId = match.id;
+            return;
+        }
+        if (
+            selectedSavedAddressId &&
+            savedAddresses.some((entry) => entry.id === selectedSavedAddressId)
+        ) {
+            return;
+        }
+        selectedSavedAddressId = "";
+    }
+
+    $effect(() => {
+        if (loadingSavedAddress || savedAddresses.length === 0) return;
+        void $form.firstName;
+        void $form.lastName;
+        void $form.address1;
+        void $form.city;
+        void $form.postalCode;
+        syncSelectedAddressFromForm();
+    });
+
+    $effect(() => {
+        if (
+            loadingSavedAddress ||
+            savedAddresses.length === 0 ||
+            hasAutoFilledDefault ||
+            !isAddressFormEmpty()
+        ) {
+            return;
+        }
+
+        const defaultEntry =
+            savedAddresses.find((entry) => entry.isDefault) ?? savedAddresses[0];
+        if (!defaultEntry) return;
+
+        hasAutoFilledDefault = true;
+        selectedSavedAddressId = defaultEntry.id;
+        applySavedAddress(defaultEntry);
     });
 
     function fieldErr(v: unknown): string {
@@ -135,7 +227,7 @@
 </script>
 
 <div class="checkout-address addresses-form">
-    {#if hasCustomerAuthSession() && (loadingSavedAddress || savedAddresses.length > 0)}
+    {#if customerAuthenticated}
         <div class="field saved-address-field">
             <label for="saved-address-combobox">Saved address</label>
             <Combobox

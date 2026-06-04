@@ -85,9 +85,24 @@ async function retrieveCart(cartId: string): Promise<Cart | null> {
   return res.data as Cart;
 }
 
-export async function initCartState(force = false): Promise<Cart | null> {
+export function getCartPagePath(cartId?: string | null): string {
+  const id = cartId?.trim() || cartState.cart?.id || getLocalCartId();
+  return id ? `/cart/${id}` : "/cart";
+}
+
+export async function initCartState(
+  force = false,
+  preferredCartId?: string,
+): Promise<Cart | null> {
   if (typeof window === "undefined") return null;
-  if (cartState.initialized && !force) return cartState.cart;
+  const normalizedPreferred = preferredCartId?.trim() || undefined;
+  if (
+    cartState.initialized &&
+    !force &&
+    (!normalizedPreferred || cartState.cart?.id === normalizedPreferred)
+  ) {
+    return cartState.cart;
+  }
   if (initPromise && !force) return initPromise;
 
   initPromise = (async () => {
@@ -96,7 +111,10 @@ export async function initCartState(force = false): Promise<Cart | null> {
     try {
       const sessionId = await ensureSessionId();
       let cart: Cart | null = null;
-      const localCartId = getLocalCartId();
+      if (normalizedPreferred) {
+        setCartId(normalizedPreferred);
+      }
+      const localCartId = normalizedPreferred || getLocalCartId();
 
       if (localCartId) {
         cart = await retrieveCart(localCartId);

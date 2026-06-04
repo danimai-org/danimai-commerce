@@ -122,7 +122,7 @@
                 </div>
             {:else if pageError}
                 <p class="stripe-pay-error" role="alert">{pageError}</p>
-                <a href="/checkout?step=payment" class="stripe-pay-cancel"
+                <a href="/checkout?payment" class="stripe-pay-cancel"
                     >Return to checkout</a
                 >
             {:else if session && returnUrl}
@@ -134,7 +134,7 @@
                         onSuccess={handlePaymentSuccess}
                     />
                 {/key}
-                <a href="/checkout?step=payment" class="stripe-pay-cancel"
+                <a href="/checkout?payment" class="stripe-pay-cancel"
                     >Cancel and return to checkout</a
                 >
             {/if}

@@ -4,6 +4,7 @@
         cartState,
         changeLineItemQuantity,
         closeCartSheet,
+        getCartPagePath,
         removeLineItem,
     } from "$lib/cart/cart-state.svelte";
     import {
@@ -73,7 +74,7 @@
     }
 
     function goToCart() {
-        goto("/cart");
+        goto(getCartPagePath());
         closeCartSheet();
     }
 

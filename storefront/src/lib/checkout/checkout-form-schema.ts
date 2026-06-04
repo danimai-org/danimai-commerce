@@ -20,7 +20,9 @@ export const checkoutFormSchema = z.object({
 		.string()
 		.trim()
 		.min(1, "Email is required")
-		.email("Enter a valid email address"),
+		.refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(value), {
+			message: "Enter a valid email address",
+		}),
 	shippingMethod: z.string().default("standard-worldwide"),
 	paymentMethod: z.string().default("manual"),
 });

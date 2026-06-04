@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { cartState } from "$lib/cart/cart-state.svelte";
+    import { getCheckoutPath } from "$lib/checkout/checkout-url";
     import { formatStoreMoney } from "$lib/money";
 
     let {
@@ -71,6 +73,9 @@
             >
         </div>
     {/if}
-    <a href="/checkout" class="checkout-btn">PROCEED TO CHECKOUT</a>
+    <a
+        href={getCheckoutPath("addresses", cartState.cart?.id)}
+        class="checkout-btn">PROCEED TO CHECKOUT</a
+    >
     <p class="shipping-note">Free shipping on all orders</p>
 </aside>

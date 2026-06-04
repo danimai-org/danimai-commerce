@@ -87,6 +87,12 @@
         .checkout-columns-scroll {
             @apply grid-cols-1;
         }
+
+        .checkout-main {
+            max-height: none;
+            overflow-y: visible;
+            padding-right: 0;
+        }
     }
 
     .visually-hidden {
@@ -284,31 +290,8 @@
     }
 
     .checkout-summary {
-        @apply bg-[#f8f8f8] rounded-lg p-6 sticky top-6 z-10 self-start;
-        max-height: calc(100vh - 8rem);
-        overflow-x: visible;
-        overflow-y: auto;
-        scrollbar-gutter: stable;
-        scrollbar-width: thin;
-        scrollbar-color: #b8b8b8 #f0f0f0;
-    }
-
-    .checkout-summary::-webkit-scrollbar {
-        width: 8px;
-    }
-
-    .checkout-summary::-webkit-scrollbar-track {
-        background: #f0f0f0;
-        border-radius: 4px;
-    }
-
-    .checkout-summary::-webkit-scrollbar-thumb {
-        background: #b8b8b8;
-        border-radius: 4px;
-    }
-
-    .checkout-summary::-webkit-scrollbar-thumb:hover {
-        background: #999;
+        @apply bg-[#f8f8f8] rounded-lg p-6 sticky z-10 self-start;
+        top: 6rem;
     }
 
     .checkout-summary .summary-title {
@@ -384,8 +367,7 @@
 
     @media (max-width: 1024px) {
         .checkout-summary {
-            @apply static max-h-none overflow-visible;
+            @apply static;
         }
     }
 }
-
