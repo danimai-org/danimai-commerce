@@ -32,6 +32,7 @@ export const CreatePaymentTransactionResponseSchema = Type.Intersect([
     customer_session_client_secret: Type.Optional(
       Type.Union([Type.String(), Type.Null()])
     ),
+    publishable_key: Type.Optional(Type.String()),
     checkout_url: Type.Optional(Type.String()),
   }),
 ]);

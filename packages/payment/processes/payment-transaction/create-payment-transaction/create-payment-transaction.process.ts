@@ -1,14 +1,18 @@
 import {
+  DANIMAI_CONFIG,
   InjectDB,
   InjectLogger,
   InjectStripe,
   NotFoundError,
   Process,
   ProcessContext,
+  resolveStripePublishableKey,
   ValidationError,
+  type DanimaiInitialize,
   type ProcessContextType,
   type ProcessContract,
 } from "@danimai/core";
+import { inject } from "inversify";
 import { Kysely, sql } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import type Stripe from "stripe";
@@ -61,7 +65,9 @@ export class CreatePaymentTransactionProcess
     @InjectLogger()
     private readonly logger: Logger,
     @InjectStripe()
-    private readonly stripe: Stripe
+    private readonly stripe: Stripe,
+    @inject(DANIMAI_CONFIG)
+    private readonly config: DanimaiInitialize["config"]
   ) {}
 
   async runOperations(
@@ -231,19 +237,6 @@ export class CreatePaymentTransactionProcess
       automatic_payment_methods: { enabled: true },
     });
 
-    const customerSession = await this.stripe.customerSessions.create({
-      customer: paymentCustomer.stripe_customer_id,
-      components: {
-        payment_element: {
-          enabled: true,
-          features: {
-            payment_method_save: "enabled",
-            payment_method_redisplay: "enabled",
-          },
-        },
-      },
-    });
-
     const updatedTransaction = await this.db
       .updateTable("payment_transactions")
       .set({
@@ -260,11 +253,16 @@ export class CreatePaymentTransactionProcess
       .returningAll()
       .executeTakeFirstOrThrow();
 
+    const publishableKey = resolveStripePublishableKey(
+      this.config.stripeKey,
+      this.config.stripePublishableKey,
+    );
+
     return {
       ...updatedTransaction,
       stripe_customer_id: paymentCustomer.stripe_customer_id,
       payment_intent_client_secret: paymentIntent.client_secret,
-      customer_session_client_secret: customerSession.client_secret,
+      publishable_key: publishableKey,
     };
   }
 }

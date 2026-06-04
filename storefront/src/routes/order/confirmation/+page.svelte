@@ -10,6 +10,7 @@
     import {
         clearPendingStripePayment,
         confirmStripePayment,
+        confirmStripePaymentIntent,
         loadPendingStripePayment,
     } from "$lib/checkout/payment-api";
     import { cartState, initCartState } from "$lib/cart/cart-state.svelte";
@@ -26,6 +27,19 @@
     const stripeSessionId = $derived(
         page.url.searchParams.get("session_id")?.trim() ?? "",
     );
+    const stripePaymentIntentId = $derived(
+        page.url.searchParams.get("payment_intent")?.trim() ?? "",
+    );
+
+    async function clearCartAfterPayment() {
+        localStorage.removeItem(CART_STORAGE_KEY);
+        cartState.cart = null;
+        cartState.initialized = false;
+        cartState.loading = false;
+        cartState.error = null;
+        cartState.sheetOpen = false;
+        await initCartState(true);
+    }
 
     $effect(() => {
         if (!browser) return;
@@ -46,20 +60,22 @@
         void (async () => {
             const pending = loadPendingStripePayment(ref);
             const sessionId = stripeSessionId;
+            const paymentIntentId = stripePaymentIntentId;
             const transactionId = pending?.transactionId;
 
-            if (sessionId && transactionId) {
+            if (transactionId && (sessionId || paymentIntentId)) {
                 confirmingPayment = true;
                 try {
-                    await confirmStripePayment(transactionId, sessionId);
+                    if (sessionId) {
+                        await confirmStripePayment(transactionId, sessionId);
+                    } else if (paymentIntentId) {
+                        await confirmStripePaymentIntent(
+                            transactionId,
+                            paymentIntentId,
+                        );
+                    }
                     clearPendingStripePayment(ref);
-                    localStorage.removeItem(CART_STORAGE_KEY);
-                    cartState.cart = null;
-                    cartState.initialized = false;
-                    cartState.loading = false;
-                    cartState.error = null;
-                    cartState.sheetOpen = false;
-                    void initCartState(true);
+                    await clearCartAfterPayment();
                 } catch (error) {
                     paymentConfirmError =
                         error instanceof Error
@@ -70,11 +86,12 @@
                 }
             }
 
-            const detail =
-                sessionId && transactionId
-                    ? ((await fetchOrderDetailFromApi(ref)) ??
-                      (await resolveOrderDetail(ref)))
-                    : await resolveOrderDetail(ref);
+            const needsApiFetch =
+                (sessionId || paymentIntentId) && transactionId;
+            const detail = needsApiFetch
+                ? ((await fetchOrderDetailFromApi(ref)) ??
+                  (await resolveOrderDetail(ref)))
+                : await resolveOrderDetail(ref);
             if (cancelled) return;
 
             if (!detail) {

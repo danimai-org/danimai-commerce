@@ -51,6 +51,7 @@ function getInitConfig() {
     logger,
     config: {
       stripeKey: process.env.STRIPE_KEY || "",
+      stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
       defaultCurrency: process.env.DEFAULT_CURRENCY || "USD",
       email: {
         resendApiKey: process.env.RESEND_API_KEY || "",

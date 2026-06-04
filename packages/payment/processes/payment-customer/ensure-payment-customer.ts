@@ -51,24 +51,37 @@ export async function ensurePaymentCustomer(
     .executeTakeFirst();
 
   if (existing) {
-    const stripeCustomer = await stripe.customers.update(
-      existing.stripe_customer_id,
-      {
-        ...stripeParams,
-        metadata: { customer_id: customerId },
+    try {
+      const stripeCustomer = await stripe.customers.update(
+        existing.stripe_customer_id,
+        {
+          ...stripeParams,
+          metadata: { customer_id: customerId },
+        },
+      );
+
+      await db
+        .updateTable("payment_customers")
+        .set({
+          metadata: stripeCustomer,
+          updated_at: sql`now()`,
+        })
+        .where("id", "=", existing.id)
+        .execute();
+
+      return { stripe_customer_id: existing.stripe_customer_id };
+    } catch (error) {
+      const code =
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        typeof (error as { code: unknown }).code === "string"
+          ? (error as { code: string }).code
+          : "";
+      if (code !== "resource_missing") {
+        throw error;
       }
-    );
-
-    await db
-      .updateTable("payment_customers")
-      .set({
-        metadata: stripeCustomer,
-        updated_at: sql`now()`,
-      })
-      .where("id", "=", existing.id)
-      .execute();
-
-    return { stripe_customer_id: existing.stripe_customer_id };
+    }
   }
 
   const stripeCustomer = await stripe.customers.create({

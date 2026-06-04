@@ -8,6 +8,7 @@ import { storefrontPaymentProviderRoutes } from "./payment-providers";
 import { storefrontPaymentRoutes } from "./payments";
 import { storefrontPaymentCustomerRoutes } from "./payment-customers";
 import { storefrontPaymentTransactionRoutes } from "./payment-transactions";
+import { storefrontStripeConfigRoutes } from "./stripe-config";
 
 export const storefrontRoutes = new Elysia().group("/storefront", (app) =>
   app
@@ -16,6 +17,7 @@ export const storefrontRoutes = new Elysia().group("/storefront", (app) =>
     .use(storefrontPaymentRoutes)
     .use(storefrontPaymentCustomerRoutes)
     .use(storefrontPaymentTransactionRoutes)
+    .use(storefrontStripeConfigRoutes)
     .use(storefrontAuthRoutes)
     .use(storefrontCustomerRoutes)
     .use(storefrontCartRoutes)

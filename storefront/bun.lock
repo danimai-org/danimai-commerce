@@ -7,6 +7,7 @@
       "dependencies": {
         "@danimai/backend": "../backend",
         "@sinclair/typebox": "^0.34.48",
+        "@stripe/stripe-js": "^9.7.0",
         "@tanstack/svelte-query": "^6.0.18",
       },
       "devDependencies": {
@@ -181,6 +182,8 @@
     "@sinclair/typebox": ["@sinclair/typebox@0.34.49", "", {}, "sha512-brySQQs7Jtn0joV8Xh9ZV/hZb9Ozb0pmazDIASBkYKCjXrXU3mpcFahmK/z4YDhGkQvP9mWJbVyahdtU5wQA+A=="],
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
+
+    "@stripe/stripe-js": ["@stripe/stripe-js@9.7.0", "", {}, "sha512-r1ElolvWXM4aYnZZVHvKW3EDL8JcwEuIgTuWxlB5lvC+YsvjkQ0gX35x9d8dTDubX395fViLVqkaolVs1PmIQQ=="],
 
     "@sveltejs/acorn-typescript": ["@sveltejs/acorn-typescript@1.0.9", "", { "peerDependencies": { "acorn": "^8.9.0" } }, "sha512-lVJX6qEgs/4DOcRTpo56tmKzVPtoWAaVbL4hfO7t7NVwl9AAXzQR6cihesW1BmNMPl+bK6dreu2sOKBP2Q9CIA=="],
 

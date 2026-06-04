@@ -1,12 +1,11 @@
 #!/usr/bin/env bun
 
 import "reflect-metadata";
-import { initialize, getService, DANIMAI_DB, DANIMAI_LOGGER } from "@danimai/core";
+import { initialize, getService, DANIMAI_DB } from "@danimai/core";
 import type { Kysely } from "kysely";
-import type { Logger } from "@logtape/logtape";
 import {
-  CREATE_PRODUCT_ATTRIBUTES_PROCESS,
-  CreateProductAttributesProcess,
+  CREATE_PRODUCT_ATTRIBUTE_PROCESS,
+  CreateProductAttributeProcess,
 } from "@danimai/product";
 import { getLogger } from "../../backend/logger";
 
@@ -39,6 +38,7 @@ function getInitConfig() {
     logger,
     config: {
       stripeKey: process.env.STRIPE_KEY || "",
+      stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
       defaultCurrency: process.env.DEFAULT_CURRENCY || "USD",
       email: {
         resendApiKey: process.env.RESEND_API_KEY || "",
@@ -57,11 +57,9 @@ async function runCreateAttributes() {
     initialize(getInitConfig());
 
     const db = getService<Kysely<any>>(DANIMAI_DB);
-    const createAttributeProcess = getService<CreateProductAttributesProcess>(
-      CREATE_PRODUCT_ATTRIBUTES_PROCESS
+    const createAttributeProcess = getService<CreateProductAttributeProcess>(
+      CREATE_PRODUCT_ATTRIBUTE_PROCESS
     );
-    const processLogger = getService<Logger>(DANIMAI_LOGGER);
-
     console.log(`Creating ${CLOTHING_ATTRIBUTES.length} clothing attributes...`);
 
     let created = 0;
@@ -69,7 +67,6 @@ async function runCreateAttributes() {
       try {
         await createAttributeProcess.runOperations({
           input: { title, type },
-          logger: processLogger,
         });
         created++;
       } catch (err: any) {

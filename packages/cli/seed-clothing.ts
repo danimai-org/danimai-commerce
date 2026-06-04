@@ -7,18 +7,17 @@
  */
 
 import "reflect-metadata";
-import { initialize, getService, DANIMAI_DB, DANIMAI_LOGGER } from "@danimai/core";
+import { initialize, getService, DANIMAI_DB } from "@danimai/core";
 import type { Kysely } from "kysely";
-import type { Logger } from "@logtape/logtape";
 import {
-  CREATE_PRODUCT_CATEGORIES_PROCESS,
-  CREATE_COLLECTIONS_PROCESS,
+  CREATE_PRODUCT_CATEGORY_PROCESS,
+  CREATE_COLLECTION_PROCESS,
   CREATE_PRODUCT_TAGS_PROCESS,
-  CREATE_PRODUCT_ATTRIBUTES_PROCESS,
-  type CreateProductCategoriesProcess,
-  type CreateCollectionsProcess,
+  CREATE_PRODUCT_ATTRIBUTE_PROCESS,
+  type CreateProductCategoryProcess,
+  type CreateCollectionProcess,
   type CreateProductTagsProcess,
-  type CreateProductAttributesProcess,
+  type CreateProductAttributeProcess,
 } from "@danimai/product";
 import { getLogger } from "../../backend/logger";
 
@@ -110,6 +109,7 @@ function getInitConfig() {
     logger,
     config: {
       stripeKey: process.env.STRIPE_KEY || "",
+      stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
       defaultCurrency: process.env.DEFAULT_CURRENCY || "USD",
       email: {
         resendApiKey: process.env.RESEND_API_KEY || "",
@@ -123,8 +123,7 @@ function getInitConfig() {
 
 async function seedCategories(
   db: Kysely<any>,
-  createCategoryProcess: CreateProductCategoriesProcess,
-  processLogger: Logger
+  createCategoryProcess: CreateProductCategoryProcess,
 ): Promise<Map<string, string>> {
   const byValue = new Map<string, string>();
   const created = await db
@@ -141,7 +140,6 @@ async function seedCategories(
     try {
       const cat = await createCategoryProcess.runOperations({
         input: { value, status: "active", visibility: "public" },
-        logger: processLogger,
       });
       if (cat) byValue.set(value, cat.id);
     } catch (err: any) {
@@ -157,7 +155,6 @@ async function seedCategories(
     try {
       const cat = await createCategoryProcess.runOperations({
         input: { value, parent_id: parentId, status: "active", visibility: "public" },
-        logger: processLogger,
       });
       if (cat) byValue.set(value, cat.id);
     } catch (err: any) {
@@ -167,16 +164,12 @@ async function seedCategories(
   return byValue;
 }
 
-async function seedCollections(
-  createCollectionProcess: CreateCollectionsProcess,
-  processLogger: Logger
-) {
+async function seedCollections(createCollectionProcess: CreateCollectionProcess) {
   let n = 0;
   for (const { title, handle } of COLLECTIONS) {
     try {
       await createCollectionProcess.runOperations({
         input: { title, handle },
-        logger: processLogger,
       });
       n++;
     } catch (err: any) {
@@ -188,11 +181,7 @@ async function seedCollections(
   return n;
 }
 
-async function seedTags(
-  db: Kysely<any>,
-  createTagProcess: CreateProductTagsProcess,
-  processLogger: Logger
-) {
+async function seedTags(db: Kysely<any>, createTagProcess: CreateProductTagsProcess) {
   const existing = new Set(
     (await db.selectFrom("product_tags").where("deleted_at", "is", null).select("value").execute()).map((r) => r.value)
   );
@@ -202,7 +191,6 @@ async function seedTags(
     try {
       await createTagProcess.runOperations({
         input: { value },
-        logger: processLogger,
       });
       n++;
     } catch (err: any) {
@@ -214,8 +202,7 @@ async function seedTags(
 
 async function seedAttributes(
   db: Kysely<any>,
-  createAttributeProcess: CreateProductAttributesProcess,
-  processLogger: Logger
+  createAttributeProcess: CreateProductAttributeProcess,
 ) {
   const existing = new Set(
     (await db.selectFrom("product_attributes").where("deleted_at", "is", null).select("title").execute()).map((r) => r.title)
@@ -226,7 +213,6 @@ async function seedAttributes(
     try {
       await createAttributeProcess.runOperations({
         input: { title, type },
-        logger: processLogger,
       });
       n++;
     } catch (err: any) {
@@ -237,29 +223,26 @@ async function seedAttributes(
 }
 
 async function runSeedClothing() {
-  const logger = getLogger();
-
   try {
     initialize(getInitConfig());
     const db = getService<Kysely<any>>(DANIMAI_DB);
-    const processLogger = getService<Logger>(DANIMAI_LOGGER);
-    const createCategoryProcess = getService<CreateProductCategoriesProcess>(CREATE_PRODUCT_CATEGORIES_PROCESS);
-    const createCollectionProcess = getService<CreateCollectionsProcess>(CREATE_COLLECTIONS_PROCESS);
+    const createCategoryProcess = getService<CreateProductCategoryProcess>(CREATE_PRODUCT_CATEGORY_PROCESS);
+    const createCollectionProcess = getService<CreateCollectionProcess>(CREATE_COLLECTION_PROCESS);
     const createTagProcess = getService<CreateProductTagsProcess>(CREATE_PRODUCT_TAGS_PROCESS);
-    const createAttributeProcess = getService<CreateProductAttributesProcess>(CREATE_PRODUCT_ATTRIBUTES_PROCESS);
+    const createAttributeProcess = getService<CreateProductAttributeProcess>(CREATE_PRODUCT_ATTRIBUTE_PROCESS);
 
     console.log("Seeding clothing-shop data...\n");
 
-    const categoryMap = await seedCategories(db, createCategoryProcess, processLogger);
+    const categoryMap = await seedCategories(db, createCategoryProcess);
     console.log(`Categories: ${categoryMap.size} total (created or existing)`);
 
-    const collectionsCreated = await seedCollections(createCollectionProcess, processLogger);
+    const collectionsCreated = await seedCollections(createCollectionProcess);
     console.log(`Collections: ${collectionsCreated} created`);
 
-    const tagsCreated = await seedTags(db, createTagProcess, processLogger);
+    const tagsCreated = await seedTags(db, createTagProcess);
     console.log(`Tags: ${tagsCreated} created`);
 
-    const attributesCreated = await seedAttributes(db, createAttributeProcess, processLogger);
+    const attributesCreated = await seedAttributes(db, createAttributeProcess);
     console.log(`Attributes: ${attributesCreated} created`);
 
     console.log("\nClothing seed finished.");

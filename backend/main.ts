@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
-import { initialize } from "@danimai/core";
+import { initialize, resolveStripeSecretKey } from "@danimai/core";
 import { getLogger } from "./logger";
 import { routes as adminRoutes } from "./routes/admin";
 import { storefrontRoutes } from "./routes/storefront";
@@ -18,7 +18,12 @@ initialize({
   },
   logger,
   config: {
-    stripeKey: Bun.env.STRIPE_KEY || "",
+    stripeKey: resolveStripeSecretKey(
+      Bun.env.STRIPE_KEY ?? "",
+      Bun.env.STRIPE_SECRET_KEY ?? "",
+      Bun.env.STRIPE_PUBLISHABLE_KEY ?? "",
+    ),
+    stripePublishableKey: Bun.env.STRIPE_PUBLISHABLE_KEY ?? "",
     defaultCurrency: Bun.env.DEFAULT_CURRENCY || "USD",
     email: {
       resendApiKey: Bun.env.RESEND_API_KEY || "",

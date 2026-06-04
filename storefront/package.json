@@ -14,6 +14,7 @@
 	"dependencies": {
 		"@danimai/backend": "../backend",
 		"@sinclair/typebox": "^0.34.48",
+		"@stripe/stripe-js": "^9.7.0",
 		"@tanstack/svelte-query": "^6.0.18"
 	},
 	"devDependencies": {

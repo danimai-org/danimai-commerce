@@ -1,9 +1,8 @@
 #!/usr/bin/env bun
 
 import "reflect-metadata";
-import { initialize, getService, DANIMAI_DB, DANIMAI_LOGGER, DANIMAI_PASSWORD } from "@danimai/core";
+import { initialize, getService, DANIMAI_DB, DANIMAI_PASSWORD } from "@danimai/core";
 import type { Kysely } from "kysely";
-import type { Logger } from "@logtape/logtape";
 import {
   CREATE_ROLE_PROCESS,
   CreateRoleProcess,
@@ -19,6 +18,7 @@ function getInitConfig() {
     logger,
     config: {
       stripeKey: process.env.STRIPE_KEY || "",
+      stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
       defaultCurrency: process.env.DEFAULT_CURRENCY || "USD",
       email: {
         resendApiKey: process.env.RESEND_API_KEY || "",
@@ -73,9 +73,8 @@ async function runCreateSuperadmin() {
     if (!role) {
       const newRole = await createRoleProcess.runOperations({
         input: { name: SUPERADMIN_ROLE_NAME, description: "Super administrator with full access" },
-        logger: getService<Logger>(DANIMAI_LOGGER),
       });
-      role = newRole ? { id: newRole.id } : null;
+      role = newRole ? { id: newRole.id } : undefined;
     }
 
     if (!role) {

@@ -3,3 +3,4 @@ export { default as CheckoutAddressStep } from './CheckoutAddressStep.svelte';
 export { default as CheckoutDeliveryStep } from './CheckoutDeliveryStep.svelte';
 export { default as CheckoutPaymentStep } from './CheckoutPaymentStep.svelte';
 export { default as CheckoutFlow } from './CheckoutFlow.svelte';
+export { default as StripePaymentCheckout } from './StripePaymentCheckout.svelte';

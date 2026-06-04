@@ -5,6 +5,7 @@
 @import "./catalog.css";
 @import "./categories.css";
 @import "./checkout.css";
+@import "./stripe-pay.css";
 @import "./collection.css";
 @import "./home.css";
 @import "./login.css";

@@ -8,12 +8,13 @@
 
 import "reflect-metadata";
 import { randomUUID } from "crypto";
-import { initialize, getService, DANIMAI_DB, DANIMAI_LOGGER } from "@danimai/core";
+import { initialize, getService, DANIMAI_DB } from "@danimai/core";
 import type { Kysely } from "kysely";
-import type { Logger } from "@logtape/logtape";
 import {
-  CREATE_PRODUCTS_PROCESS,
-  type CreateProductsProcess,
+  CREATE_PRODUCT_PROCESS,
+  ProductStatusEnum,
+  type CreateProductProcess,
+  type CreateProductProcessInput,
 } from "@danimai/product";
 import { getLogger } from "../../backend/logger";
 
@@ -81,6 +82,7 @@ function getInitConfig() {
     logger,
     config: {
       stripeKey: process.env.STRIPE_KEY || "",
+      stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
       defaultCurrency: process.env.DEFAULT_CURRENCY || "USD",
       email: {
         resendApiKey: process.env.RESEND_API_KEY || "",
@@ -166,34 +168,8 @@ function buildProductBatch(
   offset: number,
   count: number,
   categoryIds: string[]
-): Array<{
-  title: string;
-  subtitle?: string;
-  description?: string;
-  status: "published";
-  category_id: string;
-  options: Array<{ title: string; values: string[] }>;
-  variants: Array<{
-    title: string;
-    sku: string;
-    options: Record<string, string>;
-    prices: Array<{ amount: number; currency_code: string }>;
-  }>;
-}> {
-  const products: Array<{
-    title: string;
-    subtitle?: string;
-    description?: string;
-    status: "published";
-    category_id: string;
-    options: Array<{ title: string; values: string[] }>;
-    variants: Array<{
-      title: string;
-      sku: string;
-      options: Record<string, string>;
-      prices: Array<{ amount: number; currency_code: string }>;
-    }>;
-  }> = [];
+): CreateProductProcessInput[] {
+  const products: CreateProductProcessInput[] = [];
   const sizes = ["S", "M", "L", "XL"];
   const colors = ["Black", "White", "Gray", "Navy", "Red"];
 
@@ -205,7 +181,6 @@ function buildProductBatch(
     const categoryId = categoryIds[n % categoryIds.length]!;
     products.push({
       title: `Sample Product ${n}`,
-      subtitle: `Subtitle for product ${n}`,
       description: `Description for product ${n}. High quality and great value. Perfect for everyday use.`,
       status: "published",
       category_id: categoryId,
@@ -213,7 +188,7 @@ function buildProductBatch(
       variants: optionValues.map((v, vi) => ({
         title: v,
         sku: `SKU-${n}-${vi + 1}`,
-        options: { [optionTitle]: v },
+        option_values: [{ title: optionTitle, value: v }],
         prices: [{ amount: 999 + (n % 5000), currency_code: "USD" }],
       })),
     });
@@ -234,11 +209,9 @@ async function runSeedProducts() {
   try {
     initialize(getInitConfig());
     const db = getService<Kysely<any>>(DANIMAI_DB);
-    const createProductsProcess = getService<CreateProductsProcess>(
-      CREATE_PRODUCTS_PROCESS
+    const createProductProcess = getService<CreateProductProcess>(
+      CREATE_PRODUCT_PROCESS
     );
-    const logService = getService<Logger>(DANIMAI_LOGGER);
-
     const { categoryIds, tagIds } = await ensureCategoriesAndTags(db);
     logger.info(`Using ${categoryIds.length} categories, ${tagIds.length} tags`);
 
@@ -246,11 +219,11 @@ async function runSeedProducts() {
     for (let offset = 0; offset < count; offset += BATCH_SIZE) {
       const batchCount = Math.min(BATCH_SIZE, count - offset);
       const products = buildProductBatch(offset, batchCount, categoryIds);
-      const result = await createProductsProcess.runOperations({
-        input: { products },
-        logger: logService,
-      });
-      const productIds = result.map((p) => p.id);
+      const productIds: string[] = [];
+      for (const product of products) {
+        const result = await createProductProcess.runOperations({ input: product });
+        productIds.push(result.id);
+      }
 
       for (const productId of productIds) {
         const numTags = 1 + (Math.floor(Math.random() * 4));
@@ -268,8 +241,8 @@ async function runSeedProducts() {
         }
       }
 
-      created += result.length;
-      logger.info(`Created products ${offset + 1}-${offset + result.length} of ${count}`);
+      created += productIds.length;
+      logger.info(`Created products ${offset + 1}-${offset + productIds.length} of ${count}`);
     }
 
     logger.info(`Seed complete: ${created} products created.`);

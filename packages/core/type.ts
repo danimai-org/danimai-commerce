@@ -7,6 +7,7 @@ export interface DanimaiInitialize {
   logger: Logger;
   config: {
     stripeKey: string;
+    stripePublishableKey: string;
     defaultCurrency: string;
     email: {
       resendApiKey: string;

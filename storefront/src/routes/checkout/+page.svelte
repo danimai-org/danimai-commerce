@@ -39,7 +39,6 @@
         paymentMethodLabel,
         resolvePaymentAuthHeaders,
         savePendingStripePayment,
-        startStripeCheckout,
         type PaymentProviderOption,
     } from "$lib/checkout/payment-api";
     import {
@@ -509,12 +508,10 @@
                     selectedProvider.id,
                     headers,
                 );
-                const { checkoutUrl, transactionId } = await startStripeCheckout(
-                    payment.id,
-                    orderId,
+                savePendingStripePayment(orderId, payment.id);
+                await goto(
+                    `/checkout/pay?order=${orderId}&payment=${payment.id}`,
                 );
-                savePendingStripePayment(orderId, transactionId);
-                window.location.replace(checkoutUrl);
                 return;
             }
 

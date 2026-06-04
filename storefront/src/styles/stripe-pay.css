@@ -1,0 +1,49 @@
+@layer components {
+    .stripe-pay-page {
+        @apply min-h-screen bg-[#f6f7f9] flex flex-col;
+    }
+
+    .stripe-pay-main {
+        @apply flex-1 flex items-start justify-center px-4 py-10 sm:py-16;
+    }
+
+    .stripe-pay-card {
+        @apply w-full max-w-[480px] bg-white rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] p-6 sm:p-8;
+    }
+
+    .stripe-pay-title {
+        @apply m-0 mb-1 text-[1.5rem] font-bold text-[#1a1a1a] tracking-tight;
+    }
+
+    .stripe-pay-subtitle {
+        @apply m-0 mb-6 text-[0.9375rem] text-[#666];
+    }
+
+    .stripe-pay-element {
+        @apply mb-6 min-h-[120px];
+    }
+
+    .stripe-pay-error {
+        @apply m-0 mb-4 text-[0.875rem] text-[#b91c1c] leading-snug;
+    }
+
+    .stripe-pay-success {
+        @apply m-0 mb-4 text-[0.9375rem] text-[#166534] leading-snug;
+    }
+
+    .stripe-pay-loading {
+        @apply flex flex-col items-center gap-3 py-12 text-[#666] text-[0.9375rem];
+    }
+
+    .stripe-pay-spinner {
+        @apply w-8 h-8 border-2 border-[#e5e7eb] border-t-[#2563eb] rounded-full animate-spin;
+    }
+
+    .stripe-pay-submit {
+        @apply w-full bg-[#2563eb] text-white border-none py-4 px-6 text-[1rem] font-semibold cursor-pointer rounded-lg transition-colors hover:bg-[#1d4ed8] disabled:opacity-60 disabled:cursor-not-allowed;
+    }
+
+    .stripe-pay-cancel {
+        @apply block w-full mt-3 text-center text-[0.875rem] text-[#666] no-underline hover:text-[#1a1a1a];
+    }
+}
