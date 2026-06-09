@@ -1,10 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { API_BASE, firstVariantIdByProductIds, rowsFromPaginated } from '../../api/storefront-api';
 	import { client } from '$lib/api/client.js';
 	import { search } from '$lib/stores/search';
 	import { formatStoreMoney } from '$lib/money';
-	import type { AdminProductRow, AdminProductVariantPrice } from '$lib/types/admin';
 	type SearchResult = {
 		name: string;
 		price: string;
@@ -72,38 +70,23 @@
 	async function fetchResults(q: string) {
 		loading = true;
 		try {
-			const res = await client.admin.products.get({
+			const res = await client.storefront.products.get({
 				query: {
 					search: q,
 					limit: '20',
 					page: '1'
 				}
 			});
-			if (res.error) {
+			if (res.error || !res.data) {
 				results = [];
 				return;
 			}
-			const raw = res.data as unknown;
-			const { rows: list } = rowsFromPaginated<AdminProductRow>(raw);
-			const variantMap = await firstVariantIdByProductIds(
-				API_BASE,
-				list.map((p) => p.id)
-			);
-			const variantIds = list
-				.map((p) => variantMap.get(p.id))
-				.filter((id): id is string => !!id);
-			const prices: (AdminProductVariantPrice | null)[] = await Promise.all(
-				variantIds.map((id) =>
-					client.admin['product-variants']({ id }).get()
-						.then((r) => (r.error ? null : r.data?.prices?.[0] ?? null))
-						.catch(() => null)
-				)
-			);
-			results = list.map((p, i) => {
-				const raw = prices[i]?.amount;
+			const list = res.data.rows ?? [];
+			results = list.map((p) => {
+				const amount = p.variant?.price?.amount;
 				let price = '';
-				if (raw != null && raw !== '') {
-					const cents = parseInt(String(raw), 10);
+				if (amount != null && amount !== '') {
+					const cents = parseInt(String(amount), 10);
 					if (Number.isFinite(cents)) {
 						price = formatStoreMoney(cents / 100);
 					}

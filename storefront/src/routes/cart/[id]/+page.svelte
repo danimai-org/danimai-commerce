@@ -18,48 +18,25 @@
         removeLineItem,
     } from "$lib/cart/cart-state.svelte";
     import {
-        API_BASE,
-        firstVariantIdByProductIds,
-        rowsFromPaginated,
-    } from "$lib/api/storefront-api";
-    import {
         fetchVariantDisplayMap,
         variantDisplayLabel,
         type VariantDisplayRow,
     } from "$lib/cart/variant-display-map";
     import type { CartRowView } from "$lib/types/cart-view";
-    import type { AdminProductRow } from "$lib/types/admin";
+    import type { StorefrontProductListRow } from "$lib/types/product";
 
     let {} = $props();
 
-    const listQuery = { page: 1, limit: 100 } as const;
+    const listQuery = { page: "1", limit: "100" } as const;
     const productsQuery = createQuery(() => ({
-        queryKey: ["products", listQuery.page, listQuery.limit],
-        queryFn: () => client.admin["products"].get({ query: listQuery }),
+        queryKey: ["storefront-products", listQuery.page, listQuery.limit],
+        queryFn: () => client.storefront.products.get({ query: listQuery }),
     }));
 
-    const products = $derived.by((): AdminProductRow[] => {
-        const root = productsQuery.data as unknown;
-        const direct = (
-            root as { data?: { rows?: AdminProductRow[] } } | null | undefined
-        )?.data?.rows;
-        if (Array.isArray(direct) && direct.length > 0)
-            return direct as AdminProductRow[];
-        const qd = root as { data?: unknown } | null | undefined;
-        const raw = qd?.data;
-        if (raw == null) return [];
-        let { rows } = rowsFromPaginated<AdminProductRow>(raw);
-        if (
-            rows.length === 0 &&
-            raw &&
-            typeof raw === "object" &&
-            "data" in raw
-        ) {
-            rows = rowsFromPaginated<AdminProductRow>(
-                (raw as { data: unknown }).data,
-            ).rows;
-        }
-        return rows;
+    const products = $derived.by((): StorefrontProductListRow[] => {
+        const root = productsQuery.data;
+        if (root?.error || !root?.data) return [];
+        return root.data.rows ?? [];
     });
 
     type LookExtra = { image: string | null; priceDisplay: string };
@@ -185,95 +162,28 @@
         return Number.isFinite(n) ? n : 0;
     }
 
-    function treatyErrorMessage(err: unknown): string {
-        const o = err as { value?: { message?: string } };
-        return o?.value?.message ?? String(err);
-    }
-
-    async function firstVariantIdByProductId(
-        productId: string,
-    ): Promise<string | null> {
-        const res = await client.admin["product-variants"].get({
-            query: { page: 1, limit: 1, filters: { product_id: productId } },
-        });
-        if (res.error) throw new Error(treatyErrorMessage(res.error));
-        const rows =
-            (res.data as { rows?: Array<{ id?: string | null }> })?.rows ?? [];
-        return rows[0]?.id ?? null;
-    }
-
-    async function fetchVariantLineMeta(variantId: string): Promise<{
-        title: string;
-        thumbnail: string | null;
-        unitPrice: string;
-    } | null> {
-        const res = await client.admin["product-variants"]({
-            id: variantId,
-        }).get();
-        if (res.error || !res.data) return null;
-        const d = res.data as {
-            title: string;
-            thumbnail?: string | null;
-            prices?: Array<{ amount: string }>;
-        };
-        const raw = d.prices?.[0]?.amount;
-        let unitPrice = "0";
-        if (raw != null && raw !== "") {
-            const cents = parseInt(raw, 10);
-            unitPrice = Number.isFinite(cents) ? String(cents / 100) : "0";
-        }
-        return {
-            title: d.title,
-            thumbnail: d.thumbnail ?? null,
-            unitPrice,
-        };
-    }
-
     $effect(() => {
         const slice = products.slice(0, 4);
         if (slice.length === 0) {
             lookExtrasByProductId = new Map();
             return;
         }
-        let cancelled = false;
-        void (async () => {
-            try {
-                const variantByProduct = await firstVariantIdByProductIds(
-                    API_BASE,
-                    slice.map((p) => p.id),
-                );
-                const next = new Map<string, LookExtra>();
-                await Promise.all(
-                    slice.map(async (p) => {
-                        const vid = variantByProduct.get(p.id);
-                        if (!vid) {
-                            next.set(p.id, {
-                                image: p.thumbnail ?? null,
-                                priceDisplay: "—",
-                            });
-                            return;
-                        }
-                        const meta = await fetchVariantLineMeta(vid);
-                        const up =
-                            meta?.unitPrice != null
-                                ? parseFloat(meta.unitPrice)
-                                : Number.NaN;
-                        next.set(p.id, {
-                            image: meta?.thumbnail ?? p.thumbnail ?? null,
-                            priceDisplay: Number.isFinite(up)
-                                ? `$${up.toFixed(2)}`
-                                : "—",
-                        });
-                    }),
-                );
-                if (!cancelled) lookExtrasByProductId = next;
-            } catch {
-                if (!cancelled) lookExtrasByProductId = new Map();
+        const next = new Map<string, LookExtra>();
+        for (const p of slice) {
+            const raw = p.variant?.price?.amount;
+            let priceDisplay = "—";
+            if (raw != null && raw !== "") {
+                const cents = parseInt(String(raw), 10);
+                if (Number.isFinite(cents)) {
+                    priceDisplay = `$${(cents / 100).toFixed(2)}`;
+                }
             }
-        })();
-        return () => {
-            cancelled = true;
-        };
+            next.set(p.id, {
+                image: p.variant?.thumbnail ?? p.thumbnail ?? null,
+                priceDisplay,
+            });
+        }
+        lookExtrasByProductId = next;
     });
 
     async function changeLineQuantity(lineId: string, delta: number) {
@@ -295,17 +205,23 @@
     ) {
         e.preventDefault();
         e.stopPropagation();
-        const variant_id = await firstVariantIdByProductId(product.id);
-        if (!variant_id) return;
-        const meta = await fetchVariantLineMeta(variant_id);
+        const row = products.find((p) => p.id === product.id);
+        const variant = row?.variant;
+        if (!variant?.id) return;
+        const raw = variant.price?.amount;
+        let unitPrice = "0";
+        if (raw != null && raw !== "") {
+            const cents = parseInt(String(raw), 10);
+            unitPrice = Number.isFinite(cents) ? String(cents / 100) : "0";
+        }
         const fallbackThumb = thumbnailByProductId.get(product.id) ?? null;
         await addItem({
-            variantId: variant_id,
+            variantId: variant.id,
             productId: product.id,
             title: product.title,
-            description: meta?.title?.trim() || null,
-            unitPrice: meta?.unitPrice ?? "0",
-            thumbnail: meta?.thumbnail ?? fallbackThumb,
+            description: variant.title?.trim() || null,
+            unitPrice,
+            thumbnail: variant.thumbnail ?? fallbackThumb,
             quantity: 1,
         });
     }

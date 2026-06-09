@@ -17,6 +17,10 @@ import {
   firstMediaUrl,
   loadProductMediaByProductIds,
 } from "../product-media.util";
+import {
+  productHasValidSkuVariant,
+  variantSkuPreferenceOrder,
+} from "../storefront-product-sku.util";
 
 export const STOREFRONT_PAGINATED_PRODUCTS_PROCESS = Symbol("StorefrontPaginatedProducts");
 
@@ -45,7 +49,7 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
     const {
       page = 1,
       limit = 10,
-      sorting_field = "created_at",
+      sorting_field = "products.title",
       sorting_direction = SortOrder.DESC,
       search,
       filters,
@@ -58,7 +62,10 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
       collection_ids,
     } = filters ?? {};
 
-    let query = this.db.selectFrom("products").where("deleted_at", "is", null);
+    let query = this.db
+      .selectFrom("products")
+      .where("deleted_at", "is", null)
+      .where((eb) => productHasValidSkuVariant(eb));
 
     if (status) {
       query = query.where("status", "=", status);
@@ -262,6 +269,7 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
         "prices.price_list_id as price_list_id",
       ])
       .orderBy("product_variants.product_id", "asc")
+      .orderBy(variantSkuPreferenceOrder, "asc")
       .orderBy(sql`product_variants.variant_rank asc nulls last`)
       .orderBy("prices.id", "asc")
       .orderBy(sql`variant_images.rank asc nulls last`)

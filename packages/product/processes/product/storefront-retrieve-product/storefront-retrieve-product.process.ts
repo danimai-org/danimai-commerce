@@ -16,6 +16,10 @@ import {
   type StorefrontRetrieveProductProcessOutput,
   StorefrontRetrieveProductSchema,
 } from "./storefront-retrieve-product.schema";
+import {
+  compareVariantsBySkuPreference,
+  productHasValidSkuVariant,
+} from "../storefront-product-sku.util";
 
 export const STOREFRONT_RETRIEVE_PRODUCT_PROCESS = Symbol(
   "StorefrontRetrieveProduct",
@@ -49,6 +53,7 @@ export class StorefrontRetrieveProductProcess implements ProcessContract<
       .selectFrom("products")
       .where("handle", "=", handle)
       .where("deleted_at", "is", null)
+      .where((eb) => productHasValidSkuVariant(eb))
       .select(["id", "title", "handle", "thumbnail", "description"])
       .executeTakeFirst();
 
@@ -180,18 +185,20 @@ export class StorefrontRetrieveProductProcess implements ProcessContract<
       }
     }
 
-    const variantRows = variants.map((variant) => {
-      const variantThumb = variant.thumbnail ?? variant.variant_image_url ?? thumbnail;
-      return {
-        id: variant.id,
-        title: variant.title,
-        sku: variant.sku,
-        thumbnail: variantThumb,
-        variant_rank: variant.variant_rank,
-        options: optionsByVariantId.get(variant.id) ?? [],
-        prices: pricesByVariantId.get(variant.id) ?? [],
-      };
-    });
+    const variantRows = variants
+      .map((variant) => {
+        const variantThumb = variant.thumbnail ?? variant.variant_image_url ?? thumbnail;
+        return {
+          id: variant.id,
+          title: variant.title,
+          sku: variant.sku,
+          thumbnail: variantThumb,
+          variant_rank: variant.variant_rank,
+          options: optionsByVariantId.get(variant.id) ?? [],
+          prices: pricesByVariantId.get(variant.id) ?? [],
+        };
+      })
+      .sort(compareVariantsBySkuPreference);
 
     const defaultVariant = variantRows[0] ?? null;
 
