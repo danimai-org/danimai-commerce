@@ -3,6 +3,7 @@ import {
 	normalizeOptionDraftsForCombinations,
 	optionValuesKey
 } from './variant-combination-utils.js';
+import { createEmptyRegionPrices, type RegionPriceColumn } from './region-prices.js';
 
 export type VariantEditRow = {
 	key: string;
@@ -12,13 +13,14 @@ export type VariantEditRow = {
 	manage_inventory: boolean;
 	allow_backorder: boolean;
 	variant_rank: number;
-	priceAmount: string;
+	regionPrices: Record<string, string>;
 };
 
 type OptionDraft = { title: string; values: string[] };
 
 export function generateVariantEditRowsFromOptionDrafts(
-	optionDrafts: OptionDraft[]
+	optionDrafts: OptionDraft[],
+	regions: RegionPriceColumn[] = []
 ): VariantEditRow[] {
 	const optionsForApi = normalizeOptionDraftsForCombinations(optionDrafts);
 
@@ -46,7 +48,7 @@ export function generateVariantEditRowsFromOptionDrafts(
 			manage_inventory: true,
 			allow_backorder: false,
 			variant_rank: index,
-			priceAmount: ''
+			regionPrices: createEmptyRegionPrices(regions)
 		};
 	});
 }

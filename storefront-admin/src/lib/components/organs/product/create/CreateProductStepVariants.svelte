@@ -10,6 +10,8 @@
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import X from '@lucide/svelte/icons/x';
 	import { cn } from '$lib/utils.js';
+	import RegionPriceCell from '../variant/RegionPriceCell.svelte';
+	import type { RegionPriceColumn } from '../variant/region-prices.js';
 
 	type ProductOption = { title: string; values: string[] };
 	type ProductVariantForm = {
@@ -20,7 +22,7 @@
 		manage_inventory: boolean;
 		allow_backorder: boolean;
 		variant_rank: number;
-		priceAmount: string;
+		regionPrices: Record<string, string>;
 	};
 
 	let {
@@ -28,6 +30,7 @@
 		variantsError = null as string | null,
 		createOptions = $bindable([] as ProductOption[]),
 		displayedVariants = [] as ProductVariantForm[],
+		regions = [] as RegionPriceColumn[],
 		variantSearch = $bindable(''),
 		variantPagination,
 		variantStart,
@@ -45,6 +48,7 @@
 		variantsError: string | null;
 		createOptions: ProductOption[];
 		displayedVariants: ProductVariantForm[];
+		regions: RegionPriceColumn[];
 		variantSearch: string;
 		variantPagination: PaginationMeta;
 		variantStart: number;
@@ -185,14 +189,14 @@
 									<td class="px-3 py-2">
 										<input type="checkbox" bind:checked={v.allow_backorder} class="rounded border-input" />
 									</td>
-									<td class="px-3 py-2">
-										<div class="relative w-20">
-											<span class="absolute top-1/2 left-2 -translate-y-1/2 text-xs text-muted-foreground">
-												€
-											</span>
-											<Input bind:value={v.priceAmount} type="text" placeholder="0" class="h-8 pl-6" />
-										</div>
-									</td>
+									{#each regions as region (region.id)}
+										<td class="px-3 py-2">
+											<RegionPriceCell
+												bind:value={v.regionPrices[region.id]}
+												symbol={region.currency_symbol}
+											/>
+										</td>
+									{/each}
 								</tr>
 							{/each}
 						</tbody>

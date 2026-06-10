@@ -4,6 +4,10 @@ import { z } from 'zod';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { superValidate, message } from 'sveltekit-superforms';
 import { client } from '$lib/client';
+import {
+	buildPricesFromRegionPrices,
+	type RegionPriceColumn
+} from '$lib/components/organs/product/variant/region-prices.js';
 
 const ProductCreateSchema = z.object({
 	title: z.string().min(3, 'Title must be at least 3 characters').max(255, 'Title is too long'),
@@ -79,7 +83,7 @@ const ProductCreateSchema = z.object({
 				available_count: z.number().int().min(0).optional(),
 				allow_backorder: z.boolean().default(false),
 				variant_rank: z.number().int().min(0),
-				price_amount: z.string().optional()
+				region_prices: z.record(z.string(), z.string()).default({})
 			})
 		)
 		.default([]),
@@ -103,6 +107,19 @@ const ProductCreateSchema = z.object({
 			.default([])
 	)
 });
+
+async function loadActiveRegions(): Promise<RegionPriceColumn[]> {
+	const res = await client.regions.get({ query: { page: 1, limit: 100 } });
+	const rows = res.data?.rows ?? [];
+	return rows
+		.filter((row) => row.is_active)
+		.map((row) => ({
+			id: row.id,
+			name: row.name,
+			currency_code: row.currency_code,
+			currency_symbol: row.currency_symbol?.trim() || row.currency_code.toUpperCase()
+		}));
+}
 
 export const load: PageServerLoad = async () => {
 	const productCreateForm = await superValidate(zod4(ProductCreateSchema));
@@ -140,11 +157,14 @@ export const actions = {
 				(optionsForApi ?? []).map((option) => [option.title, new Set(option.values)])
 			);
 
+			const activeRegions = await loadActiveRegions();
+
 			const variantsForApi = data.has_variants
 				? data.variants.map((variant, index) => {
-						const parsedPrice = variant.price_amount?.trim()
-							? parseFloat(variant.price_amount.trim())
-							: Number.NaN;
+						const prices = buildPricesFromRegionPrices(
+							variant.region_prices ?? {},
+							activeRegions
+						);
 						const rawByTitle = new Map<string, string>();
 						for (const option of variant.option_values ?? []) {
 							const title = option.title.trim();
@@ -175,10 +195,7 @@ export const actions = {
 							manage_inventory: variant.available_count !== undefined,
 							allow_backorder: variant.allow_backorder,
 							variant_rank: Number.isFinite(variant.variant_rank) ? variant.variant_rank : index,
-							prices:
-								Number.isFinite(parsedPrice) && parsedPrice > 0
-									? [{ amount: Math.round(parsedPrice * 100), currency_code: 'eur' }]
-									: []
+							prices
 						};
 					})
 				: undefined;

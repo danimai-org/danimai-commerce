@@ -6,6 +6,12 @@
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import { client } from '$lib/client.js';
 	import { getVariantOptionEntries } from './variant-option-entries.js';
+	import RegionPriceCell from './RegionPriceCell.svelte';
+	import {
+		createEmptyRegionPrices,
+		mapPricesToRegionPrices,
+		type RegionPriceColumn
+	} from './region-prices.js';
 	import type { ProductVariantUpdateFormData } from '$lib/components/organs/product/product-detail-forms.js';
 
 	type VariantRow = {
@@ -24,7 +30,8 @@
 		productVariantUpdateForm: SuperValidated<ProductVariantUpdateFormData>;
 		options: { id: string; title: string }[];
 		variant: VariantRow | null;
-		variantPricesMap?: Map<string, string>;
+		regions?: RegionPriceColumn[];
+		variantPricesByVariantId?: Map<string, Map<string, string>>;
 		onSaved?: () => void | Promise<void>;
 	}
 
@@ -33,12 +40,18 @@
 		productVariantUpdateForm,
 		options,
 		variant = null,
-		variantPricesMap = new Map<string, string>(),
+		regions = [],
+		variantPricesByVariantId = new Map<string, Map<string, string>>(),
 		onSaved = () => {}
 	}: Props = $props();
 
 	let apiError = $state<string | null>(null);
-	let initializedForId = $state<string | null>(null);
+	let initializedKey = $state<string | null>(null);
+	let regionPrices = $state<Record<string, string>>({});
+
+	const initKey = $derived(
+		variant?.id ? `${variant.id}:${regions.map((region) => region.id).join(',')}` : ''
+	);
 
 	const optionRefs = $derived(options.map((o) => ({ id: o.id, title: o.title })));
 
@@ -65,6 +78,10 @@
 				await onSaved();
 			}
 		}
+	});
+
+	$effect(() => {
+		$form.region_prices_json = JSON.stringify(regionPrices);
 	});
 
 	function parseOptionValues(): Record<string, string> {
@@ -108,20 +125,26 @@
 	}
 
 	$effect(() => {
-		if (!open || !variant?.id) {
-			initializedForId = null;
+		if (!open || !variant?.id || regions.length === 0) {
+			initializedKey = null;
 			return;
 		}
-		if (initializedForId === variant.id) return;
+		if (initializedKey === initKey) return;
 
 		void (async () => {
-			initializedForId = variant.id;
+			initializedKey = initKey;
 			apiError = null;
 
-			let priceAmount = '';
-			const cachedPrice = variantPricesMap.get(variant.id);
-			if (cachedPrice) {
-				priceAmount = (parseFloat(cachedPrice) / 100).toFixed(2);
+			let nextRegionPrices = createEmptyRegionPrices(regions);
+			const cachedPrices = variantPricesByVariantId.get(variant.id);
+			if (cachedPrices) {
+				nextRegionPrices = mapPricesToRegionPrices(
+					Array.from(cachedPrices.entries()).map(([currency_code, amount]) => ({
+						currency_code,
+						amount
+					})),
+					regions
+				);
 			}
 
 			let material = '';
@@ -130,12 +153,7 @@
 				const res = await client['product-variants']({ id: variant.id }).get();
 				if (!res.error && res.data) {
 					manageInventory = res.data.manage_inventory ?? manageInventory;
-					const eurPrice = res.data.prices?.find(
-						(p) => p.currency_code?.toLowerCase() === 'eur'
-					)?.amount;
-					if (eurPrice) {
-						priceAmount = (parseFloat(eurPrice) / 100).toFixed(2);
-					}
+					nextRegionPrices = mapPricesToRegionPrices(res.data.prices, regions);
 					const metadata = res.data.metadata;
 					if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
 						const value = (metadata as Record<string, unknown>).material;
@@ -146,6 +164,7 @@
 				// use row defaults
 			}
 
+			regionPrices = nextRegionPrices;
 			const optionValues = populateOptionValues(variant);
 			reset({
 				data: {
@@ -156,7 +175,7 @@
 					ean: variant.ean ?? '',
 					upc: variant.upc ?? '',
 					barcode: variant.barcode ?? '',
-					price_amount: priceAmount,
+					region_prices_json: JSON.stringify(nextRegionPrices),
 					option_values_json: JSON.stringify(optionValues),
 					manage_inventory: manageInventory
 				}
@@ -174,7 +193,7 @@
 	function onOpenChange(next: boolean) {
 		if (!next) {
 			apiError = null;
-			initializedForId = null;
+			initializedKey = null;
 		}
 	}
 </script>
@@ -187,6 +206,7 @@
 				<input type="hidden" name="title" bind:value={$form.title} />
 			{/if}
 			<input type="hidden" name="option_values_json" bind:value={$form.option_values_json} />
+			<input type="hidden" name="region_prices_json" bind:value={$form.region_prices_json} />
 			<input
 				type="hidden"
 				name="manage_inventory"
@@ -251,26 +271,24 @@
 						</div>
 						<div class="flex flex-col gap-2">
 							<p class="text-sm font-medium">Pricing</p>
-							<div>
-								<label for="edit-variant-price" class="text-xs text-muted-foreground"
-									>Price EUR (Optional)</label
-								>
-								<div class="relative mt-1">
-									<span
-										class="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground"
-										>€</span
-									>
-									<Input
-										id="edit-variant-price"
-										name="price_amount"
-										bind:value={$form.price_amount}
-										type="number"
-										step="0.01"
-										min="0"
-										placeholder="0.00"
-										class="h-9 pl-8"
-									/>
-								</div>
+							<div class="grid gap-3">
+								{#each regions as region (region.id)}
+									<div>
+										<label
+											for="edit-variant-price-{region.id}"
+											class="text-xs text-muted-foreground"
+										>
+											Price {region.name} (Optional)
+										</label>
+										<div class="mt-1">
+											<RegionPriceCell
+												bind:value={regionPrices[region.id]}
+												symbol={region.currency_symbol}
+												class="h-9 pl-8"
+											/>
+										</div>
+									</div>
+								{/each}
 							</div>
 						</div>
 						<div class="flex flex-col gap-2">

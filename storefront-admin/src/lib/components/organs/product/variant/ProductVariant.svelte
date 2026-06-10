@@ -18,6 +18,14 @@
 	import type { TableColumn } from '$lib/components/organs/index.js';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { client, deleteProductVariants, postReplaceProductVariants } from '$lib/client.js';
+	import {
+		buildRegionPriceTableColumns,
+		createEmptyRegionPrices,
+		fetchActiveRegions,
+		mapPricesToRegionPrices,
+		mapVariantPricesByCurrency,
+		type RegionPriceColumn
+	} from './region-prices.js';
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import type { ProductVariantUpdateFormData } from '$lib/components/organs/product/product-detail-forms.js';
 
@@ -64,16 +72,17 @@
 	const variantLimit = 10;
 	let optionEditSubmitting = $state(false);
 	let optionEditError = $state<string | null>(null);
-	const variantPricesMap = new SvelteMap<string, string>();
+	const variantPricesByVariantId = new SvelteMap<string, Map<string, string>>();
+	let activeRegions = $state<RegionPriceColumn[]>([]);
 
-	const variantTableColumns: TableColumn[] = [
+	const variantTableColumns = $derived.by((): TableColumn[] => [
 		{ label: 'Option', key: 'option' },
 		{ label: 'Title', key: 'title' },
 		{ label: 'SKU', key: 'sku' },
 		{ label: 'Manage inventory', key: 'manage_inventory' },
 		{ label: 'Allow backorder', key: 'allow_backorder' },
-		{ label: 'Price EUR', key: 'priceAmount' }
-	];
+		...buildRegionPriceTableColumns(activeRegions)
+	]);
 
 	let variantToDelete = $state<ProductVariantRow | null>(null);
 	let deleteVariantOpen = $state(false);
@@ -250,7 +259,7 @@
 	const variantEnd = $derived(Math.min(variantPage * variantLimit, variantTotal));
 
 	function syncVariantEditRowsFromDrafts() {
-		const generated = generateVariantEditRowsFromOptionDrafts(optionEditDrafts);
+		const generated = generateVariantEditRowsFromOptionDrafts(optionEditDrafts, activeRegions);
 		const draftOptionRefs = optionEditDrafts.map((d) => ({ id: d.id, title: d.title }));
 		const existingByKey = new SvelteMap<string, ProductVariantRow>();
 		const priorByKey = new SvelteMap(variantEditRows.map((row) => [row.key, row]));
@@ -271,11 +280,20 @@
 		variantEditRows = generated.map((row, index) => {
 			const existing = existingByKey.get(row.key);
 			const prior = priorByKey.get(row.key);
-			const priceCents = existing ? variantPricesMap.get(existing.id) : undefined;
-			let priceAmount = prior?.priceAmount ?? '';
-			if (!priceAmount && priceCents) {
-				priceAmount = (parseFloat(priceCents) / 100).toFixed(2);
-			}
+			const priceByCurrency = existing
+				? variantPricesByVariantId.get(existing.id)
+				: undefined;
+			const existingPrices = priceByCurrency
+				? Array.from(priceByCurrency.entries()).map(([currency_code, amount]) => ({
+						currency_code,
+						amount
+					}))
+				: undefined;
+			const regionPrices = {
+				...createEmptyRegionPrices(activeRegions),
+				...(prior?.regionPrices ??
+					mapPricesToRegionPrices(existingPrices, activeRegions))
+			};
 			return {
 				...row,
 				variant_rank: index,
@@ -283,7 +301,7 @@
 				sku: prior?.sku ?? existing?.sku ?? '',
 				manage_inventory: prior?.manage_inventory ?? existing?.manage_inventory ?? true,
 				allow_backorder: prior?.allow_backorder ?? existing?.allow_backorder ?? false,
-				priceAmount
+				regionPrices
 			};
 		});
 	}
@@ -300,7 +318,13 @@
 		optionValueOverrides = null;
 	}
 
-	function openEditOptionSheet() {
+	async function ensureActiveRegions() {
+		if (activeRegions.length > 0) return;
+		activeRegions = await fetchActiveRegions();
+	}
+
+	async function openEditOptionSheet() {
+		await ensureActiveRegions();
 		optionEditDrafts =
 			options.length > 0
 				? options.map((option) => ({
@@ -398,15 +422,13 @@
 	}
 
 	async function loadVariantPrices() {
-		variantPricesMap.clear();
+		variantPricesByVariantId.clear();
 		for (const variant of variants) {
 			try {
 				const res = await client['product-variants']({ id: variant.id }).get();
 				if (res.error || !res.data) continue;
-				const eurPrice = res.data.prices?.find(
-					(p) => p.currency_code?.toLowerCase() === 'eur'
-				)?.amount;
-				if (eurPrice) variantPricesMap.set(variant.id, eurPrice);
+				const byCurrency = mapVariantPricesByCurrency(res.data.prices);
+				if (byCurrency.size > 0) variantPricesByVariantId.set(variant.id, byCurrency);
 			} catch {
 				// keep rendering without price
 			}
@@ -426,8 +448,16 @@
 		if (variants.length > 0) {
 			loadVariantPrices();
 		} else {
-			variantPricesMap.clear();
+			variantPricesByVariantId.clear();
 		}
+	});
+
+	$effect(() => {
+		const id = productId;
+		if (!id) return;
+		void (async () => {
+			activeRegions = await fetchActiveRegions();
+		})();
 	});
 
 	$effect(() => {
@@ -449,7 +479,8 @@
 					values: draft.values.map((v) => normalizeOptionValue(v)).filter(Boolean)
 				})),
 				existingVariants: loadedVariants,
-				priceCentsByVariantId: variantPricesMap,
+				priceCentsByVariantId: variantPricesByVariantId,
+				regions: activeRegions,
 				variantEditRows
 			});
 			await postReplaceProductVariants(payload);
@@ -470,7 +501,8 @@
 	{variants}
 	{options}
 	{optionValueOverrides}
-	{variantPricesMap}
+	{activeRegions}
+	{variantPricesByVariantId}
 	loading={variantsLoading}
 	onEditVariant={handleEditVariant}
 	onDeleteVariant={handleDeleteVariant}
@@ -496,6 +528,7 @@
 	{variantStart}
 	{variantEnd}
 	{variantTableColumns}
+	regions={activeRegions}
 	submitting={optionEditSubmitting}
 	error={optionEditError}
 	onOptionTitleChange={updateOptionDraftTitle}
@@ -513,6 +546,7 @@
 	{productVariantUpdateForm}
 	options={optionRefs}
 	variant={editingVariant}
-	{variantPricesMap}
+	regions={activeRegions}
+	{variantPricesByVariantId}
 	onSaved={handleVariantSaved}
 />

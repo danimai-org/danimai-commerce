@@ -52,7 +52,7 @@ export const ProductVariantUpdateSchema = z.object({
 	ean: z.string().default(''),
 	upc: z.string().default(''),
 	barcode: z.string().default(''),
-	price_amount: z.string().default(''),
+	region_prices_json: z.string().default('{}'),
 	option_values_json: z.string().default('{}'),
 	manage_inventory: z.preprocess(
 		(v) => (v === undefined || v === '' ? true : v === true || v === 'true'),
@@ -76,7 +76,7 @@ export const defaultProductVariantUpdateFormData: ProductVariantUpdateFormData =
 	ean: '',
 	upc: '',
 	barcode: '',
-	price_amount: '',
+	region_prices_json: '{}',
 	option_values_json: '{}',
 	manage_inventory: true
 };

@@ -19,6 +19,11 @@
 		type VariantOptionRef
 	} from './variant-option-entries.js';
 	import { SvelteSet } from 'svelte/reactivity';
+	import {
+		buildRegionPriceTableColumns,
+		formatRegionPriceDisplay,
+		type RegionPriceColumn
+	} from './region-prices.js';
 
 	const CHIP_CLASS =
 		'inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2.5 py-1 text-sm';
@@ -52,7 +57,8 @@
 		variants = [],
 		options = [],
 		optionValueOverrides = null,
-		variantPricesMap = new Map<string, string>(),
+		activeRegions = [] as RegionPriceColumn[],
+		variantPricesByVariantId = new Map<string, Map<string, string>>(),
 		loading = false,
 		onEditVariant = () => {},
 		onDeleteVariant = () => {},
@@ -61,7 +67,8 @@
 		variants?: ProductVariant[];
 		options?: ProductOption[];
 		optionValueOverrides?: OptionValueOverride[] | null;
-		variantPricesMap?: Map<string, string>;
+		activeRegions?: RegionPriceColumn[];
+		variantPricesByVariantId?: Map<string, Map<string, string>>;
 		loading?: boolean;
 		onEditVariant?: (row: Record<string, unknown>) => void;
 		onDeleteVariant?: (row: Record<string, unknown>) => void;
@@ -137,26 +144,37 @@
 	});
 	const variantTableRows = $derived(
 		paginatedVariants.map((v) => {
-			const priceInCents = variantPricesMap.get(v.id);
+			const priceByCurrency = variantPricesByVariantId.get(v.id);
 			const option_entries = getVariantOptionEntries(v, optionRefs);
+			const regionPriceDisplays = Object.fromEntries(
+				activeRegions.map((region) => {
+					const cents = priceByCurrency?.get(region.currency_code.toLowerCase());
+					return [
+						`price_${region.id}`,
+						formatRegionPriceDisplay(cents, region.currency_symbol)
+					];
+				})
+			);
 			return {
 				...v,
 				option_entries,
-				price_display: priceInCents ? `€${(parseFloat(priceInCents) / 100).toFixed(2)}` : '—'
+				...regionPriceDisplays
 			};
 		}) as Array<
 			Record<string, unknown> & {
 				option_entries: VariantOptionEntry[];
-				price_display: string;
 			}
 		>
 	);
 
-	const variantTableColumns: TableColumn[] = [
+	const variantTableColumns = $derived.by((): TableColumn[] => [
 		{ label: 'Variant', key: 'title', type: 'text' },
 		{ label: 'SKU', key: 'sku', type: 'text' },
 		{ label: 'Inventory', key: 'manage_inventory', type: 'boolean' },
-		{ label: 'Price', key: 'price_display', type: 'text' },
+		...buildRegionPriceTableColumns(activeRegions).map((column) => ({
+			...column,
+			type: 'text' as const
+		})),
 		{ label: 'Created', key: 'created_at', type: 'date' },
 		{ label: 'Updated', key: 'updated_at', type: 'date' },
 		{
@@ -168,7 +186,7 @@
 				{ label: 'Delete', key: 'delete', type: 'button', onClick: (row) => onDeleteVariant(row) }
 			]
 		}
-	];
+	]);
 
 	function goToVariantPage(pageNum: number) {
 		variantPage = Math.max(1, Math.min(variantTotalPages, pageNum));
@@ -322,7 +340,11 @@
 											</span>
 										{/if}
 									</td>
-									<td class="px-4 py-3 text-muted-foreground">{row.price_display}</td>
+									{#each activeRegions as region (region.id)}
+										<td class="px-4 py-3 text-muted-foreground">
+											{cellText(`price_${region.id}`, row)}
+										</td>
+									{/each}
 									<td class="px-4 py-3 text-muted-foreground"
 										>{formatDate(row.created_at)}</td
 									>

@@ -10,6 +10,8 @@
 	} from '$lib/components/organs/index.js';
 	import type { PaginationMeta } from '$lib/api/pagination.svelte.js';
 	import type { VariantEditRow } from './generate-variants-from-option-drafts.js';
+	import RegionPriceCell from './RegionPriceCell.svelte';
+	import type { RegionPriceColumn } from './region-prices.js';
 	import X from '@lucide/svelte/icons/x';
 
 	export type OptionEditDraft = {
@@ -27,6 +29,7 @@
 		variantStart: number;
 		variantEnd: number;
 		variantTableColumns: TableColumn[];
+		regions?: RegionPriceColumn[];
 		submitting?: boolean;
 		error?: string | null;
 		onOptionTitleChange: (optionId: string, value: string) => void;
@@ -48,6 +51,7 @@
 		variantStart,
 		variantEnd,
 		variantTableColumns,
+		regions = [],
 		submitting = false,
 		error = null,
 		onOptionTitleChange,
@@ -216,21 +220,14 @@
 													class="rounded border-input"
 												/>
 											</td>
-											<td class="px-3 py-2">
-												<div class="relative w-20">
-													<span
-														class="absolute top-1/2 left-2 -translate-y-1/2 text-xs text-muted-foreground"
-													>
-														€
-													</span>
-													<Input
-														bind:value={row.priceAmount}
-														type="text"
-														placeholder="0"
-														class="h-8 pl-6"
+											{#each regions as region (region.id)}
+												<td class="px-3 py-2">
+													<RegionPriceCell
+														bind:value={row.regionPrices[region.id]}
+														symbol={region.currency_symbol}
 													/>
-												</div>
-											</td>
+												</td>
+											{/each}
 										</tr>
 									{/each}
 								{/if}

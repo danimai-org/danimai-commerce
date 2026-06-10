@@ -4,6 +4,12 @@ import {
 	optionValuesKey,
 	type VariantOptionValue
 } from './variant-combination-utils.js';
+import {
+	buildPricesFromRegionPrices,
+	formatCentsToAmount,
+	type RegionPriceColumn,
+	type RegionPricesMap
+} from './region-prices.js';
 
 type ExistingVariant = {
 	id: string;
@@ -22,14 +28,15 @@ type VariantRowOverride = {
 	sku: string;
 	manage_inventory: boolean;
 	allow_backorder: boolean;
-	priceAmount: string;
+	regionPrices: RegionPricesMap;
 };
 
 export function buildReplaceVariantsPayload(input: {
 	productId: string;
 	optionDrafts: Array<{ id: string; title: string; values: string[] }>;
 	existingVariants: ExistingVariant[];
-	priceCentsByVariantId: Map<string, string>;
+	priceCentsByVariantId: Map<string, Map<string, string>>;
+	regions: RegionPriceColumn[];
 	variantEditRows?: VariantRowOverride[];
 }) {
 	const optionsForApi = normalizeOptionDraftsForCombinations(input.optionDrafts);
@@ -69,17 +76,21 @@ export function buildReplaceVariantsPayload(input: {
 				: option_values.map((entry) => entry.value).join(' / ');
 		const title = override?.title.trim() || defaultTitle;
 
-		let parsedCents = Number.NaN;
-		const priceFromOverride = override?.priceAmount.trim();
-		if (priceFromOverride) {
-			const euros = parseFloat(priceFromOverride);
-			if (!Number.isNaN(euros) && euros > 0) parsedCents = Math.round(euros * 100);
-		}
-		if (!Number.isFinite(parsedCents) || parsedCents <= 0) {
-			const priceCents = existing ? input.priceCentsByVariantId.get(existing.id) : undefined;
-			parsedCents = priceCents ? parseInt(priceCents, 10) : Number.NaN;
+		let regionPrices = { ...override?.regionPrices };
+		const hasOverridePrices = Object.values(regionPrices).some((amount) => amount.trim());
+		if (!hasOverridePrices && existing) {
+			const priceByCurrency = input.priceCentsByVariantId.get(existing.id);
+			if (priceByCurrency) {
+				regionPrices = Object.fromEntries(
+					input.regions.map((region) => {
+						const cents = priceByCurrency.get(region.currency_code.toLowerCase());
+						return [region.id, cents ? formatCentsToAmount(cents) : ''];
+					})
+				);
+			}
 		}
 
+		const prices = buildPricesFromRegionPrices(regionPrices, input.regions);
 		const trimmedSku = override?.sku.trim() || existing?.sku?.trim() || '';
 
 		return {
@@ -89,9 +100,7 @@ export function buildReplaceVariantsPayload(input: {
 			manage_inventory: override?.manage_inventory ?? existing?.manage_inventory ?? true,
 			allow_backorder: override?.allow_backorder ?? existing?.allow_backorder ?? false,
 			variant_rank: index,
-			...(Number.isFinite(parsedCents) && parsedCents > 0
-				? { prices: [{ amount: parsedCents, currency_code: 'eur' as const }] }
-				: {})
+			...(prices.length > 0 ? { prices } : {})
 		};
 	});
 

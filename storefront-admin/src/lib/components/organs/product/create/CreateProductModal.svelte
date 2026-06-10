@@ -17,6 +17,13 @@
 	import { get } from 'svelte/store';
 	import { type MediaUploadLocalItem } from '$lib/components/shared/media-upload.types.js';
 	import { SvelteMap } from 'svelte/reactivity';
+	import {
+		buildRegionPriceTableColumns,
+		createEmptyRegionPrices,
+		fetchActiveRegions,
+		hasAnyRegionPrice,
+		type RegionPriceColumn
+	} from '../variant/region-prices.js';
 
 	interface Props {
 		open: boolean;
@@ -38,7 +45,7 @@
 		manage_inventory: boolean;
 		allow_backorder: boolean;
 		variant_rank: number;
-		priceAmount: string;
+		regionPrices: Record<string, string>;
 	};
 
 	function cartesian<T>(arrays: T[][]): T[][] {
@@ -67,7 +74,7 @@
 				manage_inventory: true,
 				allow_backorder: false,
 				variant_rank: i,
-				priceAmount: ''
+				regionPrices: createEmptyRegionPrices(activeRegions)
 			};
 		});
 	}
@@ -174,6 +181,7 @@
 
 	let createOptions = $state<ProductOption[]>([]);
 	let createVariants = $state<ProductVariantForm[]>([]);
+	let activeRegions = $state<RegionPriceColumn[]>([]);
 
 	let variantSearch = $state('');
 	let variantPage = $state(1);
@@ -205,15 +213,15 @@
 	const variantStart = $derived(variantTotal === 0 ? 0 : (variantPage - 1) * variantLimit + 1);
 	const variantEnd = $derived(Math.min(variantPage * variantLimit, variantTotal));
 
-	const variantTableColumns: TableColumn[] = [
+	const variantTableColumns = $derived.by((): TableColumn[] => [
 		{ label: 'Option', key: 'option' },
 		{ label: 'Title', key: 'title' },
 		{ label: 'SKU', key: 'sku' },
 		{ label: 'Available count', key: 'availableCount' },
 		{ label: 'Manage inventory', key: 'manage_inventory' },
 		{ label: 'Allow backorder', key: 'allow_backorder' },
-		{ label: 'Price EUR', key: 'priceAmount' }
-	];
+		...buildRegionPriceTableColumns(activeRegions)
+	]);
 
 	$effect(() => {
 		const totalPages = Math.max(1, Math.ceil(variantTotal / variantLimit));
@@ -263,7 +271,10 @@
 						availableCount: ex.availableCount,
 						manage_inventory: ex.manage_inventory,
 						allow_backorder: ex.allow_backorder,
-						priceAmount: ex.priceAmount
+						regionPrices: {
+							...createEmptyRegionPrices(activeRegions),
+							...ex.regionPrices
+						}
 					}
 				: v;
 		});
@@ -461,8 +472,9 @@
 		variantPage = 1;
 		previousCategoryId = '';
 		attributesFetchGen = 0;
-		syncVariantsFromOptions();
 		attributesList = [];
+		activeRegions = await fetchActiveRegions();
+		syncVariantsFromOptions();
 	}
 
 	function closeCreate() {
@@ -674,7 +686,7 @@
 					manage_inventory: variant.manage_inventory,
 					allow_backorder: variant.allow_backorder,
 					variant_rank: index,
-					price_amount: variant.priceAmount.trim() || undefined
+					region_prices: variant.regionPrices
 				};
 			})
 		)
@@ -730,12 +742,9 @@
 				}
 			}
 			if (status === 'published') {
-				const hasValidPrice = createVariants.some((variant) => {
-					const priceStr = variant.priceAmount.trim();
-					if (!priceStr) return false;
-					const price = parseFloat(priceStr);
-					return !isNaN(price) && price > 0;
-				});
+				const hasValidPrice = createVariants.some((variant) =>
+					hasAnyRegionPrice(variant.regionPrices)
+				);
 				if (!hasValidPrice) {
 					createError = 'At least one variant must have a price greater than 0';
 					return;
@@ -778,7 +787,7 @@
 					manage_inventory: variant.manage_inventory,
 					allow_backorder: variant.allow_backorder,
 					variant_rank: index,
-					price_amount: variant.priceAmount.trim() || undefined
+					region_prices: variant.regionPrices
 				};
 			}),
 			attributes: createAttributeEntries
@@ -972,6 +981,7 @@
 					{createHasVariants}
 					bind:createOptions
 					{displayedVariants}
+					regions={activeRegions}
 					bind:variantSearch
 					{variantPagination}
 					{variantStart}
