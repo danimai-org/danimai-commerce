@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { z } from 'zod';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { superValidate, message } from 'sveltekit-superforms';
@@ -71,8 +71,12 @@ export const actions = {
 			metadata: {}
 		});
 
-		if (!region || region.error) {
-			return fail(400, { regionCreateForm, error: 'Failed to create region' });
+		if (region?.error) {
+			const err = region.error as { value?: { message?: string } };
+			return fail(400, {
+				regionCreateForm,
+				error: err.value?.message ?? 'Failed to create region'
+			});
 		}
 
 		const created = region.data as { id: string } | undefined;
@@ -83,15 +87,15 @@ export const actions = {
 		if (ids.length > 0) {
 			const assign = await client['regions']({ id: created.id }).countries.post({ ids });
 			if (assign?.error) {
+				const err = assign.error as { value?: { message?: string } };
 				return fail(400, {
 					regionCreateForm,
-					error: 'Region was created but assigning countries failed'
+					error: err.value?.message ?? 'Region was created but assigning countries failed'
 				});
 			}
 		}
 
-		const out = message(regionCreateForm, 'Region created successfully');
-		return { ...out, createdId: created.id };
+		redirect(303, `/regions/${created.id}`);
 	},
 	update: async ({ request }) => {
 		const regionUpdateForm = await superValidate(request, zod4(RegionUpdateSchema));

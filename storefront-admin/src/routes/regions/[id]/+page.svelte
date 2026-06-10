@@ -12,6 +12,9 @@
 	import MetadataComponent from '$lib/components/organs/MetadataComponent.svelte';
 	import { resolve } from '$app/paths';
 	import { setDetailContext, useDetailQuery } from '$lib/hooks';
+	import type { PageProps } from './$types';
+
+	const { data }: PageProps = $props();
 
 	const regionId = $derived(page.params?.id ?? '');
 	const detailQuery = useDetailQuery(
@@ -23,7 +26,8 @@
 			}
 			return res.data;
 		},
-		() => ['region-detail', regionId]
+		() => ['region-detail', regionId],
+		data.region
 	);
 
 	setDetailContext(detailQuery);

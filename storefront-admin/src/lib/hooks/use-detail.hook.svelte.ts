@@ -14,11 +14,13 @@ export function getDetailContext<T>() {
 
 export const useDetailQuery = <T>(
 	queryFn: QueryFunction<T>,
-	queryKey: QueryKey | (() => QueryKey)
+	queryKey: QueryKey | (() => QueryKey),
+	initialData?: T
 ) => {
 	const detailState = createQuery(() => ({
 		queryKey: typeof queryKey === 'function' ? queryKey() : queryKey,
 		queryFn,
+		initialData,
 		refetchOnWindowFocus: false
 	}));
 

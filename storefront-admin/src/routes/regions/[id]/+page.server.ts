@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
 import { z } from 'zod';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { superValidate, message } from 'sveltekit-superforms';
@@ -14,12 +14,25 @@ const RegionUpdateSchema = z.object({
 		.max(3, 'Currency code must be 3 characters (e.g. USD)')
 });
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ params }) => {
 	const regionUpdateForm = await superValidate(
 		{ id: '', name: '', currency_code: '' },
 		zod4(RegionUpdateSchema)
 	);
-	return { regionUpdateForm };
+
+	const res = await client.regions({ id: params.id }).get();
+	if (res?.error) {
+		const err = res.error as { status?: number; value?: { message?: string } };
+		if (err.status === 404) {
+			error(404, err.value?.message ?? 'Region not found');
+		}
+		error(500, err.value?.message ?? 'Failed to load region');
+	}
+	if (!res.data) {
+		error(404, 'Region not found');
+	}
+
+	return { regionUpdateForm, region: res.data };
 };
 
 export const actions = {

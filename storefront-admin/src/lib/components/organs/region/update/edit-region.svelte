@@ -10,7 +10,7 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import { Toaster, toast } from 'svelte-sonner';
 
-	const listQuery = { page: 1, limit: 100 } as const;
+	const listQuery = { page: 1, limit: 200 } as const;
 	const DEBOUNCE_MS = 400;
 
 	let {
@@ -48,22 +48,24 @@
 	const currencyDebouncedTrim = $derived(debouncedCurrencySearch.trim());
 
 	const currenciesQuery = createQuery(() => ({
-		queryKey: ['update-region', 'currencies', 'v2', open, currencyDebouncedTrim, listQuery.page, listQuery.limit],
-		queryFn: ({ signal }) =>
-			client['currencies'].get({
+		queryKey: ['update-region', 'currencies-available', open, currencyDebouncedTrim, listQuery.page, listQuery.limit],
+		queryFn: async ({ signal }) => {
+			const res = await client.currencies.available.get({
 				query: {
 					page: listQuery.page,
 					limit: listQuery.limit,
 					...(currencyDebouncedTrim ? { search: currencyDebouncedTrim } : {})
 				},
 				...(signal ? { fetch: { signal } } : {})
-			}),
+			});
+			if (res.error != null) throw res.error;
+			return res.data;
+		},
 		enabled: open,
 		refetchOnWindowFocus: false
 	}));
 
-	const currenciesData = $derived(currenciesQuery.data?.data);
-	const currencies = $derived(currenciesData?.rows ?? []);
+	const currencies = $derived(currenciesQuery.data?.data ?? []);
 
 	function cancelCurrencyCombRaf() {
 		if (currencyOpenRafId) cancelAnimationFrame(currencyOpenRafId);
@@ -143,9 +145,11 @@
 		open = false;
 	}
 
-	function currencyParenContent(c: { code: string; symbol: string }) {
-		if (!c.symbol || c.symbol === c.code) return c.code;
-		return `${c.code} ${c.symbol}`;
+	function formatCurrencyLabel(c: { name: string; code: string; symbol: string }) {
+		const code = String(c.code).toUpperCase();
+		const symbol = String(c.symbol);
+		if (symbol && symbol !== code) return `${c.name} (${code} ${symbol})`;
+		return `${c.name} (${code})`;
 	}
 
 	function withSelectedFallback(mapped: ComboboxOption[], selectedId: string): ComboboxOption[] {
@@ -160,7 +164,11 @@
 		withSelectedFallback(
 			currencies.map((row) => ({
 				id: String(row.code),
-				value: `${String(row.name)} (${currencyParenContent({ code: String(row.code), symbol: String(row.symbol) })})`
+				value: formatCurrencyLabel({
+					name: String(row.name),
+					code: String(row.code),
+					symbol: String(row.symbol)
+				})
 			})),
 			String($form.currency_code ?? '')
 		)

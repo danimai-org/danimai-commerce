@@ -25,7 +25,7 @@
 		onSuccess?: () => void;
 	} = $props();
 
-	const listQuery = { page: 1, limit: 100 } as const;
+	const listQuery = { page: 1, limit: 200 } as const;
 	const DEBOUNCE_MS = 400;
 
 	let currencySearch = $state('');
@@ -221,19 +221,24 @@
 		refetchOnWindowFocus: false
 	}));
 	const currenciesQuery = createQuery(() => ({
-		queryKey: ['edit-store', 'currencies', 'v2', open, currencyDebouncedTrim, listQuery.page, listQuery.limit],
-		queryFn: ({ signal }) =>
-			client['currencies'].get({
+		queryKey: ['edit-store', 'currencies-available', open, currencyDebouncedTrim, listQuery.page, listQuery.limit],
+		queryFn: async ({ signal }) => {
+			const res = await client.currencies.available.get({
 				query: {
 					page: listQuery.page,
 					limit: listQuery.limit,
 					...(currencyDebouncedTrim ? { search: currencyDebouncedTrim } : {})
 				},
 				...(signal ? { fetch: { signal } } : {})
-			}),
+			});
+			if (res.error != null) throw res.error;
+			return res.data;
+		},
 		enabled: open,
 		refetchOnWindowFocus: false
 	}));
+
+	const currencies = $derived(currenciesQuery.data?.data ?? []);
 
 	function withSelectedFallback(mapped: ComboboxOption[], selectedId: string): ComboboxOption[] {
 		const id = selectedId.trim();
@@ -270,11 +275,22 @@
 			$form.default_location_id ?? ''
 		)
 	);
+	function formatCurrencyLabel(c: { name: string; code: string; symbol: string }) {
+		const code = String(c.code).toUpperCase();
+		const symbol = String(c.symbol);
+		if (symbol && symbol !== code) return `${c.name} (${code} ${symbol})`;
+		return `${c.name} (${code})`;
+	}
+
 	const currencyOptions = $derived.by((): ComboboxOption[] =>
 		withSelectedFallback(
-			(currenciesQuery.data?.data?.rows ?? []).map((r) => ({
-				id: r.code,
-				value: `${r.code} — ${r.name}`
+			currencies.map((row) => ({
+				id: String(row.code),
+				value: formatCurrencyLabel({
+					name: String(row.name),
+					code: String(row.code),
+					symbol: String(row.symbol)
+				})
 			})),
 			$form.default_currency_code ?? ''
 		)
