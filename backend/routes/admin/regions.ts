@@ -43,7 +43,9 @@ import type { StaticDecode } from "@sinclair/typebox";
 
 const UpdateRegionBodySchema = Type.Object({
   name: Type.Optional(Type.String()),
+  code: Type.Optional(Type.String()),
   currency_code: Type.Optional(Type.String()),
+  is_active: Type.Optional(Type.Boolean()),
   metadata: Type.Optional(
     Type.Record(
       Type.String(),

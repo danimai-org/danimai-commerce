@@ -1,4 +1,6 @@
 import "reflect-metadata";
+import { join } from "node:path";
+import { mkdir } from "node:fs/promises";
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
@@ -9,6 +11,15 @@ import { storefrontRoutes } from "./routes/storefront";
 import { lambda } from "danimai-elysia-lambda";
 
 const logger = getLogger();
+const mediaStorage = Bun.env.MEDIA_STORAGE === "local" ? "local" : "s3";
+const localUploadDir = join(import.meta.dir, "uploads");
+const localBaseUrl =
+  Bun.env.MEDIA_LOCAL_BASE_URL?.trim() ||
+  `http://localhost:${Bun.env.PORT || "8000"}/uploads`;
+
+if (mediaStorage === "local") {
+  await mkdir(localUploadDir, { recursive: true });
+}
 
 // Initialize the core system with database, logger, and config
 // TODO: Replace with actual database configuration from environment variables
@@ -39,6 +50,11 @@ initialize({
       region: Bun.env.AWS_REGION || "",
       s3Bucket: Bun.env.AWS_S3_BUCKET || "",
       mediaCloudfrontUrl: Bun.env.MEDIA_CLOUDFRONT_URL || "",
+    },
+    media: {
+      storage: mediaStorage,
+      localUploadDir,
+      localBaseUrl,
     },
   },
 });
@@ -99,6 +115,23 @@ const corsOrigin = process.env.CORS_ORIGIN || "*";
 
 const app = new Elysia()
   .use(lambda())
+  .get("/uploads/*", async ({ params, set }) => {
+    if (mediaStorage !== "local") {
+      set.status = 404;
+      return "Not Found";
+    }
+    const key = params["*"];
+    if (!key || key.includes("..")) {
+      set.status = 404;
+      return "Not Found";
+    }
+    const file = Bun.file(join(localUploadDir, key));
+    if (!(await file.exists())) {
+      set.status = 404;
+      return "Not Found";
+    }
+    return file;
+  })
   .use(
     cors({
       origin: corsOrigin,

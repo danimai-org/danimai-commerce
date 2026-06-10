@@ -10,7 +10,10 @@ export type RetrieveRegionProcessInput = Static<typeof RetrieveRegionSchema>;
 export const RegionResponseSchema = Type.Object({
   id: Type.String(),
   name: Type.String(),
+  code: Type.String(),
   currency_code: Type.String(),
+  currency_symbol: Type.Union([Type.String(), Type.Null()]),
+  is_active: Type.Boolean(),
   metadata: Type.Union([Type.Unknown(), Type.Null()]),
   created_at: Type.Date(),
   updated_at: Type.Date(),

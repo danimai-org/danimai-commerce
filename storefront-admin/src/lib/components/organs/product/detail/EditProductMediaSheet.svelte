@@ -155,7 +155,7 @@
 		const body = new FormData();
 		for (const file of payload.files ?? []) body.append('files', file);
 		if (payload.delete_ids && payload.delete_ids.length > 0) {
-			body.append('delete_ids', JSON.stringify(payload.delete_ids));
+			for (const id of payload.delete_ids) body.append('delete_ids', id);
 		}
 
 		const response = await fetch(`${apiBaseUrl}/admin/products/${productId}/images`, {

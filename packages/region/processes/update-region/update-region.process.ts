@@ -57,12 +57,33 @@ export class UpdateRegionProcess
       throw new NotFoundError("Region not found");
     }
 
+    const currencyCode = input.currency_code?.trim().toUpperCase();
+    let currencySymbol: string | null | undefined;
+    if (currencyCode && currencyCode !== region.currency_code) {
+      const currency = await sql<{ symbol: string }>`
+        select symbol
+        from currencies
+        where upper(code) = upper(${currencyCode})
+          and deleted_at is null
+        limit 1
+      `.execute(this.db);
+      currencySymbol = currency.rows[0]?.symbol ?? null;
+    }
+
     return this.db
       .updateTable("regions")
       .set({
-        ...input,
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.code !== undefined
+          ? { code: input.code.trim().toUpperCase() }
+          : {}),
+        ...(currencyCode !== undefined ? { currency_code: currencyCode } : {}),
+        ...(currencySymbol !== undefined
+          ? { currency_symbol: currencySymbol }
+          : {}),
+        ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
+        ...(input.is_active !== undefined ? { is_active: input.is_active } : {}),
         updated_at: sql`now()`,
-        id: undefined
       })
       .where("id", "=", input.id)
       .where("deleted_at", "is", null)

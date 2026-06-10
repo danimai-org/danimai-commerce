@@ -29,7 +29,10 @@ export async function up(db: Kysely<any>) {
       col.primaryKey().defaultTo(sql`gen_random_uuid()`),
     )
     .addColumn("name", "text", (col) => col.notNull())
+    .addColumn("code", "text", (col) => col.notNull())
     .addColumn("currency_code", "text", (col) => col.notNull())
+    .addColumn("currency_symbol", "text")
+    .addColumn("is_active", "boolean", (col) => col.notNull().defaultTo(true))
     .addColumn("metadata", "jsonb")
     .addColumn("created_at", "timestamptz", (col) =>
       col.notNull().defaultTo(sql`now()`),
@@ -39,6 +42,10 @@ export async function up(db: Kysely<any>) {
     )
     .addColumn("deleted_at", "timestamptz")
     .execute();
+
+  await sql`CREATE UNIQUE INDEX regions_code_unique_idx ON regions (code) WHERE deleted_at IS NULL`.execute(
+    db,
+  );
 
   // Countries (must be created after regions)
   await db.schema

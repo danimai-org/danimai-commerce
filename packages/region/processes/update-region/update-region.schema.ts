@@ -4,7 +4,9 @@ import { RegionResponseSchema } from "../retrieve-region/retrieve-region.schema"
 export const UpdateRegionSchema = Type.Object({
   id: Type.String(),
   name: Type.Optional(Type.String()),
+  code: Type.Optional(Type.String()),
   currency_code: Type.Optional(Type.String()),
+  is_active: Type.Optional(Type.Boolean()),
   metadata: Type.Optional(
     Type.Record(
       Type.String(),

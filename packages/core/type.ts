@@ -1,9 +1,12 @@
 import type { Logger } from "@logtape/logtape";
-import type { BunPostgresDialectConfig } from "kysely-bun-sql";
-import type { TSchema, Static , TIntersect, TObject, StaticDecode} from "@sinclair/typebox";
+import type { TObject, StaticDecode } from "@sinclair/typebox";
+
+export type DatabaseConfig = {
+  url?: string;
+};
 
 export interface DanimaiInitialize {
-  db: BunPostgresDialectConfig;
+  db: DatabaseConfig;
   logger: Logger;
   config: {
     stripeKey: string;
@@ -23,6 +26,11 @@ export interface DanimaiInitialize {
       region: string;
       s3Bucket: string;
       mediaCloudfrontUrl?: string;
+    }
+    media?: {
+      storage: "s3" | "local";
+      localUploadDir?: string;
+      localBaseUrl?: string;
     }
     password?: {
       algorithm: Bun.Password.AlgorithmLabel;

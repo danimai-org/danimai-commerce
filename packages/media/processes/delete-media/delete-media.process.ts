@@ -1,4 +1,5 @@
 import {
+  DANIMAI_CONFIG,
   InjectDB,
   InjectS3,
   NotFoundError,
@@ -6,9 +7,19 @@ import {
   ValidationError,
 } from "@danimai/core";
 import { DeleteObjectsCommand, type S3Client } from "@aws-sdk/client-s3";
+import { inject } from "inversify";
 import { Kysely } from "kysely";
+import { join } from "node:path";
+import { unlink } from "node:fs/promises";
 import type { DeleteMediaProcessInput } from "./delete-media.schema";
 import type { Database } from "../../db";
+
+type MediaRuntimeConfig = {
+  media?: {
+    storage: "s3" | "local";
+    localUploadDir?: string;
+  };
+};
 
 export const DELETE_MEDIA_PROCESS = Symbol("DeleteMedia");
 
@@ -17,6 +28,7 @@ export class DeleteMediaProcess {
   constructor(
     @InjectDB() private readonly db: Kysely<Database>,
     @InjectS3() private readonly s3: S3Client,
+    @inject(DANIMAI_CONFIG) private readonly config: MediaRuntimeConfig,
   ) { }
 
   /**
@@ -42,7 +54,24 @@ export class DeleteMediaProcess {
       throw new NotFoundError("Media not found");
     }
 
-    const rowsByBucket = mediaRows.reduce<Record<string, typeof mediaRows>>((acc, row) => {
+    const localRows = mediaRows.filter((row) => row.provider === "local");
+    const s3Rows = mediaRows.filter((row) => row.provider !== "local");
+
+    if (localRows.length > 0) {
+      const uploadDir = this.config.media?.localUploadDir;
+      if (!uploadDir) {
+        throw new ValidationError("Local media storage is not configured", [{
+          type: "invalid",
+          message: "Missing local upload directory",
+          path: "media",
+        }]);
+      }
+      for (const row of localRows) {
+        await unlink(join(uploadDir, row.object_key)).catch(() => undefined);
+      }
+    }
+
+    const rowsByBucket = s3Rows.reduce<Record<string, typeof s3Rows>>((acc, row) => {
       const bucketRows = acc[row.bucket] ?? [];
       bucketRows.push(row);
       acc[row.bucket] = bucketRows;

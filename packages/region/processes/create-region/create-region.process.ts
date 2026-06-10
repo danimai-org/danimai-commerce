@@ -3,18 +3,51 @@ import {
   InjectLogger,
   Process,
   ProcessContext,
+  ValidationError,
   type ProcessContextType,
   type ProcessContract,
 } from "@danimai/core";
-import { Kysely, sql } from "kysely";
+import { Kysely, sql, type Transaction } from "kysely";
 import type { Logger } from "@logtape/logtape";
 import {
-  type CreateRegionProcessInput,
   type CreateRegionProcessOutput,
-  CreateRegionResponseSchema,
   CreateRegionSchema,
 } from "./create-region.schema";
-import type { Database, Region } from "../../db";
+import type { Database } from "../../db";
+
+async function resolveRegionCode(
+  trx: Transaction<Database>,
+  regionId: string,
+  currencyCode: string,
+  requestedCode?: string,
+): Promise<string> {
+  const normalizedRequested = requestedCode?.trim().toUpperCase();
+  const baseCode = normalizedRequested ?? currencyCode.trim().toUpperCase();
+
+  const existing = await trx
+    .selectFrom("regions")
+    .select("id")
+    .where("code", "=", baseCode)
+    .where("deleted_at", "is", null)
+    .executeTakeFirst();
+
+  if (!existing) {
+    return baseCode;
+  }
+
+  if (normalizedRequested) {
+    throw new ValidationError("Region code is already in use", [
+      {
+        type: "not_unique",
+        message: "Region code is already in use",
+        path: "code",
+      },
+    ]);
+  }
+
+  const suffix = regionId.replace(/-/g, "").slice(0, 4).toUpperCase();
+  return `${baseCode}${suffix}`;
+}
 
 /**
  * Handles the create regions process.
@@ -47,11 +80,32 @@ export class CreateRegionsProcess
     const { input } = context;
 
     return this.db.transaction().execute(async (trx) => {
+      const regionId = crypto.randomUUID();
+      const currencyCode = input.currency_code.trim().toUpperCase();
+      const code = await resolveRegionCode(
+        trx,
+        regionId,
+        currencyCode,
+        input.code,
+      );
+
+      const currency = await sql<{ symbol: string }>`
+        select symbol
+        from currencies
+        where upper(code) = upper(${currencyCode})
+          and deleted_at is null
+        limit 1
+      `.execute(trx);
+
       const region = await trx
         .insertInto("regions")
         .values({
+          id: regionId,
           name: input.name,
-          currency_code: input.currency_code,
+          code,
+          currency_code: currencyCode,
+          currency_symbol: currency.rows[0]?.symbol ?? null,
+          is_active: true,
           metadata: input.metadata ?? null,
         })
         .returningAll()

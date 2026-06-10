@@ -15,7 +15,7 @@ export const PaginatedRegionsSchema = createPaginationSchema(
   Type.Object({
     currency_code: Type.Optional(Type.String()),
   }),
-  ["regions.name", "regions.currency_code"]
+  ["regions.name", "regions.code", "regions.currency_code"]
 );
 
 export type PaginatedRegionsProcessInput = Static<

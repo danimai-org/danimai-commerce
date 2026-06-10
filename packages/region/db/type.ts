@@ -9,7 +9,10 @@ export interface Database {
 export interface RegionTable {
   id: Generated<string>;
   name: string;
+  code: string;
   currency_code: string; // Three-character currency code (e.g., "USD", "EUR")
+  currency_symbol: string | null;
+  is_active: Generated<boolean>;
   metadata: unknown | null;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;

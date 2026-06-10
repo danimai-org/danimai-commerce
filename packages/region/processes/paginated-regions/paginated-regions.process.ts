@@ -64,7 +64,11 @@ export class PaginatedRegionsProcess
     if (search) {
       const term = `%${search}%`;
       query = query.where((eb) =>
-        eb.or([eb("name", "ilike", term), eb("currency_code", "ilike", term)]),
+        eb.or([
+          eb("name", "ilike", term),
+          eb("code", "ilike", term),
+          eb("currency_code", "ilike", term),
+        ]),
       );
     }
 
