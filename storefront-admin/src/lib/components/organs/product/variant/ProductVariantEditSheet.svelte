@@ -284,7 +284,7 @@
 											<RegionPriceCell
 												bind:value={regionPrices[region.id]}
 												symbol={region.currency_symbol}
-												class="h-9 pl-8"
+												class="h-9"
 											/>
 										</div>
 									</div>

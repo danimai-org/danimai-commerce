@@ -150,7 +150,7 @@ export class PaginatedProductsProcess implements ProcessContract<
           sql<string | null>`COALESCE(max(products.thumbnail), max(product_variants.thumbnail))`.as(
             "thumbnail",
           ),
-        (eb) => sql<number>`count(product_variants.id)::int`.as("variant_count"),
+        (eb) => sql<number>`count(distinct product_variants.id)::int`.as("variant_count"),
         (eb) => sql<{
           id: string;
           name: string;

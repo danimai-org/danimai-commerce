@@ -63,17 +63,12 @@
 		onCancel,
 		onSave
 	}: Props = $props();
-
 </script>
 
 <Sheet.Root bind:open>
-	<Sheet.Content side="right" class="flex w-full flex-col sm:max-w-4xl">
-		<Sheet.Header class="border-b px-6 py-4">
-			<Sheet.Title class="sr-only">Options & Variants</Sheet.Title>
-		</Sheet.Header>
-
+	<Sheet.Content side="right" class="flex w-full flex-col  sm:max-w-4xl">
 		<div class="flex min-h-0 flex-1 flex-col overflow-auto p-6">
-			<h2 class="text-lg font-semibold">Edit Options & Variants</h2>
+			<h2 class="border-b text-lg font-semibold">Edit Options & Variants</h2>
 			<p class="mt-1 text-sm text-muted-foreground">
 				Define options and variant details. This ranking will affect the variants' order in your
 				storefront.
@@ -104,65 +99,65 @@
 
 				<div class="mt-4 flex flex-col gap-4">
 					{#each optionDrafts as draft (draft.id)}
-							<div class="flex flex-col gap-2 rounded-md border p-3">
-								<div class="flex items-center gap-2">
-									<Input
-										placeholder="Title (e.g. Size)"
-										class="h-8 flex-1"
-										value={draft.title}
-										disabled={submitting}
-										oninput={(e) =>
-											onOptionTitleChange(draft.id, (e.currentTarget as HTMLInputElement).value)}
-									/>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										class="size-8 shrink-0"
-										disabled={submitting}
-										onclick={() => onRemoveOption(draft.id)}
+						<div class="flex flex-col gap-2 rounded-md border p-3">
+							<div class="flex items-center gap-2">
+								<Input
+									placeholder="Title (e.g. Size)"
+									class="h-8 flex-1"
+									value={draft.title}
+									disabled={submitting}
+									oninput={(e) =>
+										onOptionTitleChange(draft.id, (e.currentTarget as HTMLInputElement).value)}
+								/>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									class="size-8 shrink-0"
+									disabled={submitting}
+									onclick={() => onRemoveOption(draft.id)}
+								>
+									<X class="size-4" />
+								</Button>
+							</div>
+							<div class="flex flex-wrap items-center gap-1.5">
+								{#each draft.values as val (val)}
+									<span
+										class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-0.5 text-sm"
 									>
-										<X class="size-4" />
-									</Button>
-								</div>
-								<div class="flex flex-wrap items-center gap-1.5">
-									{#each draft.values as val (val)}
-										<span
-											class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-0.5 text-sm"
-										>
-											{val}
-											<button
-												type="button"
-												class="rounded p-0.5 hover:bg-muted"
-												disabled={submitting}
-												onclick={() => onRemoveOptionValue(draft.id, val)}
-											>
-												<X class="size-3" />
-											</button>
-										</span>
-									{/each}
-									<div class="inline-flex">
-										<Input
-											placeholder="Add value"
-											class="h-7 w-24"
+										{val}
+										<button
+											type="button"
+											class="rounded p-0.5 hover:bg-muted"
 											disabled={submitting}
-											onblur={(e) => {
+											onclick={() => onRemoveOptionValue(draft.id, val)}
+										>
+											<X class="size-3" />
+										</button>
+									</span>
+								{/each}
+								<div class="inline-flex">
+									<Input
+										placeholder="Add value"
+										class="h-7 w-24"
+										disabled={submitting}
+										onblur={(e) => {
+											const input = e.currentTarget as HTMLInputElement;
+											onAddOptionValue(draft.id, input.value);
+											input.value = '';
+										}}
+										onkeydown={(e) => {
+											if (e.key === 'Enter') {
+												e.preventDefault();
 												const input = e.currentTarget as HTMLInputElement;
 												onAddOptionValue(draft.id, input.value);
 												input.value = '';
-											}}
-											onkeydown={(e) => {
-												if (e.key === 'Enter') {
-													e.preventDefault();
-													const input = e.currentTarget as HTMLInputElement;
-													onAddOptionValue(draft.id, input.value);
-													input.value = '';
-												}
-											}}
-										/>
-									</div>
+											}
+										}}
+									/>
 								</div>
 							</div>
+						</div>
 					{/each}
 				</div>
 			</div>
@@ -221,7 +216,7 @@
 												/>
 											</td>
 											{#each regions as region (region.id)}
-												<td class="px-3 py-2">
+												<td class="px-3 py-3">
 													<RegionPriceCell
 														bind:value={row.regionPrices[region.id]}
 														symbol={region.currency_symbol}
