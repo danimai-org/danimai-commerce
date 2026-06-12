@@ -1,4 +1,10 @@
 import { client } from "$lib/api/client";
+import {
+  getSelectedCurrencyCode,
+  getSelectedRegion,
+} from "$lib/region/region-state.svelte";
+import { fetchVariantUnitPriceMap } from "$lib/cart/variant-display-map";
+import { unitPriceStringFromVariantPrice, resolveVariantPrice } from "$lib/pricing";
 import type { Cart, CartLineItem, CartShippingAddress } from "$lib/types/cart";
 
 export type { Cart, CartLineItem, CartShippingAddress };
@@ -7,7 +13,14 @@ type LineItemPayload = Partial<CartLineItem> & Record<string, unknown>;
 
 const SESSION_STORAGE_KEY = "dm_sf_session_id";
 const CART_STORAGE_KEY = "dm_sf_cart_id";
-const DEFAULT_CART_CURRENCY_CODE = "eur";
+
+function selectedCartCurrencyCode(): string {
+  return getSelectedCurrencyCode().toLowerCase();
+}
+
+function selectedCartRegionId(): string | null {
+  return getSelectedRegion()?.id ?? null;
+}
 
 export const cartState = $state({
   cart: null as Cart | null,
@@ -69,7 +82,8 @@ async function ensureSessionId(): Promise<string> {
 async function createCartRow(sessionId: string): Promise<Cart> {
   const created = await client.storefront.carts.post({
     session_id: sessionId,
-    currency_code: DEFAULT_CART_CURRENCY_CODE,
+    currency_code: selectedCartCurrencyCode(),
+    region_id: selectedCartRegionId(),
   });
   if (created.error) {
     throw new Error(created.error.value?.message ?? "Unknown error");
@@ -328,4 +342,78 @@ export function closeCartSheet() {
 
 export function toggleCartSheet() {
   cartState.sheetOpen = !cartState.sheetOpen;
+}
+
+export async function updateCartRegion(
+  regionId: string,
+  currencyCode: string,
+  id?: string,
+): Promise<Cart> {
+  const cartId = id ?? (await ensureCartId());
+  const cartsApi = client.storefront.carts({ id: cartId }) as {
+    region: {
+      put: (body: {
+        region_id: string;
+        currency_code: string;
+      }) => Promise<{ data?: Cart; error?: { value?: { message?: string } } }>;
+    };
+  };
+  const res = await cartsApi.region.put({
+    region_id: regionId,
+    currency_code: currencyCode.toLowerCase(),
+  });
+  if (res.error || !res.data) {
+    throw new Error(res.error?.value?.message ?? "Unknown error");
+  }
+  const cart = res.data as Cart;
+  cartState.cart = cart;
+  setCartId(cart.id);
+  return cart;
+}
+
+export async function applySelectedRegionToCart(): Promise<Cart | null> {
+  const region = getSelectedRegion();
+  if (!region) return cartState.cart;
+  const cart = (await initCartState()) ?? cartState.cart;
+  if (!cart?.id) return null;
+
+  const currencyCode = getSelectedCurrencyCode();
+  const variantIds = (cart.line_items ?? [])
+    .map((item) => item.variant_id)
+    .filter((id): id is string => Boolean(id));
+  const unitPrices = await fetchVariantUnitPriceMap(variantIds, currencyCode);
+
+  const nextLineItems = (cart.line_items ?? []).map((item) => {
+    if (!item.variant_id) return item;
+    const unitPrice = unitPrices.get(item.variant_id);
+    return {
+      ...item,
+      unit_price:
+        unitPrice != null && Number.isFinite(unitPrice)
+          ? String(unitPrice)
+          : item.unit_price ?? null,
+    };
+  });
+
+  await updateCartRegion(region.id, currencyCode, cart.id);
+  if (nextLineItems.length === 0) {
+    return retrieveCart(cart.id);
+  }
+  return syncLineItems(nextLineItems as Array<LineItemPayload>, cart.id);
+}
+
+export function resolveUnitPriceForAdd(
+  prices: Array<{ amount?: string; currency_code?: string }> | undefined,
+  fallbackAmount?: number | null,
+): string | null {
+  const resolved = resolveVariantPrice(
+    (prices ?? []) as Array<{ amount: string; currency_code: string }>,
+    getSelectedCurrencyCode(),
+  );
+  const fromPrice = unitPriceStringFromVariantPrice(resolved);
+  if (fromPrice != null) return fromPrice;
+  if (fallbackAmount != null && Number.isFinite(fallbackAmount)) {
+    return String(fallbackAmount);
+  }
+  return null;
 }

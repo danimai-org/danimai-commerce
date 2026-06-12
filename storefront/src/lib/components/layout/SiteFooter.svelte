@@ -1,3 +1,7 @@
+<script lang="ts">
+	import { RegionSelector } from "$lib/components/layout";
+</script>
+
 <footer class="footer">
 	<div class="footer-newsletter">
 		<h2 class="footer-newsletter-title">Join Our Community</h2>
@@ -11,21 +15,7 @@
 		<div class="footer-col footer-brand">
 			<div class="footer-brand-name">DANIMAI STORE</div>
 			<p class="footer-brand-desc">Premium athleisure designed for movement. Thoughtfully crafted essentials that move seamlessly from studio to street.</p>
-			<div class="footer-region">
-				<label for="region">REGION</label>
-				<select id="region" name="region" class="footer-select">
-					<option selected>Europe (EUR)</option>
-					<option>United States (USD)</option>
-					<option>Canada (CAD)</option>
-					<option>United Kingdom (GBP)</option>
-					<option>Australia (AUD)</option>
-					<option>New Zealand (NZD)</option>
-					<option>Asia (JPY)</option>
-					<option>Latin America (MXN)</option>
-					<option>Middle East (AED)</option>
-					<option>Africa (ZAR)</option>
-				</select>
-			</div>
+			<RegionSelector id="footer-region" className="footer-region" />
 		</div>
 		<div class="footer-col">
 			<div class="footer-heading">SHOP</div>

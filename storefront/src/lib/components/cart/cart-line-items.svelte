@@ -1,5 +1,14 @@
 <script lang="ts">
-    import { formatStoreMoney } from "$lib/money";
+    import { formatForCurrency } from "$lib/money";
+    import {
+        getSelectedCurrencyCode,
+        regionState,
+    } from "$lib/region/region-state.svelte";
+
+    const currencyCode = $derived.by(() => {
+        void regionState.selectedRegionId;
+        return getSelectedCurrencyCode();
+    });
     import type { CartRowViewBase } from "$lib/types/cart-view";
 
     let {
@@ -74,7 +83,7 @@
                 </div>
             </div>
             <p class="line-item-total">
-                {formatStoreMoney(item.priceValue * item.quantity)}
+                {formatForCurrency(item.priceValue * item.quantity, currencyCode)}
             </p>
         </li>
     {/each}

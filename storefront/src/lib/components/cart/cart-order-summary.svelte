@@ -1,7 +1,18 @@
 <script lang="ts">
     import { cartState } from "$lib/cart/cart-state.svelte";
     import { getCheckoutPath } from "$lib/checkout/checkout-url";
-    import { formatStoreMoney } from "$lib/money";
+    import { formatForCurrency } from "$lib/money";
+    import {
+        getSelectedCurrencyCode,
+        regionState,
+    } from "$lib/region/region-state.svelte";
+
+    const currencyCode = $derived.by(() => {
+        void regionState.selectedRegionId;
+        return getSelectedCurrencyCode();
+    });
+    const formatAmount = (amount: number) =>
+        formatForCurrency(amount, currencyCode);
 
     let {
         subtotal,
@@ -33,15 +44,15 @@
     <dl class="order-summary-rows">
         <div class="summary-row">
             <dt>Subtotal</dt>
-            <dd>{formatStoreMoney(subtotal)}</dd>
+            <dd>{formatAmount(subtotal)}</dd>
         </div>
         <div class="summary-row">
             <dt>Shipping</dt>
-            <dd>{formatStoreMoney(shipping)}</dd>
+            <dd>{formatAmount(shipping)}</dd>
         </div>
         <div class="summary-row">
             <dt>Discount</dt>
-            <dd>{formatStoreMoney(discount)}</dd>
+            <dd>{formatAmount(discount)}</dd>
         </div>
         <div class="summary-row">
             <dt>Tax</dt>
@@ -50,7 +61,7 @@
     </dl>
     <div class="summary-total">
         <span>Total</span>
-        <strong>{formatStoreMoney(total)}</strong>
+        <strong>{formatAmount(total)}</strong>
     </div>
     {#if !promoOpen}
         <button type="button" class="add-promo" onclick={onOpenPromo}

@@ -7,17 +7,21 @@
     import favicon from "$lib/assets/favicon.svg";
     import CartSheet from "$lib/components/cart/CartSheet.svelte";
     import { initCartState } from "$lib/cart/cart-state.svelte";
+    import { initRegionState } from "$lib/region/region-state.svelte";
     import { QueryClient, QueryClientProvider } from "@tanstack/svelte-query";
 
     const queryClient = new QueryClient({
         defaultOptions: { queries: { enabled: browser } },
     });
-    let { children } = $props();
+    let { children, data } = $props();
 
     onMount(() => {
         if (!browser) return;
 
-        void initCartState();
+        void (async () => {
+            await initRegionState(data?.detectedCountryCode ?? null);
+            await initCartState();
+        })();
     });
 </script>
 

@@ -16,7 +16,18 @@
         getCartPagePath,
         initCartState,
         removeLineItem,
+        resolveUnitPriceForAdd,
     } from "$lib/cart/cart-state.svelte";
+    import { formatForCurrency } from "$lib/money";
+    import {
+        formatVariantPrice,
+        resolveVariantPrice,
+        type VariantPrice,
+    } from "$lib/pricing";
+    import {
+        getSelectedCurrencyCode,
+        regionState,
+    } from "$lib/region/region-state.svelte";
     import {
         fetchVariantDisplayMap,
         variantDisplayLabel,
@@ -54,6 +65,11 @@
 
     let variantDetailsById = $state(new Map<string, VariantDisplayRow>());
 
+    const currencyCode = $derived.by(() => {
+        void regionState.selectedRegionId;
+        return getSelectedCurrencyCode();
+    });
+
     const routeCartId = $derived(page.params.id ?? "");
 
     $effect(() => {
@@ -75,8 +91,9 @@
             return;
         }
         let cancelled = false;
+        const code = currencyCode;
         void (async () => {
-            const next = await fetchVariantDisplayMap(lineItems);
+            const next = await fetchVariantDisplayMap(lineItems, code);
             if (!cancelled) variantDetailsById = next;
         })();
         return () => {
@@ -91,6 +108,7 @@
         const map = handleByProductId;
         const thumbs = thumbnailByProductId;
         const vmap = variantDetailsById;
+        const code = currencyCode;
         if (!cart?.line_items?.length) return [];
         return cart.line_items.map((li) => {
             const handle = li.product_id ? map.get(li.product_id) : undefined;
@@ -116,7 +134,7 @@
                 source: "api",
                 href,
                 name: li.title ?? "Item",
-                priceDisplay: `$${pv.toFixed(2)}`,
+                priceDisplay: formatForCurrency(pv, code),
                 priceValue: pv,
                 image: li.thumbnail ?? vd?.thumbnail ?? productThumb,
                 quantity: qty,
@@ -164,23 +182,26 @@
 
     $effect(() => {
         const slice = products.slice(0, 4);
+        void regionState.selectedRegionId;
+        const code = getSelectedCurrencyCode();
         if (slice.length === 0) {
             lookExtrasByProductId = new Map();
             return;
         }
         const next = new Map<string, LookExtra>();
         for (const p of slice) {
-            const raw = p.variant?.price?.amount;
-            let priceDisplay = "—";
-            if (raw != null && raw !== "") {
-                const cents = parseInt(String(raw), 10);
-                if (Number.isFinite(cents)) {
-                    priceDisplay = `$${(cents / 100).toFixed(2)}`;
-                }
-            }
+            const prices = (p.variant?.prices ?? []) as VariantPrice[];
+            const resolved =
+                resolveVariantPrice(prices, code) ??
+                (p.variant?.price?.amount && p.variant?.price?.currency_code
+                    ? {
+                          amount: p.variant.price.amount,
+                          currency_code: p.variant.price.currency_code,
+                      }
+                    : null);
             next.set(p.id, {
                 image: p.variant?.thumbnail ?? p.thumbnail ?? null,
-                priceDisplay,
+                priceDisplay: formatVariantPrice(resolved),
             });
         }
         lookExtrasByProductId = next;
@@ -208,12 +229,10 @@
         const row = products.find((p) => p.id === product.id);
         const variant = row?.variant;
         if (!variant?.id) return;
-        const raw = variant.price?.amount;
-        let unitPrice = "0";
-        if (raw != null && raw !== "") {
-            const cents = parseInt(String(raw), 10);
-            unitPrice = Number.isFinite(cents) ? String(cents / 100) : "0";
-        }
+        const unitPrice =
+            resolveUnitPriceForAdd(
+                (variant.prices ?? []) as VariantPrice[],
+            ) ?? "0";
         const fallbackThumb = thumbnailByProductId.get(product.id) ?? null;
         await addItem({
             variantId: variant.id,

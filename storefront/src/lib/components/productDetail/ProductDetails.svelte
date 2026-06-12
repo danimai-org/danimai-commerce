@@ -1,5 +1,8 @@
 <script lang="ts">
-    import { addItemAndOpenSheet } from "$lib/cart/cart-state.svelte";
+    import {
+        addItemAndOpenSheet,
+        resolveUnitPriceForAdd,
+    } from "$lib/cart/cart-state.svelte";
     import ProductVariantSelect from "./ProductVariantSelect.svelte";
     import ProductQuantity from "./ProductQuantity.svelte";
     import ProductAccordions from "./ProductAccordions.svelte";
@@ -46,13 +49,10 @@
         const selectedVariant = variants.find(
             (variant) => variant.id === variantId,
         );
-        let unitPrice: string | null = null;
-        if (selectedVariant) {
-            const parsed = parseFloat(
-                selectedVariant.priceDisplay.replace(/[^0-9.-]/g, ""),
-            );
-            unitPrice = Number.isFinite(parsed) ? String(parsed) : null;
-        }
+        const unitPrice = resolveUnitPriceForAdd(
+            (selectedVariant as { prices?: Array<{ amount?: string; currency_code?: string }> })
+                ?.prices,
+        );
 
         const descRaw = (
             selectedVariantTitle ||
