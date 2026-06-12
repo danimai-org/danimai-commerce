@@ -1,5 +1,14 @@
 <script lang="ts">
-	import { formatStoreMoney } from '$lib/money';
+	import { formatForCurrency } from '$lib/money';
+	import {
+		getSelectedCurrencyCode,
+		regionState,
+	} from '$lib/region/region-state.svelte';
+
+	const currencyCode = $derived.by(() => {
+		void regionState.selectedRegionId;
+		return getSelectedCurrencyCode();
+	});
 
 	type CheckoutCartItem = {
 		key: string;
@@ -37,7 +46,7 @@
 					{/if}
 					<span class="summary-item-qty">Quantity: {item.quantity}</span>
 				</div>
-				<span class="summary-item-price">{formatStoreMoney(item.priceValue * item.quantity)}</span>
+				<span class="summary-item-price">{formatForCurrency(item.priceValue * item.quantity, currencyCode)}</span>
 			</li>
 		{/each}
 	</ul>
@@ -48,7 +57,7 @@
 		</div>
 		<div class="summary-row">
 			<dt>Shipping</dt>
-			<dd>{formatStoreMoney(0)}</dd>
+			<dd>{formatForCurrency(0, currencyCode)}</dd>
 		</div>
 		<div class="summary-row">
 			<dt>Discount</dt>
@@ -56,7 +65,7 @@
 		</div>
 		<div class="summary-row">
 			<dt>Tax</dt>
-			<dd>{formatStoreMoney(0)}</dd>
+			<dd>{formatForCurrency(0, currencyCode)}</dd>
 		</div>
 	</dl>
 	<div class="summary-total">

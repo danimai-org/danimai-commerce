@@ -4,12 +4,18 @@
     }
 
     .search-bar-wrap--persistent {
-        @apply w-full max-w-[20rem] flex-[1_1_12rem];
+        @apply w-full max-w-[14rem] flex-[0_1_14rem];
     }
 
     @media (min-width: 768px) {
         .search-bar-wrap--persistent {
-            @apply max-w-[22rem];
+            @apply max-w-[15rem];
+        }
+    }
+
+    @media (min-width: 1024px) {
+        .search-bar-wrap--persistent {
+            @apply max-w-[16rem];
         }
     }
 
@@ -47,11 +53,11 @@
 
     @media (min-width: 768px) {
         .search-bar--desktop {
-            @apply h-[42px] pl-3.5 pr-[0.4rem];
+            @apply h-10 pl-3 pr-[0.35rem];
         }
 
         .search-input {
-            @apply text-[0.9375rem];
+            @apply text-[0.875rem];
         }
     }
 

@@ -22,6 +22,9 @@ import {
   UPDATE_CART_TAX_LINES_PROCESS,
   UpdateCartTaxLinesProcess,
   UpdateCartTaxLinesSchema,
+  UPDATE_CART_REGION_PROCESS,
+  UpdateCartRegionProcess,
+  UpdateCartRegionSchema,
 } from "@danimai/cart";
 import { handleProcessError } from "../../utils/error-handler";
 import {
@@ -33,6 +36,7 @@ const UpdateCartLineItemsBodySchema = Type.Omit(UpdateCartLineItemsSchema, ["id"
 const UpdateCartAddressesBodySchema = Type.Omit(UpdateCartAddressesSchema, ["id"]);
 const UpdateCartTaxLinesBodySchema = Type.Omit(UpdateCartTaxLinesSchema, ["id"]);
 const ApplyCartPromoCodeBodySchema = Type.Omit(ApplyCartPromoCodeSchema, ["id"]);
+const UpdateCartRegionBodySchema = Type.Omit(UpdateCartRegionSchema, ["id"]);
 
 export const storefrontCartRoutes = new Elysia({ prefix: "/carts" })
   .onError(({ error, set }) => handleProcessError(error, set))
@@ -159,6 +163,34 @@ export const storefrontCartRoutes = new Elysia({ prefix: "/carts" })
         description: "Creates or updates the shipping address for a cart",
       },
     }
+  )
+  .put(
+    "/:id/region",
+    async ({ params, body }) => {
+      const process = getService<UpdateCartRegionProcess>(
+        UPDATE_CART_REGION_PROCESS,
+      );
+      return process.runOperations({
+        input: {
+          ...body,
+          id: params.id,
+        },
+      });
+    },
+    {
+      params: Type.Object({ id: UpdateCartRegionSchema.properties.id }),
+      body: UpdateCartRegionBodySchema,
+      response: {
+        200: RetrieveCartResponseSchema,
+        400: ValidationErrorResponseSchema,
+        500: InternalErrorResponseSchema,
+      },
+      detail: {
+        tags: ["Storefront Carts"],
+        summary: "Update cart region",
+        description: "Updates cart region and currency for storefront pricing",
+      },
+    },
   )
   .put(
     "/:id/tax-lines",

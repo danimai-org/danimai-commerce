@@ -1,49 +1,37 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import { addItemAndOpenSheet } from "$lib/cart/cart-state.svelte";
-    import { formatStoreMoney } from "$lib/money";
+    import {
+        addItemAndOpenSheet,
+        resolveUnitPriceForAdd,
+    } from "$lib/cart/cart-state.svelte";
+    import { formatForCurrency } from "$lib/money";
+    import { formatVariantPrice, resolveVariantPrice } from "$lib/pricing";
+    import {
+        getSelectedCurrencyCode,
+        regionState,
+    } from "$lib/region/region-state.svelte";
+    import { resolveGridItemPrice } from "$lib/types/product-grid";
     import { AddToCart, CartImage, CartTitle } from "../productCart";
     import type { ProductGridItem } from "$lib/types/product-grid";
 
     const { product } = $props<{ product: ProductGridItem }>();
 
-    function parsePrice(price: string | number | null | undefined): number {
-        if (typeof price === "number") {
-            return Number.isFinite(price) ? price : 0;
-        }
-        if (typeof price === "string") {
-            const trimmed = price.trim();
-            if (!trimmed || trimmed === "—") {
-                return 0;
-            }
-            const n = parseFloat(trimmed.replace(/[^0-9.]/g, ""));
-            return Number.isFinite(n) ? n : 0;
-        }
-        return 0;
-    }
+    const regionalPrice = $derived.by(() => {
+        void regionState.selectedRegionId;
+        return resolveGridItemPrice(product);
+    });
 
-    function displayPrice(
-        price: string | number | null | undefined,
-        _currencyCode: string | null | undefined,
-    ): string {
-        if (typeof price === "string") {
-            const trimmed = price.trim();
-            if (!trimmed || trimmed === "—") {
-                return "—";
-            }
-            if (/^[^\d\s-]/.test(trimmed)) {
-                return trimmed;
-            }
-            const parsed = parsePrice(trimmed);
-            if (!Number.isFinite(parsed)) return "—";
-            return formatStoreMoney(parsed);
-        }
-        if (typeof price === "number") {
-            if (!Number.isFinite(price)) return "—";
-            return formatStoreMoney(price);
-        }
-        return "—";
-    }
+    const priceDisplay = $derived.by(() => {
+        void regionState.selectedRegionId;
+        const resolved = resolveVariantPrice(
+            product.prices,
+            getSelectedCurrencyCode(),
+        );
+        if (resolved) return formatVariantPrice(resolved);
+        const amount = regionalPrice.amount;
+        if (!Number.isFinite(amount)) return "—";
+        return formatForCurrency(amount, regionalPrice.currency_code);
+    });
 
     function resolveVariantTitle(product: ProductGridItem): string | null {
         const candidates = [
@@ -65,11 +53,10 @@
         e.stopPropagation();
         const variantId = resolveVariantId(product);
         if (!variantId) return;
-        const amount = product.price?.amount;
-        const unitPrice =
-            typeof amount === "number" && Number.isFinite(amount)
-                ? String(amount)
-                : null;
+        const unitPrice = resolveUnitPriceForAdd(
+            product.prices,
+            regionalPrice.amount,
+        );
         await addItemAndOpenSheet({
             variantId,
             quantity: 1,
@@ -167,13 +154,7 @@
 
             <div class="retail-body">
                 <div class="retail-title-colume">
-                    <CartTitle
-                        title={product.name}
-                        priceDisplay={displayPrice(
-                            product.price.amount,
-                            product.price.currency_code,
-                        )}
-                    />
+                    <CartTitle title={product.name} priceDisplay={priceDisplay} />
                 </div>
             </div>
         </a>

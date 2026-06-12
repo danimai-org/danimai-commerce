@@ -277,15 +277,61 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
 
     const mediaByProductId = await loadProductMediaByProductIds(this.db, productIds);
 
+    const variantIds = variants.map((row) => row.id);
+    const pricesByVariantId = new Map<
+      string,
+      Array<{
+        amount: string;
+        currency_code: string;
+        min_quantity: number | null;
+        max_quantity: number | null;
+        price_list_id: string | null;
+      }>
+    >();
+
+    if (variantIds.length > 0) {
+      const priceRows = await this.db
+        .selectFrom("price_sets")
+        .innerJoin("prices", (join) =>
+          join
+            .onRef("prices.price_set_id", "=", "price_sets.id")
+            .on("prices.deleted_at", "is", null),
+        )
+        .where("price_sets.variant_id", "in", variantIds)
+        .where("price_sets.deleted_at", "is", null)
+        .select([
+          "price_sets.variant_id as variant_id",
+          "prices.amount as amount",
+          "prices.currency_code as currency_code",
+          "prices.min_quantity as min_quantity",
+          "prices.max_quantity as max_quantity",
+          "prices.price_list_id as price_list_id",
+        ])
+        .orderBy("prices.id", "asc")
+        .execute();
+
+      for (const row of priceRows) {
+        if (row.variant_id == null || row.amount == null || row.currency_code == null) {
+          continue;
+        }
+        const existing = pricesByVariantId.get(row.variant_id) ?? [];
+        existing.push({
+          amount: row.amount,
+          currency_code: row.currency_code,
+          min_quantity: row.min_quantity,
+          max_quantity: row.max_quantity,
+          price_list_id: row.price_list_id,
+        });
+        pricesByVariantId.set(row.variant_id, existing);
+      }
+    }
+
     const variantsByProduct = new Map<string, StorefrontPaginatedProductsProcessOutput["rows"][number]["variant"]>();
     for (const row of variants) {
-      variantsByProduct.set(row.product_id, {
-        id: row.id,
-        title: row.title,
-        sku: row.sku,
-        thumbnail: row.thumbnail ?? row.variant_image_url,
-        variant_rank: row.variant_rank,
-        price: row.amount !== null && row.currency_code !== null
+      const prices = pricesByVariantId.get(row.id) ?? [];
+      const defaultPrice =
+        prices[0] ??
+        (row.amount !== null && row.currency_code !== null
           ? {
             amount: row.amount,
             currency_code: row.currency_code,
@@ -293,7 +339,16 @@ export class StorefrontPaginatedProductsProcess implements ProcessContract<
             max_quantity: row.max_quantity,
             price_list_id: row.price_list_id,
           }
-          : null,
+          : null);
+
+      variantsByProduct.set(row.product_id, {
+        id: row.id,
+        title: row.title,
+        sku: row.sku,
+        thumbnail: row.thumbnail ?? row.variant_image_url,
+        variant_rank: row.variant_rank,
+        price: defaultPrice,
+        prices,
       });
     }
 

@@ -41,7 +41,11 @@
         variantDisplayLabel,
         type VariantDisplayRow,
     } from "$lib/cart/variant-display-map";
-    import { formatStoreMoney } from "$lib/money";
+    import { formatForCurrency } from "$lib/money";
+    import {
+        getSelectedCurrencyCode,
+        regionState,
+    } from "$lib/region/region-state.svelte";
     import { useCart } from "$lib/hooks/use-cart.hook";
     import { cacheOrderDetail } from "$lib/account/order-data";
     import { CustomerAuthError, hasCustomerAuthSession } from "$lib/account/storage";
@@ -91,7 +95,13 @@
     const SESSION_STORAGE_KEY = "dm_sf_session_id";
     const ACCOUNT_STORAGE_KEY = "dm_sf_account";
     const ORDERS_STORAGE_KEY_PREFIX = "dm_sf_orders_";
-    const DEFAULT_CART_CURRENCY_CODE = "eur";
+    const checkoutCurrencyCode = $derived.by(() => {
+        void regionState.selectedRegionId;
+        return getSelectedCurrencyCode();
+    });
+
+    const formatCheckoutAmount = (amount: number) =>
+        formatForCurrency(amount, checkoutCurrencyCode);
 
     type CheckoutCartItem = {
         key: string;
@@ -143,7 +153,7 @@
                 image: item.thumbnail ?? vd?.thumbnail ?? null,
                 quantity: item.quantity ?? 0,
                 priceValue,
-                priceDisplay: formatStoreMoney(priceValue),
+                priceDisplay: formatCheckoutAmount(priceValue),
             };
         });
     });
@@ -151,9 +161,9 @@
     const subtotal = $derived(
         cartItems.reduce((sum, i) => sum + i.priceValue * i.quantity, 0),
     );
-    const subtotalDisplay = $derived(formatStoreMoney(subtotal));
-    const discountDisplay = $derived(formatStoreMoney(0));
-    const totalDisplay = $derived(formatStoreMoney(subtotal));
+    const subtotalDisplay = $derived(formatCheckoutAmount(subtotal));
+    const discountDisplay = $derived(formatCheckoutAmount(0));
+    const totalDisplay = $derived(formatCheckoutAmount(subtotal));
 
     const steps = [
         { id: "addresses" as const, label: "Addresses" },
@@ -379,7 +389,7 @@
     }
 
     function orderTotals() {
-        const zero = formatStoreMoney(0);
+        const zero = formatCheckoutAmount(0);
         return {
             subtotal: subtotalDisplay,
             shipping: zero,
@@ -411,7 +421,7 @@
     async function createCartWithCurrency(sessionId: string): Promise<string> {
         const res = await client.storefront.carts.post({
             session_id: sessionId,
-            currency_code: DEFAULT_CART_CURRENCY_CODE,
+            currency_code: checkoutCurrencyCode.toLowerCase(),
         });
         if (res.error) throw new Error(treatyErrorMessage(res.error));
         return (res.data as { id: string }).id;
@@ -740,7 +750,7 @@
                             <h2 class="review-block-title">Shipping Method</h2>
                             <p class="review-method">
                                 {shippingMethodLabelFrom($form.shippingMethod)}
-                                <strong>{formatStoreMoney(0)}</strong>
+                                <strong>{formatCheckoutAmount(0)}</strong>
                             </p>
                         </section>
                         <section class="review-block">

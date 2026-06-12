@@ -12,7 +12,11 @@
         variantDisplayLabel,
         type VariantDisplayRow,
     } from "$lib/cart/variant-display-map";
-    import { formatStoreMoney } from "$lib/money";
+    import { formatForCurrency } from "$lib/money";
+    import {
+        getSelectedCurrencyCode,
+        regionState,
+    } from "$lib/region/region-state.svelte";
 
     let variantDisplayById = $state(new Map<string, VariantDisplayRow>());
 
@@ -31,6 +35,14 @@
             cancelled = true;
         };
     });
+
+    const currencyCode = $derived.by(() => {
+        void regionState.selectedRegionId;
+        return getSelectedCurrencyCode();
+    });
+
+    const formatAmount = (amount: number) =>
+        formatForCurrency(amount, currencyCode);
 
     const cartItems = $derived(
         ((cartState.cart?.line_items ?? []) as any[]).map((item) => {
@@ -56,7 +68,7 @@
                 variant,
                 image: item.thumbnail ?? fromMap?.thumbnail ?? null,
                 priceValue,
-                priceDisplay: formatStoreMoney(priceValue),
+                priceDisplay: formatAmount(priceValue),
             };
         }),
     );
@@ -67,7 +79,7 @@
             0,
         ),
     );
-    const subtotalDisplay = $derived(formatStoreMoney(subtotal));
+    const subtotalDisplay = $derived(formatAmount(subtotal));
 
     function handleClose() {
         closeCartSheet();

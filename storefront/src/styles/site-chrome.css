@@ -19,13 +19,13 @@
 
     .nav {
         @apply flex justify-between items-center max-w-[var(--section-max-width,1200px)] w-full min-w-0 mx-auto gap-4 box-border;
+        min-height: 3.75rem;
         padding: 0.75rem var(--section-padding-x, 1.5rem);
     }
 
     @media (min-width: 768px) {
         .nav {
-            @apply grid items-center;
-            grid-template-columns: auto 1fr auto;
+            @apply flex items-center;
         }
     }
 
@@ -39,7 +39,7 @@
 
     @media (min-width: 768px) {
         .nav-links--desktop {
-            @apply justify-self-center flex list-none m-0 p-0 gap-9 items-center;
+            @apply flex list-none m-0 p-0 gap-8 items-center ml-8;
         }
     }
 
@@ -89,11 +89,15 @@
     }
 
     .nav-end {
-        @apply flex items-center gap-3 relative min-w-0;
+        @apply flex items-center gap-2.5 relative min-w-0;
+    }
+
+    .nav-utilities {
+        @apply hidden items-center gap-3 min-w-0;
     }
 
     .nav-actions-icons {
-        @apply flex items-center gap-3 shrink-0;
+        @apply flex items-center gap-3;
     }
 
     @media (max-width: 767px) {
@@ -108,11 +112,11 @@
 
     @media (min-width: 768px) {
         .nav-end {
-            @apply justify-self-end gap-[1.125rem];
+            @apply ml-auto gap-4;
         }
 
-        .nav-actions-icons {
-            @apply gap-[1.125rem];
+        .nav-utilities {
+            @apply flex;
         }
     }
 
@@ -163,7 +167,9 @@
     }
 
     .icon-btn {
-        @apply bg-transparent border-none p-1 cursor-pointer text-[#2a2a2a] flex items-center justify-center hover:text-black;
+        @apply bg-transparent border-none p-1.5 cursor-pointer text-[#2a2a2a] flex items-center justify-center hover:text-black;
+        min-width: 2.25rem;
+        min-height: 2.25rem;
     }
 
     @media (min-width: 768px) {
@@ -337,6 +343,51 @@
 
     .footer-brand-desc {
         @apply text-sm leading-relaxed m-0 mb-6 max-w-[280px];
+    }
+
+    .region-selector label {
+        @apply block text-[0.6875rem] tracking-wide mb-2 text-[#888];
+    }
+
+    .region-selector--compact label {
+        @apply sr-only;
+    }
+
+    .region-select {
+        @apply bg-[#2a2a2a] border border-[#444] text-[#e8e8e8] py-2 pl-3 pr-8 text-sm rounded appearance-none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.5rem center;
+    }
+
+    .region-select--compact {
+        @apply bg-transparent border-[#ddd] text-[#1a1a1a] py-1.5 pl-2 pr-7 text-xs;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    }
+
+    .region-selector--header {
+        @apply shrink-0;
+    }
+
+    .region-select--header {
+        @apply h-10 m-0 border-none bg-transparent text-[0.9375rem] font-normal text-[#5c5c5c] py-0 pl-0 pr-6 cursor-pointer rounded-none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%235c5c5c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right center;
+        max-width: 11rem;
+    }
+
+    .region-select--header:hover,
+    .region-select--header:focus {
+        @apply text-[#1a1a1a] outline-none;
+    }
+
+    .header-region {
+        @apply hidden  md:block border-r border-[#e8e8e8] pr-3 mr-0;
+    }
+
+    .drawer-region-selector .region-select {
+        @apply w-full bg-[#111] border-[#333] text-[#e8e8e8];
     }
 
     .footer-region label {

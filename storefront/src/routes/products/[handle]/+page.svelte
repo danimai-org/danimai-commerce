@@ -7,7 +7,16 @@
 
     import ProductGridSection from "$lib/components/ProductGridSection.svelte";
 
-    import { formatStoreMoney } from "$lib/money";
+    import {
+        formatVariantPrice,
+        resolveVariantPrice,
+        type VariantPrice,
+    } from "$lib/pricing";
+    import {
+        getSelectedCurrencyCode,
+        regionState,
+    } from "$lib/region/region-state.svelte";
+    import { toProductGridItem } from "$lib/types/product-grid";
     import type { ProductPageData } from "./+page.js";
 
     let { data }: { data: ProductPageData } = $props();
@@ -39,18 +48,22 @@
             selectedVariantId = defaultVariantId;
         }
     });
-    function formatPrice(
-        amount: number | string | null | undefined,
-        _currencyCode: string | null | undefined,
+
+    function formatRegionalPrice(
+        prices: VariantPrice[] | undefined,
+        fallback?: { amount?: string; currency_code?: string } | null,
     ): string {
-        if (amount === null || amount === undefined) return "—";
-        const parsed =
-            typeof amount === "number"
-                ? amount
-                : Number.parseFloat(String(amount).replace(/[^0-9.-]/g, ""));
-        if (!Number.isFinite(parsed)) return "—";
-        const decimalAmount = parsed > 1000 ? parsed / 100 : parsed;
-        return formatStoreMoney(decimalAmount);
+        void regionState.selectedRegionId;
+        const currencyCode = getSelectedCurrencyCode();
+        const resolved =
+            resolveVariantPrice(prices, currencyCode) ??
+            (fallback?.amount && fallback.currency_code
+                ? {
+                      amount: fallback.amount,
+                      currency_code: fallback.currency_code,
+                  }
+                : null);
+        return formatVariantPrice(resolved);
     }
 
     const selectedVariant = $derived(
@@ -58,10 +71,9 @@
     );
 
     const priceLabel = $derived(
-        formatPrice(
-            selectedVariant?.prices?.[0]?.amount ?? product?.variant?.price?.amount,
-            selectedVariant?.prices?.[0]?.currency_code ??
-                product?.variant?.price?.currency_code,
+        formatRegionalPrice(
+            selectedVariant?.prices as VariantPrice[] | undefined,
+            selectedVariant?.prices?.[0] ?? product?.variant?.price,
         ),
     );
 
@@ -106,14 +118,20 @@
                         value: String(opt?.value ?? ""),
                     }))
                     .filter((opt) => opt.title || opt.value),
-                priceDisplay: formatPrice(
-                    row?.prices?.[0]?.amount ?? product?.variant?.price?.amount,
-                    row?.prices?.[0]?.currency_code ??
-                        product?.variant?.price?.currency_code,
+                priceDisplay: formatRegionalPrice(
+                    row?.prices as VariantPrice[] | undefined,
+                    row?.prices?.[0] ?? product?.variant?.price,
                 ),
+                prices: row?.prices ?? [],
             };
         }),
     );
+    const relatedProducts = $derived.by(() => {
+        void regionState.selectedRegionId;
+        return otherProducts.map((row, index) =>
+            toProductGridItem(row, index, { preferProductThumbnail: true }),
+        );
+    });
     const accordionItems = [
         {
             key: "details",
@@ -161,19 +179,7 @@
         <section class="also-like">
             <h2 class="also-like-title">You May Also Like</h2>
             <ProductGridSection
-                products={otherProducts.map((v) => ({
-                    name: v?.title ?? "",
-                    bg: "#f4f4f4",
-                    price: {
-                        amount:
-                            parseFloat(v?.variant?.price?.amount ?? "0") / 100,
-                        currency_code:
-                            v?.variant?.price?.currency_code ?? "EUR",
-                    },
-                    href: `/products/${v?.handle ?? ""}`,
-                    image: v?.thumbnail ?? null,
-                    variantId: v?.variant?.id ?? null,
-                }))}
+                products={relatedProducts}
                 title=""
                 subtitle=""
             />

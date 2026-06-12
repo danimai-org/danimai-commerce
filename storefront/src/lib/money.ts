@@ -13,6 +13,10 @@ export function formatStoreMoney(amount: number): string {
     return storeMoneyFormatter.format(n);
 }
 
+export function formatForCurrency(amount: number, currencyCode: string): string {
+    return formatMoney(amount, currencyCode);
+}
+
 export function formatMoney(amount: number, currencyCode: string): string {
     const n = Number.isFinite(amount) ? amount : 0;
     const code = currencyCode.trim().toUpperCase() || STORE_CURRENCY_CODE;

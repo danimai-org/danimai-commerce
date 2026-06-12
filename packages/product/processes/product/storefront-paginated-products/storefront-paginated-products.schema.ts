@@ -69,6 +69,15 @@ const StorefrontPaginatedProductItemSchema = Type.Object({
         }),
         Type.Null(),
       ]),
+      prices: Type.Array(
+        Type.Object({
+          amount: Type.String(),
+          currency_code: Type.String(),
+          min_quantity: Type.Union([Type.Number(), Type.Null()]),
+          max_quantity: Type.Union([Type.Number(), Type.Null()]),
+          price_list_id: Type.Union([Type.String(), Type.Null()]),
+        }),
+      ),
     }),
     Type.Null(),
   ]),

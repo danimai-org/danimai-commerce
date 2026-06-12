@@ -1,8 +1,15 @@
+import {
+	priceAmountDecimal,
+	resolveVariantPrice,
+	type VariantPrice,
+} from '$lib/pricing';
+import { getSelectedCurrencyCode } from '$lib/region/region-state.svelte';
 import type { StorefrontProductListRow } from './product';
 
 export type ProductGridItem = {
 	name: string;
 	price: { amount: number; currency_code: string };
+	prices?: VariantPrice[];
 	href: string;
 	bg: string;
 	image: string | null;
@@ -19,19 +26,43 @@ export function pickBg(index: number): string {
 	return FALLBACK_BGS[index % FALLBACK_BGS.length];
 }
 
+export function resolveGridItemPrice(
+	item: Pick<ProductGridItem, 'price' | 'prices'>,
+	currencyCode = getSelectedCurrencyCode(),
+): { amount: number; currency_code: string } {
+	const resolved = resolveVariantPrice(item.prices, currencyCode);
+	if (resolved) {
+		const amount = priceAmountDecimal(resolved);
+		return {
+			amount: Number.isFinite(amount) ? amount : Number.NaN,
+			currency_code: resolved.currency_code,
+		};
+	}
+	return item.price;
+}
+
 export function toProductGridItem(
 	row: StorefrontProductListRow,
 	index: number,
-	options?: { preferProductThumbnail?: boolean },
+	options?: { preferProductThumbnail?: boolean; currencyCode?: string },
 ): ProductGridItem {
-	const pr = row.variant?.price;
-	const amount = pr?.amount != null ? parseInt(pr.amount, 10) / 100 : Number.NaN;
-	const currency_code = pr?.currency_code ?? 'EUR';
+	const prices = (row.variant?.prices ?? []) as VariantPrice[];
+	const currencyCode = options?.currencyCode ?? getSelectedCurrencyCode();
+	const resolved = resolveVariantPrice(prices, currencyCode);
+	const fallback = row.variant?.price;
+	const amount = resolved
+		? priceAmountDecimal(resolved)
+		: fallback?.amount != null
+			? parseInt(fallback.amount, 10) / 100
+			: Number.NaN;
+	const currency_code =
+		resolved?.currency_code ?? fallback?.currency_code ?? currencyCode;
 	const image = options?.preferProductThumbnail
 		? (row.thumbnail ?? row.variant?.thumbnail ?? null)
 		: (row.variant?.thumbnail ?? row.thumbnail ?? null);
 	return {
 		name: row.title,
+		prices,
 		price: {
 			amount: Number.isFinite(amount) ? amount : Number.NaN,
 			currency_code,

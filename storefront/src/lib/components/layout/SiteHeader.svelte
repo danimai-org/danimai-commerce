@@ -25,6 +25,7 @@
         logoutCustomerSession,
         notifyAccountUpdated,
     } from "$lib/account/storage";
+    import RegionSelector from "./RegionSelector.svelte";
 
     let cartCount = $state(0);
     let searchOpen = $state(false);
@@ -309,7 +310,15 @@
             class:nav-end--search-open={searchOpen && !navWide}
         >
             {#if navWide}
-                <SearchSheet persistent={true} />
+                <div class="nav-utilities">
+                    <RegionSelector
+                        id="header-region"
+                        compact={true}
+                        variant="header"
+                        className="header-region"
+                    />
+                    <SearchSheet persistent={true} />
+                </div>
             {:else if !searchOpen}
                 <button
                     type="button"
@@ -365,9 +374,8 @@
                         aria-label="Account"
                     >
                         {#if isLoggedIn}
-                            <span
-                                class="account-dropdown-email"
-                                role="menuitem">{accountEmail}</span
+                            <span class="account-dropdown-email" role="menuitem"
+                                >{accountEmail}</span
                             >
                             <a
                                 href="/account"
@@ -507,8 +515,7 @@
                         stroke="currentColor"
                         stroke-width="2"
                         stroke-linecap="round"
-                        stroke-linejoin="round"
-                        ><path d="m15 18-6-6 6-6" /></svg
+                        stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg
                     >
                 </button>
                 {#if topsOpen}
@@ -548,8 +555,7 @@
                         stroke="currentColor"
                         stroke-width="2"
                         stroke-linecap="round"
-                        stroke-linejoin="round"
-                        ><path d="m15 18-6-6 6-6" /></svg
+                        stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg
                     >
                 </button>
                 {#if bottomsOpen}
@@ -589,8 +595,7 @@
                         stroke="currentColor"
                         stroke-width="2"
                         stroke-linecap="round"
-                        stroke-linejoin="round"
-                        ><path d="m15 18-6-6 6-6" /></svg
+                        stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg
                     >
                 </button>
                 {#if collectionsOpen}
@@ -618,6 +623,13 @@
                 class="drawer-link drawer-link--standalone"
                 onclick={() => (menuOpen = false)}>About</a
             >
+            <section class="drawer-section drawer-region">
+                <h2 class="drawer-cat">Region</h2>
+                <RegionSelector
+                    id="drawer-region"
+                    className="drawer-region-selector"
+                />
+            </section>
             <section class="drawer-section">
                 <h2 class="drawer-cat">Account</h2>
                 {#if isLoggedIn}

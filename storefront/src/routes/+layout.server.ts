@@ -10,11 +10,27 @@ function treatyErrorMessage(err: unknown): string {
   return o?.value?.message ?? String(err);
 }
 
+function detectCountryCode(request: Request): string | null {
+  const geoHeader =
+    request.headers.get("cf-ipcountry") ??
+    request.headers.get("x-vercel-ip-country");
+  if (geoHeader?.trim()) {
+    return geoHeader.trim().toUpperCase();
+  }
+  const acceptLanguage = request.headers.get("accept-language") ?? "";
+  const locale = acceptLanguage.split(",")[0]?.trim();
+  if (!locale) return null;
+  const parts = locale.split(/[-_]/);
+  if (parts.length < 2) return null;
+  return parts[1]?.toUpperCase() ?? null;
+}
+
 export const load: LayoutServerLoad = async ({ cookies, request, url }) => {
-  if (url.pathname === "/accept-invite") return {};
+  const detectedCountryCode = detectCountryCode(request);
+  if (url.pathname === "/accept-invite") return { detectedCountryCode };
 
   const existingSessionId = cookies.get(SESSION_COOKIE_KEY);
-  if (existingSessionId) return {};
+  if (existingSessionId) return { detectedCountryCode };
 
   const forwardedFor = request.headers.get("x-forwarded-for") ?? "";
   const ipAddress = forwardedFor.split(",")[0]?.trim() ?? "";
@@ -47,5 +63,5 @@ export const load: LayoutServerLoad = async ({ cookies, request, url }) => {
     maxAge: SESSION_COOKIE_MAX_AGE_SECONDS,
   });
 
-  return {};
+  return { detectedCountryCode };
 };

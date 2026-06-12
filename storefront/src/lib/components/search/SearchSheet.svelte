@@ -2,7 +2,15 @@
 	import { goto } from '$app/navigation';
 	import { client } from '$lib/api/client.js';
 	import { search } from '$lib/stores/search';
-	import { formatStoreMoney } from '$lib/money';
+	import {
+		formatVariantPrice,
+		resolveVariantPrice,
+		type VariantPrice,
+	} from '$lib/pricing';
+	import {
+		getSelectedCurrencyCode,
+		regionState,
+	} from '$lib/region/region-state.svelte';
 	type SearchResult = {
 		name: string;
 		price: string;
@@ -82,15 +90,19 @@
 				return;
 			}
 			const list = res.data.rows ?? [];
+			const currencyCode = getSelectedCurrencyCode();
+			void regionState.selectedRegionId;
 			results = list.map((p) => {
-				const amount = p.variant?.price?.amount;
-				let price = '';
-				if (amount != null && amount !== '') {
-					const cents = parseInt(String(amount), 10);
-					if (Number.isFinite(cents)) {
-						price = formatStoreMoney(cents / 100);
-					}
-				}
+				const prices = (p.variant?.prices ?? []) as VariantPrice[];
+				const resolved =
+					resolveVariantPrice(prices, currencyCode) ??
+					(p.variant?.price?.amount && p.variant?.price?.currency_code
+						? {
+								amount: p.variant.price.amount,
+								currency_code: p.variant.price.currency_code,
+							}
+						: null);
+				const price = formatVariantPrice(resolved);
 				return {
 					name: p.title,
 					price,
