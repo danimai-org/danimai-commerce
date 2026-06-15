@@ -115,6 +115,7 @@
 	}
 
 	async function openEditVariantSheet(variant: ProductVariantRow) {
+		await ensureActiveRegions();
 		editingVariant = variant;
 		editVariantOpen = true;
 	}
@@ -180,15 +181,21 @@
 			return option.values.map((v) => (v?.value ?? '').trim()).filter(Boolean);
 		}
 
-		const optionIndex = options.findIndex((o) => o.id === option.id);
-		if (optionIndex === -1) return [];
+		const optionTitleNorm = (option.title ?? '').trim().toLowerCase();
+		if (!optionTitleNorm) return [];
+
 		const values = new SvelteSet<string>();
 		for (const variant of variants) {
-			const parts = (variant.title ?? '')
-				.split('/')
-				.map((p) => p.trim())
-				.filter(Boolean);
-			if (parts[optionIndex]) values.add(parts[optionIndex]);
+			const entries = getVariantOptionEntries(variant, optionRefs);
+			const entry = entries.find((e) => e.optionTitle.toLowerCase() === optionTitleNorm);
+			if (entry?.value) {
+				values.add(entry.value);
+				continue;
+			}
+			if (options.length === 1) {
+				const title = (variant.title ?? '').trim();
+				if (title) values.add(title);
+			}
 		}
 		return Array.from(values);
 	}

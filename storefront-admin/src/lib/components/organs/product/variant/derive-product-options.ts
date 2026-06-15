@@ -58,7 +58,12 @@ export function deriveProductOptionsFromVariants(
 ): DerivedProductOption[] {
 	const byTitle = new Map<
 		string,
-		{ id: string; title: string; values: Map<string, { id?: string; value?: string }> }
+		{
+			id: string;
+			title: string;
+			rank: number;
+			values: Map<string, { id?: string; value?: string }>;
+		}
 	>();
 
 	for (const variant of variants) {
@@ -67,10 +72,13 @@ export function deriveProductOptionsFromVariants(
 			const value = (opt.value ?? '').trim();
 			if (!title || !value) continue;
 
+			const optionRank = typeof opt.rank === 'number' && Number.isFinite(opt.rank) ? opt.rank : 0;
 			let entry = byTitle.get(title);
 			if (!entry) {
-				entry = { id: opt.id, title, values: new Map() };
+				entry = { id: opt.id, title, rank: optionRank, values: new Map() };
 				byTitle.set(title, entry);
+			} else {
+				entry.rank = Math.min(entry.rank, optionRank);
 			}
 			if (!entry.values.has(value)) {
 				entry.values.set(value, { id: opt.id, value });
@@ -80,12 +88,14 @@ export function deriveProductOptionsFromVariants(
 
 	const productId = variants[0]?.product_id ?? null;
 
-	const fromRelations = Array.from(byTitle.values()).map((entry) => ({
-		id: entry.id,
-		title: entry.title,
-		product_id: productId,
-		values: Array.from(entry.values.values())
-	}));
+	const fromRelations = Array.from(byTitle.values())
+		.sort((a, b) => a.rank - b.rank || a.title.localeCompare(b.title))
+		.map((entry) => ({
+			id: entry.id,
+			title: entry.title,
+			product_id: productId,
+			values: Array.from(entry.values.values())
+		}));
 
 	if (fromRelations.length > 0) return fromRelations;
 

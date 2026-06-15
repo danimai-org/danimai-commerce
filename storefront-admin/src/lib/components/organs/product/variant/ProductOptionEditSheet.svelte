@@ -216,12 +216,14 @@
 												/>
 											</td>
 											{#each regions as region (region.id)}
-												<td class="px-3 py-3">
-													<RegionPriceCell
-														bind:value={row.regionPrices[region.id]}
-														symbol={region.currency_symbol}
-													/>
-												</td>
+												{#if region.id in row.regionPrices}
+													<td class="px-3 py-3">
+														<RegionPriceCell
+															bind:value={row.regionPrices[region.id]}
+															symbol={region.currency_symbol}
+														/>
+													</td>
+												{/if}
 											{/each}
 										</tr>
 									{/each}

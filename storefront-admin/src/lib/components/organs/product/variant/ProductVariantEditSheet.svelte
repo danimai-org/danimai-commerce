@@ -125,17 +125,21 @@
 	}
 
 	$effect(() => {
-		if (!open || !variant?.id || regions.length === 0) {
+		if (!open || !variant?.id) {
 			initializedKey = null;
+			if (!open) regionPrices = {};
 			return;
 		}
 		if (initializedKey === initKey) return;
 
+		regionPrices = createEmptyRegionPrices(regions);
+		const currentInitKey = initKey;
+		initializedKey = currentInitKey;
+
 		void (async () => {
-			initializedKey = initKey;
 			apiError = null;
 
-			let nextRegionPrices = createEmptyRegionPrices(regions);
+			let nextRegionPrices = { ...regionPrices };
 			const cachedPrices = variantPricesByVariantId.get(variant.id);
 			if (cachedPrices) {
 				nextRegionPrices = mapPricesToRegionPrices(
@@ -163,6 +167,8 @@
 			} catch {
 				// use row defaults
 			}
+
+			if (currentInitKey !== initKey) return;
 
 			regionPrices = nextRegionPrices;
 			const optionValues = populateOptionValues(variant);
@@ -273,21 +279,23 @@
 							<p class="text-sm font-medium">Pricing</p>
 							<div class="grid gap-3">
 								{#each regions as region (region.id)}
-									<div>
-										<label
-											for="edit-variant-price-{region.id}"
-											class="text-xs text-muted-foreground"
-										>
-											Price {region.name} (Optional)
-										</label>
-										<div class="mt-1">
-											<RegionPriceCell
-												bind:value={regionPrices[region.id]}
-												symbol={region.currency_symbol}
-												class="h-9"
-											/>
+									{#if region.id in regionPrices}
+										<div>
+											<label
+												for="edit-variant-price-{region.id}"
+												class="text-xs text-muted-foreground"
+											>
+												Price {region.name} (Optional)
+											</label>
+											<div class="mt-1">
+												<RegionPriceCell
+													bind:value={regionPrices[region.id]}
+													symbol={region.currency_symbol}
+													class="h-9"
+												/>
+											</div>
 										</div>
-									</div>
+									{/if}
 								{/each}
 							</div>
 						</div>

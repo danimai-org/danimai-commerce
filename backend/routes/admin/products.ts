@@ -156,7 +156,7 @@ export const productRoutes = new Elysia({ prefix: "/products" })
       body,
     }: {
       params: { id: string };
-      body: { files?: File | File[]; delete_ids?: string[]; type?: string };
+      body: { files?: File | File[]; delete_ids?: string | string[]; type?: string };
     }) => {
       const process = getService<UpdateProductImagesProcess>(
         UPDATE_PRODUCT_IMAGES_PROCESS,
@@ -165,7 +165,11 @@ export const productRoutes = new Elysia({ prefix: "/products" })
         input: {
           id: params.id,
           files: body.files,
-          delete_ids: body.delete_ids,
+          delete_ids: body.delete_ids
+            ? Array.isArray(body.delete_ids)
+              ? body.delete_ids
+              : [body.delete_ids]
+            : undefined,
           type: body.type,
         },
       });
@@ -175,7 +179,12 @@ export const productRoutes = new Elysia({ prefix: "/products" })
       type: "multipart/form-data",
       body: t.Object({
         files: t.Optional(t.Union([t.File(), t.Array(t.File())])),
-        delete_ids: t.Optional(t.Array(t.String({ format: "uuid" }))),
+        delete_ids: t.Optional(
+          t.Union([
+            t.String({ format: "uuid" }),
+            t.Array(t.String({ format: "uuid" })),
+          ]),
+        ),
         type: t.Optional(t.String()),
       }),
       response: {

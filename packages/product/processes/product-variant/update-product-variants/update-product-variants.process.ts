@@ -62,7 +62,12 @@ export class UpdateProductVariantsProcess
       await this.upsertVariantPrices(this.db, input.id, input.prices);
     }
 
-    return undefined;
+    return await this.db
+      .selectFrom("product_variants")
+      .where("id", "=", input.id)
+      .where("deleted_at", "is", null)
+      .selectAll()
+      .executeTakeFirst();
   }
 
   async ensureManagedVariantInventoryItem(

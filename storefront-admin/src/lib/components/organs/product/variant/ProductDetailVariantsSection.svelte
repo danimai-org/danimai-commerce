@@ -95,7 +95,7 @@
 
 		if (options.length === 0) return [] as { option: ProductOption; values: string[] }[];
 
-		return options.map((opt, optIndex) => {
+		return options.map((opt) => {
 			const valuesSet = new SvelteSet<string>();
 			if (Array.isArray(opt.values) && opt.values.length > 0) {
 				for (const value of opt.values) {
@@ -104,18 +104,17 @@
 				}
 			}
 			if (valuesSet.size === 0) {
-				if (options.length === 1) {
-					variants.forEach((v) => {
-						if (v.title?.trim()) valuesSet.add(v.title.trim());
-					});
-				} else {
-					variants.forEach((v) => {
-						const parts = (v.title ?? '')
-							.split('/')
-							.map((p) => p.trim())
-							.filter(Boolean);
-						if (parts[optIndex]) valuesSet.add(parts[optIndex]);
-					});
+				const optionTitleNorm = (opt.title ?? '').trim().toLowerCase();
+				for (const variant of variants) {
+					const entries = getVariantOptionEntries(variant, optionRefs);
+					const entry = entries.find((e) => e.optionTitle.toLowerCase() === optionTitleNorm);
+					if (entry?.value) {
+						valuesSet.add(entry.value);
+						continue;
+					}
+					if (options.length === 1 && variant.title?.trim()) {
+						valuesSet.add(variant.title.trim());
+					}
 				}
 			}
 			return { option: opt, values: Array.from(valuesSet) };

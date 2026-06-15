@@ -35,7 +35,24 @@ export type UpdateProductVariantProcessInput = Static<
 >;
 
 export const UpdateProductVariantsResponseSchema = Type.Union([
-  Type.Undefined(),
+  Type.Null(),
+  Type.Object({
+    id: Type.String(),
+    title: Type.String(),
+    sku: Type.Union([Type.String(), Type.Null()]),
+    barcode: Type.Union([Type.String(), Type.Null()]),
+    ean: Type.Union([Type.String(), Type.Null()]),
+    upc: Type.Union([Type.String(), Type.Null()]),
+    allow_backorder: Type.Boolean(),
+    manage_inventory: Type.Boolean(),
+    metadata: Type.Union([Type.Record(Type.String(), Type.Unknown()), Type.Null()]),
+    variant_rank: Type.Number(),
+    thumbnail: Type.Union([Type.String(), Type.Null()]),
+    product_id: Type.String(),
+    created_at: Type.Union([Type.String(), Type.Date()]),
+    updated_at: Type.Union([Type.String(), Type.Date()]),
+    deleted_at: Type.Union([Type.String(), Type.Date(), Type.Null()]),
+  }),
 ]);
 export type UpdateProductVariantsProcessOutput = Static<
   typeof UpdateProductVariantsResponseSchema

@@ -186,12 +186,12 @@ export class CreateProductVariantsProcess implements ProcessContract<
           if (!optionId) {
             return [];
           }
-          return o.values.map((value) => ({
+          return o.values.map((value, valueRank) => ({
             id: randomUUID(),
             value,
             option_id: optionId,
             product_id: input.product_id,
-            rank: optionRank,
+            rank: optionRank * 1000 + valueRank,
           }));
         });
 

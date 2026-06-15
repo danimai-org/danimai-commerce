@@ -54,8 +54,11 @@ export class DeleteMediaProcess {
       throw new NotFoundError("Media not found");
     }
 
+    const storage = this.config.media?.storage ?? "s3";
     const localRows = mediaRows.filter((row) => row.provider === "local");
-    const s3Rows = mediaRows.filter((row) => row.provider !== "local");
+    const s3Rows = storage === "local"
+      ? []
+      : mediaRows.filter((row) => row.provider !== "local");
 
     if (localRows.length > 0) {
       const uploadDir = this.config.media?.localUploadDir;
